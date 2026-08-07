@@ -1,35 +1,31 @@
-# mcp-htmleditor .gitignore
 
-# State file (written next to current HTML file)
-.mcp_state.json
-
-# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.venv/
-venv/
-.python-version
-*.egg
-
-# Env
-.env
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# macOS
 .DS_Store
-
-# Test artifacts
-*.pptx.test
+.env
+.idea/
+.mcp_state.json
+.Python
+.python-version
+.venv/
+.vscode/
 *.docx.test
+*.egg
+*.egg-info/
+*.pptx.test
+*.pyc
+*.pyd
+*.pyo
+*.swo
+*.swp
 /tmp/
+# Env
+# IDE
+# macOS
+# mcp-htmleditor .gitignore
+# Python
+# State file (written next to current HTML file)
+# Test artifacts
+build/
+dist/
+uv.lock
+venv/
