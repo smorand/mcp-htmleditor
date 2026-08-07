@@ -78,10 +78,10 @@ Pandoc génère souvent un CSS très verbeux. Remplacer par un CSS minimal:
 
 ```bash
 # Pour une présentation
-cp output.html skill/templates/reference/slides/mon-template.html
+cp output.html templates/reference/slides/mon-template.html
 
 # Pour un document
-cp output.html skill/templates/reference/documents/mon-template.html
+cp output.html templates/reference/documents/mon-template.html
 ```
 
 ### 7. Documenter le template

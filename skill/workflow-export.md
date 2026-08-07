@@ -63,7 +63,7 @@ mcp-htmleditor export docx input.html output.docx
 
 ```bash
 # Préparer le fichier
-cp skill/templates/reference/slides/presentation-standard.html /tmp/ma-pres.html
+cp templates/reference/slides/presentation-standard.html /tmp/ma-pres.html
 
 # Exporter
 mcp-htmleditor export pptx /tmp/ma-pres.html /tmp/ma-pres.pptx

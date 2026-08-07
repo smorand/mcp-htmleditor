@@ -34,6 +34,12 @@ include = [
     "src/mcp_htmleditor/static/**",
 ]
 
+# Bundle repo-root templates/ and skill/ into the package so a plain
+# `pip install` ships them (resolved as a fallback after ~/.config).
+[tool.hatch.build.targets.wheel.force-include]
+"templates" = "mcp_htmleditor/templates"
+"skill" = "mcp_htmleditor/skill"
+
 [tool.ruff]
 target-version = "py311"
 line-length = 120

@@ -1,5 +1,6 @@
 
 __pycache__/
+.coverage
 .DS_Store
 .env
 .idea/
@@ -17,8 +18,7 @@ __pycache__/
 *.pyo
 *.swo
 *.swp
-.coverage
-htmlcov/
+**/.mcp_state.json
 /tmp/
 # Env
 # IDE
@@ -29,5 +29,6 @@ htmlcov/
 # Test artifacts
 build/
 dist/
+htmlcov/
 uv.lock
 venv/

@@ -7,11 +7,11 @@ placed next to the current HTML file (or in CWD if no file set).
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
-_DEFAULT_POLL_INTERVAL = 1000  # ms
+from . import config
+
 _STATE_FILENAME = ".mcp_state.json"
 
 
@@ -36,12 +36,10 @@ class EditorState:
             return
         self._initialized = True
         self.current_file: str | None = None
-        self.port: int = 7842
+        self.port: int = config.default_port()
         self.server_pid: int | None = None
         self.update_in_progress: bool = False
-        self.poll_interval: int = int(
-            os.environ.get("HTMLEDITOR_POLL_INTERVAL", str(_DEFAULT_POLL_INTERVAL))
-        )
+        self.poll_interval: int = config.default_poll_interval()
 
     # ------------------------------------------------------------------
     # Persistence helpers

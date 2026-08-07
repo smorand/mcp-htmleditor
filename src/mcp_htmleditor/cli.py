@@ -14,6 +14,18 @@ def main() -> None:
     """mcp-htmleditor: WYSIWYG HTML editor with MCP server support."""
 
 
+@main.command("skill")
+def skill_cmd() -> None:
+    """Print the full mcp-htmleditor skill (index + all sub-documents).
+
+    Used by the dynamic Pi skill: it simply runs `mcp-htmleditor skill`
+    so the skill content lives here and stays in sync with the tool.
+    """
+    from .skill_content import build_skill_content
+
+    click.echo(build_skill_content())
+
+
 @main.command("templates")
 def templates_cmd() -> None:
     """List the available presentation/document templates."""
@@ -28,8 +40,8 @@ def templates_cmd() -> None:
 @click.argument("template")
 @click.argument("output_file")
 @click.option("--serve", is_flag=True, help="Ouvrir l'éditeur sur le fichier créé.")
-@click.option("--port", default=7842, show_default=True, help="HTTP port (avec --serve).")
-def new_cmd(template: str, output_file: str, serve: bool, port: int) -> None:
+@click.option("--port", default=None, type=int, help="HTTP port (avec --serve).")
+def new_cmd(template: str, output_file: str, serve: bool, port: int | None) -> None:
     """Create a new file from a template.
 
     TEMPLATE is a template key (see `mcp-htmleditor templates`): ei, carbon, doc.
@@ -57,7 +69,8 @@ def new_cmd(template: str, output_file: str, serve: bool, port: int) -> None:
     click.echo(f"Créé: {dest}  (template: {template})")
 
     if serve:
-        _serve_file(str(dest), port, None)
+        from .config import default_port
+        _serve_file(str(dest), port if port is not None else default_port(), None)
 
 
 @main.command("mcp")
@@ -73,19 +86,21 @@ def mcp_cmd() -> None:
 
 @main.command("serve")
 @click.argument("file", type=click.Path(exists=True, dir_okay=False))
-@click.option("--port", default=7842, show_default=True, help="HTTP port.")
+@click.option("--port", default=None, type=int, help="HTTP port (défaut: HTMLEDITOR_PORT ou 7842).")
 @click.option(
     "--poll",
     default=None,
     type=int,
     help="Polling interval in ms (overrides HTMLEDITOR_POLL_INTERVAL env var).",
 )
-def serve_cmd(file: str, port: int, poll: int | None) -> None:
+def serve_cmd(file: str, port: int | None, poll: int | None) -> None:
     """Open an HTML file in the WYSIWYG browser editor.
 
     FILE is the path to the HTML file to edit.
     """
-    _serve_file(file, port, poll)
+    from .config import default_port
+
+    _serve_file(file, port if port is not None else default_port(), poll)
 
 
 def _serve_file(file: str, port: int, poll: int | None) -> None:

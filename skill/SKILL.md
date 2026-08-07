@@ -27,7 +27,7 @@ mcp-htmleditor new doc    mon-rapport.html        # Document
 ### Où sont stockés les templates
 
 ```
-skill/templates/
+templates/
 ├── bootstrap/                    ← points de départ (copiés par `new`)
 │   ├── slides-ei-empty.html      ← key: ei     (Euro-Information)
 │   ├── slides-empty.html         ← key: carbon (IBM Carbon)
@@ -45,7 +45,7 @@ skill/templates/
 Les fichiers `bootstrap/` sont le point de départ minimal. Les fichiers `reference/`
 sont des exemples riches: le LLM peut s'en inspirer pour cloner des layouts.
 **Ces fichiers sont en lecture seule via le serveur** (une sauvegarde vers un chemin
-contenant `skill/templates/` est ignorée).
+contenant `templates/` est ignorée).
 
 ### Le template par défaut
 
@@ -160,10 +160,10 @@ mcp-htmleditor export docx input.html output.docx
 | `skill/types/annotated-image.md` | Règles pour les images annotées |
 | `skill/types/tables.md` | Règles pour les tableaux |
 | `skill/types/document.md` | Règles pour le mode document |
-| `skill/templates/bootstrap/slides-empty.html` | Template minimal présentation |
-| `skill/templates/bootstrap/document-empty.html` | Template minimal document |
-| `skill/templates/reference/slides/ibm-carbon.html` | **Template de référence IBM Carbon** (9 slides complètes, tous composants) |
-| `skill/templates/reference/slides/euro-information.html` | **Template de référence Euro-Information** (3 slides: titre, agenda, contenu; logos CM/CIC/EI embarqués) |
-| `skill/templates/reference/slides/presentation-standard.html` | Template 4 slides standard |
-| `skill/templates/reference/slides/roadmap-one-pager.html` | Template roadmap one-pager |
-| `skill/templates/reference/documents/report-standard.html` | Template rapport standard |
+| `templates/bootstrap/slides-empty.html` | Template minimal présentation |
+| `templates/bootstrap/document-empty.html` | Template minimal document |
+| `templates/reference/slides/ibm-carbon.html` | **Template de référence IBM Carbon** (9 slides complètes, tous composants) |
+| `templates/reference/slides/euro-information.html` | **Template de référence Euro-Information** (3 slides: titre, agenda, contenu; logos CM/CIC/EI embarqués) |
+| `templates/reference/slides/presentation-standard.html` | Template 4 slides standard |
+| `templates/reference/slides/roadmap-one-pager.html` | Template roadmap one-pager |
+| `templates/reference/documents/report-standard.html` | Template rapport standard |

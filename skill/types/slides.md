@@ -5,8 +5,8 @@
 Le format de présentation standard est **IBM Carbon**. Tous les templates slides
 utilisent les design tokens Carbon et la navigation JavaScript intégrée.
 
-Template de référence complet: `skill/templates/reference/slides/ibm-carbon.html`
-Template bootstrap (point de départ vide): `skill/templates/bootstrap/slides-empty.html`
+Template de référence complet: `templates/reference/slides/ibm-carbon.html`
+Template bootstrap (point de départ vide): `templates/bootstrap/slides-empty.html`
 
 ---
 

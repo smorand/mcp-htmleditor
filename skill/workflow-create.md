@@ -39,7 +39,7 @@ mcp-htmleditor new ei ma-presentation.html --serve   # + ouvre l'éditeur
 
 Équivalent manuel:
 ```bash
-cp skill/templates/bootstrap/slides-ei-empty.html mon-fichier.html
+cp templates/bootstrap/slides-ei-empty.html mon-fichier.html
 ```
 
 Ensuite ouvrir dans l'éditeur:
@@ -49,8 +49,8 @@ start_server(file="mon-fichier.html")   # via MCP
 ```
 
 Templates de référence (exemples riches à consulter/cloner, en lecture seule):
-`skill/templates/reference/slides/euro-information.html`,
-`skill/templates/reference/slides/ibm-carbon.html`. Voir `skill/types/slides.md`.
+`templates/reference/slides/euro-information.html`,
+`templates/reference/slides/ibm-carbon.html`. Voir `skill/types/slides.md`.
 
 ---
 

@@ -197,7 +197,10 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
 
         # Safety: never overwrite reference/bootstrap templates. They are meant
         # to be copied, not edited in place. Silently ignore such saves.
-        if "skill/templates/" in state.current_file.replace("\\", "/"):
+        # Safety: never overwrite reference/bootstrap templates. They are meant
+        # to be copied, not edited in place. Silently ignore such saves.
+        normalized = state.current_file.replace("\\", "/")
+        if "/templates/bootstrap/" in normalized or "/templates/reference/" in normalized:
             self._send_json({"ok": True, "skipped": "template file is read-only"})
             return
 
