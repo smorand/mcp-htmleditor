@@ -122,16 +122,23 @@
     position:absolute; left:0; right:0; bottom:22%; height:6%; background:var(--ei-blue-2);
   }
 
-  /* ── Type: CONTENT / AGENDA / DIAGRAM (fond blanc, cadre bleu en L) ─ */
+  /* ── Type: CONTENT / AGENDA / DIAGRAM (cadre bleu carré, intérieur arrondi) ─ */
   .slide[data-slide-type="content"],
   .slide[data-slide-type="agenda"],
   .slide[data-slide-type="diagram"] {
-    background:var(--ei-white);
-    border:10px solid var(--ei-blue);
-    border-radius:18px;
-    overflow:visible;
+    background:var(--ei-blue);   /* le bleu forme le cadre, coins extérieurs carrés */
+    overflow:hidden;
   }
-  .slide-inner { position:absolute; inset:0; display:flex; flex-direction:column; padding:34px 44px 54px; }
+  /* Zone blanche intérieure: coins arrondis à l'INTÉRIEUR uniquement */
+  .slide[data-slide-type="content"] .slide-inner,
+  .slide[data-slide-type="agenda"]  .slide-inner,
+  .slide[data-slide-type="diagram"] .slide-inner {
+    position:absolute; inset:10px;
+    background:var(--ei-white);
+    border-radius:16px;
+    display:flex; flex-direction:column;
+    padding:30px 40px 50px;
+  }
   .slide-eyebrow {
     font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
     color:var(--ei-blue-2); margin-bottom:6px;
@@ -142,19 +149,35 @@
   .slide-title-rule { height:3px; background:var(--ei-orange); width:64px; margin:12px 0 18px; }
   .slide-body { flex:1; overflow:hidden; }
 
-  /* Slide footer: logo rond posé au coin bas-gauche + page + meeting title */
+  /* Slide footer: logo « b » EI au coin bas-gauche + page + meeting title */
   .slide-foot {
-    position:absolute; left:0; right:0; bottom:0; height:40px;
-    display:flex; align-items:center; padding:0 20px 0 56px;
+    position:absolute; left:0; right:0; bottom:0; height:40px; z-index:2;
+    display:flex; align-items:center; padding:0 20px 6px 74px;
   }
+  /* Logo « b » EI: disque bleu fondu dans le coin, tige verticale montante,
+     cercle blanc centré avec les chevrons. Le disque partage la couleur du cadre. */
   .slide-foot-logo {
-    position:absolute; left:-10px; bottom:-10px;
-    width:52px; height:52px; border-radius:50%;
-    background:var(--ei-white); border:4px solid var(--ei-blue);
-    display:flex; align-items:center; justify-content:center; flex-shrink:0;
-    box-shadow:0 1px 4px rgba(0,0,0,.12);
+    position:absolute; left:6px; bottom:6px;
+    width:60px; height:60px; flex-shrink:0; z-index:3;
   }
-  .slide-foot-logo img { height:20px; }
+  .slide-foot-logo::before {
+    content:''; position:absolute; left:0; bottom:0;
+    width:60px; height:60px; border-radius:50%;
+    background:var(--ei-blue);
+  }
+  .slide-foot-logo::after {
+    content:''; position:absolute; left:0; bottom:30px;
+    width:22px; height:52px; background:var(--ei-blue);
+    border-top-left-radius:10px;
+  }
+  .slide-foot-logo .logo-disc {
+    position:absolute; left:13px; bottom:13px;
+    width:34px; height:34px; border-radius:50%;
+    background:var(--ei-white);
+    display:flex; align-items:center; justify-content:center;
+    z-index:1;
+  }
+  .slide-foot-logo .logo-disc img { height:15px; }
   .slide-foot-page { font-size:12px; color:var(--ei-blue); font-weight:700; }
   .slide-foot-title {
     flex:1; text-align:center; font-size:11px; color:var(--ei-blue-light);
@@ -244,7 +267,7 @@
         </div>
       </div>
       <div class="slide-foot">
-        <div class="slide-foot-logo"><img src="data:image/png;base64,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" alt="EI"></div>
+        <div class="slide-foot-logo"><span class="logo-disc"><img src="data:image/png;base64,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" alt="EI"></span></div>
         <span class="slide-foot-page">2</span>
         <span class="slide-foot-title" data-editable="text">Meeting Title · Mois Année</span>
       </div>
@@ -266,7 +289,7 @@
         </div>
       </div>
       <div class="slide-foot">
-        <div class="slide-foot-logo"><img src="data:image/png;base64,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" alt="EI"></div>
+        <div class="slide-foot-logo"><span class="logo-disc"><img src="data:image/png;base64,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" alt="EI"></span></div>
         <span class="slide-foot-page">3</span>
         <span class="slide-foot-title" data-editable="text">Meeting Title · Mois Année</span>
       </div>
