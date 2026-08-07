@@ -21,10 +21,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 from pptx import Presentation
-from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Inches, Pt
-
 
 # ---------------------------------------------------------------------------
 # Slide dimensions (standard 4:3 — 10" × 7.5")
@@ -182,10 +179,10 @@ def _resolve_position(
 
     if all(v is not None for v in (left_raw, top_raw, width_raw, height_raw)):
         return (
-            Emu(int(left_raw)),  # type: ignore[arg-type]
-            Emu(int(top_raw)),  # type: ignore[arg-type]
-            Emu(int(width_raw)),  # type: ignore[arg-type]
-            Emu(int(height_raw)),  # type: ignore[arg-type]
+            Emu(int(left_raw)),  # type: ignore[arg-type]  # python-pptx Emu accepts int
+            Emu(int(top_raw)),  # type: ignore[arg-type]  # python-pptx Emu accepts int
+            Emu(int(width_raw)),  # type: ignore[arg-type]  # python-pptx Emu accepts int
+            Emu(int(height_raw)),  # type: ignore[arg-type]  # python-pptx Emu accepts int
         )
 
     return _default_positions(index, total)

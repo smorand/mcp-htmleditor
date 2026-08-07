@@ -133,10 +133,18 @@ avoir un attribut `data-editable`. Les éléments sans cet attribut ne sont pas
 - Supprimer tout formatage
 
 ### Insertion (toolbar au-dessus de la zone au focus)
-- **Image**: URL externe ou chemin relatif
+- **Image**: sélecteur de fichier local ou glisser-déposer, embarquée en base64 (single-page)
 - **Tableau**: N colonnes × M lignes, style IBM Carbon automatique
 - Ligne séparatrice HR
 - Lien hypertexte
+
+### Slides (mode présentation + édition)
+Boutons dans la toolbar du serveur:
+- **＋ Slide avant** / **Slide après ＋**: ouvre un sélecteur de type de slide (title, agenda, section, content, diagram)
+- **🗑 Slide**: supprime la slide courante
+
+L'insertion et la suppression renumérotent automatiquement tout le document
+(ids, TOTAL, slideNames, eyebrow, footer, dropdown). Voir `skill/types/slides.md`.
 
 ### Context menus (clic droit sur éléments typés)
 - `data-type="table"`: ajouter/supprimer ligne, ajouter/supprimer colonne, supprimer tableau
@@ -178,18 +186,26 @@ avoir un attribut `data-editable`. Les éléments sans cet attribut ne sont pas
 
 ## Workflow LLM: insérer une image (portabilité maximale)
 
+**Le document est single-page: toutes les images doivent être embarquées en base64.**
+Jamais de chemin externe ni de fichier séparé, le HTML doit rester autonome et envoyable tel quel.
+
+### Côté humain (browser)
+En mode édition, deux façons d'insérer une image locale, toutes deux embarquées automatiquement en base64:
+- **Bouton « Image »** dans la barre d'insertion: ouvre le sélecteur de fichier du PC
+- **Glisser-déposer** un fichier image depuis le Finder/Explorateur sur une zone éditable
+
+Rien n'est uploadé sur un serveur; l'image est lue localement et insérée comme `data:image/...;base64,...`.
+
+### Côté LLM (écriture directe)
 ```python
-import base64
-with open("image.png", "rb") as f:
-    b64 = base64.b64encode(f.read()).decode()
-# Insérer dans le HTML:
-img = f'<img src="data:image/png;base64,{b64}" data-editable="resize,reposition" style="max-width:100%;height:auto;" />'
+import base64, mimetypes
+path = "image.png"
+mime = mimetypes.guess_type(path)[0] or "image/png"
+b64  = base64.b64encode(open(path, "rb").read()).decode()
+img  = f'<img src="data:{mime};base64,{b64}" data-editable="resize,reposition" style="max-width:100%;height:auto;" />'
 ```
 
-Chemin relatif si l'image est dans le même dossier:
-```html
-<img src="./screenshot.png" data-editable="resize,reposition" style="max-width:100%;" />
-```
+**Règle absolue:** ne jamais référencer une image par chemin relatif ou URL externe si le document doit être partagé. Toujours base64.
 
 ---
 

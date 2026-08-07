@@ -20,12 +20,15 @@ let lastMtime     = null;
 let wasUpdating   = false;
 let editMode      = false;
 let saveTimer     = null;
+let isPresentation = false;   // detected from data-doc-type
+let insertPosition = null;    // 'before' | 'after' when picker is open
 
 const frame        = document.getElementById('content-frame');
 const overlay      = document.getElementById('update-overlay');
 const savedBadge   = document.getElementById('toolbar-saved');
 const statusDot    = document.getElementById('toolbar-status');
 const editCheckbox = document.getElementById('edit-mode-checkbox');
+const slideActions = document.getElementById('toolbar-slide-actions');
 
 /* ============================================================
    Bootstrap
@@ -45,7 +48,15 @@ const editCheckbox = document.getElementById('edit-mode-checkbox');
   editCheckbox.addEventListener('change', () => {
     editMode = editCheckbox.checked;
     applyEditMode();
+    updateSlideActionsVisibility();
   });
+
+  // Slide action buttons
+  document.getElementById('btn-insert-before').addEventListener('click', () => openSlidePicker('before'));
+  document.getElementById('btn-insert-after').addEventListener('click',  () => openSlidePicker('after'));
+  document.getElementById('btn-delete-slide').addEventListener('click',  deleteCurrentSlide);
+  document.querySelector('#slide-picker .picker-cancel').addEventListener('click', closeSlidePicker);
+  document.querySelector('#slide-picker .picker-backdrop').addEventListener('click', closeSlidePicker);
 
   frame.addEventListener('load', onFrameLoad);
   setInterval(pollStatus, pollInterval);
@@ -58,11 +69,22 @@ function onFrameLoad() {
   try {
     const doc = frame.contentDocument;
     if (!doc) return;
+    // Detect presentation mode from <html data-doc-type>
+    const docType = doc.documentElement.getAttribute('data-doc-type');
+    isPresentation = docType === 'presentation';
+    updateSlideActionsVisibility();
     if (editMode) injectEditMode(doc);
     injectContextMenus(doc);
   } catch (e) {
     console.warn('Could not access iframe content:', e);
   }
+}
+
+/* ============================================================
+   Slide actions visibility (presentation + edit mode only)
+   ============================================================ */
+function updateSlideActionsVisibility() {
+  slideActions.style.display = (isPresentation && editMode) ? 'inline-flex' : 'none';
 }
 
 /* ============================================================
@@ -125,6 +147,7 @@ function injectEditMode(doc) {
   injectEditorStyles(doc);
   createFormatBar(doc);
   createInsertBar(doc);
+  enableImageDrop(doc);
 }
 
 function removeEditMode(doc) {
@@ -416,13 +439,54 @@ function hideInsertBar() {
    Insert helpers
    ============================================================ */
 function insertImage(doc) {
-  const url = prompt('URL ou chemin de l\'image :', 'https://');
-  if (!url) return;
-  const alt = prompt('Texte alternatif :', '');
-  doc.execCommand('insertHTML', false,
-    `<img src="${url}" alt="${alt || ''}" style="max-width:100%;height:auto;display:block;margin:8px 0;" />`
-  );
-  scheduleSave();
+  // Local file picker → embed as base64 (single-page portability)
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    embedImageFile(doc, file);
+  });
+  input.click();
+}
+
+/** Read a File as a base64 data URI and insert it at the current selection. */
+function embedImageFile(doc, file, targetEl) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUri = reader.result;  // data:image/...;base64,...
+    const img = `<img src="${dataUri}" alt="${file.name}" data-editable="resize,reposition" style="max-width:100%;height:auto;display:block;margin:8px 0;" />`;
+    if (targetEl) {
+      // Dropped onto a specific editable: append there
+      targetEl.insertAdjacentHTML('beforeend', img);
+    } else {
+      doc.execCommand('insertHTML', false, img);
+    }
+    scheduleSave();
+  };
+  reader.readAsDataURL(file);
+}
+
+/** Enable drag-and-drop of local image files onto editable text zones. */
+function enableImageDrop(doc) {
+  doc.querySelectorAll('[data-editable~="text"]').forEach(el => {
+    el.addEventListener('dragover', e => {
+      if (e.dataTransfer && [...e.dataTransfer.items].some(i => i.kind === 'file')) {
+        e.preventDefault();
+        el.style.boxShadow = 'inset 0 0 0 3px #0f62fe';
+      }
+    });
+    el.addEventListener('dragleave', () => { el.style.boxShadow = ''; });
+    el.addEventListener('drop', e => {
+      el.style.boxShadow = '';
+      if (!e.dataTransfer) return;
+      const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      e.preventDefault();
+      files.forEach(f => embedImageFile(doc, f, el));
+    });
+  });
 }
 
 function insertTable(doc) {
@@ -691,4 +755,166 @@ async function saveContent() {
   } catch (e) {
     console.warn('Save failed:', e);
   }
+}
+
+/* ============================================================
+   Slide management (presentation mode)
+   ============================================================
+   Insère/supprime des slides typées et maintient la cohérence:
+   - ids séquentiels slide-0..slide-N
+   - const TOTAL et slideNames[] dans le <script> de navigation
+   - eyebrow "Slide 0N / TT" et footer "Slide N / TT"
+   - <option> du dropdown (régénérées par le JS du template)
+   ============================================================ */
+
+/** Get the array of slide <article> elements in the iframe, in order. */
+function getSlides(doc) {
+  return [...doc.querySelectorAll('article[data-type="slide"]')];
+}
+
+/** Determine the currently displayed slide index (the .active one). */
+function getCurrentSlideIndex(doc) {
+  const slides = getSlides(doc);
+  const idx = slides.findIndex(s => s.classList.contains('active'));
+  return idx >= 0 ? idx : 0;
+}
+
+/* ── Picker modal ─────────────────────────────────────────────── */
+function openSlidePicker(position) {
+  insertPosition = position;
+  const grid = document.getElementById('picker-grid');
+  grid.innerHTML = '';
+  Object.entries(SLIDE_LAYOUTS).forEach(([key, layout]) => {
+    const card = document.createElement('button');
+    card.className = 'picker-card';
+    card.innerHTML =
+      `<span class="picker-card-icon">${layout.icon}</span>` +
+      `<span class="picker-card-label">${layout.label}</span>` +
+      `<span class="picker-card-desc">${layout.description}</span>`;
+    card.addEventListener('click', () => { insertSlide(key, insertPosition); closeSlidePicker(); });
+    grid.appendChild(card);
+  });
+  document.getElementById('slide-picker').style.display = 'flex';
+}
+
+function closeSlidePicker() {
+  document.getElementById('slide-picker').style.display = 'none';
+  insertPosition = null;
+}
+
+/* ── Insert ───────────────────────────────────────────────────── */
+function insertSlide(layoutKey, position) {
+  const doc = frame.contentDocument;
+  if (!doc) return;
+  const layout = SLIDE_LAYOUTS[layoutKey];
+  if (!layout) return;
+
+  const slides = getSlides(doc);
+  const curIdx = getCurrentSlideIndex(doc);
+  const uid = 'slide-' + Date.now();
+
+  // Build the new slide element from the layout HTML
+  const tmp = doc.createElement('div');
+  tmp.innerHTML = layout.html.replace(/\{\{ID\}\}/g, uid).trim();
+  const newSlide = tmp.firstElementChild;
+  newSlide.classList.remove('active');
+
+  // Insert relative to current slide
+  const ref = slides[curIdx];
+  if (position === 'before') {
+    ref.parentNode.insertBefore(newSlide, ref);
+  } else {
+    ref.parentNode.insertBefore(newSlide, ref.nextSibling);
+  }
+
+  renumberSlides(doc);
+  makeEditableIfNeeded(doc, newSlide);
+  saveContent();
+}
+
+/* ── Delete ───────────────────────────────────────────────────── */
+function deleteCurrentSlide() {
+  const doc = frame.contentDocument;
+  if (!doc) return;
+  const slides = getSlides(doc);
+  if (slides.length <= 1) {
+    alert('Impossible de supprimer la dernière slide.');
+    return;
+  }
+  const curIdx = getCurrentSlideIndex(doc);
+  if (!confirm(`Supprimer la slide ${curIdx + 1} ?`)) return;
+  slides[curIdx].remove();
+  renumberSlides(doc);
+  saveContent();
+}
+
+/* ── Renumbering: keeps the whole document coherent ───────────── */
+function renumberSlides(doc) {
+  const slides = getSlides(doc);
+  const total = slides.length;
+
+  slides.forEach((slide, i) => {
+    const id = 'slide-' + i;
+    slide.id = id;
+    slide.setAttribute('data-id', id);
+
+    // eyebrow "… Slide 0N / TT"
+    const eyebrow = slide.querySelector('.slide-eyebrow');
+    if (eyebrow) {
+      eyebrow.textContent = eyebrow.textContent.replace(
+        /Slide\s*\d+\s*\/\s*\d+/i,
+        `Slide ${String(i + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`
+      );
+      // If no "Slide N / TT" pattern existed, leave text untouched.
+    }
+
+    // footer "Slide N / TT"
+    const footer = slide.querySelector('.slide-footer-right');
+    if (footer) footer.textContent = `Slide ${i + 1} / ${total}`;
+
+    // active state: keep first active
+    slide.classList.toggle('active', i === 0);
+  });
+
+  // Update the navigation <script>: TOTAL + slideNames[]
+  updateNavScript(doc, slides);
+
+  // Rebuild dropdown options via the template's own buildOptions() if present
+  const win = frame.contentWindow;
+  try {
+    if (win && typeof win.buildOptions === 'function') win.buildOptions();
+    if (win && typeof win.goToSlide === 'function') win.goToSlide(0);
+  } catch (e) { /* template may not expose these; ignore */ }
+}
+
+/** Rewrite `const TOTAL = …` and `const slideNames = [ … ]` in the nav script. */
+function updateNavScript(doc, slides) {
+  const scripts = [...doc.querySelectorAll('script')];
+  const navScript = scripts.find(s => /const\s+TOTAL\s*=/.test(s.textContent));
+  if (!navScript) return;
+
+  const names = slides.map(s => (s.getAttribute('data-title') || 'Slide').replace(/"/g, '\\"'));
+  let src = navScript.textContent;
+
+  src = src.replace(/const\s+TOTAL\s*=\s*\d+\s*;/,
+                    `const TOTAL = ${slides.length};`);
+  src = src.replace(/const\s+slideNames\s*=\s*\[[\s\S]*?\];/,
+                    'const slideNames = [\n    ' + names.map(n => `"${n}"`).join(',\n    ') + ',\n  ];');
+
+  navScript.textContent = src;
+}
+
+/** If edit mode is active, wire up the new slide's editable zones. */
+function makeEditableIfNeeded(doc, slide) {
+  if (!editMode) return;
+  slide.querySelectorAll('[data-editable~="text"]').forEach(el => {
+    el.contentEditable = 'true';
+    el.classList.add('_mcp_editable');
+    el.addEventListener('input',   onEditableInput);
+    el.addEventListener('blur',    onEditableBlur);
+    el.addEventListener('mouseup', () => showFormatBar(doc));
+    el.addEventListener('keyup',   () => showFormatBar(doc));
+    el.addEventListener('focus',   () => showInsertBar(doc, el));
+  });
+  enableImageDrop(doc);
 }

@@ -88,6 +88,44 @@ Exemple: `IBM <strong>Bob</strong>`, `Capacités <strong>clés</strong>`.
 
 ---
 
+## Types de slides insérables (data-slide-type)
+
+En mode présentation + édition, le bouton « Slide avant / après » propose 5 types.
+Chaque slide porte un attribut `data-slide-type` qui identifie son layout:
+
+| `data-slide-type` | Usage | Fréquence typique |
+|-------------------|-------|-------------------|
+| `title` | Couverture de la présentation | 1 (première slide) |
+| `agenda` | Plan / sommaire | 1 |
+| `section` | Coupure de section (fond noir) | plusieurs |
+| `content` | Titre + texte + tuiles (la plus fréquente) | beaucoup |
+| `diagram` | Zone de schéma d'architecture | selon besoin |
+
+Les layouts sont définis dans `src/mcp_htmleditor/static/slide-layouts.js`. Chaque
+layout contient les attributs requis (`data-type="slide"`, `data-id`, `data-title`,
+`data-slide-type`) et un contenu par défaut minimal, éditable.
+
+**Pour le LLM:** quand tu génères une nouvelle slide, choisis le `data-slide-type`
+adapté et respecte sa structure. Une présentation cohérente suit généralement:
+`title` → `agenda` → (`section` → `content`×N)×M → `content` de clôture.
+
+### Cohérence garantie à l'insertion (browser)
+
+Quand l'humain insère/supprime une slide via le browser, le système renumérote
+automatiquement tout le document:
+- `id` et `data-id` séquentiels: `slide-0`, `slide-1`, …
+- `const TOTAL` et `const slideNames[]` dans le `<script>` de navigation
+- Le compteur eyebrow « Slide 0N / TT »
+- Le footer « Slide N / TT »
+- Les `<option>` du dropdown (régénérées par `buildOptions()`)
+
+**Pour le LLM:** quand tu ajoutes une slide manuellement (écriture directe du
+fichier), tu dois toi-même maintenir cette cohérence: mettre à jour `TOTAL`,
+`slideNames[]`, les `data-id`, l'eyebrow et le footer. Voir la section « Comment
+ajouter une slide » ci-dessous.
+
+---
+
 ## Composants Carbon disponibles
 
 ### Grid (mise en page)

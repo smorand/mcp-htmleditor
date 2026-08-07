@@ -39,9 +39,10 @@ def serve_cmd(file: str, port: int, poll: int | None) -> None:
 
     FILE is the path to the HTML file to edit.
     """
+    import time
+
     from .http_server import start_http_server
     from .state import get_state
-    import time
 
     if poll is not None:
         os.environ["HTMLEDITOR_POLL_INTERVAL"] = str(poll)

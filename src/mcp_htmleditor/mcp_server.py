@@ -5,7 +5,6 @@ Exposes 6 tools for LLM agents to control the WYSIWYG editor.
 
 from __future__ import annotations
 
-import os
 import webbrowser
 from typing import Any
 
@@ -17,7 +16,6 @@ from .http_server import (
     stop_http_server,
 )
 from .state import get_state
-
 
 mcp: FastMCP = FastMCP("html-editor")
 
@@ -44,10 +42,7 @@ def start_server(file: str, port: int = 7842) -> dict[str, Any]:
 
     already_running = is_server_running() and state.current_file == abs_file
 
-    if not already_running:
-        started = start_http_server(abs_file, port)
-    else:
-        started = False
+    started = start_http_server(abs_file, port) if not already_running else False
 
     url = f"http://localhost:{port}/"
     if not already_running:

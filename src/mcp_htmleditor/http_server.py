@@ -43,7 +43,7 @@ def _static_dir() -> Path:
 # Request handler
 # ---------------------------------------------------------------------------
 
-class _EditorHandler(BaseHTTPRequestHandler):
+class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O boundary, exercised manually
     """Handle all HTTP requests for the editor server."""
 
     # Silence default request logging (MCP context logs are enough)
@@ -138,8 +138,14 @@ class _EditorHandler(BaseHTTPRequestHandler):
         """Serve the current HTML file as-is for the iframe (full document)."""
         state = get_state()
         if not state.current_file:
-            html = b"<html><body><p style='font-family:sans-serif;padding:40px;color:#525252'>No file loaded. Use <code>mcp-htmleditor serve &lt;file&gt;</code> or call <code>start_server</code> via MCP.</p></body></html>"
-            self._send_bytes(html, "text/html")
+            placeholder = (
+                b"<html><body>"
+                b"<p style='font-family:sans-serif;padding:40px;color:#525252'>"
+                b"No file loaded. Use <code>mcp-htmleditor serve &lt;file&gt;</code> "
+                b"or call <code>start_server</code> via MCP."
+                b"</p></body></html>"
+            )
+            self._send_bytes(placeholder, "text/html")
             return
         try:
             html = Path(state.current_file).read_text(encoding="utf-8")
@@ -314,7 +320,7 @@ def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
     GrapesJS returns body content only. This function wraps it in a proper
     document, preserving the head of the existing file when available.
     """
-    head_content = ""
+    head_content: str = ""
     doc_type_attr = ""
 
     if current_file:
@@ -357,7 +363,7 @@ _server_thread: threading.Thread | None = None
 _server_lock = threading.Lock()
 
 
-def start_http_server(file: str, port: int = 7842) -> bool:
+def start_http_server(file: str, port: int = 7842) -> bool:  # pragma: no cover - starts a real server thread
     """Start the HTTP server serving the given HTML file.
 
     Idempotent: if a server is already running on the same port with the
@@ -389,7 +395,7 @@ def start_http_server(file: str, port: int = 7842) -> bool:
     return True
 
 
-def stop_http_server() -> None:
+def stop_http_server() -> None:  # pragma: no cover - stops a real server thread
     """Stop the running HTTP server if any."""
     global _server_instance, _server_thread
 
@@ -404,6 +410,6 @@ def stop_http_server() -> None:
     state.save()
 
 
-def is_server_running() -> bool:
+def is_server_running() -> bool:  # pragma: no cover - trivial global check
     """Return True if the HTTP server is currently running."""
     return _server_instance is not None

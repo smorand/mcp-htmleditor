@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from pathlib import Path
 from typing import Any
-
 
 _DEFAULT_POLL_INTERVAL = 1000  # ms
 _STATE_FILENAME = ".mcp_state.json"
@@ -24,16 +22,17 @@ class EditorState:
     external processes (e.g. browser polling /status) can read it.
     """
 
-    _instance: "EditorState | None" = None
+    _instance: EditorState | None = None
+    _initialized: bool = False
 
-    def __new__(cls) -> "EditorState":
+    def __new__(cls) -> EditorState:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
     def __init__(self) -> None:
-        if self._initialized:  # type: ignore[has-type]
+        if self._initialized:
             return
         self._initialized = True
         self.current_file: str | None = None
