@@ -1,11 +1,5 @@
 <!DOCTYPE html>
-<!--
-  IBM Carbon Slides — Template bootstrap vide
-  Usage: copier ce fichier, renseigner data-title sur chaque section,
-         ajouter les slides dans .slide-frame, mettre à jour TOTAL et slideNames.
-  Référence complète: skill/templates/reference/slides/ibm-carbon.html
--->
-<html lang="fr" data-doc-type="presentation">
+<html data-doc-type="presentation">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -278,172 +272,13 @@
 </style>
 </head>
 <body>
-
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!-- Shell Header  —  personnaliser logo + titre               -->
-<!-- ═══════════════════════════════════════════════════════════ -->
-<header class="shell-header">
-  <div class="shell-logo">
-    <!-- Remplacer par le vrai logo SVG si besoin -->
-    <svg width="20" height="20" viewBox="0 0 32 32" fill="#78a9ff" xmlns="http://www.w3.org/2000/svg">
-      <rect width="32" height="32" rx="4" fill="#0f62fe"/>
-      <text x="7" y="22" fill="#fff" font-family="IBM Plex Sans,sans-serif" font-size="16" font-weight="700">P</text>
-    </svg>
-    <span class="product-name"><!-- Nom produit --></span>
-  </div>
-  <div class="shell-divider"></div>
-  <span class="shell-title"><!-- Titre de la présentation --></span>
-</header>
-
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!-- Toolbar                                                    -->
-<!-- ═══════════════════════════════════════════════════════════ -->
-<div class="toolbar">
-  <button class="cds-btn-icon" id="btn-prev" onclick="navigate(-1)" title="Précédent (←)" disabled>
-    <svg viewBox="0 0 16 16"><path d="M10.5 15.5 3 8l7.5-7.5 1.4 1.4L5.8 8l6.1 6.1z"/></svg>
-  </button>
-  <button class="cds-btn-icon" id="btn-next" onclick="navigate(1)" title="Suivant (→)">
-    <svg viewBox="0 0 16 16"><path d="M5.5.5 13 8l-7.5 7.5-1.4-1.4L10.2 8 4.1 1.9z"/></svg>
-  </button>
-  <div class="toolbar-sep"></div>
-  <span class="cds-select-label">Diapositive :</span>
-  <div class="cds-select-wrapper">
-    <select class="cds-select" id="slide-select" onchange="goToSlide(this.value)">
-      <!-- OPTIONS GÉNÉRÉES PAR JS — ne pas modifier manuellement -->
-    </select>
-    <svg class="cds-select-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
-      <path d="M8 11L3 6h10z"/>
-    </svg>
-  </div>
-  <div class="toolbar-sep"></div>
-  <button class="cds-btn-icon" onclick="goToSlide(0)" title="Première diapositive">
-    <svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zm3.5 6 7-6v12z"/></svg>
-  </button>
-  <button class="cds-btn-icon" id="btn-last" title="Dernière diapositive">
-    <svg viewBox="0 0 16 16"><path d="M12 2h2v12h-2zm-2.5 6-7 6V2z"/></svg>
-  </button>
-  <span class="cds-tag" id="progress-tag">1 / 1</span>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!-- Stage                                                      -->
-<!-- ═══════════════════════════════════════════════════════════ -->
-<div class="stage">
-  <button class="nav-arrow" id="nav-prev" onclick="navigate(-1)" disabled title="Précédent">
-    <svg viewBox="0 0 24 24"><path d="M15.5 20 8 12l7.5-8 1.5 1.4L11 12l6 6.6z"/></svg>
-  </button>
-
-  <div class="slide-frame">
-
-    <!-- ══════════════════════════════════════════════════ -->
-    <!-- SLIDE 1 — Couverture                              -->
-    <!-- Dupliquer ce bloc pour chaque nouvelle slide.    -->
-    <!-- Mettre à jour TOTAL et slideNames dans le JS.    -->
-    <!-- ══════════════════════════════════════════════════ -->
-    <article class="slide active" id="slide-0" data-type="slide" data-id="slide-0" data-title="Titre de la présentation">
-      <div class="slide-header">
-        <div class="slide-eyebrow" data-editable="text">Section · Slide 01 / 01</div>
-        <h1 class="slide-h1" data-editable="text"><strong>Titre</strong> de la présentation</h1>
-        <p class="slide-subtitle" data-editable="text">Sous-titre ou description courte de la présentation.</p>
-      </div>
-      <div class="slide-body" data-editable="text">
-        <!-- Insérer le contenu ici.
+<body><header class="shell-header"><div class="shell-logo"><!-- Remplacer par le vrai logo SVG si besoin --><svg width="20" height="20" viewBox="0 0 32 32" fill="#78a9ff" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="4" fill="#0f62fe"></rect><text x="7" y="22" fill="#fff" font-family="IBM Plex Sans,sans-serif" font-size="16" font-weight="700">P</text></svg><span class="product-name"><!-- Nom produit --></span></div><div class="shell-divider"></div><span class="shell-title"><!-- Titre de la présentation --></span></header><!-- ═══════════════════════════════════════════════════════════ --><!-- Toolbar                                                    --><!-- ═══════════════════════════════════════════════════════════ --><div class="toolbar"><button id="btn-prev" title="Précédent (←)" disabled class="cds-btn-icon"><svg viewBox="0 0 16 16"><path d="M10.5 15.5 3 8l7.5-7.5 1.4 1.4L5.8 8l6.1 6.1z"></path></svg></button><button id="btn-next" title="Suivant (→)" disabled class="cds-btn-icon"><svg viewBox="0 0 16 16"><path d="M5.5.5 13 8l-7.5 7.5-1.4-1.4L10.2 8 4.1 1.9z"></path></svg></button><div class="toolbar-sep"></div><span class="cds-select-label">Diapositive :</span><div class="cds-select-wrapper"><select id="slide-select" class="cds-select"><!-- OPTIONS GÉNÉRÉES PAR JS — ne pas modifier manuellement --><option value="0">01 — Titre de la présentation</option><option value="0">01 — Titre de la présentation</option><option value="0">01 — Titre de la présentation</option><option value="0">01 — Titre de la présentation</option><option value="0">01 — Titre de la présentation</option><option value="0">01 — Titre de la présentation</option><option value="0">01 — Titre de la présentation</option><option value="0">01 — Titre de la présentation</option></select><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" class="cds-select-icon"><path d="M8 11L3 6h10z"></path></svg></div><div class="toolbar-sep"></div><button title="Première diapositive" class="cds-btn-icon"><svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zm3.5 6 7-6v12z"></path></svg></button><button id="btn-last" title="Dernière diapositive" class="cds-btn-icon"><svg viewBox="0 0 16 16"><path d="M12 2h2v12h-2zm-2.5 6-7 6V2z"></path></svg></button><span id="progress-tag" class="cds-tag">1 / 1</span></div><!-- ═══════════════════════════════════════════════════════════ --><!-- Stage                                                      --><!-- ═══════════════════════════════════════════════════════════ --><div class="stage"><button id="nav-prev" disabled title="Précédent" class="nav-arrow"><svg viewBox="0 0 24 24"><path d="M15.5 20 8 12l7.5-8 1.5 1.4L11 12l6 6.6z"></path></svg></button><div class="slide-frame"><!-- ══════════════════════════════════════════════════ --><!-- SLIDE 1 — Couverture                              --><!-- Dupliquer ce bloc pour chaque nouvelle slide.    --><!-- Mettre à jour TOTAL et slideNames dans le JS.    --><!-- ══════════════════════════════════════════════════ --><article id="slide-0" data-type="slide" data-id="slide-0" data-title="Titre de la présentation" class="slide active"><div class="slide-header"><div data-editable="text" id="ildxf" class="slide-eyebrow">Section · Slide 01 / 01</div><h1 data-editable="text" id="ij46l" class="slide-h1"><b>IBM Bob</b></h1><p data-editable="text" id="imuti" class="slide-subtitle">Sous-titre ou description courte de la présentation.</p></div><div data-editable="text" id="imz89" class="slide-body"><!-- Insérer le contenu ici.
              Composants disponibles: .cds-grid .cols-2/.cols-3/.cols-4,
              .cds-tile, .cds-structured-list, .cds-notification,
              .stat-grid/.stat-card, .cds-code, .tag-blue/green/purple/gray/red
-             Voir ibm-carbon.html pour des exemples complets. -->
-        <p style="color: var(--cds-text-secondary); font-style: italic;">Contenu de la slide…</p>
-      </div>
-      <div class="slide-footer">
-        <span class="slide-footer-left" data-editable="text"><!-- Nom produit / Présentation --></span>
-        <span class="slide-footer-right">Slide 1 / 1</span>
-      </div>
-    </article>
+             Voir ibm-carbon.html pour des exemples complets. --><p id="is46z">qsdfqds</p></div><div class="slide-footer"><span data-editable="text" id="iq2os" class="slide-footer-left"><!-- Nom produit / Présentation --></span><span class="slide-footer-right">Slide 1 / 1</span></div></article><!-- Ajouter les slides suivantes ici avec id="slide-1", "slide-2", etc. --></div><button id="nav-next" title="Suivant" disabled class="nav-arrow"><svg viewBox="0 0 24 24"><path d="M8.5 4 16 12l-7.5 8-1.5-1.4L13 12 7 5.4z"></path></svg></button></div><!-- ═══════════════════════════════════════════════════════════ --><!-- Status bar                                                 --><!-- ═══════════════════════════════════════════════════════════ --><div class="status-bar"><span class="status-active">●</span><span id="status-slide">Slide 1 / 1 — Titre de la présentation</span><span id="i6v0uk">Navigation : ← → ou menu déroulant</span></div><!-- ═══════════════════════════════════════════════════════════ --><!-- JavaScript — navigation                                    --><!-- Mettre à jour TOTAL et slideNames quand on ajoute slides  --><!-- ═══════════════════════════════════════════════════════════ -->
 
-    <!-- Ajouter les slides suivantes ici avec id="slide-1", "slide-2", etc. -->
 
-  </div>
-
-  <button class="nav-arrow" id="nav-next" onclick="navigate(1)" title="Suivant">
-    <svg viewBox="0 0 24 24"><path d="M8.5 4 16 12l-7.5 8-1.5-1.4L13 12 7 5.4z"/></svg>
-  </button>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!-- Status bar                                                 -->
-<!-- ═══════════════════════════════════════════════════════════ -->
-<div class="status-bar">
-  <span class="status-active">●</span>
-  <span id="status-slide">Slide 1 / 1</span>
-  <span style="margin-left:auto;">Navigation : ← → ou menu déroulant</span>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!-- JavaScript — navigation                                    -->
-<!-- Mettre à jour TOTAL et slideNames quand on ajoute slides  -->
-<!-- ═══════════════════════════════════════════════════════════ -->
-<script>
-  // ── À METTRE À JOUR à chaque ajout de slide ──────────────────
-  const TOTAL = 1;
-  const slideNames = [
-    "Titre de la présentation",
-    // "Slide 2", "Slide 3", ...
-  ];
-  // ─────────────────────────────────────────────────────────────
-
-  let current = 0;
-
-  // Générer les options du dropdown
-  const sel = document.getElementById('slide-select');
-  slideNames.forEach((name, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = String(i + 1).padStart(2, '0') + ' — ' + name;
-    sel.appendChild(opt);
-  });
-
-  // Bouton "Dernière diapositive"
-  document.getElementById('btn-last').onclick = () => goToSlide(TOTAL - 1);
-
-  function render() {
-    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
-    document.getElementById('slide-' + current).classList.add('active');
-    sel.value = current;
-    document.getElementById('progress-tag').textContent = (current + 1) + ' / ' + TOTAL;
-    document.getElementById('status-slide').textContent =
-      'Slide ' + (current + 1) + ' / ' + TOTAL + ' — ' + slideNames[current];
-    const isFirst = current === 0;
-    const isLast  = current === TOTAL - 1;
-    document.getElementById('btn-prev').disabled = isFirst;
-    document.getElementById('nav-prev').disabled = isFirst;
-    document.getElementById('btn-next').disabled = isLast;
-    document.getElementById('nav-next').disabled = isLast;
-    // Mettre à jour le footer de chaque slide
-    document.querySelectorAll('.slide-footer-right').forEach((el, i) => {
-      if (parseInt(el.closest('.slide').id.replace('slide-','')) === current) {
-        el.textContent = 'Slide ' + (current + 1) + ' / ' + TOTAL;
-      }
-    });
-  }
-
-  function navigate(dir) {
-    const next = current + dir;
-    if (next >= 0 && next < TOTAL) { current = next; render(); }
-  }
-
-  function goToSlide(idx) {
-    current = parseInt(idx, 10);
-    render();
-  }
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
-    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  navigate(-1);
-    if (e.key === 'Home') goToSlide(0);
-    if (e.key === 'End')  goToSlide(TOTAL - 1);
-  });
-
-  render();
-</script>
+iv class="gtx-trans-icon"&gt;iv class="gtx-trans-icon"&gt;</body>
 </body>
 </html>

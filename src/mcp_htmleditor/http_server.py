@@ -14,7 +14,16 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from bs4 import BeautifulSoup
+
 from .state import get_state
+
+# IDs/classes injected by the browser editor — must be stripped before saving.
+_EDITOR_ARTIFACTS = {
+    "ids":     {"_mcp_format_bar", "_mcp_insert_bar", "_mcp_editor_styles", "_editor_ctx_host"},
+    "classes": {"_mcp_editable"},
+    "attrs":   {"contenteditable"},
+}
 
 
 # ---------------------------------------------------------------------------
@@ -169,10 +178,12 @@ class _EditorHandler(BaseHTTPRequestHandler):
         else:
             html = body.decode("utf-8")
 
-        # The editor sends the full document (DOCTYPE + html); write it directly.
-        # Only fall back to rebuild if it looks like a fragment (no <html> tag).
+        # The editor sends the full document (DOCTYPE + html); strip ephemeral
+        # editor artifacts before writing so the file stays clean for LLM agents.
         if "<html" not in html.lower():
             html = _rebuild_full_html(html, state.current_file)
+
+        html = _strip_editor_artifacts(html)
 
         try:
             Path(state.current_file).write_text(html, encoding="utf-8")
@@ -237,6 +248,37 @@ class _EditorHandler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # HTML reconstruction
 # ---------------------------------------------------------------------------
+
+def _strip_editor_artifacts(html: str) -> str:
+    """Remove ephemeral editor elements injected by the browser UI.
+
+    The JS editor injects helper nodes (format bar, insert bar, style tag,
+    context menu host) and attributes (contenteditable, _mcp_editable class)
+    directly into the iframe DOM.  Before persisting to disk we strip all of
+    them so the saved file stays clean and readable by LLM agents.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Remove injected elements by id
+    for eid in _EDITOR_ARTIFACTS["ids"]:
+        el = soup.find(id=eid)
+        if el:
+            el.decompose()
+
+    # Remove injected CSS class from all elements
+    for cls in _EDITOR_ARTIFACTS["classes"]:
+        for el in soup.find_all(class_=cls):
+            el["class"] = [c for c in el.get("class", []) if c != cls]
+            if not el.get("class"):
+                del el["class"]
+
+    # Remove injected attributes
+    for attr in _EDITOR_ARTIFACTS["attrs"]:
+        for el in soup.find_all(attrs={attr: True}):
+            del el[attr]
+
+    return str(soup)
+
 
 def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
     """Reconstruct a complete HTML document from a GrapesJS canvas fragment.
