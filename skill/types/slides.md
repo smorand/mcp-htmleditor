@@ -90,24 +90,36 @@ Exemple: `IBM <strong>Bob</strong>`, `Capacités <strong>clés</strong>`.
 
 ## Types de slides insérables (data-slide-type)
 
-En mode présentation + édition, le bouton « Slide avant / après » propose 5 types.
-Chaque slide porte un attribut `data-slide-type` qui identifie son layout:
+Deux jeux de layouts selon le template actif (détecté automatiquement par le picker):
+
+### Template IBM Carbon (`ibm-carbon.html`)
+Structure: shell-header noir + toolbar + `.slide` avec `.slide-header`/`.slide-body`/`.slide-footer`.
+
+### Template Euro-Information (`euro-information.html`)
+Structure: canvas 16:9, couleurs EI (bleu #003A8D, orange #FBAE40), Segoe UI, logos embarqués.
+- `title`: couverture image tech + logos CM/CIC/EI
+- `agenda`: sommaire, cadre bleu arrondi + logo rond au coin
+- `section`: séparateur plein bleu
+- `content`: titre + tuiles, cadre bleu arrondi 10px + logo rond au coin bas-gauche
+- `diagram`: zone de schéma, même cadre EI
+
+Les deux templates exposent les mêmes 5 `data-slide-type`:
 
 | `data-slide-type` | Usage | Fréquence typique |
 |-------------------|-------|-------------------|
 | `title` | Couverture de la présentation | 1 (première slide) |
 | `agenda` | Plan / sommaire | 1 |
-| `section` | Coupure de section (fond noir) | plusieurs |
+| `section` | Coupure de section | plusieurs |
 | `content` | Titre + texte + tuiles (la plus fréquente) | beaucoup |
 | `diagram` | Zone de schéma d'architecture | selon besoin |
 
-Les layouts sont définis dans `src/mcp_htmleditor/static/slide-layouts.js`. Chaque
-layout contient les attributs requis (`data-type="slide"`, `data-id`, `data-title`,
-`data-slide-type`) et un contenu par défaut minimal, éditable.
+Layouts définis dans `src/mcp_htmleditor/static/slide-layouts.js` (`LAYOUT_SETS.carbon`
+et `LAYOUT_SETS.ei`). À l'insertion, les assets EI (couverture, logos) sont récupérés
+depuis le document actif pour rester cohérents.
 
 **Pour le LLM:** quand tu génères une nouvelle slide, choisis le `data-slide-type`
-adapté et respecte sa structure. Une présentation cohérente suit généralement:
-`title` → `agenda` → (`section` → `content`×N)×M → `content` de clôture.
+adapté et respecte la structure du template du document. Une présentation cohérente
+suit généralement: `title` → `agenda` → (`section` → `content`×N)×M → `content` de clôture.
 
 ### Cohérence garantie à l'insertion (browser)
 

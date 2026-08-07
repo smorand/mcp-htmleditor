@@ -784,7 +784,8 @@ function openSlidePicker(position) {
   insertPosition = position;
   const grid = document.getElementById('picker-grid');
   grid.innerHTML = '';
-  Object.entries(SLIDE_LAYOUTS).forEach(([key, layout]) => {
+  const layouts = getLayouts(frame.contentDocument);
+  Object.entries(layouts).forEach(([key, layout]) => {
     const card = document.createElement('button');
     card.className = 'picker-card';
     card.innerHTML =
@@ -806,16 +807,18 @@ function closeSlidePicker() {
 function insertSlide(layoutKey, position) {
   const doc = frame.contentDocument;
   if (!doc) return;
-  const layout = SLIDE_LAYOUTS[layoutKey];
+  const layout = getLayouts(doc)[layoutKey];
   if (!layout) return;
 
   const slides = getSlides(doc);
   const curIdx = getCurrentSlideIndex(doc);
   const uid = 'slide-' + Date.now();
 
-  // Build the new slide element from the layout HTML
+  // Build slide HTML, resolve template assets (EI cover/logos), then insert
+  let html = layout.html.replace(/\{\{ID\}\}/g, uid).trim();
+  html = resolveTemplateAssets(html, doc);
   const tmp = doc.createElement('div');
-  tmp.innerHTML = layout.html.replace(/\{\{ID\}\}/g, uid).trim();
+  tmp.innerHTML = html;
   const newSlide = tmp.firstElementChild;
   newSlide.classList.remove('active');
 
@@ -830,6 +833,21 @@ function insertSlide(layoutKey, position) {
   renumberSlides(doc);
   makeEditableIfNeeded(doc, newSlide);
   saveContent();
+}
+
+/** Replace EI template asset placeholders with data URIs already embedded
+ *  in the document, so inserted slides reuse the same cover/logos. */
+function resolveTemplateAssets(html, doc) {
+  const grab = sel => { const el = doc.querySelector(sel); return el ? el.getAttribute('src') : ''; };
+  const map = {
+    '{{COVER}}':    grab('.slide-cover-img'),
+    '{{CM}}':       grab('img.logo-cm'),
+    '{{CIC}}':      grab('img.logo-cic'),
+    '{{EI}}':       grab('img.logo-ei'),
+    '{{CHEVRONS}}': grab('.slide-foot-logo img'),
+  };
+  Object.entries(map).forEach(([ph, uri]) => { html = html.split(ph).join(uri || ''); });
+  return html;
 }
 
 /* ── Delete ───────────────────────────────────────────────────── */

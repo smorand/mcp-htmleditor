@@ -14,10 +14,18 @@ L'agent modifie le fichier HTML sur disque; le navigateur se synchronise automat
 
 ## Template de présentation par défaut
 
-**IBM Carbon** est le template de référence pour toutes les présentations.
+**IBM Carbon** est le template de référence générique pour les présentations.
 - Bootstrap: `skill/templates/bootstrap/slides-empty.html` (copier, ne jamais modifier l'original)
 - Référence complète: `skill/templates/reference/slides/ibm-carbon.html` (9 slides, tous les composants Carbon)
-- Règles détaillées: `skill/types/slides.md`
+
+**Euro-Information** est le template pour les présentations EI (Crédit Mutuel / CIC).
+- Bootstrap: `skill/templates/bootstrap/slides-ei-empty.html` (1 slide titre, logos embarqués)
+- Référence complète: `skill/templates/reference/slides/euro-information.html` (titre + agenda + contenu)
+- Couleurs: bleu `#003A8D`, orange `#FBAE40`, bleu secondaire `#284AAA`, corail `#EC6962`
+- Police: Segoe UI partout. Logos Crédit Mutuel, CIC, Euro Information embarqués en base64.
+
+Règles détaillées des slides: `skill/types/slides.md`. Le picker « Insérer slide »
+détecte automatiquement le template actif (Carbon ou EI) et propose les 5 layouts adaptés.
 
 ---
 
@@ -112,6 +120,7 @@ mcp-htmleditor export docx input.html output.docx
 | `skill/templates/bootstrap/slides-empty.html` | Template minimal présentation |
 | `skill/templates/bootstrap/document-empty.html` | Template minimal document |
 | `skill/templates/reference/slides/ibm-carbon.html` | **Template de référence IBM Carbon** (9 slides complètes, tous composants) |
+| `skill/templates/reference/slides/euro-information.html` | **Template de référence Euro-Information** (3 slides: titre, agenda, contenu; logos CM/CIC/EI embarqués) |
 | `skill/templates/reference/slides/presentation-standard.html` | Template 4 slides standard |
 | `skill/templates/reference/slides/roadmap-one-pager.html` | Template roadmap one-pager |
 | `skill/templates/reference/documents/report-standard.html` | Template rapport standard |
