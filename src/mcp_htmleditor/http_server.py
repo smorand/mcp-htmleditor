@@ -256,6 +256,10 @@ def _strip_editor_artifacts(html: str) -> str:
     context menu host) and attributes (contenteditable, _mcp_editable class)
     directly into the iframe DOM.  Before persisting to disk we strip all of
     them so the saved file stays clean and readable by LLM agents.
+
+    We also clear dynamically-generated <option> elements from the slide
+    dropdown (#slide-select) to prevent duplication on each reload (the JS
+    rebuilds them from slideNames[] every time the page loads).
     """
     soup = BeautifulSoup(html, "html.parser")
 
@@ -276,6 +280,14 @@ def _strip_editor_artifacts(html: str) -> str:
     for attr in _EDITOR_ARTIFACTS["attrs"]:
         for el in soup.find_all(attrs={attr: True}):
             del el[attr]
+
+    # Clear dynamically-generated <option> elements from the slide dropdown.
+    # The navigation JS regenerates them from slideNames[] on every page load;
+    # keeping them in the saved HTML causes duplication on each reload.
+    slide_select = soup.find(id="slide-select")
+    if slide_select:
+        for opt in slide_select.find_all("option"):
+            opt.decompose()
 
     return str(soup)
 
