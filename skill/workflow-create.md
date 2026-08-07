@@ -27,21 +27,30 @@ artefacts d'édition humaine.
 
 ## Partir d'un template bootstrap
 
-La méthode la plus rapide pour un nouveau fichier:
+La méthode recommandée: la commande `new` copie le bon bootstrap.
 
 ```bash
-cp skill/templates/bootstrap/slides-empty.html mon-fichier.html
-# ou document
-cp skill/templates/bootstrap/document-empty.html mon-document.html
+mcp-htmleditor templates                        # lister les templates
+mcp-htmleditor new ei     ma-presentation.html  # Euro-Information
+mcp-htmleditor new carbon ma-presentation.html  # IBM Carbon
+mcp-htmleditor new doc    mon-document.html      # Document
+mcp-htmleditor new ei ma-presentation.html --serve   # + ouvre l'éditeur
+```
+
+Équivalent manuel:
+```bash
+cp skill/templates/bootstrap/slides-ei-empty.html mon-fichier.html
 ```
 
 Ensuite ouvrir dans l'éditeur:
 ```
-start_server(file="mon-fichier.html")
+start_server(file="mon-fichier.html")   # via MCP
+# ou: mcp-htmleditor serve mon-fichier.html
 ```
 
-Le template IBM Carbon (`skill/templates/reference/slides/ibm-carbon.html`) est
-la référence visuelle pour toutes les présentations. Voir `skill/types/slides.md`.
+Templates de référence (exemples riches à consulter/cloner, en lecture seule):
+`skill/templates/reference/slides/euro-information.html`,
+`skill/templates/reference/slides/ibm-carbon.html`. Voir `skill/types/slides.md`.
 
 ---
 

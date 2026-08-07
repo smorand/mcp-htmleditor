@@ -14,6 +14,52 @@ def main() -> None:
     """mcp-htmleditor: WYSIWYG HTML editor with MCP server support."""
 
 
+@main.command("templates")
+def templates_cmd() -> None:
+    """List the available presentation/document templates."""
+    from .templates import list_templates
+
+    click.echo("Templates disponibles (mcp-htmleditor new <key> <fichier>):\n")
+    for key, desc in list_templates():
+        click.echo(f"  {key:<8} {desc}")
+
+
+@main.command("new")
+@click.argument("template")
+@click.argument("output_file")
+@click.option("--serve", is_flag=True, help="Ouvrir l'éditeur sur le fichier créé.")
+@click.option("--port", default=7842, show_default=True, help="HTTP port (avec --serve).")
+def new_cmd(template: str, output_file: str, serve: bool, port: int) -> None:
+    """Create a new file from a template.
+
+    TEMPLATE is a template key (see `mcp-htmleditor templates`): ei, carbon, doc.
+    OUTPUT_FILE is the destination path for the new HTML file.
+    """
+    import shutil
+
+    from .templates import list_templates, template_path
+
+    try:
+        src = template_path(template)
+    except KeyError:
+        keys = ", ".join(k for k, _ in list_templates())
+        raise click.ClickException(
+            f"Template inconnu: '{template}'. Templates disponibles: {keys}"
+        ) from None
+    except FileNotFoundError as exc:
+        raise click.ClickException(f"Fichier template manquant: {exc}") from None
+
+    dest = Path(output_file)
+    if dest.exists():
+        raise click.ClickException(f"Le fichier existe déjà: {dest}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dest)
+    click.echo(f"Créé: {dest}  (template: {template})")
+
+    if serve:
+        _serve_file(str(dest), port, None)
+
+
 @main.command("mcp")
 def mcp_cmd() -> None:
     """Start the MCP server using stdio transport.
@@ -39,6 +85,11 @@ def serve_cmd(file: str, port: int, poll: int | None) -> None:
 
     FILE is the path to the HTML file to edit.
     """
+    _serve_file(file, port, poll)
+
+
+def _serve_file(file: str, port: int, poll: int | None) -> None:
+    """Start the HTTP server on a file and block until Ctrl+C."""
     import time
 
     from .http_server import start_http_server

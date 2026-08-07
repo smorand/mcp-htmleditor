@@ -8,11 +8,17 @@ WYSIWYG HTML editor + MCP server. LLM agents modify HTML files on disk; the brow
 
 ```bash
 pip install -e .                          # Install
-mcp-htmleditor serve file.html            # Open editor in browser
+mcp-htmleditor templates                  # List available templates (ei, carbon, doc)
+mcp-htmleditor new ei pres.html --serve   # Create from template + open editor
+mcp-htmleditor serve file.html            # Open editor on existing file
 mcp-htmleditor mcp                        # MCP server (stdio)
 mcp-htmleditor export pptx in.html out.pptx
 mcp-htmleditor export docx in.html out.docx
 ```
+
+Template keys: `ei` (Euro-Information), `carbon` (IBM Carbon), `doc` (Word-like document).
+Bootstraps live in `skill/templates/bootstrap/`, full examples in `skill/templates/reference/`.
+The `new` command copies a bootstrap; template files are read-only via the server.
 
 ### Dev commands (Makefile)
 
@@ -38,10 +44,12 @@ own uv-isolated env, so third-party import stubs are handled via
 - `state.py` — singleton in-process state + `.mcp_state.json` on disk
 - `http_server.py` — ThreadingHTTPServer, routes: `/`, `/static/*`, `/content`, `/status`
 - `mcp_server.py` — FastMCP with 6 tools
-- `cli.py` — Click CLI: `serve`, `mcp`, `export`
+- `cli.py` — Click CLI: `templates`, `new`, `serve`, `mcp`, `export`
+- `templates.py` — template registry (key → bootstrap file): ei, carbon, doc
 - `export/to_pptx.py` — HTML → PPTX (python-pptx, parses data-type attributes)
 - `export/to_docx.py` — HTML → DOCX (pandoc subprocess)
-- `static/editor.js` — GrapesJS init, polling, slide nav, context menus, blocks
+- `static/editor.js` — iframe renderer, polling, rich-text toolbar, slide insert, image embed
+- `static/slide-layouts.js` — per-template slide layouts (LAYOUT_SETS.carbon / .ei)
 
 ## LLM workflow pattern
 

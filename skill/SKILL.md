@@ -12,20 +12,51 @@ L'agent modifie le fichier HTML sur disque; le navigateur se synchronise automat
 
 ---
 
-## Template de présentation par défaut
+## Choisir et créer depuis un template
 
-**IBM Carbon** est le template de référence générique pour les présentations.
-- Bootstrap: `skill/templates/bootstrap/slides-empty.html` (copier, ne jamais modifier l'original)
-- Référence complète: `skill/templates/reference/slides/ibm-carbon.html` (9 slides, tous les composants Carbon)
+**Le template se choisit à la création du fichier**, via `mcp-htmleditor new <key>`.
+Il n'y a pas d'option `--template` sur `serve`: on crée d'abord, on édite ensuite.
 
-**Euro-Information** est le template pour les présentations EI (Crédit Mutuel / CIC).
-- Bootstrap: `skill/templates/bootstrap/slides-ei-empty.html` (1 slide titre, logos embarqués)
-- Référence complète: `skill/templates/reference/slides/euro-information.html` (titre + agenda + contenu)
-- Couleurs: bleu `#003A8D`, orange `#FBAE40`, bleu secondaire `#284AAA`, corail `#EC6962`
-- Police: Segoe UI partout. Logos Crédit Mutuel, CIC, Euro Information embarqués en base64.
+```bash
+mcp-htmleditor templates                          # liste les templates
+mcp-htmleditor new ei     ma-pres.html   --serve  # Euro-Information
+mcp-htmleditor new carbon ma-pres.html   --serve  # IBM Carbon
+mcp-htmleditor new doc    mon-rapport.html        # Document
+```
 
-Règles détaillées des slides: `skill/types/slides.md`. Le picker « Insérer slide »
-détecte automatiquement le template actif (Carbon ou EI) et propose les 5 layouts adaptés.
+### Où sont stockés les templates
+
+```
+skill/templates/
+├── bootstrap/                    ← points de départ (copiés par `new`)
+│   ├── slides-ei-empty.html      ← key: ei     (Euro-Information)
+│   ├── slides-empty.html         ← key: carbon (IBM Carbon)
+│   └── document-empty.html       ← key: doc    (document Word-like)
+└── reference/                    ← exemples complets (à consulter/cloner)
+    ├── slides/
+    │   ├── euro-information.html  ← EI: titre + agenda + contenu, logos embarqués
+    │   ├── ibm-carbon.html        ← IBM Carbon: 9 slides, tous les composants
+    │   ├── presentation-standard.html
+    │   └── roadmap-one-pager.html
+    └── documents/
+        └── report-standard.html
+```
+
+Les fichiers `bootstrap/` sont le point de départ minimal. Les fichiers `reference/`
+sont des exemples riches: le LLM peut s'en inspirer pour cloner des layouts.
+**Ces fichiers sont en lecture seule via le serveur** (une sauvegarde vers un chemin
+contenant `skill/templates/` est ignorée).
+
+### Le template par défaut
+
+- **Euro-Information** (`ei`): présentations EI. Bleu `#003A8D`, orange `#FBAE40`,
+  police Segoe UI, logos Crédit Mutuel / CIC / Euro Information embarqués en base64.
+- **IBM Carbon** (`carbon`): présentations génériques. Tokens Carbon.
+- **Document** (`doc`): documents Word-like (export DOCX optimal).
+
+Le serveur détecte automatiquement le template du fichier ouvert et adapte le picker
+« Insérer slide » (5 layouts adaptés au template: title, agenda, section, content, diagram).
+Règles détaillées: `skill/types/slides.md`.
 
 ---
 
@@ -54,7 +85,19 @@ détecte automatiquement le template actif (Carbon ou EI) et propose les 5 layou
 ## Commandes CLI
 
 ```bash
-# Démarrer l'éditeur viusuel sur un fichier
+# Lister les templates disponibles
+mcp-htmleditor templates
+
+# Créer un fichier à partir d'un template (le moyen recommandé de démarrer)
+mcp-htmleditor new <template> mon-fichier.html
+#   <template> = ei | carbon | doc
+#   ei     → Euro-Information (Crédit Mutuel / CIC)
+#   carbon → IBM Carbon
+#   doc    → document Word-like
+# Option --serve pour ouvrir l'éditeur immédiatement:
+mcp-htmleditor new ei ma-presentation.html --serve
+
+# Démarrer l'éditeur visuel sur un fichier existant
 mcp-htmleditor serve path/to/file.html [--port 7842] [--poll 1000]
 
 # Démarrer le serveur MCP (stdio)

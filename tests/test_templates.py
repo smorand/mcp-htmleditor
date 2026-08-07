@@ -1,0 +1,48 @@
+"""Tests for the template registry (mcp_htmleditor.templates)."""
+
+from __future__ import annotations
+
+import pytest
+
+from mcp_htmleditor.templates import TEMPLATES, list_templates, template_path
+
+
+def test_all_templates_resolve_to_existing_files() -> None:
+    """Every registered template key maps to a bootstrap file on disk."""
+    for key in TEMPLATES:
+        path = template_path(key)
+        assert path.is_file(), f"missing bootstrap for '{key}': {path}"
+        assert path.suffix == ".html"
+
+
+def test_ei_template_is_euro_information() -> None:
+    """The 'ei' template contains Euro-Information markers."""
+    content = template_path("ei").read_text(encoding="utf-8")
+    assert "--ei-blue" in content
+    assert 'data-doc-type="presentation"' in content
+
+
+def test_carbon_template_is_presentation() -> None:
+    """The 'carbon' template is a presentation."""
+    content = template_path("carbon").read_text(encoding="utf-8")
+    assert 'data-doc-type="presentation"' in content
+
+
+def test_doc_template_is_document() -> None:
+    """The 'doc' template is a document."""
+    content = template_path("doc").read_text(encoding="utf-8")
+    assert 'data-doc-type="document"' in content
+
+
+def test_unknown_key_raises_keyerror() -> None:
+    """An unknown template key raises KeyError."""
+    with pytest.raises(KeyError):
+        template_path("does-not-exist")
+
+
+def test_list_templates_returns_all_keys() -> None:
+    """list_templates returns a (key, description) pair for each template."""
+    listed = list_templates()
+    keys = {k for k, _ in listed}
+    assert keys == set(TEMPLATES.keys())
+    assert all(isinstance(desc, str) and desc for _, desc in listed)
