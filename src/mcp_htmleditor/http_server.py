@@ -67,6 +67,8 @@ class _EditorHandler(BaseHTTPRequestHandler):
             self._serve_static(path[len("/static/"):])
         elif path == "/content":
             self._serve_content()
+        elif path == "/content-frame":
+            self._serve_content_frame()
         elif path == "/status":
             self._serve_status()
         else:
@@ -107,10 +109,24 @@ class _EditorHandler(BaseHTTPRequestHandler):
         self._send_file(file_path, mime)
 
     def _serve_content(self) -> None:
-        """Return the raw HTML of the current file."""
+        """Return the raw HTML of the current file (for POST saves)."""
         state = get_state()
         if not state.current_file:
             self._send_json({"error": "No file loaded"}, status=404)
+            return
+        try:
+            html = Path(state.current_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+        self._send_bytes(html.encode("utf-8"), "text/html")
+
+    def _serve_content_frame(self) -> None:
+        """Serve the current HTML file as-is for the iframe (full document)."""
+        state = get_state()
+        if not state.current_file:
+            html = b"<html><body><p style='font-family:sans-serif;padding:40px;color:#525252'>No file loaded. Use <code>mcp-htmleditor serve &lt;file&gt;</code> or call <code>start_server</code> via MCP.</p></body></html>"
+            self._send_bytes(html, "text/html")
             return
         try:
             html = Path(state.current_file).read_text(encoding="utf-8")
@@ -132,7 +148,7 @@ class _EditorHandler(BaseHTTPRequestHandler):
         self._send_json(payload)
 
     def _receive_content(self) -> None:
-        """Receive updated HTML from GrapesJS and write it to disk."""
+        """Receive updated HTML from the editor and write it to disk."""
         state = get_state()
         if not state.current_file:
             self._send_json({"error": "No file loaded"}, status=404)
@@ -146,18 +162,20 @@ class _EditorHandler(BaseHTTPRequestHandler):
         if "application/json" in content_type:
             try:
                 data: dict[str, Any] = json.loads(body)
-                canvas_html: str = data.get("html", "")
+                html: str = data.get("html", "")
             except (json.JSONDecodeError, KeyError):
                 self._send_json({"error": "Invalid JSON body"}, status=400)
                 return
         else:
-            # Raw HTML body
-            canvas_html = body.decode("utf-8")
+            html = body.decode("utf-8")
 
-        # Reconstruct full HTML document from canvas body fragment
-        full_html = _rebuild_full_html(canvas_html, state.current_file)
+        # The editor sends the full document (DOCTYPE + html); write it directly.
+        # Only fall back to rebuild if it looks like a fragment (no <html> tag).
+        if "<html" not in html.lower():
+            html = _rebuild_full_html(html, state.current_file)
+
         try:
-            Path(state.current_file).write_text(full_html, encoding="utf-8")
+            Path(state.current_file).write_text(html, encoding="utf-8")
         except OSError as exc:
             self._send_json({"error": str(exc)}, status=500)
             return

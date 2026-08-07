@@ -4,30 +4,28 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HTML Editor</title>
-  <link rel="stylesheet" href="https://unpkg.com/grapesjs@0.21.13/dist/css/grapes.min.css" />
   <link rel="stylesheet" href="/static/editor.css" />
 </head>
 <body>
 
-  <!-- Slide navigation bar (hidden for document mode) -->
-  <div id="slide-nav" style="display:none">
-    <button id="nav-prev">&#9664;</button>
-    <span id="nav-info">Slide 1 / 1</span>
-    <button id="nav-next">&#9654;</button>
+  <!-- Toolbar: update overlay + save indicator -->
+  <div id="toolbar">
+    <span id="toolbar-filename">—</span>
+    <span id="toolbar-status">●</span>
+    <span id="toolbar-saved" style="display:none">✓ Sauvegardé</span>
+    <label id="toolbar-edit-toggle">
+      <input type="checkbox" id="edit-mode-checkbox"> Édition
+    </label>
   </div>
 
-  <!-- "Modification en cours" overlay -->
+  <!-- "Modification LLM en cours" overlay -->
   <div id="update-overlay" style="display:none">
-    <div class="overlay-content">&#8635; Modification en cours&hellip;</div>
+    <div class="overlay-content">&#8635; Modification en cours…</div>
   </div>
 
-  <!-- GrapesJS canvas -->
-  <div id="gjs"></div>
+  <!-- The actual HTML file rendered as-is in a full-page iframe -->
+  <iframe id="content-frame" src="/content-frame" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
 
-  <!-- GrapesJS library -->
-  <script src="https://unpkg.com/grapesjs@0.21.13/dist/grapes.min.js"></script>
-  <!-- Editor logic -->
   <script src="/static/editor.js"></script>
-
 </body>
 </html>

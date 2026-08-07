@@ -1,131 +1,65 @@
 /**
- * editor.js — mcp-htmleditor
+ * editor.js — mcp-htmleditor (v2: iframe-based, no GrapesJS)
  *
- * Initialises GrapesJS, wires the polling loop, slide navigation,
- * custom context menus, block panel, and auto-save.
+ * Le HTML est servi tel quel dans un <iframe>. Ce script gère:
+ *  - Polling /status pour détecter les modifications LLM et recharger l'iframe
+ *  - Overlay "modification en cours"
+ *  - Mode édition: injection de contenteditable dans l'iframe + sauvegarde
+ *  - Context menus par data-type (injectés dans l'iframe)
  */
 
-/* ============================================================
-   Constants / globals
-   ============================================================ */
-let editor = null;
-let pollInterval = 1000;          // ms, overridden from /status
+let pollInterval = 1000;
 let lastMtime = null;
 let wasUpdating = false;
-let currentSlideIndex = 0;
-let slides = [];                  // Array of GrapesJS components (data-type="slide")
+let editMode = false;
+let saveTimer = null;
+
+const frame = document.getElementById('content-frame');
+const overlay = document.getElementById('update-overlay');
+const savedBadge = document.getElementById('toolbar-saved');
+const statusDot = document.getElementById('toolbar-status');
+const editCheckbox = document.getElementById('edit-mode-checkbox');
 
 /* ============================================================
-   Bootstrap — fetch content then init GrapesJS
+   Bootstrap
    ============================================================ */
 (async function init() {
-  // 1. Fetch current poll interval from /status
+  // Fetch poll interval + initial mtime
   try {
     const st = await fetch('/status').then(r => r.json());
     pollInterval = st.poll_interval || 1000;
     lastMtime = st.mtime;
+    const name = (st.filename || '').split('/').pop();
+    document.getElementById('toolbar-filename').textContent = name;
+    document.title = name || 'HTML Editor';
   } catch (e) {
-    console.warn('Could not reach /status, using defaults', e);
+    console.warn('Could not reach /status', e);
   }
 
-  // 2. Fetch initial HTML content
-  let initialHtml = '';
-  try {
-    initialHtml = await fetch('/content').then(r => r.text());
-  } catch (e) {
-    console.warn('Could not load /content', e);
-    initialHtml = '<p>No content loaded.</p>';
-  }
-
-  // 3. Extract body content for GrapesJS (it cannot handle <!DOCTYPE>)
-  const bodyContent = extractBody(initialHtml);
-
-  // 4. Detect presentation mode
-  const isPresentation = /data-doc-type=["']presentation["']/i.test(initialHtml);
-
-  // 5. Init GrapesJS
-  editor = grapesjs.init({
-    container: '#gjs',
-    height: '100vh',
-    width: 'auto',
-    fromElement: false,
-    components: bodyContent,
-    storageManager: false,  // We handle save manually
-    deviceManager: { devices: [] },
-    panels: { defaults: [] },
-    blockManager: {
-      appendTo: '#blocks',
-      blocks: [],
-    },
-    styleManager: {
-      sectors: [
-        {
-          name: 'General',
-          open: true,
-          properties: ['display', 'position', 'top', 'left', 'width', 'height'],
-        },
-        {
-          name: 'Typography',
-          open: false,
-          properties: ['font-family', 'font-size', 'font-weight', 'color', 'text-align'],
-        },
-        {
-          name: 'Decorations',
-          open: false,
-          properties: ['background-color', 'border', 'border-radius', 'padding', 'margin'],
-        },
-      ],
-    },
+  // Edit mode toggle
+  editCheckbox.addEventListener('change', () => {
+    editMode = editCheckbox.checked;
+    applyEditMode();
   });
 
-  // 6. Register custom blocks
-  registerBlocks(editor);
+  // Wait for iframe to load, then wire it up
+  frame.addEventListener('load', onFrameLoad);
 
-  // 7. Custom context menus
-  registerContextMenus(editor);
-
-  // 8. Auto-save on change
-  let saveTimer = null;
-  editor.on('update', () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveContent(), 500);
-  });
-
-  // 9. Slide navigation
-  if (isPresentation) {
-    initSlideNav(editor);
-  }
-
-  // 10. Start polling
+  // Start polling
   setInterval(pollStatus, pollInterval);
 })();
 
 /* ============================================================
-   HTML utilities
+   Iframe load callback
    ============================================================ */
-
-/** Extract the content of <body> from a full HTML document string. */
-function extractBody(html) {
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if (bodyMatch) return bodyMatch[1];
-  // No <body> tag: return as-is
-  return html;
-}
-
-/* ============================================================
-   Save
-   ============================================================ */
-async function saveContent() {
-  if (!editor) return;
-  const html = editor.getHtml();
+function onFrameLoad() {
   try {
-    await fetch('/content', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html }),
-    });
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    if (editMode) injectEditMode(doc);
+    injectContextMenus(doc);
   } catch (e) {
-    console.warn('Auto-save failed', e);
+    console.warn('Could not access iframe content:', e);
   }
 }
 
@@ -140,21 +74,23 @@ async function pollStatus() {
     return;
   }
 
-  const overlay = document.getElementById('update-overlay');
+  // Update filename in toolbar if changed
+  const name = (status.filename || '').split('/').pop();
+  document.getElementById('toolbar-filename').textContent = name || '—';
 
-  // Show / hide overlay
   if (status.update_in_progress) {
     overlay.style.display = 'flex';
+    statusDot.style.color = '#f1c21b';
     wasUpdating = true;
   } else {
     overlay.style.display = 'none';
+    statusDot.style.color = '#42be65';
 
-    // If update just completed OR mtime changed (external edit), reload
     const mtimeChanged = lastMtime !== null && status.mtime !== lastMtime;
     if ((wasUpdating || mtimeChanged) && !status.update_in_progress) {
       wasUpdating = false;
       lastMtime = status.mtime;
-      await reloadContent();
+      reloadFrame();
       return;
     }
   }
@@ -162,98 +98,157 @@ async function pollStatus() {
   lastMtime = status.mtime;
 }
 
-async function reloadContent() {
+function reloadFrame() {
+  // Reload the iframe without reloading the parent page
+  frame.src = '/content-frame?' + Date.now();
+}
+
+/* ============================================================
+   Edit mode: inject contenteditable on [data-editable="text"]
+   ============================================================ */
+function applyEditMode() {
   try {
-    const html = await fetch('/content').then(r => r.text());
-    const bodyContent = extractBody(html);
-    editor.setComponents(bodyContent);
-    // Re-init slide nav if needed
-    const isPresentation = /data-doc-type=["']presentation["']/i.test(html);
-    if (isPresentation) {
-      initSlideNav(editor);
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    if (editMode) {
+      injectEditMode(doc);
+    } else {
+      removeEditMode(doc);
     }
   } catch (e) {
-    console.warn('Reload failed', e);
+    console.warn('Could not toggle edit mode:', e);
+  }
+}
+
+function injectEditMode(doc) {
+  // Make elements with data-editable="text" contenteditable
+  doc.querySelectorAll('[data-editable~="text"]').forEach(el => {
+    el.contentEditable = 'true';
+    el.style.outline = '2px dashed #0f62fe';
+    el.style.cursor = 'text';
+    el.style.minHeight = '1em';
+
+    el.addEventListener('input', onEditableInput);
+    el.addEventListener('blur', onEditableBlur);
+  });
+}
+
+function removeEditMode(doc) {
+  doc.querySelectorAll('[data-editable~="text"]').forEach(el => {
+    el.contentEditable = 'false';
+    el.style.outline = '';
+    el.style.cursor = '';
+    el.removeEventListener('input', onEditableInput);
+    el.removeEventListener('blur', onEditableBlur);
+  });
+}
+
+function onEditableInput() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveContent, 800);
+}
+
+function onEditableBlur() {
+  clearTimeout(saveTimer);
+  saveContent();
+}
+
+/* ============================================================
+   Save: POST the full iframe HTML to /content
+   ============================================================ */
+async function saveContent() {
+  try {
+    const doc = frame.contentDocument;
+    if (!doc) return;
+
+    // Temporarily remove contenteditable markers before saving
+    const editables = doc.querySelectorAll('[contenteditable]');
+    const saved = [];
+    editables.forEach(el => {
+      saved.push({ el, ce: el.contentEditable, outline: el.style.outline, cursor: el.style.cursor });
+      el.removeAttribute('contenteditable');
+      el.style.outline = '';
+      el.style.cursor = '';
+    });
+
+    const html = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+
+    // Restore
+    saved.forEach(({ el, ce, outline, cursor }) => {
+      el.contentEditable = ce;
+      el.style.outline = outline;
+      el.style.cursor = cursor;
+    });
+
+    await fetch('/content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html }),
+    });
+
+    // Flash saved badge
+    savedBadge.style.display = 'inline';
+    clearTimeout(savedBadge._timer);
+    savedBadge._timer = setTimeout(() => { savedBadge.style.display = 'none'; }, 1500);
+
+  } catch (e) {
+    console.warn('Save failed:', e);
   }
 }
 
 /* ============================================================
-   Slide navigation
+   Context menus (injected into iframe document)
    ============================================================ */
-function initSlideNav(ed) {
-  // Collect slide components
-  slides = [];
-  ed.getComponents().each(comp => {
-    if (comp.get('attributes')?.['data-type'] === 'slide') {
-      slides.push(comp);
+function injectContextMenus(doc) {
+  doc.addEventListener('contextmenu', e => {
+    // Walk up from target to find a data-type element
+    let el = e.target;
+    let dtype = null;
+    while (el && el !== doc.body) {
+      if (el.dataset && el.dataset.type) { dtype = el.dataset.type; break; }
+      el = el.parentElement;
     }
-  });
+    if (!dtype) return;
 
-  if (slides.length === 0) return;
-
-  const nav = document.getElementById('slide-nav');
-  nav.style.display = 'flex';
-  currentSlideIndex = 0;
-  showSlide(0);
-
-  document.getElementById('nav-prev').onclick = () => {
-    if (currentSlideIndex > 0) showSlide(currentSlideIndex - 1);
-  };
-  document.getElementById('nav-next').onclick = () => {
-    if (currentSlideIndex < slides.length - 1) showSlide(currentSlideIndex + 1);
-  };
-}
-
-function showSlide(index) {
-  currentSlideIndex = index;
-  // Hide all slides, show only the current one
-  slides.forEach((s, i) => {
-    const el = s.getEl();
-    if (el) el.style.display = i === index ? '' : 'none';
-  });
-  document.getElementById('nav-info').textContent =
-    `Slide ${index + 1} / ${slides.length}`;
-}
-
-/* ============================================================
-   Custom context menus
-   ============================================================ */
-function registerContextMenus(ed) {
-  ed.on('component:contextmenu', (component, event) => {
-    event.preventDefault();
-    const dtype = component.get('attributes')?.['data-type'] || '';
-    const items = getContextMenuItems(dtype, component);
+    const items = getContextMenuItems(dtype, el, doc);
     if (!items.length) return;
-    showContextMenu(event, items);
+
+    e.preventDefault();
+    showContextMenu(doc, e.clientX, e.clientY, items);
   });
 }
 
-function getContextMenuItems(dtype, component) {
+function getContextMenuItems(dtype, el, doc) {
   switch (dtype) {
     case 'gantt-task':
       return [
         {
           label: 'Agrandir (+20%)',
           action: () => {
-            const w = component.getStyle()['width'] || '100%';
-            component.addStyle({ width: scalePercent(w, 1.2) });
+            const w = parseFloat(el.style.width) || 30;
+            el.style.width = Math.min(100, w * 1.2).toFixed(1) + '%';
+            scheduleSave();
           },
         },
         {
           label: 'Réduire (-20%)',
           action: () => {
-            const w = component.getStyle()['width'] || '100%';
-            component.addStyle({ width: scalePercent(w, 0.8) });
+            const w = parseFloat(el.style.width) || 30;
+            el.style.width = Math.max(5, w * 0.8).toFixed(1) + '%';
+            scheduleSave();
           },
         },
         {
           label: 'Renommer',
           action: () => {
-            const name = prompt('Nouveau nom :', component.get('attributes')['data-label'] || '');
-            if (name !== null) component.addAttributes({ 'data-label': name });
+            const name = prompt('Nouveau libellé :', el.textContent.trim());
+            if (name !== null) { el.textContent = name; el.dataset.label = name; scheduleSave(); }
           },
         },
-        { label: 'Supprimer', action: () => component.remove() },
+        {
+          label: 'Supprimer',
+          action: () => { el.remove(); scheduleSave(); },
+        },
       ];
 
     case 'arch-node':
@@ -261,21 +256,21 @@ function getContextMenuItems(dtype, component) {
         {
           label: 'Renommer',
           action: () => {
-            const name = prompt('Nouveau nom :', component.get('attributes')['data-label'] || '');
-            if (name !== null) {
-              component.addAttributes({ 'data-label': name });
-              component.set('content', name);
-            }
+            const name = prompt('Nouveau libellé :', el.textContent.trim());
+            if (name !== null) { el.textContent = name; el.dataset.label = name; scheduleSave(); }
           },
         },
         {
           label: 'Changer forme',
           action: () => {
-            const shape = prompt('Forme (box/circle/diamond) :', component.get('attributes')['data-shape'] || 'box');
-            if (shape) component.addAttributes({ 'data-shape': shape });
+            const shape = prompt('Forme (box / circle / diamond) :', el.dataset.shape || 'box');
+            if (shape) { el.dataset.shape = shape; scheduleSave(); }
           },
         },
-        { label: 'Supprimer', action: () => component.remove() },
+        {
+          label: 'Supprimer',
+          action: () => { el.remove(); scheduleSave(); },
+        },
       ];
 
     case 'annotation':
@@ -283,30 +278,33 @@ function getContextMenuItems(dtype, component) {
         {
           label: 'Éditer texte',
           action: () => {
-            const text = prompt('Texte :', component.get('content') || '');
-            if (text !== null) component.set('content', text);
+            const text = prompt('Texte :', el.textContent.trim());
+            if (text !== null) { el.textContent = text; scheduleSave(); }
           },
         },
-        { label: 'Supprimer', action: () => component.remove() },
+        {
+          label: 'Supprimer',
+          action: () => { el.remove(); scheduleSave(); },
+        },
       ];
 
     case 'table':
       return [
         {
           label: 'Ajouter ligne',
-          action: () => addTableRow(component),
+          action: () => { addTableRow(el); scheduleSave(); },
         },
         {
-          label: 'Supprimer ligne',
-          action: () => removeLastTableRow(component),
+          label: 'Supprimer dernière ligne',
+          action: () => { removeLastTableRow(el); scheduleSave(); },
         },
         {
           label: 'Ajouter colonne',
-          action: () => addTableCol(component),
+          action: () => { addTableCol(el); scheduleSave(); },
         },
         {
-          label: 'Supprimer colonne',
-          action: () => removeLastTableCol(component),
+          label: 'Supprimer dernière colonne',
+          action: () => { removeLastTableCol(el); scheduleSave(); },
         },
       ];
 
@@ -314,7 +312,17 @@ function getContextMenuItems(dtype, component) {
       return [
         {
           label: 'Ajouter tâche',
-          action: () => addGanttTask(component),
+          action: () => {
+            const label = prompt('Libellé :', 'Nouvelle tâche');
+            if (!label) return;
+            const task = doc.createElement('div');
+            task.dataset.type = 'gantt-task';
+            task.dataset.label = label;
+            task.style.cssText = 'background:#4a90d9;color:white;padding:4px 8px;margin:2px 0;border-radius:3px;width:30%;';
+            task.textContent = label;
+            el.appendChild(task);
+            scheduleSave();
+          },
         },
       ];
 
@@ -322,15 +330,18 @@ function getContextMenuItems(dtype, component) {
       return [
         {
           label: 'Ajouter nœud',
-          action: () => addArchNode(component),
-        },
-      ];
-
-    case 'annotated-image':
-      return [
-        {
-          label: 'Ajouter annotation',
-          action: () => addAnnotation(component),
+          action: () => {
+            const label = prompt('Libellé :', 'Nouveau nœud');
+            if (!label) return;
+            const node = doc.createElement('div');
+            node.dataset.type = 'arch-node';
+            node.dataset.label = label;
+            node.dataset.shape = 'box';
+            node.style.cssText = 'display:inline-block;border:2px solid #333;padding:8px 16px;border-radius:4px;background:#f5f5f5;margin:8px;';
+            node.textContent = label;
+            el.appendChild(node);
+            scheduleSave();
+          },
         },
       ];
 
@@ -339,235 +350,84 @@ function getContextMenuItems(dtype, component) {
   }
 }
 
-function showContextMenu(event, items) {
-  // Remove any existing context menu
-  const existing = document.getElementById('_gjs_ctx_menu');
+function showContextMenu(doc, x, y, items) {
+  // Remove any existing
+  const existing = doc.getElementById('_editor_ctx_menu');
   if (existing) existing.remove();
+  const existingParent = document.getElementById('_editor_ctx_menu_host');
+  if (existingParent) existingParent.remove();
 
+  // Build menu in the parent frame (to avoid iframe z-index issues)
   const menu = document.createElement('div');
-  menu.id = '_gjs_ctx_menu';
+  menu.id = '_editor_ctx_menu_host';
   menu.style.cssText = [
     'position:fixed',
-    `top:${event.clientY}px`,
-    `left:${event.clientX}px`,
+    `top:${y + frame.getBoundingClientRect().top}px`,
+    `left:${x + frame.getBoundingClientRect().left}px`,
     'background:white',
-    'border:1px solid #ccc',
-    'border-radius:4px',
-    'box-shadow:0 2px 8px rgba(0,0,0,.2)',
+    'border:1px solid #c6c6c6',
+    'box-shadow:0 4px 12px rgba(0,0,0,.2)',
     'z-index:99999',
-    'min-width:160px',
+    'min-width:180px',
+    'font-family:IBM Plex Sans,-apple-system,sans-serif',
+    'font-size:13px',
   ].join(';');
 
   items.forEach(item => {
     const btn = document.createElement('div');
     btn.textContent = item.label;
-    btn.style.cssText = 'padding:8px 14px;cursor:pointer;font-size:13px;';
-    btn.onmouseenter = () => (btn.style.background = '#f0f0f0');
+    btn.style.cssText = 'padding:8px 16px;cursor:pointer;';
+    btn.onmouseenter = () => (btn.style.background = '#e8e8e8');
     btn.onmouseleave = () => (btn.style.background = '');
-    btn.onclick = () => {
-      item.action();
-      menu.remove();
-    };
+    btn.onclick = () => { item.action(); menu.remove(); };
     menu.appendChild(btn);
   });
 
   document.body.appendChild(menu);
-  const dismiss = () => { menu.remove(); document.removeEventListener('click', dismiss); };
-  setTimeout(() => document.addEventListener('click', dismiss), 10);
+  const dismiss = e => {
+    if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('mousedown', dismiss); }
+  };
+  setTimeout(() => document.addEventListener('mousedown', dismiss), 10);
 }
 
 /* ============================================================
-   Table helpers
+   Table helpers (DOM-based)
    ============================================================ */
-function addTableRow(tableComp) {
-  const tbody = tableComp.find('tbody')[0] || tableComp;
-  const existingRows = tbody.find('tr');
-  const colCount = existingRows.length
-    ? existingRows[existingRows.length - 1].find('td').length || 1
-    : 3;
-  const cells = Array(colCount).fill('<td>&nbsp;</td>').join('');
-  tbody.append(`<tr>${cells}</tr>`);
+function addTableRow(tableEl) {
+  const tbody = tableEl.querySelector('tbody') || tableEl;
+  const rows = tbody.querySelectorAll('tr');
+  const colCount = rows.length ? rows[rows.length - 1].querySelectorAll('td,th').length : 3;
+  const tr = tableEl.ownerDocument.createElement('tr');
+  for (let i = 0; i < colCount; i++) {
+    const td = tableEl.ownerDocument.createElement('td');
+    td.innerHTML = '&nbsp;';
+    tr.appendChild(td);
+  }
+  tbody.appendChild(tr);
 }
 
-function removeLastTableRow(tableComp) {
-  const tbody = tableComp.find('tbody')[0] || tableComp;
-  const rows = tbody.find('tr');
+function removeLastTableRow(tableEl) {
+  const tbody = tableEl.querySelector('tbody') || tableEl;
+  const rows = tbody.querySelectorAll('tr');
   if (rows.length > 1) rows[rows.length - 1].remove();
 }
 
-function addTableCol(tableComp) {
-  tableComp.find('tr').forEach(row => {
-    row.append('<td>&nbsp;</td>');
+function addTableCol(tableEl) {
+  tableEl.querySelectorAll('tr').forEach(row => {
+    const cell = tableEl.ownerDocument.createElement(row.querySelector('th') ? 'th' : 'td');
+    cell.innerHTML = '&nbsp;';
+    row.appendChild(cell);
   });
 }
 
-function removeLastTableCol(tableComp) {
-  tableComp.find('tr').forEach(row => {
-    const cells = row.find('td, th');
+function removeLastTableCol(tableEl) {
+  tableEl.querySelectorAll('tr').forEach(row => {
+    const cells = row.querySelectorAll('td,th');
     if (cells.length > 1) cells[cells.length - 1].remove();
   });
 }
 
-/* ============================================================
-   Gantt helpers
-   ============================================================ */
-function addGanttTask(ganttComp) {
-  const label = prompt('Libellé de la tâche :', 'Nouvelle tâche');
-  if (!label) return;
-  const start = prompt('Date de début (YYYY-MM) :', '2024-01');
-  const end   = prompt('Date de fin (YYYY-MM) :', '2024-03');
-  ganttComp.append(
-    `<div data-type="gantt-task" data-label="${label}" data-start="${start || ''}" data-end="${end || ''}"
-         style="background:#4a90d9;color:white;padding:4px 8px;margin:2px 0;border-radius:3px;">
-      ${label}
-    </div>`
-  );
-}
-
-/* ============================================================
-   Arch-diagram helpers
-   ============================================================ */
-function addArchNode(diagramComp) {
-  const label = prompt('Libellé du nœud :', 'Nouveau nœud');
-  if (!label) return;
-  diagramComp.append(
-    `<div data-type="arch-node" data-label="${label}" data-shape="box" data-x="10" data-y="10" data-width="20" data-height="10"
-         style="display:inline-block;border:1px solid #333;padding:8px 16px;margin:8px;border-radius:4px;background:#fff;">
-      ${label}
-    </div>`
-  );
-}
-
-/* ============================================================
-   Annotated image helpers
-   ============================================================ */
-function addAnnotation(imgComp) {
-  const text = prompt('Texte de l\'annotation :', '');
-  if (!text) return;
-  imgComp.append(
-    `<div data-type="annotation" data-x="50" data-y="50"
-         style="position:absolute;left:50%;top:50%;background:rgba(255,255,0,0.8);
-                padding:4px 8px;border-radius:3px;font-size:12px;">
-      ${text}
-    </div>`
-  );
-}
-
-/* ============================================================
-   Utility
-   ============================================================ */
-function scalePercent(cssValue, factor) {
-  const m = String(cssValue).match(/([\d.]+)(%?)/);
-  if (!m) return cssValue;
-  return (parseFloat(m[1]) * factor).toFixed(1) + (m[2] || '%');
-}
-
-/* ============================================================
-   Block registration
-   ============================================================ */
-function registerBlocks(ed) {
-  // -- Slide vide --
-  ed.BlockManager.add('slide-empty', {
-    label: 'Slide vide',
-    category: 'Slides',
-    content: `<section data-type="slide" data-id="slide-${Date.now()}" data-title="Nouveau slide"
-                style="width:100%;min-height:400px;padding:40px;box-sizing:border-box;background:#fff;">
-      <h2 data-editable="text" style="margin:0 0 20px">Titre du slide</h2>
-      <p data-editable="text">Contenu…</p>
-    </section>`,
-  });
-
-  // -- Gantt --
-  ed.BlockManager.add('gantt', {
-    label: 'Gantt',
-    category: 'Composants',
-    content: `<div data-type="gantt" style="width:100%;overflow-x:auto;padding:8px;">
-      <div style="font-weight:bold;margin-bottom:8px;">Roadmap</div>
-      <div data-type="gantt-task" data-label="Tâche 1" data-start="2024-01" data-end="2024-03"
-           style="background:#4a90d9;color:white;padding:4px 8px;margin:2px 0;border-radius:3px;width:30%;">
-        Tâche 1
-      </div>
-      <div data-type="gantt-task" data-label="Tâche 2" data-start="2024-03" data-end="2024-06"
-           style="background:#7ed321;color:white;padding:4px 8px;margin:2px 0;border-radius:3px;width:30%;margin-left:30%;">
-        Tâche 2
-      </div>
-    </div>`,
-  });
-
-  // -- Nœud architecture --
-  ed.BlockManager.add('arch-node', {
-    label: 'Nœud archi',
-    category: 'Composants',
-    content: `<div data-type="arch-node" data-label="Service" data-shape="box" data-x="10" data-y="20" data-width="20" data-height="10"
-                style="display:inline-block;border:2px solid #333;padding:10px 20px;border-radius:4px;background:#f5f5f5;font-weight:bold;">
-      Service
-    </div>`,
-  });
-
-  // -- Image annotée --
-  ed.BlockManager.add('annotated-image', {
-    label: 'Image annotée',
-    category: 'Composants',
-    content: `<div data-type="annotated-image" style="position:relative;display:inline-block;">
-      <img src="https://placehold.co/600x400" alt="Image" data-editable="resize,reposition" style="width:100%;" />
-      <div data-type="annotation" data-x="20" data-y="30"
-           style="position:absolute;left:20%;top:30%;background:rgba(255,255,0,0.85);padding:4px 8px;border-radius:3px;font-size:12px;">
-        Annotation exemple
-      </div>
-    </div>`,
-  });
-
-  // -- Tableau 3×3 --
-  ed.BlockManager.add('table-3x3', {
-    label: 'Tableau 3×3',
-    category: 'Composants',
-    content: `<table data-type="table" style="width:100%;border-collapse:collapse;">
-      <thead>
-        <tr>
-          <th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;">Col 1</th>
-          <th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;">Col 2</th>
-          <th style="border:1px solid #ccc;padding:8px;background:#f0f0f0;">Col 3</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style="border:1px solid #ccc;padding:8px;">A1</td>
-          <td style="border:1px solid #ccc;padding:8px;">A2</td>
-          <td style="border:1px solid #ccc;padding:8px;">A3</td>
-        </tr>
-        <tr>
-          <td style="border:1px solid #ccc;padding:8px;">B1</td>
-          <td style="border:1px solid #ccc;padding:8px;">B2</td>
-          <td style="border:1px solid #ccc;padding:8px;">B3</td>
-        </tr>
-      </tbody>
-    </table>`,
-  });
-
-  // -- Section document --
-  ed.BlockManager.add('document-section', {
-    label: 'Section document',
-    category: 'Document',
-    content: `<section data-type="document-section" style="margin-bottom:32px;">
-      <h2 data-editable="text">Section titre</h2>
-      <p data-editable="text">Contenu de la section. Modifiez ce texte selon vos besoins.</p>
-    </section>`,
-  });
-
-  // -- Arch diagram --
-  ed.BlockManager.add('arch-diagram', {
-    label: 'Schéma archi',
-    category: 'Composants',
-    content: `<div data-type="arch-diagram" style="position:relative;min-height:200px;border:1px dashed #ccc;padding:16px;">
-      <div data-type="arch-node" data-label="Frontend" data-shape="box"
-           style="display:inline-block;border:2px solid #4a90d9;padding:8px 16px;border-radius:4px;background:#e8f0fe;margin:8px;">
-        Frontend
-      </div>
-      <span style="font-size:24px;vertical-align:middle;">→</span>
-      <div data-type="arch-node" data-label="API" data-shape="box"
-           style="display:inline-block;border:2px solid #333;padding:8px 16px;border-radius:4px;background:#f5f5f5;margin:8px;">
-        API
-      </div>
-    </div>`,
-  });
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveContent, 600);
 }
