@@ -21,9 +21,13 @@ from .state import get_state
 # IDs/classes injected by the browser editor — must be stripped before saving.
 _EDITOR_ARTIFACTS = {
     "ids":     {"_mcp_format_bar", "_mcp_insert_bar", "_mcp_editor_styles", "_editor_ctx_host"},
-    "classes": {"_mcp_editable"},
+    "classes": {"_mcp_editable", "gtx-trans-icon"},
     "attrs":   {"contenteditable"},
 }
+
+# Browser-extension attributes (Google Translate, Grammarly, etc.) that pollute
+# the serialized DOM and must be stripped on save.
+_EXTENSION_ATTR_PREFIXES = ("_msthash", "_msttexthash", "_msthidden", "data-gr-", "data-gramm")
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +189,12 @@ class _EditorHandler(BaseHTTPRequestHandler):
 
         html = _strip_editor_artifacts(html)
 
+        # Safety: never overwrite reference/bootstrap templates. They are meant
+        # to be copied, not edited in place. Silently ignore such saves.
+        if "skill/templates/" in state.current_file.replace("\\", "/"):
+            self._send_json({"ok": True, "skipped": "template file is read-only"})
+            return
+
         try:
             Path(state.current_file).write_text(html, encoding="utf-8")
         except OSError as exc:
@@ -288,6 +298,12 @@ def _strip_editor_artifacts(html: str) -> str:
     if slide_select:
         for opt in slide_select.find_all("option"):
             opt.decompose()
+
+    # Strip browser-extension attributes (Google Translate, Grammarly, etc.)
+    for el in soup.find_all(True):
+        for attr in list(el.attrs.keys()):
+            if any(attr.startswith(p) for p in _EXTENSION_ATTR_PREFIXES):
+                del el[attr]
 
     return str(soup)
 
