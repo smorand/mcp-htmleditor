@@ -30,7 +30,10 @@ make install
 1. Installs the `mcp-htmleditor` CLI into `~/.local/bin/` (symlink; ensure it is on your PATH)
 2. Copies templates into `~/.config/mcp-htmleditor/templates/`
 3. Creates the log dir `~/.cache/mcp-htmleditor/logs/`
-4. Installs the dynamic Pi skill into `~/.pi/agent/skills/mcp-htmleditor/`
+4. Installs the dynamic Pi skill into `~/.pi/agent/dynamic-skills/html-editor/`
+   (then add the routing rule to `~/.pi/agent/dynamic_prompt.yaml`, see
+   `dynamic-skills/README.md` — zero overlap with the `pptx`/`docx` skills via the
+   word "html")
 
 All targets are overridable via env vars (see below). `make uninstall` reverses it.
 
@@ -70,7 +73,8 @@ mcp-htmleditor skill      # prints the full skill (index + all sub-docs)
 
 The dynamic Pi skill triggers on "html powerpoint", "html edition", "html doc" and
 simply instructs the agent to run `mcp-htmleditor skill`, keeping the skill content
-in sync with the installed tool.
+in sync with the installed tool. Routing is disjoint from the native `pptx`/`docx`
+skills (the word "html" is the exclusive discriminant). See `dynamic-skills/README.md`.
 
 ### Export
 
@@ -163,7 +167,7 @@ src/mcp_htmleditor/
     └── editor.css       toolbar, overlay, picker styles
 templates/          versioned templates (bootstrap + reference)
 skill/              skill docs (served by `mcp-htmleditor skill`)
-.pi/skills/         dynamic Pi skill (installed to ~/.pi/agent/skills)
+dynamic-skills/     dynamic Pi skill + routing doc (installed to ~/.pi/agent/dynamic-skills)
 ```
 
 ## How it works

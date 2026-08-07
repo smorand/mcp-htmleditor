@@ -11,7 +11,7 @@ CONFIG_DIR    ?= $(HOME)/.config/mcp-htmleditor
 TEMPLATES_DIR ?= $(CONFIG_DIR)/templates
 CACHE_DIR     ?= $(HOME)/.cache/mcp-htmleditor
 LOG_DIR       ?= $(CACHE_DIR)/logs
-PI_SKILLS_DIR ?= $(HOME)/.pi/agent/skills/mcp-htmleditor
+PI_SKILLS_DIR ?= $(HOME)/.pi/agent/dynamic-skills/html-editor
 
 .DEFAULT_GOAL := help
 
@@ -39,10 +39,13 @@ install: ## Install CLI (~/.local/bin), templates (~/.config), logs dir (~/.cach
 	@$(MAKE) install-skill
 	@echo "==> Done. Ensure $(BIN_DIR) is on your PATH."
 
-install-skill: ## Install the dynamic Pi skill into ~/.pi/agent/skills
-	@echo "==> Installing Pi skill into $(PI_SKILLS_DIR)"
+install-skill: ## Install the dynamic Pi skill into ~/.pi/agent/dynamic-skills
+	@echo "==> Installing dynamic Pi skill into $(PI_SKILLS_DIR)"
 	@mkdir -p $(PI_SKILLS_DIR)
-	@cp .pi/skills/mcp-htmleditor/SKILL.md $(PI_SKILLS_DIR)/SKILL.md
+	@cp dynamic-skills/html-editor/SKILL.md $(PI_SKILLS_DIR)/SKILL.md
+	@echo "    NOTE: add the routing rule to ~/.pi/agent/dynamic_prompt.yaml"
+	@echo "          (see dynamic-skills/README.md for the html-editor rule +"
+	@echo "           the pptx/docx negative-lookahead variants, zero overlap)."
 
 uninstall: ## Remove installed CLI symlink, templates, logs, and Pi skill
 	@rm -f $(BIN_DIR)/mcp-htmleditor
