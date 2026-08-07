@@ -12,6 +12,15 @@ L'agent modifie le fichier HTML sur disque; le navigateur se synchronise automat
 
 ---
 
+## Template de présentation par défaut
+
+**IBM Carbon** est le template de référence pour toutes les présentations.
+- Bootstrap: `skill/templates/bootstrap/slides-empty.html` (copier, ne jamais modifier l'original)
+- Référence complète: `skill/templates/reference/slides/ibm-carbon.html` (9 slides, tous les composants Carbon)
+- Règles détaillées: `skill/types/slides.md`
+
+---
+
 ## Règles absolues
 
 1. **Toujours appeler `update_start` avant de modifier le fichier HTML** et `update_end` après.
@@ -102,6 +111,7 @@ mcp-htmleditor export docx input.html output.docx
 | `skill/types/document.md` | Règles pour le mode document |
 | `skill/templates/bootstrap/slides-empty.html` | Template minimal présentation |
 | `skill/templates/bootstrap/document-empty.html` | Template minimal document |
+| `skill/templates/reference/slides/ibm-carbon.html` | **Template de référence IBM Carbon** (9 slides complètes, tous composants) |
 | `skill/templates/reference/slides/presentation-standard.html` | Template 4 slides standard |
 | `skill/templates/reference/slides/roadmap-one-pager.html` | Template roadmap one-pager |
 | `skill/templates/reference/documents/report-standard.html` | Template rapport standard |

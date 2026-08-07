@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IBM Bob — Présentation</title>
+<style>
+  /* ── IBM Carbon Design Tokens ──────────────────────────────── */
+  :root {
+    --cds-background:          #ffffff;
+    --cds-background-hover:    #e8e8e8;
+    --cds-layer-01:            #f4f4f4;
+    --cds-layer-02:            #e0e0e0;
+    --cds-border-subtle-01:    #e0e0e0;
+    --cds-border-strong-01:    #8d8d8d;
+    --cds-text-primary:        #161616;
+    --cds-text-secondary:      #525252;
+    --cds-text-placeholder:    #a8a8a8;
+    --cds-text-on-color:       #ffffff;
+    --cds-interactive:         #0f62fe;
+    --cds-interactive-hover:   #0050e6;
+    --cds-focus:               #0f62fe;
+    --cds-icon-primary:        #161616;
+    --cds-icon-secondary:      #525252;
+    --cds-support-info:        #0043ce;
+    --cds-support-success:     #198038;
+    --cds-support-warning:     #f1c21b;
+    --cds-support-error:       #da1e28;
+    --cds-inverse-background:  #161616;
+    --cds-inverse-text:        #f4f4f4;
+    --ibm-blue-60:             #0f62fe;
+    --ibm-blue-70:             #0043ce;
+    --ibm-blue-10:             #edf5ff;
+    --ibm-gray-10:             #f4f4f4;
+    --ibm-gray-20:             #e0e0e0;
+    --ibm-gray-90:             #262626;
+    --ibm-gray-100:            #161616;
+    /* Carbon spacing scale */
+    --cds-spacing-01: 2px;
+    --cds-spacing-02: 4px;
+    --cds-spacing-03: 8px;
+    --cds-spacing-04: 12px;
+    --cds-spacing-05: 16px;
+    --cds-spacing-06: 24px;
+    --cds-spacing-07: 32px;
+    --cds-spacing-08: 40px;
+    --cds-spacing-09: 48px;
+    --cds-spacing-10: 64px;
+    --cds-spacing-11: 80px;
+    --cds-spacing-12: 96px;
+    /* IBM Plex typography */
+    --cds-font-family-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --cds-font-family-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--cds-font-family-sans);
+    background: var(--cds-background);
+    color: var(--cds-text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header / Shell ─────────────────────────────────────────── */
+  .shell-header {
+    height: 48px;
+    background: var(--ibm-gray-100);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--cds-spacing-05);
+    gap: var(--cds-spacing-05);
+    flex-shrink: 0;
+    border-bottom: 1px solid #393939;
+  }
+  .shell-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+    color: var(--cds-inverse-text);
+    font-size: 14px;
+    font-weight: 400;
+    white-space: nowrap;
+    letter-spacing: .01em;
+  }
+  .shell-logo .product-name {
+    font-weight: 600;
+    color: #78a9ff;
+  }
+  .shell-divider {
+    width: 1px;
+    height: 20px;
+    background: #393939;
+  }
+  .shell-title {
+    color: #c6c6c6;
+    font-size: 14px;
+  }
+
+  /* ── Toolbar ────────────────────────────────────────────────── */
+  .toolbar {
+    height: 48px;
+    background: var(--ibm-gray-10);
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--cds-spacing-05);
+    gap: var(--cds-spacing-05);
+    flex-shrink: 0;
+  }
+
+  /* Carbon Select (dropdown) */
+  .cds-select-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  .cds-select-label {
+    font-size: 12px;
+    color: var(--cds-text-secondary);
+    margin-right: var(--cds-spacing-03);
+    white-space: nowrap;
+  }
+  .cds-select {
+    appearance: none;
+    -webkit-appearance: none;
+    height: 32px;
+    min-width: 260px;
+    padding: 0 36px 0 12px;
+    background: var(--cds-background);
+    border: 1px solid var(--cds-border-strong-01);
+    border-bottom-color: var(--ibm-gray-100);
+    color: var(--cds-text-primary);
+    font-family: var(--cds-font-family-sans);
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 70ms ease;
+  }
+  .cds-select:focus {
+    border-color: var(--cds-focus);
+    box-shadow: inset 0 0 0 1px var(--cds-focus);
+  }
+  .cds-select:hover { background: var(--ibm-gray-10); }
+  .cds-select-icon {
+    position: absolute;
+    right: 10px;
+    pointer-events: none;
+    color: var(--cds-icon-primary);
+  }
+
+  /* Carbon Icon Buttons */
+  .cds-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    color: var(--cds-icon-primary);
+    transition: background 70ms ease;
+    border-radius: 0;
+    outline: none;
+    flex-shrink: 0;
+  }
+  .cds-btn-icon:hover { background: var(--cds-background-hover); }
+  .cds-btn-icon:focus { border-color: var(--cds-focus); box-shadow: inset 0 0 0 1px var(--cds-focus); }
+  .cds-btn-icon:disabled { opacity: .3; cursor: not-allowed; }
+  .cds-btn-icon svg { width: 16px; height: 16px; fill: currentColor; }
+
+  .toolbar-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--cds-border-subtle-01);
+  }
+
+  /* Progress tag */
+  .cds-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 var(--cds-spacing-03);
+    background: var(--ibm-blue-10);
+    color: var(--ibm-blue-70);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 100px;
+    white-space: nowrap;
+    margin-left: auto;
+  }
+
+  /* ── Slide stage ────────────────────────────────────────────── */
+  .stage {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    overflow: hidden;
+    background: #e8e8e8;
+  }
+
+  /* Side nav arrow buttons */
+  .nav-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    background: var(--ibm-gray-10);
+    border: none;
+    cursor: pointer;
+    color: var(--cds-icon-primary);
+    transition: background 70ms ease, color 70ms ease;
+    flex-shrink: 0;
+    outline: none;
+  }
+  .nav-arrow:hover:not(:disabled) { background: var(--ibm-gray-20); }
+  .nav-arrow:focus { box-shadow: inset 0 0 0 2px var(--cds-focus); }
+  .nav-arrow:disabled { opacity: .25; cursor: not-allowed; }
+  .nav-arrow svg { width: 20px; height: 20px; fill: currentColor; }
+
+  /* Slide frame */
+  .slide-frame {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--cds-spacing-07);
+    overflow: hidden;
+  }
+
+  .slide {
+    display: none;
+    width: 100%;
+    max-width: 900px;
+    background: var(--cds-background);
+    border: 1px solid var(--cds-border-subtle-01);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    flex-direction: column;
+    animation: fadein 200ms ease;
+    overflow-y: auto;
+    max-height: 100%;
+  }
+  .slide.active { display: flex; }
+
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Slide inner layout */
+  .slide-header {
+    padding: var(--cds-spacing-07) var(--cds-spacing-08);
+    border-bottom: 4px solid var(--ibm-blue-60);
+  }
+  .slide-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ibm-blue-60);
+    margin-bottom: var(--cds-spacing-03);
+  }
+  .slide-h1 {
+    font-size: 36px;
+    font-weight: 300;
+    line-height: 1.2;
+    color: var(--cds-text-primary);
+    letter-spacing: -.01em;
+  }
+  .slide-h1 strong { font-weight: 600; }
+  .slide-subtitle {
+    margin-top: var(--cds-spacing-04);
+    font-size: 16px;
+    color: var(--cds-text-secondary);
+    line-height: 1.5;
+    max-width: 600px;
+  }
+
+  .slide-body {
+    padding: var(--cds-spacing-07) var(--cds-spacing-08);
+    flex: 1;
+  }
+
+  /* Carbon grid helpers */
+  .cds-grid { display: grid; gap: var(--cds-spacing-05); }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  /* Tile */
+  .cds-tile {
+    background: var(--ibm-gray-10);
+    border: 1px solid var(--cds-border-subtle-01);
+    padding: var(--cds-spacing-05);
+  }
+  .cds-tile .tile-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--ibm-blue-60);
+    margin-bottom: var(--cds-spacing-02);
+  }
+  .cds-tile .tile-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--cds-text-primary);
+    margin-bottom: var(--cds-spacing-02);
+  }
+  .cds-tile p {
+    font-size: 12.5px;
+    color: var(--cds-text-secondary);
+    line-height: 1.55;
+  }
+
+  /* Structured list */
+  .cds-structured-list { width: 100%; border-collapse: collapse; }
+  .cds-structured-list thead th {
+    background: var(--ibm-gray-100);
+    color: var(--cds-inverse-text);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    padding: var(--cds-spacing-03) var(--cds-spacing-05);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .cds-structured-list tbody td {
+    font-size: 13px;
+    padding: var(--cds-spacing-04) var(--cds-spacing-05);
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+    color: var(--cds-text-primary);
+    vertical-align: top;
+  }
+  .cds-structured-list tbody tr:last-child td { border-bottom: none; }
+  .cds-structured-list tbody tr:hover td { background: var(--ibm-gray-10); }
+
+  /* Inline code */
+  .cds-code {
+    font-family: var(--cds-font-family-mono);
+    font-size: 12px;
+    background: var(--ibm-gray-10);
+    border: 1px solid var(--cds-border-subtle-01);
+    padding: 1px 6px;
+    color: var(--ibm-blue-70);
+  }
+
+  /* Tags / badges */
+  .tag-blue   { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#d1fae5; color:#065f46; }
+  .tag-purple { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#ede9fe; color:#5b21b6; }
+  .tag-gray   { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#e0e0e0; color:#525252; }
+
+  /* Hero stat */
+  .stat-grid { display:grid; grid-template-columns: repeat(3,1fr); gap: var(--cds-spacing-05); margin-top: var(--cds-spacing-05); }
+  .stat-card { background: var(--ibm-gray-10); border-left: 4px solid var(--ibm-blue-60); padding: var(--cds-spacing-05); }
+  .stat-value { font-size: 32px; font-weight: 300; color: var(--ibm-blue-60); line-height:1; }
+  .stat-label { font-size: 12px; color: var(--cds-text-secondary); margin-top: var(--cds-spacing-02); }
+
+  /* Notification */
+  .cds-notification {
+    display: flex;
+    gap: var(--cds-spacing-04);
+    padding: var(--cds-spacing-04) var(--cds-spacing-05);
+    border-left: 4px solid var(--ibm-blue-60);
+    background: var(--ibm-blue-10);
+    margin-top: var(--cds-spacing-05);
+  }
+  .cds-notification .notif-title { font-size: 13px; font-weight: 600; color: var(--ibm-blue-70); }
+  .cds-notification .notif-body  { font-size: 12.5px; color: var(--cds-text-secondary); margin-top: 2px; }
+
+  /* Context window bar */
+  .cw-bar { display:flex; border:1px solid var(--cds-border-subtle-01); overflow:hidden; height: 32px; margin-top: var(--cds-spacing-04); border-radius:2px; }
+  .cw-seg { display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff; overflow:hidden; white-space:nowrap; padding:0 6px; }
+
+  /* Mention pills */
+  .mention-wrap { display:flex; flex-wrap:wrap; gap: var(--cds-spacing-03); margin-top: var(--cds-spacing-04); }
+  .mention-pill {
+    display:inline-flex; align-items:center; gap: var(--cds-spacing-02);
+    padding: var(--cds-spacing-02) var(--cds-spacing-04);
+    background: var(--ibm-gray-10);
+    border: 1px solid var(--cds-border-subtle-01);
+    font-size: 12px; color: var(--cds-text-primary);
+  }
+  .mention-pill code { font-family: var(--cds-font-family-mono); font-size: 11.5px; color: var(--ibm-blue-60); }
+  .mention-pill span { color: var(--cds-text-secondary); font-size: 11.5px; }
+
+  /* ── Footer ─────────────────────────────────────────────────── */
+  .slide-footer {
+    height: 40px;
+    padding: 0 var(--cds-spacing-08);
+    border-top: 1px solid var(--cds-border-subtle-01);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--ibm-gray-10);
+    flex-shrink: 0;
+  }
+  .slide-footer-left  { font-size: 11.5px; color: var(--cds-text-secondary); }
+  .slide-footer-right { font-size: 11.5px; color: var(--cds-text-placeholder); }
+
+  /* ── Status bar ─────────────────────────────────────────────── */
+  .status-bar {
+    height: 24px;
+    background: var(--ibm-gray-100);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--cds-spacing-05);
+    gap: var(--cds-spacing-05);
+    flex-shrink: 0;
+    border-top: 1px solid #393939;
+  }
+  .status-bar span { font-size: 11px; color: #8d8d8d; }
+  .status-bar .status-active { color: #42be65; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- IBM Carbon Shell Header                                    -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<header class="shell-header">
+  <div class="shell-logo">
+    <svg width="20" height="20" viewBox="0 0 32 32" fill="#78a9ff" xmlns="http://www.w3.org/2000/svg">
+      <path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2zm-1.5 20.5v-13l9 6.5-9 6.5z"/>
+    </svg>
+    IBM <span class="product-name">Bob</span>
+  </div>
+  <div class="shell-divider"></div>
+  <span class="shell-title">Présentation produit — AI SDLC Partner</span>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Toolbar                                                    -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="toolbar">
+  <!-- Prev button -->
+  <button class="cds-btn-icon" id="btn-prev" onclick="navigate(-1)" title="Diapositive précédente (←)" disabled>
+    <svg viewBox="0 0 16 16"><path d="M10.5 15.5 3 8l7.5-7.5 1.4 1.4L5.8 8l6.1 6.1z"/></svg>
+  </button>
+
+  <!-- Next button -->
+  <button class="cds-btn-icon" id="btn-next" onclick="navigate(1)" title="Diapositive suivante (→)">
+    <svg viewBox="0 0 16 16"><path d="M5.5.5 13 8l-7.5 7.5-1.4-1.4L10.2 8 4.1 1.9z"/></svg>
+  </button>
+
+  <div class="toolbar-sep"></div>
+
+  <!-- Dropdown select -->
+  <span class="cds-select-label">Diapositive :</span>
+  <div class="cds-select-wrapper">
+    <select class="cds-select" id="slide-select" onchange="goToSlide(this.value)">
+      <option value="0">01 — IBM Bob, c'est quoi ?</option>
+      <option value="1">02 — Capacités clés</option>
+      <option value="2">03 — Le système de Modes</option>
+      <option value="3">04 — Sources d'information</option>
+      <option value="4">05 — Outils natifs</option>
+      <option value="5">06 — LLMs & Routing</option>
+      <option value="6">07 — Pour les profils non-développeurs</option>
+      <option value="7">08 — Gouvernance Enterprise</option>
+      <option value="8">09 — Démarrage rapide : l'écran d'accueil</option>
+    </select>
+    <svg class="cds-select-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+      <path d="M8 11L3 6h10z"/>
+    </svg>
+  </div>
+
+  <div class="toolbar-sep"></div>
+
+  <!-- First / Last shortcuts -->
+  <button class="cds-btn-icon" onclick="goToSlide(0)" title="Première diapositive">
+    <svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zm3.5 6 7-6v12z"/></svg>
+  </button>
+  <button class="cds-btn-icon" id="btn-last" onclick="goToSlide(7)" title="Dernière diapositive">
+    <svg viewBox="0 0 16 16"><path d="M12 2h2v12h-2zm-2.5 6-7 6V2z"/></svg>
+  </button>
+
+  <!-- Progress tag -->
+  <span class="cds-tag" id="progress-tag">1 / 8</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Stage                                                      -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="stage">
+  <!-- Left arrow -->
+  <button class="nav-arrow" id="nav-prev" onclick="navigate(-1)" disabled title="Précédent">
+    <svg viewBox="0 0 24 24"><path d="M15.5 20 8 12l7.5-8 1.5 1.4L11 12l6 6.6z"/></svg>
+  </button>
+
+  <div class="slide-frame">
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 1 — IBM Bob c'est quoi?   -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide active" id="slide-0">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Introduction · Slide 01 / 08</div>
+        <h1 class="slide-h1">IBM <strong>Bob</strong></h1>
+        <p class="slide-subtitle">Un partenaire IA pour l'ensemble du cycle de développement logiciel (SDLC), conçu pour augmenter vos workflows sans remplacer le jugement humain.</p>
+      </div>
+      <div class="slide-body">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value">270k</div>
+            <div class="stat-label">tokens — fenêtre de contexte</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">5+</div>
+            <div class="stat-label">modes spécialisés built-in</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">∞</div>
+            <div class="stat-label">modes custom via YAML</div>
+          </div>
+        </div>
+        <div class="cds-notification" style="margin-top:24px;">
+          <div>
+            <div class="notif-title">Définition officielle</div>
+            <div class="notif-body">"IBM Bob is an AI SDLC partner that augments your existing workflows and helps you understand, plan, improve, and work confidently with real codebases while offering proactive insights that keep you in control every step."</div>
+          </div>
+        </div>
+        <div class="cds-grid cols-3" style="margin-top:20px;">
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Interface</div>
+            <div class="tile-title">Chat agentique</div>
+            <p>Langage naturel, actions autonomes, approbation explicite à chaque étape.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Portée</div>
+            <div class="tile-title">Full SDLC</div>
+            <p>Écriture, test, revue, documentation, modernisation, sécurité.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Plateforme</div>
+            <div class="tile-title">IDE + Shell</div>
+            <p>Environnement graphique (Bob IDE) et ligne de commande (Bob Shell).</p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 1 / 8</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 2 — Capacités clés        -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide" id="slide-1">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Fonctionnalités · Slide 02 / 08</div>
+        <h1 class="slide-h1">Capacités <strong>clés</strong></h1>
+        <p class="slide-subtitle">Les grandes fonctionnalités qui structurent le produit IBM Bob.</p>
+      </div>
+      <div class="slide-body">
+        <div class="cds-grid cols-2">
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Agentic Chat</div>
+            <div class="tile-title">Interface principale multi-étapes</div>
+            <p>Bob lit des fichiers, raisonne sur l'ensemble du codebase et implémente des features de façon autonome sur plusieurs fichiers à la fois.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Literate Coding</div>
+            <div class="tile-title">Code depuis le langage naturel</div>
+            <p>Écrire des instructions en français directement dans le fichier source. Bob génère le code et affiche un diff inline pour révision avant acceptation.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Code Review <span class="cds-code">/review</span></div>
+            <div class="tile-title">Revue assistée par IA</div>
+            <p>Détecte les problèmes potentiels (complexité cyclomatique, maintenabilité) et propose des refactorisations via le Bob Findings panel.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Subagents</div>
+            <div class="tile-title">Parallélisation des tâches</div>
+            <p>Bob décompose une tâche complexe en workstreams parallèles. Chaque sous-agent tourne dans son propre contexte isolé, résume ses résultats au parent.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Marketplace</div>
+            <div class="tile-title">Écosystème extensible</div>
+            <p>Serveurs MCP et modes custom contribués par la communauté. Installation en quelques clics depuis l'interface Settings de Bob.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Bobalytics</div>
+            <div class="tile-title">Analytics Enterprise</div>
+            <p>Tableau de bord d'adoption, Bob Factor (impact codebase), suivi des dépenses en Bobcoins par équipe. Réservé au plan Enterprise.</p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 2 / 8</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 3 — Modes                 -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide" id="slide-2">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Architecture · Slide 03 / 08</div>
+        <h1 class="slide-h1">Le système de <strong>Modes</strong></h1>
+        <p class="slide-subtitle">Chaque mode est une personnalité spécialisée qui adapte le comportement, les outils autorisés et les instructions de Bob.</p>
+      </div>
+      <div class="slide-body">
+        <table class="cds-structured-list">
+          <thead>
+            <tr>
+              <th>Mode</th>
+              <th>Rôle</th>
+              <th>Outils</th>
+              <th>Profil cible</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Agent</strong></td>
+              <td>Écriture et modification de code, correction de bugs</td>
+              <td>Lecture, écriture, commandes, agents</td>
+              <td><span class="tag-blue">Développeur</span></td>
+            </tr>
+            <tr>
+              <td><strong>Plan</strong></td>
+              <td>Architecture, spécifications, plan d'implémentation</td>
+              <td>Lecture, écriture (limité)</td>
+              <td><span class="tag-blue">Dev</span> <span class="tag-purple">Fonctionnel</span></td>
+            </tr>
+            <tr>
+              <td><strong>Ask</strong></td>
+              <td>Questions, explications, compréhension du code</td>
+              <td>Lecture seule</td>
+              <td><span class="tag-purple">Fonctionnel</span></td>
+            </tr>
+            <tr>
+              <td><strong>Advanced</strong></td>
+              <td>Capacités étendues + MCP, intégrations complexes</td>
+              <td>Tous outils + MCP</td>
+              <td><span class="tag-blue">Développeur</span></td>
+            </tr>
+            <tr>
+              <td><strong>Orchestrator</strong></td>
+              <td>Coordination de sous-agents sur tâches longues</td>
+              <td>Spawn subagents</td>
+              <td><span class="tag-blue">Développeur</span></td>
+            </tr>
+            <tr>
+              <td><strong>Custom Modes</strong></td>
+              <td>Personnalité sur-mesure (Product Manager, Docs Writer…)</td>
+              <td>Configurables par mode</td>
+              <td><span class="tag-green">Tous profils</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="cds-notification" style="margin-top:16px;">
+          <div>
+            <div class="notif-title">Rules vs. Modes</div>
+            <div class="notif-body">Les <strong>Rules</strong> (<code>.bob/rules/</code>) s'appliquent à toutes les conversations, peu importe le mode. Les modes définissent le comportement et les outils pour une session spécifique. Les deux mécanismes sont complémentaires et versionnés en git.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 3 / 8</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 4 — Sources info          -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide" id="slide-3">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Contexte · Slide 04 / 08</div>
+        <h1 class="slide-h1">Sources d'<strong>information</strong></h1>
+        <p class="slide-subtitle">Bob ne suppose rien — il lit les sources réelles via les Context Mentions et les mécanismes de chargement automatique.</p>
+      </div>
+      <div class="slide-body">
+        <p style="font-size:13px; color:var(--cds-text-secondary); margin-bottom:8px;">Fenêtre de contexte : <strong>270 000 tokens</strong></p>
+        <div class="cw-bar">
+          <div class="cw-seg" style="width:6%;background:#3b82d4;">Sys</div>
+          <div class="cw-seg" style="width:19%;background:#7c5cd8;">Tool defs</div>
+          <div class="cw-seg" style="width:8%;background:#a855f7;">MCP</div>
+          <div class="cw-seg" style="width:6%;background:#0d9488;">Rules</div>
+          <div class="cw-seg" style="width:4%;background:#0891b2;">Skills</div>
+          <div class="cw-seg" style="flex:1;background:#1d4ed8;">Messages (prompts · fichiers · sorties outils)</div>
+          <div class="cw-seg" style="width:10%;background:#e0e0e0;color:#525252;">Réservé</div>
+        </div>
+        <p style="font-size:12px; color:var(--cds-text-secondary); margin: 8px 0 14px;">Les catégories fixes (sys prompt, tool defs, rules, skills) sont re-envoyées à chaque prompt.</p>
+        <p style="font-size:13px; font-weight:600; margin-bottom:8px; color:var(--cds-text-primary);">Toutes les sources disponibles via <span class="cds-code">@mention</span></p>
+        <div class="mention-wrap">
+          <div class="mention-pill"><code>@/src/app.ts</code><span>— Fichier texte, PDF, DOCX</span></div>
+          <div class="mention-pill"><code>@/src/components</code><span>— Dossier (non récursif)</span></div>
+          <div class="mention-pill"><code>@problems</code><span>— Erreurs / warnings IDE</span></div>
+          <div class="mention-pill"><code>@terminal</code><span>— Sortie du terminal</span></div>
+          <div class="mention-pill"><code>@git-changes</code><span>— Diff non-commité</span></div>
+          <div class="mention-pill"><code>@a1b2c3d</code><span>— Diff d'un commit Git</span></div>
+          <div class="mention-pill"><code>@https://...</code><span>— Page web (headless browser)</span></div>
+          <div class="mention-pill"><code>⌘+L</code><span>— Sélection éditeur</span></div>
+          <div class="mention-pill"><code>Glisser-déposer</code><span>— .docx .pdf .xlsx + images</span></div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 4 / 8</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 5 — Outils natifs         -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide" id="slide-4">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Outils · Slide 05 / 08</div>
+        <h1 class="slide-h1">Outils <strong>natifs</strong></h1>
+        <p class="slide-subtitle">Bob agit sur votre environnement via un ensemble d'outils built-in organisés en catégories fonctionnelles.</p>
+      </div>
+      <div class="slide-body">
+        <div class="cds-grid cols-2">
+          <div class="cds-tile">
+            <div class="tile-eyebrow" style="color:#1d4ed8;">📖 Lecture</div>
+            <div class="tile-title">Exploration de code</div>
+            <p><code class="cds-code">read_file</code> · <code class="cds-code">glob</code> · <code class="cds-code">grep</code><br><code class="cds-code">list_files</code> · <code class="cds-code">GetSymbolsOverview</code><br><code class="cds-code">FindSymbol</code> · <code class="cds-code">FindReferencingSymbols</code></p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow" style="color:#5b21b6;">✏️ Écriture</div>
+            <div class="tile-title">Modification précise du code</div>
+            <p><code class="cds-code">write_file</code> · <code class="cds-code">apply_diff</code><br><code class="cds-code">insert_content</code> · <code class="cds-code">search_and_replace</code></p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow" style="color:#92400e;">⚡ Commandes</div>
+            <div class="tile-title">Exécution terminal</div>
+            <p><code class="cds-code">execute_command</code> — installe des dépendances, lance des tests, build, run scripts. Requiert une approbation explicite.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow" style="color:#0369a1;">🤖 Agents</div>
+            <div class="tile-title">Parallélisation</div>
+            <p><code class="cds-code">spawn_subagent</code> · <code class="cds-code">start_subtask</code> — contexte isolé, résultats résumés, sans polluer le thread principal.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow" style="color:#065f46;">🔌 MCP</div>
+            <div class="tile-title">Outils externes (dynamiques)</div>
+            <p>Outils fournis par les serveurs MCP connectés : monday.com, Jira, GitHub, Carbon, bases de données, APIs internes…</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow" style="color:#9d174d;">🔄 Navigation</div>
+            <div class="tile-title">Orchestration</div>
+            <p><code class="cds-code">switch_mode</code> — Bob change de mode automatiquement selon les besoins de la tâche. Chaque mode contraint les outils disponibles.</p>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 5 / 8</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 6 — LLMs & Routing        -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide" id="slide-5">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Infrastructure IA · Slide 06 / 08</div>
+        <h1 class="slide-h1">LLMs &amp; <strong>Routing</strong></h1>
+        <p class="slide-subtitle">Bob utilise plusieurs Large Language Models. La sélection est automatique et transparente — l'utilisateur ne choisit pas le modèle.</p>
+      </div>
+      <div class="slide-body">
+        <div class="cds-grid cols-2">
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Complexité de la tâche</div>
+            <div class="tile-title">Tâches simples vs complexes</div>
+            <p>Questions rapides → modèles légers, économiques. Implémentation multi-fichiers → modèles puissants avec raisonnement profond.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Capacités requises</div>
+            <div class="tile-title">Forces spécifiques</div>
+            <p>Génération de code, raisonnement logique, compréhension de doc, vision (analyse d'images)… chaque tâche est routée vers le modèle le plus adapté.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Taille du contexte</div>
+            <div class="tile-title">Grands codebases</div>
+            <p>Les projets volumineux nécessitent des modèles avec une fenêtre étendue. Bob route automatiquement vers ces modèles sans configuration manuelle.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Optimisation des coûts</div>
+            <div class="tile-title">Bobcoins = budget prévisible</div>
+            <p>Les tokens sont convertis en <strong>Bobcoins</strong> — une unité standardisée indépendante du modèle. Les admins suivent la dépense par équipe via Bobalytics.</p>
+          </div>
+        </div>
+        <div class="cds-notification">
+          <div>
+            <div class="notif-title">Capacité Vision</div>
+            <div class="notif-body">Bob peut analyser des captures d'écran et images. Le mode <strong>Carbon React</strong> est spécialement conçu pour convertir des maquettes / screenshots en composants React Carbon Design System.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 6 / 8</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 7 — Non-développeurs      -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide" id="slide-6">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Valeur métier · Slide 07 / 08</div>
+        <h1 class="slide-h1">Profils <strong>non-développeurs</strong></h1>
+        <p class="slide-subtitle">Bob n'est pas réservé aux ingénieurs. Le système de modes et le langage naturel ouvrent ses capacités à tous les profils.</p>
+      </div>
+      <div class="slide-body">
+        <table class="cds-structured-list">
+          <thead>
+            <tr><th>Profil</th><th>Mode recommandé</th><th>Ce que Bob apporte</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Product Manager / PO</strong></td>
+              <td><span class="tag-purple">Custom PM mode</span></td>
+              <td>Transforme une idée floue en user stories, MVP, success metrics et roadmap en langage naturel.</td>
+            </tr>
+            <tr>
+              <td><strong>Business Analyst</strong></td>
+              <td><span class="tag-green">Ask</span></td>
+              <td>Interroge la logique métier d'une application sans toucher au code. Produit des spécifications fonctionnelles.</td>
+            </tr>
+            <tr>
+              <td><strong>Technical Writer</strong></td>
+              <td><span class="tag-purple">Custom Docs mode</span></td>
+              <td>Lit le code et génère / met à jour la documentation Markdown automatiquement.</td>
+            </tr>
+            <tr>
+              <td><strong>Security / Compliance</strong></td>
+              <td><span class="tag-purple">Custom Security mode</span></td>
+              <td>Analyse le code sous angle conformité et produit des rapports standardisés.</td>
+            </tr>
+            <tr>
+              <td><strong>Designer / UX</strong></td>
+              <td><span class="tag-blue">Carbon React</span></td>
+              <td>Convertit une maquette ou screenshot en composants React Carbon — sans écrire de code.</td>
+            </tr>
+            <tr>
+              <td><strong>Manager / DSI</strong></td>
+              <td><span class="tag-green">Bobalytics</span></td>
+              <td>Dashboard d'adoption, d'impact et de coûts par équipe — sans jamais ouvrir l'IDE.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="cds-notification" style="margin-top:16px;">
+          <div>
+            <div class="notif-title">Clé d'accessibilité</div>
+            <div class="notif-body">Les équipes techniques configurent Rules + AGENTS.md <strong>une fois</strong>. Les profils fonctionnels bénéficient automatiquement d'un Bob déjà "formé" au contexte projet — sans configuration manuelle.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 7 / 8</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════ -->
+    <!-- SLIDE 8 — Enterprise            -->
+    <!-- ════════════════════════════════ -->
+    <article class="slide" id="slide-7">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Gouvernance · Slide 08 / 09</div>
+        <h1 class="slide-h1">Plan <strong>Enterprise</strong></h1>
+        <p class="slide-subtitle">Fonctionnalités dédiées aux organisations : gestion des équipes, contrôle des dépenses et observabilité complète.</p>
+      </div>
+      <div class="slide-body">
+        <div class="cds-grid cols-2">
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Gestion des rôles</div>
+            <div class="tile-title">User &amp; Admin</div>
+            <p><strong>User</strong> : accès Bob dans les limites de dépenses de l'équipe.<br><strong>Admin</strong> : gestion des utilisateurs, équipes, dashboard administration.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Spending limits</div>
+            <div class="tile-title">Contrôle des coûts par équipe</div>
+            <p>Les admins configurent des plafonds de Bobcoins par équipe pour maîtriser les coûts d'usage de l'IA à l'échelle de l'organisation.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Bobalytics</div>
+            <div class="tile-title">KPIs d'adoption</div>
+            <p><strong>Adoption rate</strong> — taux d'utilisation par équipe.<br><strong>Bob Factor</strong> — contribution réelle au codebase.<br><strong>Bobcoin spend</strong> — coûts quotidiens et tendances.</p>
+          </div>
+          <div class="cds-tile">
+            <div class="tile-eyebrow">Premium packages</div>
+            <div class="tile-title">Add-ons spécialisés</div>
+            <p>Extensions optionnelles avec des capacités spécifiques. Attribution de seats par package et par utilisateur contrôlée par les admins.</p>
+          </div>
+        </div>
+        <div class="cds-notification" style="margin-top:16px; border-left-color:#198038; background:#defbe6;">
+          <div>
+            <div class="notif-title" style="color:#0e6027;">Sécurité des données</div>
+            <div class="notif-body">Bob ne collecte jamais votre code ni vos prompts dans sa télémétrie. Données interdites : SPI, PHI, données financières sensibles, code export-controlled Red/Gray.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 8 / 9</span>
+      </div>
+    </article>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- SLIDE 9 — Démarrage rapide : l'écran d'accueil  -->
+    <!-- ════════════════════════════════════════════════ -->
+    <article class="slide" id="slide-8">
+      <div class="slide-header">
+        <div class="slide-eyebrow">Démarrage rapide · Slide 09 / 09</div>
+        <h1 class="slide-h1">L'écran d'accueil <strong>Bob IDE</strong></h1>
+        <p class="slide-subtitle">Trois actions essentielles pour démarrer immédiatement depuis la page Welcome de Bob IDE.</p>
+      </div>
+      <div class="slide-body" style="padding: 12px 20px 8px; display:flex; flex-direction:column; gap:10px;">
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- Reconstitution fidèle de la capture d'écran           -->
+        <!-- Layout : panneau gauche Bob (50%) | panneau droit Welcome (50%) -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <div style="position:relative; width:100%; max-width:860px; margin:0 auto;">
+
+          <!-- SVG reconstruction fidèle à la capture d'écran -->
+          <svg viewBox="0 0 860 430" xmlns="http://www.w3.org/2000/svg"
+               style="width:100%; border:1px solid #3c3c3c; border-radius:4px; display:block;"
+               font-family="IBM Plex Sans, -apple-system, sans-serif">
+
+            <!-- ── Fond global ── -->
+            <rect width="860" height="430" fill="#1e1e1e"/>
+
+            <!-- ── Barre de titre macOS ── -->
+            <rect width="860" height="28" fill="#2d2d2d"/>
+            <circle cx="14" cy="14" r="5" fill="#ff5f57"/>
+            <circle cx="30" cy="14" r="5" fill="#ffbd2e"/>
+            <circle cx="46" cy="14" r="5" fill="#28c840"/>
+            <text x="370" y="19" fill="#8d8d8d" font-size="11" text-anchor="middle">test</text>
+            <!-- tab bar -->
+            <rect y="28" width="860" height="22" fill="#252526"/>
+            <rect x="0" y="28" width="100" height="22" fill="#1e1e1e"/>
+            <text x="10" y="43" fill="#cccccc" font-size="10">IBM BOB</text>
+            <!-- onglets navigateur (droite) -->
+            <rect x="690" y="28" width="90" height="22" fill="#1e1e1e" rx="2"/>
+            <text x="700" y="43" fill="#cccccc" font-size="9">🏠 Welcome</text>
+            <rect x="784" y="28" width="76" height="22" fill="#2d2d2d" rx="2"/>
+            <text x="788" y="43" fill="#8d8d8d" font-size="8">ibm_bob_slides</text>
+
+            <!-- ══ PANNEAU GAUCHE — Bob Chat (0..500) ══ -->
+            <rect x="0" y="50" width="500" height="380" fill="#1e1e1e"/>
+
+            <!-- Badge 95% en haut -->
+            <rect x="420" y="60" width="68" height="20" rx="10" fill="#1a4b8a"/>
+            <circle cx="430" cy="70" r="6" fill="#4589ff"/>
+            <text x="440" y="74" fill="#78a9ff" font-size="9" font-weight="600">95%</text>
+
+            <!-- Logo Bob (rectangle arrondi bleu avec robot) -->
+            <rect x="175" y="80" width="150" height="150" rx="20" fill="#1a3566"/>
+            <!-- tête du robot -->
+            <rect x="200" y="95" width="100" height="90" rx="12" fill="#ffffff"/>
+            <!-- casque bleu -->
+            <ellipse cx="250" cy="95" rx="54" ry="20" fill="#4589ff"/>
+            <rect x="196" y="88" width="108" height="30" rx="10" fill="#4589ff"/>
+            <!-- visage -->
+            <circle cx="232" cy="130" r="10" fill="#ffffff" stroke="#2d6ef7" stroke-width="2"/>
+            <circle cx="268" cy="130" r="10" fill="#ffffff" stroke="#2d6ef7" stroke-width="2"/>
+            <circle cx="232" cy="130" r="4" fill="#2d6ef7"/>
+            <circle cx="268" cy="130" r="4" fill="#2d6ef7"/>
+            <!-- sourire -->
+            <path d="M235 150 Q250 162 265 150" stroke="#525252" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- corps -->
+            <rect x="205" y="185" width="90" height="40" rx="6" fill="#ffffff"/>
+            <text x="220" y="211" fill="#2d6ef7" font-size="14" font-weight="700">&lt;/&gt;</text>
+
+            <!-- Hi, I'm Bob -->
+            <text x="250" y="248" fill="#ffffff" font-size="16" font-weight="300" text-anchor="middle">Hi, I'm </text>
+            <text x="310" y="248" fill="#78a9ff" font-size="16" font-weight="600">Bob</text>
+            <text x="250" y="266" fill="#8d8d8d" font-size="10" text-anchor="middle">Ask me questions or let me code for you.</text>
+
+            <!-- Documentation button -->
+            <rect x="185" y="276" width="130" height="22" rx="2" fill="none" stroke="#525252" stroke-width="1"/>
+            <text x="222" y="291" fill="#c6c6c6" font-size="10">📖 Documentation</text>
+
+            <!-- ── Recent Tasks ── -->
+            <text x="12" y="320" fill="#8d8d8d" font-size="9" font-weight="600" letter-spacing="1">RECENT TASKS</text>
+            <text x="460" y="320" fill="#78a9ff" font-size="9" text-anchor="end">See all</text>
+
+            <!-- task rows -->
+            <rect x="8" y="326" width="484" height="32" rx="2" fill="#252526"/>
+            <text x="16" y="340" fill="#cccccc" font-size="9">fais moi une explication détaillée du produit IBM BOB…</text>
+            <text x="16" y="352" fill="#6f6f6f" font-size="8">3 min ago   🔗 4.41</text>
+
+            <rect x="8" y="362" width="484" height="28" rx="2" fill="#2a2a2a"/>
+            <text x="16" y="374" fill="#cccccc" font-size="9">génère un powerpoint standard qui présente IBM en 2 slides</text>
+            <text x="16" y="385" fill="#6f6f6f" font-size="8">3 hrs ago   🔗 0.214</text>
+
+            <!-- ── Barre de chat ── -->
+            <rect x="8" y="392" width="484" height="26" rx="3" fill="#2d2d2d" stroke="#3c3c3c" stroke-width="1"/>
+            <text x="18" y="409" fill="#6f6f6f" font-size="9">Build Anything, @ for context, / for commands, ⌘ drag to attach</text>
+            <!-- bouton send -->
+            <circle cx="482" cy="405" r="9" fill="#525252"/>
+            <text x="478" y="409" fill="#ffffff" font-size="9">↑</text>
+
+            <!-- mode indicator -->
+            <text x="14" y="428" fill="#8d8d8d" font-size="8">+ Agent ∨   Permissions ∨</text>
+            <text x="350" y="428" fill="#8d8d8d" font-size="8">⌥ main*  ⚠ 0  △ 0  Bob Findings</text>
+
+            <!-- ══ SÉPARATEUR VERTICAL ══ -->
+            <line x1="500" y1="50" x2="500" y2="430" stroke="#3c3c3c" stroke-width="1"/>
+
+            <!-- ══ PANNEAU DROIT — Welcome page (500..860) ══ -->
+            <rect x="500" y="50" width="360" height="380" fill="#1e1e1e"/>
+
+            <!-- IBM Bob title -->
+            <text x="524" y="100" fill="#ffffff" font-size="20" font-weight="300">IBM Bob</text>
+            <text x="524" y="118" fill="#8d8d8d" font-size="11">Editing evolved</text>
+
+            <!-- Start section -->
+            <text x="524" y="148" fill="#c6c6c6" font-size="10" font-weight="600" letter-spacing="1">START</text>
+
+            <!-- New File… -->
+            <text x="536" y="168" fill="#78a9ff" font-size="12">New File…</text>
+
+            <!-- Open… -->
+            <text x="536" y="190" fill="#78a9ff" font-size="12">Open…</text>
+
+            <!-- Clone Git Repository… -->
+            <text x="536" y="212" fill="#78a9ff" font-size="12">Clone Git Repository…</text>
+
+            <!-- Connect to… -->
+            <text x="536" y="234" fill="#78a9ff" font-size="12">Connect to…</text>
+
+            <!-- Walkthroughs -->
+            <text x="700" y="148" fill="#c6c6c6" font-size="10" font-weight="600" letter-spacing="1">WALKTHROUGHS</text>
+            <rect x="695" y="155" width="155" height="26" rx="2" fill="#2a4a7f"/>
+            <text x="700" y="172" fill="#78a9ff" font-size="10">⧉ Working with Bob</text>
+            <text x="700" y="192" fill="#78a9ff" font-size="10">More…</text>
+
+            <!-- IBM-Bob Announcements -->
+            <text x="700" y="220" fill="#c6c6c6" font-size="10" font-weight="600">IBM-Bob Announcements</text>
+            <text x="700" y="236" fill="#8d8d8d" font-size="9">There are no current announcements.</text>
+
+            <!-- Recent section -->
+            <text x="524" y="264" fill="#c6c6c6" font-size="10" font-weight="600" letter-spacing="1">RECENT</text>
+            <text x="524" y="282" fill="#78a9ff" font-size="11">travaux IAA impacts</text>
+            <text x="660" y="282" fill="#6f6f6f" font-size="10">~/BOB Folder…</text>
+            <text x="524" y="300" fill="#78a9ff" font-size="11">BOB documentation</text>
+            <text x="660" y="300" fill="#6f6f6f" font-size="10">~/BOB Folder…</text>
+            <text x="524" y="318" fill="#78a9ff" font-size="11">BOB Folder test</text>
+            <text x="660" y="318" fill="#6f6f6f" font-size="10">~</text>
+
+            <!-- Show welcome page on startup -->
+            <text x="570" y="400" fill="#8d8d8d" font-size="9" text-anchor="middle">☑ Show welcome page on startup</text>
+            <text x="570" y="414" fill="#6f6f6f" font-size="8" text-anchor="middle">© Copyright IBM Corp. 2025, 2026</text>
+
+            <!-- Sidebar icons (droite extrême) -->
+            <rect x="844" y="50" width="16" height="380" fill="#252526"/>
+            <text x="846" y="100" fill="#8d8d8d" font-size="10">🔔</text>
+            <text x="846" y="140" fill="#8d8d8d" font-size="10">🔍</text>
+            <text x="846" y="185" fill="#8d8d8d" font-size="10">⇄</text>
+            <text x="846" y="230" fill="#8d8d8d" font-size="10">⬡</text>
+
+            <!-- ════════════════════════════════════════════ -->
+            <!--  ANNOTATIONS ROUGES                         -->
+            <!-- ════════════════════════════════════════════ -->
+
+            <!-- ① Créer un nouveau fichier / dossier -->
+            <!-- Encadré rouge sur "New File…" -->
+            <rect x="528" y="158" width="108" height="16" rx="2"
+                  fill="none" stroke="#da1e28" stroke-width="2"
+                  filter="url(#glow)"/>
+            <!-- Flèche vers la droite sortant du label -->
+            <line x1="640" y1="166" x2="700" y2="130" stroke="#da1e28" stroke-width="2"/>
+            <polygon points="695,122 708,128 698,136" fill="#da1e28"/>
+            <!-- Label callout ① -->
+            <rect x="705" y="108" width="148" height="22" rx="3" fill="#ffffff" stroke="#da1e28" stroke-width="2"/>
+            <text x="712" y="123" fill="#da1e28" font-size="10" font-weight="700">① Créer un fichier / dossier</text>
+
+            <!-- ② Lancer une conversation (barre de chat) -->
+            <!-- Encadré rouge sur la barre de chat -->
+            <rect x="8" y="391" width="485" height="28" rx="3"
+                  fill="none" stroke="#da1e28" stroke-width="2"/>
+            <!-- Flèche vers le bas depuis label -->
+            <line x1="180" y1="375" x2="180" y2="390" stroke="#da1e28" stroke-width="2"/>
+            <polygon points="174,384 180,393 186,384" fill="#da1e28"/>
+            <!-- Label callout ② -->
+            <rect x="80" y="352" width="148" height="22" rx="3" fill="#ffffff" stroke="#da1e28" stroke-width="2"/>
+            <text x="87" y="367" fill="#da1e28" font-size="10" font-weight="700">② Lancer une conversation</text>
+
+            <!-- ③ Cloner un repo Git -->
+            <!-- Encadré rouge sur "Clone Git Repository…" -->
+            <rect x="528" y="202" width="172" height="16" rx="2"
+                  fill="none" stroke="#da1e28" stroke-width="2"/>
+            <!-- Flèche vers la droite -->
+            <line x1="700" y1="210" x2="755" y2="248" stroke="#da1e28" stroke-width="2"/>
+            <polygon points="748,244 760,252 752,257" fill="#da1e28"/>
+            <!-- Label callout ③ -->
+            <rect x="756" y="252" width="96" height="22" rx="3" fill="#ffffff" stroke="#da1e28" stroke-width="2"/>
+            <text x="763" y="267" fill="#da1e28" font-size="10" font-weight="700">③ Cloner un repo Git</text>
+
+            <!-- Filtre glow pour les encadrés -->
+            <defs>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+                <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+
+          </svg>
+        </div><!-- /relative wrapper -->
+
+        <!-- Légende en 3 cartes Carbon -->
+        <div style="display:flex; gap:12px; flex-wrap:wrap; max-width:860px; margin:0 auto;">
+          <div style="background:#f4f4f4; border:1px solid #e0e0e0; border-left:4px solid #da1e28; padding:8px 12px; flex:1; min-width:200px;">
+            <div style="font-size:11px; font-weight:700; color:#da1e28; margin-bottom:3px;">① New File… — Créer un fichier / dossier</div>
+            <div style="font-size:11.5px; color:#525252;">Démarre un nouveau projet depuis zéro, directement dans Bob IDE, sans passer par l'explorateur de fichiers système.</div>
+          </div>
+          <div style="background:#f4f4f4; border:1px solid #e0e0e0; border-left:4px solid #da1e28; padding:8px 12px; flex:1; min-width:200px;">
+            <div style="font-size:11px; font-weight:700; color:#da1e28; margin-bottom:3px;">② Barre de chat — Lancer une conversation</div>
+            <div style="font-size:11.5px; color:#525252;">Utilisez <code style="font-size:10px;">@</code> pour le contexte fichier, <code style="font-size:10px;">/</code> pour les commandes, et le langage naturel pour tout le reste.</div>
+          </div>
+          <div style="background:#f4f4f4; border:1px solid #e0e0e0; border-left:4px solid #da1e28; padding:8px 12px; flex:1; min-width:200px;">
+            <div style="font-size:11px; font-weight:700; color:#da1e28; margin-bottom:3px;">③ Clone Git Repository… — Cloner un repo</div>
+            <div style="font-size:11.5px; color:#525252;">Importe un dépôt GitHub/GitLab. Bob génère automatiquement l'AGENTS.md et est prêt à travailler dessus immédiatement.</div>
+          </div>
+        </div>
+
+      </div><!-- /.slide-body -->
+      <div class="slide-footer">
+        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 9 / 9</span>
+      </div>
+    </article>
+
+  </div><!-- /.slide-frame -->
+
+  <!-- Right arrow -->
+  <button class="nav-arrow" id="nav-next" onclick="navigate(1)" title="Suivant">
+    <svg viewBox="0 0 24 24"><path d="M8.5 4 16 12l-7.5 8-1.5-1.4L13 12 7 5.4z"/></svg>
+  </button>
+</div><!-- /.stage -->
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Status bar                                                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="status-bar">
+  <span class="status-active">● IBM Bob IDE</span>
+  <span id="status-slide">Slide 1 / 9 — IBM Bob, c'est quoi ?</span>
+  <span style="margin-left:auto;">Navigation : ← → ou menu déroulant</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- JavaScript                                                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+  const TOTAL = 9;
+  let current = 0;
+
+  const slideNames = [
+    "IBM Bob, c'est quoi ?",
+    "Capacités clés",
+    "Le système de Modes",
+    "Sources d'information",
+    "Outils natifs",
+    "LLMs & Routing",
+    "Profils non-développeurs",
+    "Gouvernance Enterprise",
+    "Démarrage rapide : l'écran d'accueil"
+  ];
+
+  function render() {
+    // Hide all slides
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    // Show current
+    document.getElementById('slide-' + current).classList.add('active');
+
+    // Update dropdown
+    document.getElementById('slide-select').value = current;
+
+    // Update progress tag
+    document.getElementById('progress-tag').textContent = (current + 1) + ' / ' + TOTAL;
+
+    // Update status bar
+    document.getElementById('status-slide').textContent =
+      'Slide ' + (current + 1) + ' / ' + TOTAL + ' — ' + slideNames[current];
+
+    // Update arrow states
+    const isFirst = current === 0;
+    const isLast  = current === TOTAL - 1;
+
+    document.getElementById('btn-prev').disabled  = isFirst;
+    document.getElementById('nav-prev').disabled  = isFirst;
+    document.getElementById('btn-next').disabled  = isLast;
+    document.getElementById('nav-next').disabled  = isLast;
+  }
+
+  function navigate(dir) {
+    const next = current + dir;
+    if (next >= 0 && next < TOTAL) {
+      current = next;
+      render();
+    }
+  }
+
+  function goToSlide(idx) {
+    current = parseInt(idx, 10);
+    render();
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  navigate(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')    navigate(-1);
+    if (e.key === 'Home') goToSlide(0);
+    if (e.key === 'End')  goToSlide(TOTAL - 1);
+  });
+
+  // Init
+  render();
+</script>
+</body>
+</html>

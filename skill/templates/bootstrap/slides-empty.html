@@ -1,44 +1,449 @@
-<!--
-  Template: slides-empty
-  Usage: Template minimal pour démarrer une nouvelle présentation
-  Slides: 1 slide vide
-  Date: 2024-01
--->
 <!DOCTYPE html>
-<html data-doc-type="presentation">
+<!--
+  IBM Carbon Slides — Template bootstrap vide
+  Usage: copier ce fichier, renseigner data-title sur chaque section,
+         ajouter les slides dans .slide-frame, mettre à jour TOTAL et slideNames.
+  Référence complète: skill/templates/reference/slides/ibm-carbon.html
+-->
+<html lang="fr" data-doc-type="presentation">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nouvelle présentation</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Présentation — IBM Carbon</title>
+<style>
+  /* ── IBM Carbon Design Tokens ──────────────────────────────── */
+  :root {
+    --cds-background:          #ffffff;
+    --cds-background-hover:    #e8e8e8;
+    --cds-layer-01:            #f4f4f4;
+    --cds-layer-02:            #e0e0e0;
+    --cds-border-subtle-01:    #e0e0e0;
+    --cds-border-strong-01:    #8d8d8d;
+    --cds-text-primary:        #161616;
+    --cds-text-secondary:      #525252;
+    --cds-text-placeholder:    #a8a8a8;
+    --cds-text-on-color:       #ffffff;
+    --cds-interactive:         #0f62fe;
+    --cds-interactive-hover:   #0050e6;
+    --cds-focus:               #0f62fe;
+    --cds-icon-primary:        #161616;
+    --cds-icon-secondary:      #525252;
+    --cds-support-info:        #0043ce;
+    --cds-support-success:     #198038;
+    --cds-support-warning:     #f1c21b;
+    --cds-support-error:       #da1e28;
+    --cds-inverse-background:  #161616;
+    --cds-inverse-text:        #f4f4f4;
+    --ibm-blue-60:             #0f62fe;
+    --ibm-blue-70:             #0043ce;
+    --ibm-blue-10:             #edf5ff;
+    --ibm-gray-10:             #f4f4f4;
+    --ibm-gray-20:             #e0e0e0;
+    --ibm-gray-90:             #262626;
+    --ibm-gray-100:            #161616;
+    /* Carbon spacing scale */
+    --cds-spacing-01: 2px;  --cds-spacing-02: 4px;   --cds-spacing-03: 8px;
+    --cds-spacing-04: 12px; --cds-spacing-05: 16px;  --cds-spacing-06: 24px;
+    --cds-spacing-07: 32px; --cds-spacing-08: 40px;  --cds-spacing-09: 48px;
+    --cds-spacing-10: 64px; --cds-spacing-11: 80px;  --cds-spacing-12: 96px;
+    /* IBM Plex typography */
+    --cds-font-family-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --cds-font-family-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
 
-    body {
-      background: #e8e8e8;
-      font-family: Arial, Helvetica, sans-serif;
-    }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    section[data-type="slide"] {
-      width: 1280px;
-      min-height: 720px;
-      margin: 40px auto;
-      background: white;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-      padding: 80px 100px;
-      position: relative;
-    }
-  </style>
+  body {
+    font-family: var(--cds-font-family-sans);
+    background: var(--cds-background);
+    color: var(--cds-text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header / Shell ─────────────────────────────────────────── */
+  .shell-header {
+    height: 48px;
+    background: var(--ibm-gray-100);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--cds-spacing-05);
+    gap: var(--cds-spacing-05);
+    flex-shrink: 0;
+    border-bottom: 1px solid #393939;
+  }
+  .shell-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+    color: var(--cds-inverse-text);
+    font-size: 14px;
+    font-weight: 400;
+    white-space: nowrap;
+    letter-spacing: .01em;
+  }
+  .shell-logo .product-name { font-weight: 600; color: #78a9ff; }
+  .shell-divider { width: 1px; height: 20px; background: #393939; }
+  .shell-title { color: #c6c6c6; font-size: 14px; }
+
+  /* ── Toolbar ────────────────────────────────────────────────── */
+  .toolbar {
+    height: 48px;
+    background: var(--ibm-gray-10);
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--cds-spacing-05);
+    gap: var(--cds-spacing-05);
+    flex-shrink: 0;
+  }
+  .cds-select-wrapper { position: relative; display: inline-flex; align-items: center; }
+  .cds-select-label { font-size: 12px; color: var(--cds-text-secondary); margin-right: var(--cds-spacing-03); white-space: nowrap; }
+  .cds-select {
+    appearance: none; -webkit-appearance: none;
+    height: 32px; min-width: 260px; padding: 0 36px 0 12px;
+    background: var(--cds-background);
+    border: 1px solid var(--cds-border-strong-01);
+    border-bottom-color: var(--ibm-gray-100);
+    color: var(--cds-text-primary);
+    font-family: var(--cds-font-family-sans); font-size: 14px;
+    cursor: pointer; outline: none;
+    transition: border-color 70ms ease;
+  }
+  .cds-select:focus { border-color: var(--cds-focus); box-shadow: inset 0 0 0 1px var(--cds-focus); }
+  .cds-select:hover { background: var(--ibm-gray-10); }
+  .cds-select-icon { position: absolute; right: 10px; pointer-events: none; color: var(--cds-icon-primary); }
+  .cds-btn-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; background: transparent;
+    border: 1px solid transparent; cursor: pointer; color: var(--cds-icon-primary);
+    transition: background 70ms ease; border-radius: 0; outline: none; flex-shrink: 0;
+  }
+  .cds-btn-icon:hover { background: var(--cds-background-hover); }
+  .cds-btn-icon:focus { border-color: var(--cds-focus); box-shadow: inset 0 0 0 1px var(--cds-focus); }
+  .cds-btn-icon:disabled { opacity: .3; cursor: not-allowed; }
+  .cds-btn-icon svg { width: 16px; height: 16px; fill: currentColor; }
+  .toolbar-sep { width: 1px; height: 24px; background: var(--cds-border-subtle-01); }
+  .cds-tag {
+    display: inline-flex; align-items: center; height: 24px;
+    padding: 0 var(--cds-spacing-03); background: var(--ibm-blue-10);
+    color: var(--ibm-blue-70); font-size: 12px; font-weight: 600;
+    border-radius: 100px; white-space: nowrap; margin-left: auto;
+  }
+
+  /* ── Slide stage ────────────────────────────────────────────── */
+  .stage {
+    flex: 1; display: flex; align-items: stretch;
+    overflow: hidden; background: #e8e8e8;
+  }
+  .nav-arrow {
+    display: flex; align-items: center; justify-content: center;
+    width: 48px; background: var(--ibm-gray-10); border: none;
+    cursor: pointer; color: var(--cds-icon-primary);
+    transition: background 70ms ease, color 70ms ease;
+    flex-shrink: 0; outline: none;
+  }
+  .nav-arrow:hover:not(:disabled) { background: var(--ibm-gray-20); }
+  .nav-arrow:focus { box-shadow: inset 0 0 0 2px var(--cds-focus); }
+  .nav-arrow:disabled { opacity: .25; cursor: not-allowed; }
+  .nav-arrow svg { width: 20px; height: 20px; fill: currentColor; }
+  .slide-frame {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: var(--cds-spacing-07); overflow: hidden;
+  }
+  .slide {
+    display: none; width: 100%; max-width: 900px;
+    background: var(--cds-background);
+    border: 1px solid var(--cds-border-subtle-01);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    flex-direction: column;
+    animation: fadein 200ms ease;
+    overflow-y: auto; max-height: 100%;
+  }
+  .slide.active { display: flex; }
+  @keyframes fadein {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Slide anatomy ──────────────────────────────────────────── */
+  .slide-header {
+    padding: var(--cds-spacing-07) var(--cds-spacing-08);
+    border-bottom: 4px solid var(--ibm-blue-60);
+  }
+  .slide-eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ibm-blue-60);
+    margin-bottom: var(--cds-spacing-03);
+  }
+  .slide-h1 {
+    font-size: 36px; font-weight: 300; line-height: 1.2;
+    color: var(--cds-text-primary); letter-spacing: -.01em;
+  }
+  .slide-h1 strong { font-weight: 600; }
+  .slide-subtitle {
+    margin-top: var(--cds-spacing-04); font-size: 16px;
+    color: var(--cds-text-secondary); line-height: 1.5; max-width: 600px;
+  }
+  .slide-body { padding: var(--cds-spacing-07) var(--cds-spacing-08); flex: 1; }
+  .slide-footer {
+    height: 40px; padding: 0 var(--cds-spacing-08);
+    border-top: 1px solid var(--cds-border-subtle-01);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--ibm-gray-10); flex-shrink: 0;
+  }
+  .slide-footer-left  { font-size: 11.5px; color: var(--cds-text-secondary); }
+  .slide-footer-right { font-size: 11.5px; color: var(--cds-text-placeholder); }
+
+  /* ── Carbon components ──────────────────────────────────────── */
+  /* Grid */
+  .cds-grid { display: grid; gap: var(--cds-spacing-05); }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  /* Tile */
+  .cds-tile { background: var(--ibm-gray-10); border: 1px solid var(--cds-border-subtle-01); padding: var(--cds-spacing-05); }
+  .cds-tile .tile-eyebrow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--ibm-blue-60); margin-bottom: var(--cds-spacing-02); }
+  .cds-tile .tile-title { font-size: 14px; font-weight: 600; color: var(--cds-text-primary); margin-bottom: var(--cds-spacing-02); }
+  .cds-tile p { font-size: 12.5px; color: var(--cds-text-secondary); line-height: 1.55; }
+
+  /* Structured list (table) */
+  .cds-structured-list { width: 100%; border-collapse: collapse; }
+  .cds-structured-list thead th {
+    background: var(--ibm-gray-100); color: var(--cds-inverse-text);
+    font-size: 12px; font-weight: 600; text-align: left;
+    padding: var(--cds-spacing-03) var(--cds-spacing-05);
+    letter-spacing: .04em; text-transform: uppercase;
+  }
+  .cds-structured-list tbody td {
+    font-size: 13px; padding: var(--cds-spacing-04) var(--cds-spacing-05);
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+    color: var(--cds-text-primary); vertical-align: top;
+  }
+  .cds-structured-list tbody tr:last-child td { border-bottom: none; }
+  .cds-structured-list tbody tr:hover td { background: var(--ibm-gray-10); }
+
+  /* Notification */
+  .cds-notification {
+    display: flex; gap: var(--cds-spacing-04);
+    padding: var(--cds-spacing-04) var(--cds-spacing-05);
+    border-left: 4px solid var(--ibm-blue-60);
+    background: var(--ibm-blue-10); margin-top: var(--cds-spacing-05);
+  }
+  .cds-notification .notif-title { font-size: 13px; font-weight: 600; color: var(--ibm-blue-70); }
+  .cds-notification .notif-body  { font-size: 12.5px; color: var(--cds-text-secondary); margin-top: 2px; }
+  .cds-notification.success { border-left-color: #198038; background: #defbe6; }
+  .cds-notification.success .notif-title { color: #0e6027; }
+  .cds-notification.warning { border-left-color: #f1c21b; background: #fdf6dd; }
+  .cds-notification.error   { border-left-color: #da1e28; background: #fff1f1; }
+
+  /* Hero stat */
+  .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: var(--cds-spacing-05); margin-top: var(--cds-spacing-05); }
+  .stat-card { background: var(--ibm-gray-10); border-left: 4px solid var(--ibm-blue-60); padding: var(--cds-spacing-05); }
+  .stat-value { font-size: 32px; font-weight: 300; color: var(--ibm-blue-60); line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--cds-text-secondary); margin-top: var(--cds-spacing-02); }
+
+  /* Inline code */
+  .cds-code { font-family: var(--cds-font-family-mono); font-size: 12px; background: var(--ibm-gray-10); border: 1px solid var(--cds-border-subtle-01); padding: 1px 6px; color: var(--ibm-blue-70); }
+
+  /* Tags */
+  .tag-blue   { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#dbeafe; color:#1d4ed8; }
+  .tag-green  { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#d1fae5; color:#065f46; }
+  .tag-purple { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#ede9fe; color:#5b21b6; }
+  .tag-gray   { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#e0e0e0; color:#525252; }
+  .tag-red    { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#ffd7d9; color:#a2191f; }
+
+  /* Context window bar */
+  .cw-bar { display:flex; border:1px solid var(--cds-border-subtle-01); overflow:hidden; height:32px; margin-top:var(--cds-spacing-04); border-radius:2px; }
+  .cw-seg { display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff; overflow:hidden; white-space:nowrap; padding:0 6px; }
+
+  /* Mention pills */
+  .mention-wrap { display:flex; flex-wrap:wrap; gap:var(--cds-spacing-03); margin-top:var(--cds-spacing-04); }
+  .mention-pill { display:inline-flex; align-items:center; gap:var(--cds-spacing-02); padding:var(--cds-spacing-02) var(--cds-spacing-04); background:var(--ibm-gray-10); border:1px solid var(--cds-border-subtle-01); font-size:12px; color:var(--cds-text-primary); }
+  .mention-pill code { font-family:var(--cds-font-family-mono); font-size:11.5px; color:var(--ibm-blue-60); }
+  .mention-pill span { color:var(--cds-text-secondary); font-size:11.5px; }
+
+  /* ── Status bar ─────────────────────────────────────────────── */
+  .status-bar {
+    height: 24px; background: var(--ibm-gray-100);
+    display: flex; align-items: center;
+    padding: 0 var(--cds-spacing-05); gap: var(--cds-spacing-05);
+    flex-shrink: 0; border-top: 1px solid #393939;
+  }
+  .status-bar span { font-size: 11px; color: #8d8d8d; }
+  .status-bar .status-active { color: #42be65; }
+</style>
 </head>
 <body>
 
-  <section data-type="slide" data-id="slide-1" data-title="Slide principal">
-    <h1 data-editable="text" style="font-size:48px; color:#1a1a2e; margin-bottom:24px;">
-      Titre de la présentation
-    </h1>
-    <p data-editable="text" style="font-size:22px; color:#555;">
-      Sous-titre ou accroche
-    </p>
-  </section>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Shell Header  —  personnaliser logo + titre               -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<header class="shell-header">
+  <div class="shell-logo">
+    <!-- Remplacer par le vrai logo SVG si besoin -->
+    <svg width="20" height="20" viewBox="0 0 32 32" fill="#78a9ff" xmlns="http://www.w3.org/2000/svg">
+      <rect width="32" height="32" rx="4" fill="#0f62fe"/>
+      <text x="7" y="22" fill="#fff" font-family="IBM Plex Sans,sans-serif" font-size="16" font-weight="700">P</text>
+    </svg>
+    <span class="product-name"><!-- Nom produit --></span>
+  </div>
+  <div class="shell-divider"></div>
+  <span class="shell-title"><!-- Titre de la présentation --></span>
+</header>
 
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Toolbar                                                    -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="toolbar">
+  <button class="cds-btn-icon" id="btn-prev" onclick="navigate(-1)" title="Précédent (←)" disabled>
+    <svg viewBox="0 0 16 16"><path d="M10.5 15.5 3 8l7.5-7.5 1.4 1.4L5.8 8l6.1 6.1z"/></svg>
+  </button>
+  <button class="cds-btn-icon" id="btn-next" onclick="navigate(1)" title="Suivant (→)">
+    <svg viewBox="0 0 16 16"><path d="M5.5.5 13 8l-7.5 7.5-1.4-1.4L10.2 8 4.1 1.9z"/></svg>
+  </button>
+  <div class="toolbar-sep"></div>
+  <span class="cds-select-label">Diapositive :</span>
+  <div class="cds-select-wrapper">
+    <select class="cds-select" id="slide-select" onchange="goToSlide(this.value)">
+      <!-- OPTIONS GÉNÉRÉES PAR JS — ne pas modifier manuellement -->
+    </select>
+    <svg class="cds-select-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+      <path d="M8 11L3 6h10z"/>
+    </svg>
+  </div>
+  <div class="toolbar-sep"></div>
+  <button class="cds-btn-icon" onclick="goToSlide(0)" title="Première diapositive">
+    <svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zm3.5 6 7-6v12z"/></svg>
+  </button>
+  <button class="cds-btn-icon" id="btn-last" title="Dernière diapositive">
+    <svg viewBox="0 0 16 16"><path d="M12 2h2v12h-2zm-2.5 6-7 6V2z"/></svg>
+  </button>
+  <span class="cds-tag" id="progress-tag">1 / 1</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Stage                                                      -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="stage">
+  <button class="nav-arrow" id="nav-prev" onclick="navigate(-1)" disabled title="Précédent">
+    <svg viewBox="0 0 24 24"><path d="M15.5 20 8 12l7.5-8 1.5 1.4L11 12l6 6.6z"/></svg>
+  </button>
+
+  <div class="slide-frame">
+
+    <!-- ══════════════════════════════════════════════════ -->
+    <!-- SLIDE 1 — Couverture                              -->
+    <!-- Dupliquer ce bloc pour chaque nouvelle slide.    -->
+    <!-- Mettre à jour TOTAL et slideNames dans le JS.    -->
+    <!-- ══════════════════════════════════════════════════ -->
+    <article class="slide active" id="slide-0" data-type="slide" data-id="slide-0" data-title="Titre de la présentation">
+      <div class="slide-header">
+        <div class="slide-eyebrow" data-editable="text">Section · Slide 01 / 01</div>
+        <h1 class="slide-h1" data-editable="text"><strong>Titre</strong> de la présentation</h1>
+        <p class="slide-subtitle" data-editable="text">Sous-titre ou description courte de la présentation.</p>
+      </div>
+      <div class="slide-body" data-editable="text">
+        <!-- Insérer le contenu ici.
+             Composants disponibles: .cds-grid .cols-2/.cols-3/.cols-4,
+             .cds-tile, .cds-structured-list, .cds-notification,
+             .stat-grid/.stat-card, .cds-code, .tag-blue/green/purple/gray/red
+             Voir ibm-carbon.html pour des exemples complets. -->
+        <p style="color: var(--cds-text-secondary); font-style: italic;">Contenu de la slide…</p>
+      </div>
+      <div class="slide-footer">
+        <span class="slide-footer-left" data-editable="text"><!-- Nom produit / Présentation --></span>
+        <span class="slide-footer-right">Slide 1 / 1</span>
+      </div>
+    </article>
+
+    <!-- Ajouter les slides suivantes ici avec id="slide-1", "slide-2", etc. -->
+
+  </div>
+
+  <button class="nav-arrow" id="nav-next" onclick="navigate(1)" title="Suivant">
+    <svg viewBox="0 0 24 24"><path d="M8.5 4 16 12l-7.5 8-1.5-1.4L13 12 7 5.4z"/></svg>
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- Status bar                                                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="status-bar">
+  <span class="status-active">●</span>
+  <span id="status-slide">Slide 1 / 1</span>
+  <span style="margin-left:auto;">Navigation : ← → ou menu déroulant</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- JavaScript — navigation                                    -->
+<!-- Mettre à jour TOTAL et slideNames quand on ajoute slides  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+  // ── À METTRE À JOUR à chaque ajout de slide ──────────────────
+  const TOTAL = 1;
+  const slideNames = [
+    "Titre de la présentation",
+    // "Slide 2", "Slide 3", ...
+  ];
+  // ─────────────────────────────────────────────────────────────
+
+  let current = 0;
+
+  // Générer les options du dropdown
+  const sel = document.getElementById('slide-select');
+  slideNames.forEach((name, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = String(i + 1).padStart(2, '0') + ' — ' + name;
+    sel.appendChild(opt);
+  });
+
+  // Bouton "Dernière diapositive"
+  document.getElementById('btn-last').onclick = () => goToSlide(TOTAL - 1);
+
+  function render() {
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    document.getElementById('slide-' + current).classList.add('active');
+    sel.value = current;
+    document.getElementById('progress-tag').textContent = (current + 1) + ' / ' + TOTAL;
+    document.getElementById('status-slide').textContent =
+      'Slide ' + (current + 1) + ' / ' + TOTAL + ' — ' + slideNames[current];
+    const isFirst = current === 0;
+    const isLast  = current === TOTAL - 1;
+    document.getElementById('btn-prev').disabled = isFirst;
+    document.getElementById('nav-prev').disabled = isFirst;
+    document.getElementById('btn-next').disabled = isLast;
+    document.getElementById('nav-next').disabled = isLast;
+    // Mettre à jour le footer de chaque slide
+    document.querySelectorAll('.slide-footer-right').forEach((el, i) => {
+      if (parseInt(el.closest('.slide').id.replace('slide-','')) === current) {
+        el.textContent = 'Slide ' + (current + 1) + ' / ' + TOTAL;
+      }
+    });
+  }
+
+  function navigate(dir) {
+    const next = current + dir;
+    if (next >= 0 && next < TOTAL) { current = next; render(); }
+  }
+
+  function goToSlide(idx) {
+    current = parseInt(idx, 10);
+    render();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  navigate(-1);
+    if (e.key === 'Home') goToSlide(0);
+    if (e.key === 'End')  goToSlide(TOTAL - 1);
+  });
+
+  render();
+</script>
 </body>
 </html>
