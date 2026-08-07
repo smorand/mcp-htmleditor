@@ -34,6 +34,20 @@ def test_doc_template_is_document() -> None:
     assert 'data-doc-type="document"' in content
 
 
+def test_doc_perso_template_is_document() -> None:
+    """The 'doc-perso' template is a document with the perso charter marker."""
+    content = template_path("doc-perso").read_text(encoding="utf-8")
+    assert 'data-doc-type="document"' in content
+    assert 'data-doc-template="perso"' in content
+
+
+def test_doc_ei_template_is_document() -> None:
+    """The 'doc-ei' template is a document with the Euro-Information marker."""
+    content = template_path("doc-ei").read_text(encoding="utf-8")
+    assert 'data-doc-type="document"' in content
+    assert 'data-doc-template="ei"' in content
+
+
 def test_unknown_key_raises_keyerror() -> None:
     """An unknown template key raises KeyError."""
     with pytest.raises(KeyError):

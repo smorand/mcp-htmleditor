@@ -16,7 +16,7 @@ mcp-htmleditor export pptx in.html out.pptx
 mcp-htmleditor export docx in.html out.docx
 ```
 
-Template keys: `ei` (Euro-Information), `carbon` (IBM Carbon), `doc` (Word-like document).
+Template keys: `ei` (Euro-Information slides), `carbon` (IBM Carbon slides), `doc` (Word-like document), `doc-perso` (Perso charter document), `doc-ei` (Euro-Information document).
 Bootstraps live in `skill/templates/bootstrap/`, full examples in `skill/templates/reference/`.
 The `new` command copies a bootstrap; template files are read-only via the server.
 
@@ -45,11 +45,12 @@ own uv-isolated env, so third-party import stubs are handled via
 - `http_server.py` — ThreadingHTTPServer, routes: `/`, `/static/*`, `/content`, `/status`
 - `mcp_server.py` — FastMCP with 6 tools
 - `cli.py` — Click CLI: `templates`, `new`, `serve`, `mcp`, `export`
-- `templates.py` — template registry (key → bootstrap file): ei, carbon, doc
+- `templates.py` — template registry (key → bootstrap file): ei, carbon, doc, doc-perso, doc-ei
 - `export/to_pptx.py` — HTML → PPTX (python-pptx, parses data-type attributes)
-- `export/to_docx.py` — HTML → DOCX (pandoc subprocess)
-- `static/editor.js` — iframe renderer, polling, rich-text toolbar, slide insert, image embed
+- `export/to_docx.py` — HTML → DOCX (pandoc `-f html`, maps h1-h5 to Word Heading styles)
+- `static/editor.js` — iframe renderer, polling, rich-text toolbar, slide insert, doc-block insert, image embed
 - `static/slide-layouts.js` — per-template slide layouts (LAYOUT_SETS.carbon / .ei)
+- `static/doc-blocks.js` — document block definitions (DOC_BLOCKS: title, subtitle, heading1-5, paragraph, table, list)
 
 ## LLM workflow pattern
 
@@ -62,9 +63,11 @@ Never modify the file without these flanking calls.
 ## HTML conventions
 
 - `data-doc-type="presentation"` on `<html>` → slide navigation active
-- `data-doc-type="document"` → Word-like mode
+- `data-doc-type="document"` → Word-like mode ("＋ Bloc" picker in edit mode)
+- `data-doc-template="perso"` / `"ei"` on the document `<article>` selects the charter
 - `data-type="slide"` requires `data-id` (unique) and `data-title`
 - `data-editable="text"` on editable text elements
+- Document headings use semantic `<h1>`..`<h5>` (classes `doc-title`, `doc-subtitle`, `doc-h1`..`doc-h5`) so pandoc maps them to Word Heading styles
 
 ## State file
 

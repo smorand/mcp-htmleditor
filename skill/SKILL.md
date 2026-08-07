@@ -19,19 +19,23 @@ Il n'y a pas d'option `--template` sur `serve`: on crée d'abord, on édite ensu
 
 ```bash
 mcp-htmleditor templates                          # liste les templates
-mcp-htmleditor new ei     ma-pres.html   --serve  # Euro-Information
-mcp-htmleditor new carbon ma-pres.html   --serve  # IBM Carbon
-mcp-htmleditor new doc    mon-rapport.html        # Document
+mcp-htmleditor new ei     ma-pres.html   --serve  # Euro-Information (slides)
+mcp-htmleditor new carbon ma-pres.html   --serve  # IBM Carbon (slides)
+mcp-htmleditor new doc    mon-rapport.html        # Document standard
+mcp-htmleditor new doc-perso mon-doc.html --serve # Document charte Perso
+mcp-htmleditor new doc-ei    note-ei.html --serve # Document Euro-Information
 ```
 
 ### Où sont stockés les templates
 
 ```
 templates/
-├── bootstrap/                    ← points de départ (copiés par `new`)
-│   ├── slides-ei-empty.html      ← key: ei     (Euro-Information)
-│   ├── slides-empty.html         ← key: carbon (IBM Carbon)
-│   └── document-empty.html       ← key: doc    (document Word-like)
+├── bootstrap/                     ← points de départ (copiés par `new`)
+│   ├── slides-ei-empty.html       ← key: ei        (Euro-Information)
+│   ├── slides-empty.html          ← key: carbon    (IBM Carbon)
+│   ├── document-empty.html        ← key: doc       (document standard)
+│   ├── document-perso-empty.html  ← key: doc-perso (charte Perso, Arial)
+│   └── document-ei-empty.html     ← key: doc-ei    (Euro-Information, Segoe UI)
 └── reference/                    ← exemples complets (à consulter/cloner)
     ├── slides/
     │   ├── euro-information.html  ← EI: titre + agenda + contenu, logos embarqués
@@ -39,7 +43,9 @@ templates/
     │   ├── presentation-standard.html
     │   └── roadmap-one-pager.html
     └── documents/
-        └── report-standard.html
+        ├── report-standard.html   ← rapport standard générique
+        ├── perso.html             ← charte Perso: titre/sous-titre + h1-h5 + tableau + liste
+        └── euro-information.html   ← document EI: en-tête bleu + logo, headings bleus
 ```
 
 Les fichiers `bootstrap/` sont le point de départ minimal. Les fichiers `reference/`
@@ -52,11 +58,17 @@ contenant `templates/` est ignorée).
 - **Euro-Information** (`ei`): présentations EI. Bleu `#003A8D`, orange `#FBAE40`,
   police Segoe UI, logos Crédit Mutuel / CIC / Euro Information embarqués en base64.
 - **IBM Carbon** (`carbon`): présentations génériques. Tokens Carbon.
-- **Document** (`doc`): documents Word-like (export DOCX optimal).
+- **Document** (`doc`): documents Word-like standard (export DOCX optimal).
+- **Document Perso** (`doc-perso`): charte Perso, police Arial, headings h1-h5
+  colorés (titre 22pt gras souligné centré, h1 18pt, h2 bleu, etc.).
+- **Document EI** (`doc-ei`): document Euro-Information, bleu EI + orange, Segoe UI,
+  en-tête avec filet bleu et logo EI embarqué.
 
-Le serveur détecte automatiquement le template du fichier ouvert et adapte le picker
-« Insérer slide » (5 layouts adaptés au template: title, agenda, section, content, diagram).
-Règles détaillées: `skill/types/slides.md`.
+En mode présentation, le serveur adapte le picker « Insérer slide » (5 layouts:
+title, agenda, section, content, diagram). En mode document, la toolbar affiche un
+bouton « ＋ Bloc » qui ouvre un picker de blocs (titre, sous-titre, h1-h5,
+paragraphe, tableau, liste). Règles détaillées: `skill/types/slides.md` et
+`skill/types/document.md`.
 
 ---
 
@@ -90,10 +102,12 @@ mcp-htmleditor templates
 
 # Créer un fichier à partir d'un template (le moyen recommandé de démarrer)
 mcp-htmleditor new <template> mon-fichier.html
-#   <template> = ei | carbon | doc
-#   ei     → Euro-Information (Crédit Mutuel / CIC)
-#   carbon → IBM Carbon
-#   doc    → document Word-like
+#   <template> = ei | carbon | doc | doc-perso | doc-ei
+#   ei        → Euro-Information slides (Crédit Mutuel / CIC)
+#   carbon    → IBM Carbon slides
+#   doc       → document Word-like standard
+#   doc-perso → document charte Perso (Arial, headings colorés)
+#   doc-ei    → document Euro-Information (bleu EI, Segoe UI)
 # Option --serve pour ouvrir l'éditeur immédiatement:
 mcp-htmleditor new ei ma-presentation.html --serve
 
@@ -166,4 +180,6 @@ mcp-htmleditor export docx input.html output.docx
 | `templates/reference/slides/euro-information.html` | **Template de référence Euro-Information** (3 slides: titre, agenda, contenu; logos CM/CIC/EI embarqués) |
 | `templates/reference/slides/presentation-standard.html` | Template 4 slides standard |
 | `templates/reference/slides/roadmap-one-pager.html` | Template roadmap one-pager |
-| `templates/reference/documents/report-standard.html` | Template rapport standard |
+| `templates/reference/documents/report-standard.html` | Template rapport standard générique |
+| `templates/reference/documents/perso.html` | **Template document charte Perso** (titre/sous-titre, h1-h5 colorés, tableau, liste) |
+| `templates/reference/documents/euro-information.html` | **Template document Euro-Information** (en-tête bleu + logo, headings bleus, Segoe UI) |

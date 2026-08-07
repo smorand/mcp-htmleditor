@@ -1,0 +1,126 @@
+<!--
+  Template: document-ei-empty (bootstrap)
+  Usage: Point de depart minimal pour un document Euro-Information (bleu EI, Segoe UI)
+  Logo EI embarque en base64 dans l'en-tete.
+  Date: 2026-02
+-->
+<!DOCTYPE html>
+<html lang="fr" data-doc-type="document">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document Euro-Information</title>
+  <style>
+    :root {
+      --ei-blue:    #003A8D;
+      --ei-blue-2:  #284AAA;
+      --ei-blue-3:  #285C99;
+      --ei-orange:  #FBAE40;
+      --ei-gray:    #50565B;
+      --ei-font: 'Segoe UI', 'Calibri', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+
+    body { background: #e8e8e8; font-family: var(--ei-font); }
+
+    article[data-type="document"] {
+      max-width: 820px; margin: 40px auto; background: #ffffff;
+      padding: 0 0 64px; box-shadow: 0 2px 16px rgba(0, 0, 0, 0.14);
+      font-family: var(--ei-font); font-size: 11pt; line-height: 1.65; color: #262626;
+    }
+
+    .ei-doc-head {
+      border-top: 6px solid var(--ei-blue); border-bottom: 2px solid var(--ei-orange);
+      padding: 28px 72px 20px; display: flex; align-items: center;
+      justify-content: space-between; gap: 24px;
+    }
+    .ei-doc-head .ei-doc-logo img { height: 40px; display: block; }
+    .ei-doc-head .ei-doc-brand {
+      font-size: 10pt; color: var(--ei-gray); letter-spacing: 0.04em; text-transform: uppercase;
+    }
+
+    .ei-doc-body { padding: 32px 72px 0; }
+
+    .doc-title {
+      font-size: 24pt; color: var(--ei-blue); font-weight: 700;
+      line-height: 1.15; margin-bottom: 8px;
+    }
+    .doc-subtitle {
+      font-size: 13pt; color: var(--ei-gray); font-weight: 400; margin-bottom: 8px;
+    }
+    .ei-title-rule {
+      height: 3px; width: 96px; background: var(--ei-orange);
+      margin: 6px 0 28px; border: none;
+    }
+
+    article[data-type="document"] h1.doc-h1 {
+      font-size: 18pt; color: var(--ei-blue); font-weight: 700;
+      margin-top: 28px; margin-bottom: 12px;
+      border-bottom: 2px solid var(--ei-blue); padding-bottom: 4px;
+    }
+    article[data-type="document"] h2.doc-h2 {
+      font-size: 15pt; color: var(--ei-blue-2); font-weight: 700;
+      margin-top: 22px; margin-bottom: 10px;
+    }
+    article[data-type="document"] h3.doc-h3 {
+      font-size: 13pt; color: var(--ei-blue-3); font-weight: 600;
+      margin-top: 18px; margin-bottom: 8px;
+    }
+    article[data-type="document"] h4.doc-h4 {
+      font-size: 12pt; color: var(--ei-gray); font-weight: 600;
+      margin-top: 16px; margin-bottom: 6px;
+    }
+    article[data-type="document"] h5.doc-h5 {
+      font-size: 11pt; color: var(--ei-gray); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.04em; margin-top: 14px; margin-bottom: 6px;
+    }
+
+    article[data-type="document"] p { margin-bottom: 12px; }
+    article[data-type="document"] ul,
+    article[data-type="document"] ol { padding-left: 26px; margin-bottom: 12px; }
+    article[data-type="document"] li { margin-bottom: 4px; }
+
+    table[data-type="table"] {
+      width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 10.5pt;
+    }
+    table[data-type="table"] th {
+      background: var(--ei-blue); color: #ffffff; text-align: left; font-weight: 700; padding: 8px 12px;
+    }
+    table[data-type="table"] td { padding: 8px 12px; border-bottom: 1px solid #dbe3f0; }
+    table[data-type="table"] tbody tr:nth-child(even) td { background: #f4f6f9; }
+
+    .ei-doc-foot {
+      margin: 40px 72px 0; padding-top: 12px; border-top: 1px solid #dbe3f0;
+      font-size: 9pt; color: #8a9099; display: flex; justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+
+  <article data-type="document" data-doc-template="ei" data-layout="single-column">
+
+    <div class="ei-doc-head">
+      <div class="ei-doc-logo"><img src="data:image/png;base64,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" alt="Euro Information" /></div>
+      <div class="ei-doc-brand" data-editable="text">Euro-Information</div>
+    </div>
+
+    <div class="ei-doc-body">
+      <h1 class="doc-title" data-editable="text">Titre du document</h1>
+      <p class="doc-subtitle" data-editable="text">Sous-titre, auteur, mois annee</p>
+      <hr class="ei-title-rule" />
+
+      <p data-editable="text">
+        Redigez votre document ici. Utilisez le bouton Bloc en mode edition pour
+        inserer des titres, paragraphes, tableaux et listes.
+      </p>
+    </div>
+
+    <div class="ei-doc-foot">
+      <span data-editable="text">Euro-Information</span>
+      <span data-editable="text">Confidentiel</span>
+    </div>
+
+  </article>
+
+</body>
+</html>

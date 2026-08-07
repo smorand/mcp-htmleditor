@@ -20,6 +20,10 @@
       <button id="btn-insert-after" title="Insérer une slide après la slide courante">Slide après ＋</button>
       <button id="btn-delete-slide" title="Supprimer la slide courante">🗑 Slide</button>
     </span>
+    <!-- Document block actions: only shown in document mode + edit mode -->
+    <span id="toolbar-doc-actions" style="display:none">
+      <button id="btn-insert-block" title="Insérer un bloc de document à la position du curseur">＋ Bloc</button>
+    </span>
     <label id="toolbar-edit-toggle">
       <input type="checkbox" id="edit-mode-checkbox"> Édition
     </label>
@@ -35,6 +39,16 @@
     </div>
   </div>
 
+  <!-- Document block picker modal (reuse picker CSS) -->
+  <div id="block-picker" style="display:none">
+    <div class="picker-backdrop"></div>
+    <div class="picker-panel">
+      <div class="picker-title">Choisir un bloc de document</div>
+      <div id="block-picker-grid"></div>
+      <button class="picker-cancel">Annuler</button>
+    </div>
+  </div>
+
   <!-- "Modification LLM en cours" overlay -->
   <div id="update-overlay" style="display:none">
     <div class="overlay-content">&#8635; Modification en cours…</div>
@@ -44,6 +58,7 @@
   <iframe id="content-frame" src="/content-frame" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
 
   <script src="/static/slide-layouts.js"></script>
+  <script src="/static/doc-blocks.js"></script>
   <script src="/static/editor.js"></script>
 </body>
 </html>

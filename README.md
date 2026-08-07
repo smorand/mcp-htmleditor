@@ -42,7 +42,7 @@ All targets are overridable via env vars (see below). `make uninstall` reverses 
 ### Create from a template (recommended)
 
 ```bash
-mcp-htmleditor templates                          # list templates: ei, carbon, doc
+mcp-htmleditor templates                          # list templates: ei, carbon, doc, doc-perso, doc-ei
 mcp-htmleditor new ei ma-presentation.html --serve # create + open editor
 ```
 
@@ -54,8 +54,11 @@ mcp-htmleditor serve file.html --port 7842 --poll 500
 ```
 
 Edit mode toggle (top-right "Édition"): in-place rich-text editing, format toolbar
-on selection, insert image (local file picker or drag-drop, embedded as base64),
-insert table, and slide insert/delete (presentation mode) with a template-aware picker.
+on selection (bold/italic/underline/strike, superscript/subscript, align, size,
+color), insert image (local file picker or drag-drop, embedded as base64), insert
+table, slide insert/delete (presentation mode) with a template-aware picker, and
+document block insert (document mode) via a "＋ Bloc" picker (title, subtitle,
+h1-h5, paragraph, table, list).
 
 ### MCP server (stdio)
 
@@ -104,9 +107,11 @@ Templates are resolved in priority order:
 ```
 templates/
 ├── bootstrap/                     starters copied by `new`
-│   ├── slides-ei-empty.html       key: ei     (Euro-Information)
-│   ├── slides-empty.html          key: carbon (IBM Carbon)
-│   └── document-empty.html        key: doc    (Word-like document)
+│   ├── slides-ei-empty.html       key: ei        (Euro-Information)
+│   ├── slides-empty.html          key: carbon    (IBM Carbon)
+│   ├── document-empty.html        key: doc       (Word-like document)
+│   ├── document-perso-empty.html  key: doc-perso (Perso charter, Arial)
+│   └── document-ei-empty.html     key: doc-ei    (Euro-Information, Segoe UI)
 └── reference/                     rich examples to clone (read-only via server)
     ├── slides/
     │   ├── euro-information.html   EI: title + agenda + content, embedded logos
@@ -114,7 +119,9 @@ templates/
     │   ├── presentation-standard.html
     │   └── roadmap-one-pager.html
     └── documents/
-        └── report-standard.html
+        ├── report-standard.html    generic standard report
+        ├── perso.html              Perso charter: title/subtitle + h1-h5 + table + list
+        └── euro-information.html    EI document: blue header + logo, blue headings
 ```
 
 Add your own templates by dropping files into `~/.config/mcp-htmleditor/templates/`
@@ -162,8 +169,9 @@ src/mcp_htmleditor/
 │   └── to_docx.py   HTML → DOCX via pandoc
 └── static/
     ├── editor.html      iframe shell + toolbar
-    ├── editor.js        polling, rich-text, slide insert, image embed
+    ├── editor.js        polling, rich-text, slide insert, doc-block insert, image embed
     ├── slide-layouts.js per-template slide layouts (carbon / ei)
+    ├── doc-blocks.js    document block definitions (title, subtitle, h1-h5, paragraph, table, list)
     └── editor.css       toolbar, overlay, picker styles
 templates/          versioned templates (bootstrap + reference)
 skill/              skill docs (served by `mcp-htmleditor skill`)

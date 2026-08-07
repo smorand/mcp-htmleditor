@@ -112,8 +112,34 @@ html, body {
   border-color: #0f62fe;
 }
 
+/* Document block action buttons (toolbar) */
+#toolbar-doc-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 16px;
+}
+#toolbar-doc-actions button {
+  background: #262626;
+  color: #c6c6c6;
+  border: 1px solid #393939;
+  border-radius: 2px;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 8px;
+  height: 20px;
+  cursor: pointer;
+  transition: background 80ms, color 80ms;
+}
+#toolbar-doc-actions button:hover {
+  background: #0f62fe;
+  color: #ffffff;
+  border-color: #0f62fe;
+}
+
 /* ── Slide-type picker modal ─────────────────────────────────── */
-#slide-picker {
+#slide-picker,
+#block-picker {
   position: fixed;
   inset: 0;
   z-index: 100000;
@@ -121,12 +147,14 @@ html, body {
   align-items: center;
   justify-content: center;
 }
-#slide-picker .picker-backdrop {
+#slide-picker .picker-backdrop,
+#block-picker .picker-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
 }
-#slide-picker .picker-panel {
+#slide-picker .picker-panel,
+#block-picker .picker-panel {
   position: relative;
   background: #ffffff;
   border-radius: 2px;
@@ -135,13 +163,15 @@ html, body {
   max-width: 720px;
   width: 90%;
 }
-#slide-picker .picker-title {
+#slide-picker .picker-title,
+#block-picker .picker-title {
   font-size: 18px;
   font-weight: 400;
   color: #161616;
   margin-bottom: 20px;
 }
-#picker-grid {
+#picker-grid,
+#block-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;

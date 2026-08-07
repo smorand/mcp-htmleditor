@@ -31,9 +31,11 @@ La méthode recommandée: la commande `new` copie le bon bootstrap.
 
 ```bash
 mcp-htmleditor templates                        # lister les templates
-mcp-htmleditor new ei     ma-presentation.html  # Euro-Information
-mcp-htmleditor new carbon ma-presentation.html  # IBM Carbon
-mcp-htmleditor new doc    mon-document.html      # Document
+mcp-htmleditor new ei     ma-presentation.html  # Euro-Information (slides)
+mcp-htmleditor new carbon ma-presentation.html  # IBM Carbon (slides)
+mcp-htmleditor new doc    mon-document.html      # Document standard
+mcp-htmleditor new doc-perso mon-doc.html        # Document charte Perso
+mcp-htmleditor new doc-ei    note-ei.html        # Document Euro-Information
 mcp-htmleditor new ei ma-presentation.html --serve   # + ouvre l'éditeur
 ```
 
@@ -107,13 +109,18 @@ En pratique: **toujours copier `slides-empty.html`**, jamais construire de zéro
 <html lang="fr" data-doc-type="document">
 <head><meta charset="UTF-8"><title>Mon document</title></head>
 <body>
-  <article data-type="document">
-    <h1 data-editable="text">Titre</h1>
+  <article data-type="document" data-doc-template="perso">
+    <h1 class="doc-title" data-editable="text">Titre</h1>
+    <p class="doc-subtitle" data-editable="text">Sous-titre</p>
     <p data-editable="text">Introduction…</p>
   </article>
 </body>
 </html>
 ```
+
+En pratique: **toujours copier un bootstrap document** (`doc`, `doc-perso`,
+`doc-ei`) plutôt que construire de zéro; les chartes (Arial/EI) vivent dans le
+`<style>` du template. Voir `skill/types/document.md`.
 
 ---
 
@@ -155,6 +162,13 @@ Boutons dans la toolbar du serveur:
 L'insertion et la suppression renumérotent automatiquement tout le document
 (ids, TOTAL, slideNames, eyebrow, footer, dropdown). Voir `skill/types/slides.md`.
 
+### Blocs document (mode document + édition)
+Bouton dans la toolbar du serveur:
+- **＋ Bloc**: ouvre un sélecteur de blocs (titre, sous-titre, h1-h5, paragraphe,
+  tableau, liste). Le bloc s'insère à la position du curseur, ou à la fin de
+  l'article si aucun curseur n'est placé. Les blocs héritent de la charte du
+  template actif (perso, ei, standard). Voir `skill/types/document.md`.
+
 ### Context menus (clic droit sur éléments typés)
 - `data-type="table"`: ajouter/supprimer ligne, ajouter/supprimer colonne, supprimer tableau
 - `data-type="gantt-task"`: agrandir, réduire, renommer, supprimer
@@ -192,6 +206,25 @@ L'insertion et la suppression renumérotent automatiquement tout le document
 7. update_end()
 8. git commit
 ```
+
+## Workflow LLM: créer et exporter un document
+
+```
+1. mcp-htmleditor new doc-perso mon-doc.html   (ou doc / doc-ei)
+2. start_server(file="mon-doc.html")
+3. update_start()
+4. Lire le fichier, ajouter des <h1 class="doc-h1">…<h5 class="doc-h5">,
+   <p>, <ul>/<ol>, <table data-type="table">, avec data-editable="text"
+   — balises sémantiques uniquement (pas de <div> stylés)
+5. Réécrire le fichier complet (DOCTYPE + head + body), conserver le <style>
+6. update_end()
+7. mcp-htmleditor export docx mon-doc.html mon-doc.docx
+8. Vérifier: pandoc mon-doc.docx -t markdown | grep -E '^#{1,6} '
+9. git commit
+```
+
+Règles document détaillées (chartes, blocs, headings, export DOCX):
+`skill/types/document.md`.
 
 ## Workflow LLM: insérer une image (portabilité maximale)
 

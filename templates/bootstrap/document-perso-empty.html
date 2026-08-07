@@ -1,0 +1,101 @@
+<!--
+  Template: document-perso-empty (bootstrap)
+  Usage: Point de depart minimal pour un document charte Perso (Arial, headings colores)
+  Date: 2026-02
+-->
+<!DOCTYPE html>
+<html lang="fr" data-doc-type="document">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document Perso</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      background: #f0f0f0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    article[data-type="document"] {
+      max-width: 820px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 72px 80px;
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: #000000;
+    }
+
+    .doc-title {
+      font-size: 22pt;
+      color: #000000;
+      font-weight: bold;
+      text-decoration: underline;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .doc-subtitle {
+      font-size: 15pt;
+      color: #666666;
+      font-weight: normal;
+      text-decoration: none;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    article[data-type="document"] h1.doc-h1 {
+      font-size: 18pt; color: #000000; font-weight: bold;
+      text-decoration: underline; margin-top: 28px; margin-bottom: 12px;
+    }
+    article[data-type="document"] h2.doc-h2 {
+      font-size: 16pt; color: #1155cc; font-weight: normal;
+      text-decoration: none; margin-top: 22px; margin-bottom: 10px;
+    }
+    article[data-type="document"] h3.doc-h3 {
+      font-size: 14pt; color: #6d9eeb; font-weight: normal;
+      margin-top: 18px; margin-bottom: 8px;
+    }
+    article[data-type="document"] h4.doc-h4 {
+      font-size: 12pt; color: #b4a7d6; font-weight: normal;
+      margin-top: 16px; margin-bottom: 6px;
+    }
+    article[data-type="document"] h5.doc-h5 {
+      font-size: 11pt; color: #c27ba0; font-weight: normal;
+      margin-top: 14px; margin-bottom: 6px;
+    }
+
+    article[data-type="document"] p { margin-bottom: 12px; }
+    article[data-type="document"] ul,
+    article[data-type="document"] ol { padding-left: 26px; margin-bottom: 12px; }
+    article[data-type="document"] li { margin-bottom: 4px; }
+
+    table[data-type="table"] {
+      width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 10.5pt;
+    }
+    table[data-type="table"] th {
+      background: #1155cc; color: #ffffff; text-align: left;
+      font-weight: bold; padding: 8px 12px;
+    }
+    table[data-type="table"] td { padding: 8px 12px; border-bottom: 1px solid #dddddd; }
+    table[data-type="table"] tbody tr:nth-child(even) td { background: #f5f8ff; }
+  </style>
+</head>
+<body>
+
+  <article data-type="document" data-doc-template="perso" data-layout="single-column">
+
+    <h1 class="doc-title" data-editable="text">Titre du document</h1>
+    <p class="doc-subtitle" data-editable="text">Sous-titre, auteur, date</p>
+
+    <p data-editable="text">
+      Redigez votre document ici. Utilisez le bouton Bloc en mode edition pour
+      inserer des titres, paragraphes, tableaux et listes.
+    </p>
+
+  </article>
+
+</body>
+</html>
