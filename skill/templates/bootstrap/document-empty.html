@@ -1,0 +1,77 @@
+<!--
+  Template: document-empty
+  Usage: Template minimal pour démarrer un nouveau document
+  Date: 2024-01
+-->
+<!DOCTYPE html>
+<html data-doc-type="document">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nouveau document</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      background: #f0f0f0;
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+
+    article[data-type="document"] {
+      max-width: 800px;
+      margin: 40px auto;
+      background: white;
+      padding: 80px 80px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      font-size: 15px;
+      line-height: 1.7;
+      color: #222;
+    }
+
+    article[data-type="document"] h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+      color: #1a1a2e;
+    }
+
+    article[data-type="document"] h2 {
+      font-size: 22px;
+      margin-top: 36px;
+      margin-bottom: 12px;
+      color: #333;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+    }
+
+    article[data-type="document"] p {
+      margin-bottom: 16px;
+    }
+
+    article[data-type="document"] ul,
+    article[data-type="document"] ol {
+      padding-left: 24px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <article data-type="document" data-layout="single-column">
+
+    <h1 data-editable="text">Titre du document</h1>
+
+    <p data-editable="text" style="color:#777; font-size:13px; margin-bottom:32px;">
+      Auteur &bull; Date &bull; Version 1.0
+    </p>
+
+    <h2 data-editable="text">Introduction</h2>
+
+    <p data-editable="text">
+      Rédigez votre introduction ici. Présentez le contexte, les objectifs
+      et la structure du document.
+    </p>
+
+  </article>
+
+</body>
+</html>

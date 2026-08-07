@@ -1,0 +1,86 @@
+/* ============================================================
+   editor.css — mcp-htmleditor
+   ============================================================ */
+
+/* Base reset */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* GrapesJS canvas fills the viewport */
+#gjs {
+  height: 100vh;
+}
+
+/* ============================================================
+   Update overlay
+   ============================================================ */
+#update-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.overlay-content {
+  background: white;
+  padding: 20px 40px;
+  border-radius: 8px;
+  font-size: 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+/* ============================================================
+   Slide navigation bar
+   ============================================================ */
+#slide-nav {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 8px 20px;
+  border-radius: 20px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  z-index: 1000;
+  user-select: none;
+}
+
+#slide-nav button {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+#slide-nav button:hover {
+  color: #adf;
+}
+
+#nav-info {
+  font-size: 14px;
+  min-width: 80px;
+  text-align: center;
+}

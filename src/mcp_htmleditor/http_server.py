@@ -1,0 +1,321 @@
+"""HTTP server for the WYSIWYG editor.
+
+Serves the GrapesJS editor shell and proxies HTML content
+reads/writes to the current file on disk.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+
+from .state import get_state
+
+
+# ---------------------------------------------------------------------------
+# Path helpers
+# ---------------------------------------------------------------------------
+
+def _static_dir() -> Path:
+    """Return the path to the bundled static directory."""
+    return Path(__file__).parent / "static"
+
+
+# ---------------------------------------------------------------------------
+# Request handler
+# ---------------------------------------------------------------------------
+
+class _EditorHandler(BaseHTTPRequestHandler):
+    """Handle all HTTP requests for the editor server."""
+
+    # Silence default request logging (MCP context logs are enough)
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        pass
+
+    # ------------------------------------------------------------------
+    # CORS helper
+    # ------------------------------------------------------------------
+
+    def _send_cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        """Handle pre-flight CORS requests."""
+        self.send_response(204)
+        self._send_cors_headers()
+        self.end_headers()
+
+    # ------------------------------------------------------------------
+    # GET dispatch
+    # ------------------------------------------------------------------
+
+    def do_GET(self) -> None:  # noqa: N802
+        """Dispatch GET requests."""
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+
+        if path == "/" or path == "":
+            self._serve_editor_html()
+        elif path.startswith("/static/"):
+            self._serve_static(path[len("/static/"):])
+        elif path == "/content":
+            self._serve_content()
+        elif path == "/status":
+            self._serve_status()
+        else:
+            self._not_found()
+
+    # ------------------------------------------------------------------
+    # POST dispatch
+    # ------------------------------------------------------------------
+
+    def do_POST(self) -> None:  # noqa: N802
+        """Dispatch POST requests."""
+        parsed = urlparse(self.path)
+        path = parsed.path
+
+        if path == "/content":
+            self._receive_content()
+        else:
+            self._not_found()
+
+    # ------------------------------------------------------------------
+    # Route handlers
+    # ------------------------------------------------------------------
+
+    def _serve_editor_html(self) -> None:
+        """Serve the GrapesJS shell HTML."""
+        html_path = _static_dir() / "editor.html"
+        self._send_file(html_path, "text/html")
+
+    def _serve_static(self, filename: str) -> None:
+        """Serve a file from the static directory."""
+        # Security: prevent path traversal
+        safe_name = Path(filename).name
+        file_path = _static_dir() / safe_name
+        if not file_path.exists():
+            self._not_found()
+            return
+        mime = self._guess_mime(safe_name)
+        self._send_file(file_path, mime)
+
+    def _serve_content(self) -> None:
+        """Return the raw HTML of the current file."""
+        state = get_state()
+        if not state.current_file:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return
+        try:
+            html = Path(state.current_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+        self._send_bytes(html.encode("utf-8"), "text/html")
+
+    def _serve_status(self) -> None:
+        """Return JSON status for polling."""
+        state = get_state()
+        payload: dict[str, Any] = {
+            "mtime": state.get_mtime(),
+            "update_in_progress": state.update_in_progress,
+            "filename": state.current_file,
+            "poll_interval": state.poll_interval,
+            "port": state.port,
+        }
+        self._send_json(payload)
+
+    def _receive_content(self) -> None:
+        """Receive updated HTML from GrapesJS and write it to disk."""
+        state = get_state()
+        if not state.current_file:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+
+        content_type = self.headers.get("Content-Type", "")
+
+        if "application/json" in content_type:
+            try:
+                data: dict[str, Any] = json.loads(body)
+                canvas_html: str = data.get("html", "")
+            except (json.JSONDecodeError, KeyError):
+                self._send_json({"error": "Invalid JSON body"}, status=400)
+                return
+        else:
+            # Raw HTML body
+            canvas_html = body.decode("utf-8")
+
+        # Reconstruct full HTML document from canvas body fragment
+        full_html = _rebuild_full_html(canvas_html, state.current_file)
+        try:
+            Path(state.current_file).write_text(full_html, encoding="utf-8")
+        except OSError as exc:
+            self._send_json({"error": str(exc)}, status=500)
+            return
+
+        self._send_json({"ok": True})
+
+    # ------------------------------------------------------------------
+    # Low-level helpers
+    # ------------------------------------------------------------------
+
+    def _send_file(self, path: Path, mime: str) -> None:
+        try:
+            data = path.read_bytes()
+        except OSError:
+            self._not_found()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Content-Length", str(len(data)))
+        self._send_cors_headers()
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_bytes(self, data: bytes, mime: str) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Content-Length", str(len(data)))
+        self._send_cors_headers()
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_json(self, payload: Any, status: int = 200) -> None:
+        data = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self._send_cors_headers()
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _not_found(self) -> None:
+        self._send_json({"error": "Not found"}, status=404)
+
+    @staticmethod
+    def _guess_mime(filename: str) -> str:
+        ext = Path(filename).suffix.lower()
+        return {
+            ".html": "text/html",
+            ".js": "application/javascript",
+            ".css": "text/css",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".svg": "image/svg+xml",
+            ".json": "application/json",
+        }.get(ext, "application/octet-stream")
+
+
+# ---------------------------------------------------------------------------
+# HTML reconstruction
+# ---------------------------------------------------------------------------
+
+def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
+    """Reconstruct a complete HTML document from a GrapesJS canvas fragment.
+
+    GrapesJS returns body content only. This function wraps it in a proper
+    document, preserving the head of the existing file when available.
+    """
+    head_content = ""
+    doc_type_attr = ""
+
+    if current_file:
+        try:
+            existing = Path(current_file).read_text(encoding="utf-8")
+            # Extract head
+            head_start = existing.lower().find("<head")
+            head_end = existing.lower().find("</head>")
+            if head_start != -1 and head_end != -1:
+                head_content = existing[head_start : head_end + 7]
+            # Extract data-doc-type from <html> tag
+            html_tag_end = existing.lower().find(">", existing.lower().find("<html"))
+            if html_tag_end != -1:
+                html_tag = existing[: html_tag_end + 1]
+                import re
+                m = re.search(r'data-doc-type=["\']([^"\']+)["\']', html_tag)
+                if m:
+                    doc_type_attr = f' data-doc-type="{m.group(1)}"'
+        except OSError:
+            pass
+
+    if not head_content:
+        head_content = "<head><meta charset=\"UTF-8\"></head>"
+
+    return (
+        f"<!DOCTYPE html>\n"
+        f"<html{doc_type_attr}>\n"
+        f"{head_content}\n"
+        f"<body>\n{canvas_html}\n</body>\n"
+        f"</html>\n"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Server lifecycle
+# ---------------------------------------------------------------------------
+
+_server_instance: ThreadingHTTPServer | None = None
+_server_thread: threading.Thread | None = None
+_server_lock = threading.Lock()
+
+
+def start_http_server(file: str, port: int = 7842) -> bool:
+    """Start the HTTP server serving the given HTML file.
+
+    Idempotent: if a server is already running on the same port with the
+    same file, this is a no-op and returns False. Returns True if a new
+    server was started.
+    """
+    global _server_instance, _server_thread
+
+    state = get_state()
+
+    with _server_lock:
+        if _server_instance is not None:
+            # Already running; just update the file
+            state.set_file(file)
+            return False
+
+        state.set_file(file)
+        state.port = port
+        state.server_pid = os.getpid()
+        state.save()
+
+        server = ThreadingHTTPServer(("localhost", port), _EditorHandler)
+        _server_instance = server
+
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        _server_thread = thread
+
+    return True
+
+
+def stop_http_server() -> None:
+    """Stop the running HTTP server if any."""
+    global _server_instance, _server_thread
+
+    with _server_lock:
+        if _server_instance is not None:
+            _server_instance.shutdown()
+            _server_instance = None
+            _server_thread = None
+
+    state = get_state()
+    state.server_pid = None
+    state.save()
+
+
+def is_server_running() -> bool:
+    """Return True if the HTTP server is currently running."""
+    return _server_instance is not None

@@ -1,0 +1,207 @@
+<!--
+  Template: roadmap-one-pager
+  Usage: One-pager roadmap avec Gantt Q1-Q4 et 6 tâches
+  Slides: 1 slide (one-pager)
+  Date: 2024-01
+-->
+<!DOCTYPE html>
+<html data-doc-type="presentation">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roadmap</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    section[data-type="slide"] {
+      width: 1280px;
+      min-height: 720px;
+      margin: 40px auto;
+      background: white;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      padding: 50px 60px;
+    }
+
+    .slide-title-area {
+      margin-bottom: 32px;
+    }
+
+    .slide-title-area h1 {
+      font-size: 36px;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+    }
+
+    .slide-title-area p {
+      font-size: 16px;
+      color: #888;
+    }
+
+    /* Gantt */
+    .gantt-wrapper {
+      width: 100%;
+    }
+
+    .gantt-header {
+      display: flex;
+      margin-left: 220px;
+      margin-bottom: 8px;
+    }
+
+    .gantt-quarter {
+      flex: 1;
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding-bottom: 6px;
+      border-left: 1px dashed #e0e0e0;
+    }
+
+    .gantt-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      height: 36px;
+    }
+
+    .gantt-label {
+      width: 220px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      padding-right: 16px;
+    }
+
+    .gantt-track {
+      flex: 1;
+      position: relative;
+      height: 28px;
+      background: #f8f8f8;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <section data-type="slide" data-id="slide-roadmap" data-title="Roadmap">
+
+    <div class="slide-title-area">
+      <h1 data-editable="text">Roadmap 2024</h1>
+      <p data-editable="text">Vue d'ensemble des initiatives et jalons clés de l'année</p>
+    </div>
+
+    <div data-type="gantt" class="gantt-wrapper">
+
+      <!-- En-tête trimestres -->
+      <div class="gantt-header">
+        <div class="gantt-quarter">Q1 — Jan, Fév, Mar</div>
+        <div class="gantt-quarter">Q2 — Avr, Mai, Juin</div>
+        <div class="gantt-quarter">Q3 — Juil, Août, Sep</div>
+        <div class="gantt-quarter">Q4 — Oct, Nov, Déc</div>
+      </div>
+
+      <!-- Tâche 1: Discovery Q1 -->
+      <div class="gantt-row">
+        <div class="gantt-label">Discovery &amp; Research</div>
+        <div class="gantt-track">
+          <div data-type="gantt-task"
+               data-id="task-1" data-label="Discovery &amp; Research"
+               data-start="2024-01" data-end="2024-03" data-color="#4a90d9"
+               style="position:absolute; left:0%; width:25%; height:100%;
+                      background:#4a90d9; color:white; border-radius:4px;
+                      display:flex; align-items:center; padding-left:10px; font-size:12px;">
+            Discovery
+          </div>
+        </div>
+      </div>
+
+      <!-- Tâche 2: Design Q2 -->
+      <div class="gantt-row">
+        <div class="gantt-label">Design &amp; Prototypage</div>
+        <div class="gantt-track">
+          <div data-type="gantt-task"
+               data-id="task-2" data-label="Design &amp; Prototypage"
+               data-start="2024-04" data-end="2024-06" data-color="#7ed321"
+               style="position:absolute; left:25%; width:25%; height:100%;
+                      background:#7ed321; color:white; border-radius:4px;
+                      display:flex; align-items:center; padding-left:10px; font-size:12px;">
+            Design
+          </div>
+        </div>
+      </div>
+
+      <!-- Tâche 3: Développement Q2-Q3 -->
+      <div class="gantt-row">
+        <div class="gantt-label">Développement</div>
+        <div class="gantt-track">
+          <div data-type="gantt-task"
+               data-id="task-3" data-label="Développement"
+               data-start="2024-05" data-end="2024-09" data-color="#f5a623"
+               style="position:absolute; left:33.3%; width:41.7%; height:100%;
+                      background:#f5a623; color:white; border-radius:4px;
+                      display:flex; align-items:center; padding-left:10px; font-size:12px;">
+            Développement
+          </div>
+        </div>
+      </div>
+
+      <!-- Tâche 4: Tests Q3 -->
+      <div class="gantt-row">
+        <div class="gantt-label">Tests &amp; QA</div>
+        <div class="gantt-track">
+          <div data-type="gantt-task"
+               data-id="task-4" data-label="Tests &amp; QA"
+               data-start="2024-08" data-end="2024-10" data-color="#d0021b"
+               style="position:absolute; left:58.3%; width:25%; height:100%;
+                      background:#d0021b; color:white; border-radius:4px;
+                      display:flex; align-items:center; padding-left:10px; font-size:12px;">
+            Tests &amp; QA
+          </div>
+        </div>
+      </div>
+
+      <!-- Tâche 5: Déploiement Q4 -->
+      <div class="gantt-row">
+        <div class="gantt-label">Déploiement</div>
+        <div class="gantt-track">
+          <div data-type="gantt-task"
+               data-id="task-5" data-label="Déploiement"
+               data-start="2024-10" data-end="2024-11" data-color="#9013fe"
+               style="position:absolute; left:75%; width:16.7%; height:100%;
+                      background:#9013fe; color:white; border-radius:4px;
+                      display:flex; align-items:center; padding-left:10px; font-size:12px;">
+            Déploiement
+          </div>
+        </div>
+      </div>
+
+      <!-- Tâche 6: Communication transverse -->
+      <div class="gantt-row">
+        <div class="gantt-label">Communication</div>
+        <div class="gantt-track">
+          <div data-type="gantt-task"
+               data-id="task-6" data-label="Communication"
+               data-start="2024-01" data-end="2024-12" data-color="#417505"
+               style="position:absolute; left:0%; width:100%; height:100%;
+                      background:rgba(65,117,5,0.35); color:#417505; border-radius:4px;
+                      border:1px solid #417505;
+                      display:flex; align-items:center; padding-left:10px; font-size:12px; font-weight:600;">
+            Communication (transverse)
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /gantt -->
+
+  </section>
+
+</body>
+</html>

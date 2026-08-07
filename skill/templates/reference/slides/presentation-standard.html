@@ -1,0 +1,264 @@
+<!--
+  Template: presentation-standard
+  Usage: Présentation standard avec 4 slides: couverture, agenda, contenu, clôture
+  Slides: cover, agenda, content-bullets, closing
+  Date: 2024-01
+-->
+<!DOCTYPE html>
+<html data-doc-type="presentation">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Présentation standard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a1a2e;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    section[data-type="slide"] {
+      width: 1280px;
+      min-height: 720px;
+      margin: 40px auto;
+      background: white;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ── Slide couverture ── */
+    .slide-cover {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 100px;
+    }
+
+    .slide-cover .tag {
+      font-size: 13px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #e94560;
+      margin-bottom: 24px;
+    }
+
+    .slide-cover h1 {
+      font-size: 56px;
+      line-height: 1.15;
+      margin-bottom: 24px;
+      font-weight: 700;
+    }
+
+    .slide-cover .subtitle {
+      font-size: 22px;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 48px;
+    }
+
+    .slide-cover .meta {
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .slide-cover .accent-line {
+      width: 80px;
+      height: 4px;
+      background: #e94560;
+      margin-bottom: 32px;
+    }
+
+    /* ── Slide agenda ── */
+    .slide-agenda {
+      display: flex;
+      flex-direction: column;
+      padding: 60px 80px;
+    }
+
+    .slide-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 40px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid #e94560;
+    }
+
+    .slide-header h2 {
+      font-size: 32px;
+      color: #1a1a2e;
+    }
+
+    .agenda-items {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      flex: 1;
+    }
+
+    .agenda-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+    }
+
+    .agenda-item .num {
+      font-size: 36px;
+      font-weight: 700;
+      color: #e94560;
+      line-height: 1;
+      min-width: 40px;
+    }
+
+    .agenda-item .item-content h3 {
+      font-size: 16px;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+    }
+
+    .agenda-item .item-content p {
+      font-size: 13px;
+      color: #888;
+    }
+
+    /* ── Slide contenu ── */
+    .slide-content {
+      display: flex;
+      flex-direction: column;
+      padding: 60px 80px;
+    }
+
+    .bullet-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 16px;
+    }
+
+    .bullet-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 17px;
+      color: #333;
+      line-height: 1.5;
+    }
+
+    .bullet-list li::before {
+      content: '▸';
+      color: #e94560;
+      font-size: 14px;
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+
+    /* ── Slide clôture ── */
+    .slide-closing {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px;
+    }
+
+    .slide-closing h2 {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+
+    .slide-closing p {
+      font-size: 20px;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 40px;
+      max-width: 600px;
+    }
+
+    .slide-closing .contact {
+      font-size: 15px;
+      color: rgba(255,255,255,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Slide 1: Couverture -->
+  <section data-type="slide" data-id="slide-cover" data-title="Couverture" class="slide-cover">
+    <div class="tag" data-editable="text">Département &bull; Date</div>
+    <div class="accent-line"></div>
+    <h1 data-editable="text">Titre de la<br>Présentation</h1>
+    <p class="subtitle" data-editable="text">Sous-titre descriptif de la présentation</p>
+    <div class="meta" data-editable="text">Prénom Nom &nbsp;&bull;&nbsp; Rôle &nbsp;&bull;&nbsp; 2024</div>
+  </section>
+
+  <!-- Slide 2: Agenda -->
+  <section data-type="slide" data-id="slide-agenda" data-title="Agenda" class="slide-agenda">
+    <div class="slide-header">
+      <h2 data-editable="text">Agenda</h2>
+    </div>
+    <div class="agenda-items">
+      <div class="agenda-item">
+        <div class="num">01</div>
+        <div class="item-content">
+          <h3 data-editable="text">Contexte et enjeux</h3>
+          <p data-editable="text">Description courte de cette section</p>
+        </div>
+      </div>
+      <div class="agenda-item">
+        <div class="num">02</div>
+        <div class="item-content">
+          <h3 data-editable="text">Solution proposée</h3>
+          <p data-editable="text">Description courte de cette section</p>
+        </div>
+      </div>
+      <div class="agenda-item">
+        <div class="num">03</div>
+        <div class="item-content">
+          <h3 data-editable="text">Résultats attendus</h3>
+          <p data-editable="text">Description courte de cette section</p>
+        </div>
+      </div>
+      <div class="agenda-item">
+        <div class="num">04</div>
+        <div class="item-content">
+          <h3 data-editable="text">Prochaines étapes</h3>
+          <p data-editable="text">Description courte de cette section</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Slide 3: Contenu avec bullets -->
+  <section data-type="slide" data-id="slide-content" data-title="Points clés" class="slide-content">
+    <div class="slide-header">
+      <h2 data-editable="text">Points clés</h2>
+    </div>
+    <ul class="bullet-list" data-editable="text">
+      <li>Premier point important à communiquer sur ce sujet</li>
+      <li>Deuxième point avec des précisions supplémentaires si nécessaire</li>
+      <li>Troisième point qui soutient l'argumentation principale</li>
+      <li>Quatrième point conclusif qui renforce le message</li>
+      <li>Cinquième point avec chiffres ou données probantes</li>
+    </ul>
+  </section>
+
+  <!-- Slide 4: Clôture -->
+  <section data-type="slide" data-id="slide-closing" data-title="Clôture" class="slide-closing">
+    <h2 data-editable="text">Merci</h2>
+    <p data-editable="text">Des questions ? N'hésitez pas à nous contacter.</p>
+    <div class="contact" data-editable="text">
+      prenom.nom@entreprise.com &nbsp;&bull;&nbsp; +33 6 00 00 00 00
+    </div>
+  </section>
+
+</body>
+</html>

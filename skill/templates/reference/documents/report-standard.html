@@ -1,0 +1,243 @@
+<!--
+  Template: report-standard
+  Usage: Rapport standard avec titre, 3 sections, 1 tableau, 1 image placeholder
+  Date: 2024-01
+-->
+<!DOCTYPE html>
+<html data-doc-type="document">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rapport standard</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      background: #f0f0f0;
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+
+    article[data-type="document"] {
+      max-width: 820px;
+      margin: 40px auto;
+      background: white;
+      padding: 80px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.12);
+      font-size: 15px;
+      line-height: 1.75;
+      color: #222;
+    }
+
+    /* ── Cover block ── */
+    .report-cover {
+      text-align: center;
+      padding-bottom: 48px;
+      margin-bottom: 48px;
+      border-bottom: 3px double #222;
+    }
+
+    .report-cover h1 {
+      font-size: 32px;
+      margin-bottom: 12px;
+      color: #111;
+    }
+
+    .report-meta {
+      font-size: 14px;
+      color: #777;
+      font-style: italic;
+    }
+
+    /* ── Headings ── */
+    h2 {
+      font-size: 22px;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      color: #111;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 8px;
+      counter-increment: section;
+    }
+
+    h2::before {
+      content: counter(section) ". ";
+      color: #888;
+    }
+
+    h3 {
+      font-size: 17px;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    body { counter-reset: section; }
+
+    /* ── Body text ── */
+    p { margin-bottom: 16px; }
+
+    ul, ol {
+      padding-left: 28px;
+      margin-bottom: 16px;
+    }
+
+    li { margin-bottom: 6px; }
+
+    blockquote {
+      margin: 24px 0;
+      padding: 16px 24px;
+      border-left: 4px solid #e94560;
+      background: #fdf0f3;
+      color: #555;
+      font-style: italic;
+    }
+
+    /* ── Table ── */
+    table[data-type="table"] {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 28px 0;
+      font-size: 14px;
+    }
+
+    table[data-type="table"] th {
+      background: #1a1a2e;
+      color: white;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    table[data-type="table"] td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+    }
+
+    table[data-type="table"] tbody tr:hover {
+      background: #fafafa;
+    }
+
+    /* ── Image placeholder ── */
+    .figure {
+      margin: 28px 0;
+      text-align: center;
+    }
+
+    .figure img {
+      max-width: 100%;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+    }
+
+    .figure-caption {
+      font-size: 12px;
+      color: #777;
+      margin-top: 8px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <article data-type="document" data-layout="single-column">
+
+    <!-- Couverture -->
+    <div class="report-cover">
+      <h1 data-editable="text">Titre du rapport</h1>
+      <div class="report-meta" data-editable="text">
+        Auteur &bull; Département &bull; Version 1.0 &bull; Janvier 2024
+      </div>
+    </div>
+
+    <!-- Section 1 -->
+    <h2 data-editable="text">Contexte et objectifs</h2>
+
+    <p data-editable="text">
+      Présentez ici le contexte général du rapport. Expliquez pourquoi ce document
+      a été produit, quel besoin il répond, et quels sont les objectifs visés.
+    </p>
+
+    <p data-editable="text">
+      Ajoutez des précisions sur le périmètre couvert, les parties prenantes impliquées,
+      et les contraintes éventuelles qui ont influencé les conclusions.
+    </p>
+
+    <blockquote data-editable="text">
+      Citation ou insight clé à mettre en avant pour cette section.
+    </blockquote>
+
+    <!-- Section 2 -->
+    <h2 data-editable="text">Analyse et résultats</h2>
+
+    <p data-editable="text">
+      Développez ici l'analyse principale. Présentez les données, les observations,
+      et les conclusions intermédiaires. Structurez en sous-sections si nécessaire.
+    </p>
+
+    <h3 data-editable="text">Données quantitatives</h3>
+
+    <table data-type="table">
+      <thead>
+        <tr>
+          <th>Indicateur</th>
+          <th>Valeur actuelle</th>
+          <th>Cible</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td data-editable="text">Indicateur A</td>
+          <td data-editable="text">42%</td>
+          <td data-editable="text">60%</td>
+          <td data-editable="text">En cours</td>
+        </tr>
+        <tr>
+          <td data-editable="text">Indicateur B</td>
+          <td data-editable="text">1 240</td>
+          <td data-editable="text">2 000</td>
+          <td data-editable="text">En retard</td>
+        </tr>
+        <tr>
+          <td data-editable="text">Indicateur C</td>
+          <td data-editable="text">98%</td>
+          <td data-editable="text">95%</td>
+          <td data-editable="text">Atteint</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 data-editable="text">Observations visuelles</h3>
+
+    <div class="figure">
+      <img src="https://placehold.co/700x350?text=Graphique+ou+Schema"
+           data-editable="resize,reposition"
+           alt="Figure 1" />
+      <div class="figure-caption" data-editable="text">
+        Figure 1 — Description du graphique ou schéma
+      </div>
+    </div>
+
+    <!-- Section 3 -->
+    <h2 data-editable="text">Recommandations et prochaines étapes</h2>
+
+    <p data-editable="text">
+      Sur la base de l'analyse précédente, nous recommandons les actions suivantes:
+    </p>
+
+    <ol data-editable="text">
+      <li>Première recommandation prioritaire avec justification</li>
+      <li>Deuxième recommandation avec délai suggéré</li>
+      <li>Troisième recommandation et responsable proposé</li>
+    </ol>
+
+    <p data-editable="text">
+      Pour toute question relative à ce rapport, contacter
+      <strong>prenom.nom@entreprise.com</strong>.
+    </p>
+
+  </article>
+
+</body>
+</html>
