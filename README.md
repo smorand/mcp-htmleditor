@@ -57,8 +57,11 @@ Edit mode toggle (top-right "Édition"): in-place rich-text editing, format tool
 on selection (bold/italic/underline/strike, superscript/subscript, align, size,
 color), insert image (local file picker or drag-drop, embedded as base64), insert
 table, slide insert/delete (presentation mode) with a template-aware picker, and
-document block insert (document mode) via a "＋ Bloc" picker (title, subtitle,
-h1-h5, paragraph, table, list).
+document block insert before/after (document mode) via "＋ Bloc avant / Bloc après"
+pickers (title, subtitle, h1-h5, paragraph, table, list). Drag-and-drop editing:
+reorder top-level document blocks with a left-side grip handle (DOM order = visual
+order, no attribute added), and move arch-diagram nodes with the mouse (position
+written as readable `data-x`/`data-y` percentages plus inline `left`/`top` in %).
 
 ### MCP server (stdio)
 
@@ -169,7 +172,7 @@ src/mcp_htmleditor/
 │   └── to_docx.py   HTML → DOCX via pandoc
 └── static/
     ├── editor.html      iframe shell + toolbar
-    ├── editor.js        polling, rich-text, slide insert, doc-block insert, image embed
+    ├── editor.js        polling, rich-text, slide insert, doc-block insert, image embed, drag-reorder blocks + move arch-nodes
     ├── slide-layouts.js per-template slide layouts (carbon / ei)
     ├── doc-blocks.js    document block definitions (title, subtitle, h1-h5, paragraph, table, list)
     └── editor.css       toolbar, overlay, picker styles

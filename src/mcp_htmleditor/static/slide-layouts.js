@@ -154,14 +154,16 @@ LAYOUT_SETS.carbon = {
         </div>
         <div class="slide-body">
           <div data-type="arch-diagram"
-               style="position:relative; min-height:280px; border:1px dashed #e0e0e0; padding:24px; display:flex; align-items:center; justify-content:center; gap:24px;">
+               style="position:relative; min-height:280px; border:1px dashed #e0e0e0; padding:24px;">
             <div data-type="arch-node" data-label="Composant A" data-shape="box"
-                 style="border:2px solid #0f62fe; background:#edf5ff; padding:12px 24px; font-weight:600; color:#161616;">
+                 data-x="12.0" data-y="40.0"
+                 style="position:absolute; left:12.0%; top:40.0%; border:2px solid #0f62fe; background:#edf5ff; padding:12px 24px; font-weight:600; color:#161616;">
               Composant A
             </div>
-            <span style="font-size:28px; color:#525252;">→</span>
+            <span style="position:absolute; left:41.0%; top:44.0%; font-size:28px; color:#525252;">→</span>
             <div data-type="arch-node" data-label="Composant B" data-shape="box"
-                 style="border:2px solid #161616; background:#f4f4f4; padding:12px 24px; font-weight:600; color:#161616;">
+                 data-x="58.0" data-y="40.0"
+                 style="position:absolute; left:58.0%; top:40.0%; border:2px solid #161616; background:#f4f4f4; padding:12px 24px; font-weight:600; color:#161616;">
               Composant B
             </div>
           </div>
@@ -288,12 +290,14 @@ LAYOUT_SETS.ei = {
           <div class="slide-title-rule"></div>
           <div class="slide-body">
             <div data-type="arch-diagram"
-                 style="position:relative; min-height:220px; display:flex; align-items:center; justify-content:center; gap:24px;">
+                 style="position:relative; min-height:220px;">
               <div data-type="arch-node" data-label="Composant A" data-shape="box"
-                   style="border:2px solid #003A8D; background:#eef3fb; padding:12px 24px; font-weight:700; color:#003A8D;">Composant A</div>
-              <span style="font-size:28px; color:#284AAA;">→</span>
+                   data-x="12.0" data-y="40.0"
+                   style="position:absolute; left:12.0%; top:40.0%; border:2px solid #003A8D; background:#eef3fb; padding:12px 24px; font-weight:700; color:#003A8D;">Composant A</div>
+              <span style="position:absolute; left:41.0%; top:44.0%; font-size:28px; color:#284AAA;">→</span>
               <div data-type="arch-node" data-label="Composant B" data-shape="box"
-                   style="border:2px solid #284AAA; background:#f4f6f9; padding:12px 24px; font-weight:700; color:#003A8D;">Composant B</div>
+                   data-x="58.0" data-y="40.0"
+                   style="position:absolute; left:58.0%; top:40.0%; border:2px solid #284AAA; background:#f4f6f9; padding:12px 24px; font-weight:700; color:#003A8D;">Composant B</div>
             </div>
           </div>
         </div>

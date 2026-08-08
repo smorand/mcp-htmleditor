@@ -48,7 +48,7 @@ own uv-isolated env, so third-party import stubs are handled via
 - `templates.py` — template registry (key → bootstrap file): ei, carbon, doc, doc-perso, doc-ei
 - `export/to_pptx.py` — HTML → PPTX (python-pptx, parses data-type attributes)
 - `export/to_docx.py` — HTML → DOCX (pandoc `-f html`, maps h1-h5 to Word Heading styles)
-- `static/editor.js` — iframe renderer, polling, rich-text toolbar, slide insert, doc-block insert, image embed
+- `static/editor.js` — iframe renderer, polling, rich-text toolbar, slide insert, doc-block insert (avant/apres), image embed, drag-reorder des blocs document (poignee), deplacement des arch-nodes a la souris (data-x/data-y en %)
 - `static/slide-layouts.js` — per-template slide layouts (LAYOUT_SETS.carbon / .ei)
 - `static/doc-blocks.js` — document block definitions (DOC_BLOCKS: title, subtitle, heading1-5, paragraph, table, list)
 

@@ -76,6 +76,27 @@ def test_strip_clears_duplicated_slide_options() -> None:
     assert "<option" not in out
 
 
+def test_strip_removes_drag_handles() -> None:
+    """Document drag handles and drop indicator are removed entirely."""
+    html = (
+        "<article data-type='document'>"
+        "<h1 class='doc-title _mcp_drag_host'>Titre"
+        "<span class='_mcp_drag_handle' draggable='true'>\u2839</span></h1>"
+        "<div id='_mcp_drop_indicator' class='_mcp_drop_indicator'></div>"
+        "<p class='_mcp_drag_host'>Corps"
+        "<span class='_mcp_drag_handle'>\u2839</span></p>"
+        "</article>"
+    )
+    out = _strip_editor_artifacts(html)
+    assert "_mcp_drag_handle" not in out
+    assert "_mcp_drag_host" not in out
+    assert "_mcp_drop_indicator" not in out
+    assert "\u2839" not in out  # the grip glyph span is gone, not just its class
+    assert "Titre" in out
+    assert "Corps" in out
+    assert "doc-title" in out
+
+
 def test_rebuild_wraps_fragment_into_document(tmp_path: Path) -> None:
     """A canvas fragment becomes a full document."""
     out = _rebuild_full_html("<p>hi</p>", None)

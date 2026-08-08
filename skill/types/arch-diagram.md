@@ -1,5 +1,34 @@
 # Types: Schéma d'architecture
 
+## Positionnement: data-x / data-y en pourcentages (règle absolue)
+
+Un nœud (`data-type="arch-node"`) porte sa position dans des attributs LISIBLES:
+
+- `data-x`: position gauche en pourcentage (0-100) du conteneur, arrondie à 1 décimale.
+- `data-y`: position haut en pourcentage (0-100) du conteneur, arrondie à 1 décimale.
+- un style inline `position:absolute; left:X%; top:Y%;` qui reproduit exactement `data-x`/`data-y` pour le rendu.
+
+Le conteneur `data-type="arch-diagram"` doit être `position:relative` pour servir
+de repère aux pourcentages. Pas de transform matrix, pas de coordonnées en pixels,
+pas d'attribut cryptique: le LLM lit `data-x`/`data-y` directement et sans ambiguïté,
+et l'humain peut déplacer les boîtes à la souris en mode édition (l'éditeur réécrit
+`data-x`/`data-y` + `left`/`top` en %). LLM et humain travaillent sur le même format.
+
+### Exemple d'un nœud après déplacement
+
+```html
+<div data-type="arch-node" data-label="API" data-shape="box"
+     data-x="42.5" data-y="30.0"
+     style="position:absolute; left:42.5%; top:30.0%; border:2px solid #0f62fe;
+            background:#edf5ff; padding:12px 24px; font-weight:600; color:#161616;">
+  API
+</div>
+```
+
+Le LLM qui produit ou modifie un schéma doit respecter ce format: toujours poser
+`data-x`/`data-y` (0-100, 1 décimale) ET le `left`/`top` en % correspondant. Un nœud
+sans `data-x`/`data-y` reçoit une position par défaut au premier déplacement humain.
+
 ## Structure HTML avec exemple
 
 ```html

@@ -20,9 +20,24 @@ from .state import get_state
 
 # IDs/classes injected by the browser editor — must be stripped before saving.
 _EDITOR_ARTIFACTS = {
-    "ids":     {"_mcp_format_bar", "_mcp_insert_bar", "_mcp_editor_styles", "_editor_ctx_host"},
-    "classes": {"_mcp_editable", "gtx-trans-icon"},
-    "attrs":   {"contenteditable"},
+    "ids": {
+        "_mcp_format_bar",
+        "_mcp_insert_bar",
+        "_mcp_editor_styles",
+        "_editor_ctx_host",
+        "_mcp_drop_indicator",
+    },
+    "classes": {
+        "_mcp_editable",
+        "_mcp_drag_handle",
+        "_mcp_drag_host",
+        "_mcp_drop_indicator",
+        "_mcp_dragging",
+        "_mcp_arch_draggable",
+        "_mcp_arch_grabbing",
+        "gtx-trans-icon",
+    },
+    "attrs": {"contenteditable"},
 }
 
 # Browser-extension attributes (Google Translate, Grammarly, etc.) that pollute
@@ -286,6 +301,13 @@ def _strip_editor_artifacts(html: str) -> str:
     for eid in _EDITOR_ARTIFACTS["ids"]:
         el = soup.find(id=eid)
         if el:
+            el.decompose()
+
+    # Remove drag-reorder artifacts entirely (handle span + drop indicator).
+    # These are whole nodes the editor injects, not just annotated content, so
+    # we drop the element rather than merely clearing its class.
+    for cls in ("_mcp_drag_handle", "_mcp_drop_indicator"):
+        for el in soup.find_all(class_=cls):
             el.decompose()
 
     # Remove injected CSS class from all elements

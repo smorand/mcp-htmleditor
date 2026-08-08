@@ -72,9 +72,11 @@ Meme systeme de classes (`doc-title`, `doc-subtitle`, `doc-h1`..`doc-h5`).
 
 ## Blocs inserables (mode edition)
 
-En mode document + edition, la toolbar affiche un bouton **＋ Bloc** qui ouvre un
-picker (meme modal que le picker de slides). Les blocs disponibles (definis dans
-`static/doc-blocks.js`, objet `DOC_BLOCKS`):
+En mode document + edition, la toolbar affiche deux boutons **＋ Bloc avant** et
+**Bloc après ＋** qui ouvrent un picker (meme modal que le picker de slides). Le bloc
+choisi s'insere avant ou apres le bloc courant (base sur la position du curseur),
+ou en tete/fin de l'article si aucun curseur n'est place. Les blocs disponibles
+(definis dans `static/doc-blocks.js`, objet `DOC_BLOCKS`):
 
 | Cle | Rendu |
 |-----|-------|
@@ -85,9 +87,38 @@ picker (meme modal que le picker de slides). Les blocs disponibles (definis dans
 | `table` | tableau 3x3 `data-type="table"` |
 | `list` | liste a puces `<ul>` de trois elements |
 
-Le bloc s'insere a la position du curseur (a la suite du bloc courant) ou a la fin
-de l'article si aucun curseur n'est place. Les nouveaux blocs deviennent editables
-automatiquement quand le mode edition est actif.
+Les nouveaux blocs deviennent editables automatiquement quand le mode edition est
+actif, et recoivent une poignee de drag (voir ci-dessous).
+
+## Reordonner les blocs par glisser-deposer (drag handle)
+
+En mode document + edition, chaque bloc de premier niveau de l'article (les enfants
+directs: `<h1>`..`<h5>`, `<p>`, `<ul>`/`<ol>`, `<table>`, `<blockquote>`, etc.)
+recoit une petite poignee (icone ⠿) a sa gauche, visible seulement en mode edition.
+L'humain tire la poignee pour reordonner verticalement les blocs; une ligne bleue
+indique la position de drop.
+
+**Regle absolue de lisibilite:** apres le drop, l'ordre des blocs dans le DOM est
+exactement l'ordre visuel. RIEN d'autre ne change: aucun attribut de position ajoute,
+aucun style inline, aucune transform. Le HTML reste une sequence propre
+`<h1>..</h1><p>..</p><table>..</table>` dans le nouvel ordre. La poignee est un
+artefact d'edition (classe `_mcp_drag_handle`): elle n'est jamais ecrite dans le
+fichier (retiree avant serialisation et strippee cote serveur). Le LLM peut donc
+reordonner les blocs simplement en deplacant les balises dans le fichier.
+
+Exemple: un article
+
+```html
+<article data-type="document" data-doc-template="perso">
+  <h1 class="doc-title" data-editable="text">Rapport Q1</h1>
+  <p data-editable="text">Introduction.</p>
+  <h1 class="doc-h1" data-editable="text">Resultats</h1>
+</article>
+```
+
+apres avoir remonte le paragraphe sous le titre reste tout aussi lisible, sans
+aucun attribut supplementaire (seul l'ordre des balises change).
+
 
 ## Elements supportes
 
@@ -181,7 +212,7 @@ page imprevisibles a l'impression et a l'export).
 | Navigation entre sections | prev/next | scroll continu |
 | Structure | `<article data-type="slide">` | `<article data-type="document">` |
 | Taille fixe | oui (16:9) | non (max-width) |
-| Bouton toolbar (edition) | ＋ Slide | ＋ Bloc |
+| Bouton toolbar (edition) | ＋ Slide avant / Slide après | ＋ Bloc avant / Bloc après |
 | Export optimal | PPTX | DOCX |
 
 ## Quand exporter en DOCX vs garder en HTML

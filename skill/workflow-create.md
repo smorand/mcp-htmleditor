@@ -17,6 +17,7 @@ rechargement automatique pendant ce temps.
 Quand l'humain sauvegarde via le browser, le serveur **nettoie automatiquement** le HTML
 avant d'écrire sur disque:
 - Supprime les éléments UI de l'éditeur (`_mcp_format_bar`, `_mcp_insert_bar`, style tag `_mcp_editor_styles`)
+- Supprime les poignées de drag et l'indicateur de drop (`_mcp_drag_handle`, `_mcp_drop_indicator`)
 - Supprime les attributs `contenteditable` et la classe `_mcp_editable`
 - Supprime tout résidu de context menu (`_editor_ctx_host`)
 
@@ -163,17 +164,28 @@ L'insertion et la suppression renumérotent automatiquement tout le document
 (ids, TOTAL, slideNames, eyebrow, footer, dropdown). Voir `skill/types/slides.md`.
 
 ### Blocs document (mode document + édition)
-Bouton dans la toolbar du serveur:
-- **＋ Bloc**: ouvre un sélecteur de blocs (titre, sous-titre, h1-h5, paragraphe,
-  tableau, liste). Le bloc s'insère à la position du curseur, ou à la fin de
-  l'article si aucun curseur n'est placé. Les blocs héritent de la charte du
-  template actif (perso, ei, standard). Voir `skill/types/document.md`.
+Boutons dans la toolbar du serveur:
+- **＋ Bloc avant** / **Bloc après ＋**: ouvre un sélecteur de blocs (titre, sous-titre,
+  h1-h5, paragraphe, tableau, liste). Le bloc s'insère avant ou après le bloc courant
+  (position du curseur), ou en tête/fin de l'article si aucun curseur n'est placé. Les
+  blocs héritent de la charte du template actif (perso, ei, standard).
+- **Reordonner les blocs**: chaque bloc de premier niveau porte une poignée de drag
+  (⠿) à sa gauche; on la tire pour déplacer le bloc verticalement. Après le drop,
+  l'ordre du DOM = l'ordre visuel, sans aucun attribut ni style ajouté (HTML propre).
+
+Voir `skill/types/document.md`.
+
+### Déplacer les boîtes d'un schéma (mode présentation + édition)
+Dans un `data-type="arch-diagram"`, les nœuds `data-type="arch-node"` se déplacent à
+la souris. La position est écrite en attributs lisibles `data-x`/`data-y` (pourcentages
+0-100, 1 décimale) + un style `left`/`top` en %. Le LLM lit et produit ce même format.
+Voir `skill/types/arch-diagram.md`.
 
 ### Context menus (clic droit sur éléments typés)
 - `data-type="table"`: ajouter/supprimer ligne, ajouter/supprimer colonne, supprimer tableau
 - `data-type="gantt-task"`: agrandir, réduire, renommer, supprimer
 - `data-type="gantt"`: ajouter une tâche
-- `data-type="arch-node"`: renommer, changer forme, supprimer
+- `data-type="arch-node"`: renommer, changer forme, supprimer (et déplacer à la souris, cf. `data-x`/`data-y`)
 - `data-type="arch-diagram"`: ajouter un nœud
 - `data-type="annotation"`: éditer texte, supprimer
 
