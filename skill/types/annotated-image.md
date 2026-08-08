@@ -146,6 +146,7 @@ suppression du titre interne du graphique, puis vérifiées par capture).
 **Base64 (recommandé pour la portabilité):**
 ```python
 import base64
+
 with open("screenshot.png", "rb") as f:
     b64 = base64.b64encode(f.read()).decode()
 src = f"data:image/png;base64,{b64}"

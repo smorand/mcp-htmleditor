@@ -1,12 +1,14 @@
 """HTTP server for the WYSIWYG editor.
 
-Serves the GrapesJS editor shell and proxies HTML content
-reads/writes to the current file on disk.
+Serves the editor shell and proxies HTML content reads/writes to the current
+file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
+``/content-frame``, ``/status`` (polling) and ``/health`` (status + version).
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import threading
@@ -15,9 +17,14 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
+from .config import default_host
 from .state import get_state
+from .tracing import trace_span
+from .version import __version__
+
+logger = logging.getLogger(__name__)
 
 # IDs/classes injected by the browser editor — must be stripped before saving.
 _EDITOR_ARTIFACTS = {
@@ -50,6 +57,7 @@ _EXTENSION_ATTR_PREFIXES = ("_msthash", "_msttexthash", "_msthidden", "data-gr-"
 # Path helpers
 # ---------------------------------------------------------------------------
 
+
 def _static_dir() -> Path:
     """Return the path to the bundled static directory."""
     return Path(__file__).parent / "static"
@@ -58,6 +66,7 @@ def _static_dir() -> Path:
 # ---------------------------------------------------------------------------
 # Request handler
 # ---------------------------------------------------------------------------
+
 
 class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O boundary, exercised manually
     """Handle all HTTP requests for the editor server."""
@@ -75,7 +84,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
-    def do_OPTIONS(self) -> None:  # noqa: N802
+    def do_OPTIONS(self) -> None:
         """Handle pre-flight CORS requests."""
         self.send_response(204)
         self._send_cors_headers()
@@ -85,21 +94,23 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
     # GET dispatch
     # ------------------------------------------------------------------
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         """Dispatch GET requests."""
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
-        if path == "/" or path == "":
+        if path in {"/", ""}:
             self._serve_editor_html()
         elif path.startswith("/static/"):
-            self._serve_static(path[len("/static/"):])
+            self._serve_static(path[len("/static/") :])
         elif path == "/content":
             self._serve_content()
         elif path == "/content-frame":
             self._serve_content_frame()
         elif path == "/status":
             self._serve_status()
+        elif path == "/health":
+            self._send_json(health_payload())
         else:
             self._not_found()
 
@@ -107,7 +118,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
     # POST dispatch
     # ------------------------------------------------------------------
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         """Dispatch POST requests."""
         parsed = urlparse(self.path)
         path = parsed.path
@@ -220,12 +231,16 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._send_json({"ok": True, "skipped": "template file is read-only"})
             return
 
-        try:
-            Path(state.current_file).write_text(html, encoding="utf-8")
-        except OSError as exc:
-            self._send_json({"error": str(exc)}, status=500)
-            return
+        target = Path(state.current_file)
+        with trace_span("file.write", {"file.path": str(target), "file.size": len(html)}):
+            try:
+                target.write_text(html, encoding="utf-8")
+            except OSError as exc:
+                logger.error("Save failed for %s: %s", target, exc)
+                self._send_json({"error": str(exc)}, status=500)
+                return
 
+        logger.debug("Saved %s (%d bytes)", target, len(html))
         self._send_json({"ok": True})
 
     # ------------------------------------------------------------------
@@ -281,8 +296,29 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
 
 
 # ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+
+def health_payload() -> dict[str, Any]:
+    """Return the ``/health`` body: liveness plus the running version.
+
+    Returns:
+        Dict with keys ``status``, ``version``, ``file`` and ``port``.
+    """
+    state = get_state()
+    return {
+        "status": "ok",
+        "version": __version__,
+        "file": state.current_file,
+        "port": state.port,
+    }
+
+
+# ---------------------------------------------------------------------------
 # HTML reconstruction
 # ---------------------------------------------------------------------------
+
 
 def _strip_editor_artifacts(html: str) -> str:
     """Remove ephemeral editor elements injected by the browser UI.
@@ -301,7 +337,7 @@ def _strip_editor_artifacts(html: str) -> str:
     # Remove injected elements by id
     for eid in _EDITOR_ARTIFACTS["ids"]:
         el = soup.find(id=eid)
-        if el:
+        if isinstance(el, Tag):
             el.decompose()
 
     # Remove drag-reorder artifacts entirely (handle span + drop indicator).
@@ -327,7 +363,7 @@ def _strip_editor_artifacts(html: str) -> str:
     # The navigation JS regenerates them from slideNames[] on every page load;
     # keeping them in the saved HTML causes duplication on each reload.
     slide_select = soup.find(id="slide-select")
-    if slide_select:
+    if isinstance(slide_select, Tag):
         for opt in slide_select.find_all("option"):
             opt.decompose()
 
@@ -377,15 +413,9 @@ def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
             pass
 
     if not head_content:
-        head_content = "<head><meta charset=\"UTF-8\"></head>"
+        head_content = '<head><meta charset="UTF-8"></head>'
 
-    return (
-        f"<!DOCTYPE html>\n"
-        f"<html{html_attrs}>\n"
-        f"{head_content}\n"
-        f"<body>\n{canvas_html}\n</body>\n"
-        f"</html>\n"
-    )
+    return f"<!DOCTYPE html>\n<html{html_attrs}>\n{head_content}\n<body>\n{canvas_html}\n</body>\n</html>\n"
 
 
 # ---------------------------------------------------------------------------
@@ -397,21 +427,33 @@ _server_thread: threading.Thread | None = None
 _server_lock = threading.Lock()
 
 
-def start_http_server(file: str, port: int = 7842) -> bool:  # pragma: no cover - starts a real server thread
+def start_http_server(
+    file: str,
+    port: int = 7842,
+    host: str | None = None,
+) -> bool:  # pragma: no cover - starts a real server thread
     """Start the HTTP server serving the given HTML file.
 
     Idempotent: if a server is already running on the same port with the
     same file, this is a no-op and returns False. Returns True if a new
     server was started.
+
+    Args:
+        file: HTML file to serve.
+        port: TCP port to bind.
+        host: Bind address; defaults to HTMLEDITOR_HOST (localhost). Use
+            ``0.0.0.0`` inside a container so the published port is reachable.
     """
     global _server_instance, _server_thread
 
     state = get_state()
+    bind_host = host if host is not None else default_host()
 
     with _server_lock:
         if _server_instance is not None:
             # Already running; just update the file
             state.set_file(file)
+            logger.info("Server already running, switched file to %s", file)
             return False
 
         state.set_file(file)
@@ -419,8 +461,9 @@ def start_http_server(file: str, port: int = 7842) -> bool:  # pragma: no cover 
         state.server_pid = os.getpid()
         state.save()
 
-        server = ThreadingHTTPServer(("localhost", port), _EditorHandler)
+        server = ThreadingHTTPServer((bind_host, port), _EditorHandler)
         _server_instance = server
+        logger.info("HTTP server listening on http://%s:%d/ (file: %s)", bind_host, port, file)
 
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -438,6 +481,7 @@ def stop_http_server() -> None:  # pragma: no cover - stops a real server thread
             _server_instance.shutdown()
             _server_instance = None
             _server_thread = None
+            logger.info("HTTP server stopped")
 
     state = get_state()
     state.server_pid = None

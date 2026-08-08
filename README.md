@@ -7,35 +7,67 @@ presentations and documents.
 
 ## Stack
 
-- Python 3.11+, FastMCP, python-pptx, BeautifulSoup4, Click
+- Python 3.13+, uv, FastMCP, python-pptx, BeautifulSoup4, Click
+- pydantic-settings for configuration, rich for logging, OpenTelemetry for tracing
 - No Node.js, no build step (iframe renderer + vanilla JS)
 - pandoc for DOCX export
-- stdlib `http.server` for the local HTTP server
+- stdlib `http.server` for the HTTP server
 
 ## Installation
 
-### Development (editable)
+Everything goes through `make` (uv under the hood, never `pip`).
 
-```bash
-pip install -e /path/to/html-editor
-```
-
-### System install (XDG-compliant)
+### System install (XDG compliant)
 
 ```bash
 make install
 ```
 
 `make install` performs:
-1. Installs the `mcp-htmleditor` CLI into `~/.local/bin/` (symlink; ensure it is on your PATH)
+1. Installs the CLI as a **uv tool** in its own isolated environment and links
+   `mcp-htmleditor` into `~/.local/bin/` (ensure it is on your PATH). A legacy
+   `pip install --user` copy is removed when found, because its console script
+   used to shadow both the tool and the sources.
 2. Copies templates into `~/.config/mcp-htmleditor/templates/`
 3. Creates the log dir `~/.cache/mcp-htmleditor/logs/`
 4. Installs the dynamic Pi skill into `~/.pi/agent/dynamic-skills/html-editor/`
    (then add the routing rule to `~/.pi/agent/dynamic_prompt.yaml`, see
-   `dynamic-skills/README.md` — zero overlap with the `pptx`/`docx` skills via the
+   `dynamic-skills/README.md`, zero overlap with the `pptx`/`docx` skills via the
    word "html")
 
-All targets are overridable via env vars (see below). `make uninstall` reverses it.
+The tool environment is a snapshot: run `make install` again after changing the
+sources. All install targets are overridable via env vars (see below).
+`make uninstall` reverses everything.
+
+### Development
+
+```bash
+make sync     # uv sync: .venv from the committed uv.lock, dev group included
+make check    # lint + format-check + typecheck + security + tests with coverage
+make run ARGS='export pptx pres.html /tmp/out.pptx'
+make run-dev ARGS='-v serve doc.html'
+```
+
+### Docker
+
+```bash
+make docker-build            # image mcp-htmleditor:latest, version from the git tag
+make run-up                  # docker compose up -d, editor on http://localhost:7842/
+make run-down
+```
+
+The image is multi stage (`python:3.13-slim`), installs from `uv.lock`, ships pandoc,
+runs as a non root user and exposes `GET /health`. Documents live in the `./data`
+volume mounted on `/data`. Details in `.agent_docs/docker.md`.
+
+### Version
+
+```bash
+mcp-htmleditor --version      # or: curl localhost:7842/health
+```
+
+`src/mcp_htmleditor/version.py` holds `dev` in the working tree; `make build` and
+`make docker-build` overwrite it from `git describe --tags --always --dirty`.
 
 ## Usage
 
@@ -51,7 +83,12 @@ mcp-htmleditor new ei ma-presentation.html --serve # create + open editor
 ```bash
 mcp-htmleditor serve path/to/file.html            # open existing file
 mcp-htmleditor serve file.html --port 7842 --poll 500
+mcp-htmleditor -v serve file.html                 # DEBUG logs (-q for errors only)
+mcp-htmleditor serve file.html --host 0.0.0.0 --no-browser   # remote or container
 ```
+
+Global options come before the subcommand: `-v` / `--verbose` raises the log level,
+`-q` / `--quiet` keeps errors only, `-V` / `--version` prints the version.
 
 Edit mode toggle (top-right "Édition"): in-place rich-text editing, format toolbar
 on selection (bold/italic/underline/strike, superscript/subscript, align, size,
@@ -176,33 +213,62 @@ run `make bootstrap-ei`; never patch the bootstrap directly.
 
 ## Environment variables
 
+Every variable is read through the `Settings` class (pydantic-settings,
+`src/mcp_htmleditor/config.py`). A local `.env` file is loaded automatically; see
+`.env.example`.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `HTMLEDITOR_HOST` | `localhost` | HTTP bind address (`0.0.0.0` in a container) |
 | `HTMLEDITOR_PORT` | `7842` | Default HTTP port |
 | `HTMLEDITOR_POLL_INTERVAL` | `1000` | Browser polling interval in ms |
 | `HTMLEDITOR_TEMPLATES_DIR` | `~/.config/mcp-htmleditor/templates` | Templates directory |
-| `HTMLEDITOR_LOG_DIR` | `~/.cache/mcp-htmleditor/logs` | Log directory |
+| `HTMLEDITOR_CACHE_DIR` | `~/.cache/mcp-htmleditor` | Cache base (logs, generated `reference.docx`) |
+| `HTMLEDITOR_LOG_DIR` | `<cache>/logs` | Log directory (`HTMLEDITOR_LOGS` is an accepted alias) |
 | `HTMLEDITOR_BIN_DIR` | `~/.local/bin` | CLI install target |
+| `HTMLEDITOR_OTEL_DESTINATION` | unset | OTLP/HTTP endpoint for spans; unset means local JSONL |
+| `HTMLEDITOR_OTEL_API_KEY` | unset | Sent as `Authorization: Bearer <key>` on OTLP exports |
 | `XDG_CONFIG_HOME` | `~/.config` | Base for config |
 | `XDG_CACHE_HOME` | `~/.cache` | Base for cache |
+
+A malformed `HTMLEDITOR_PORT` or `HTMLEDITOR_POLL_INTERVAL` falls back to its default
+instead of aborting; a blank path variable means "unset", not the current directory.
+
+## Logs and tracing
+
+| File | Content |
+|------|---------|
+| `<log dir>/mcp-htmleditor.log` | Application log, rotating (2 MB, 3 backups) |
+| `<log dir>/mcp-htmleditor-otel.log` | One JSON object per finished span (JSONL) |
+
+Console logs go to stderr (stdout carries the MCP protocol and the CLI output) and every
+line carries its own timestamp. Spans are named `category.operation`: `mcp.*` for tool
+calls, `export.pptx` / `export.docx` with slide count, charter and duration,
+`tool.pandoc` for pandoc runs, `file.write` for file mutations. Document content,
+prompts and credentials are never traced. Details in `.agent_docs/observability.md`.
 
 ## Project structure
 
 ```
 src/mcp_htmleditor/
-├── cli.py           CLI: templates, new, serve, skill, mcp, export
-├── config.py        XDG paths + env-var overrides
+├── cli.py           CLI: templates, new, serve, skill, mcp, export (-v/-q, --version)
+├── config.py        Settings (pydantic-settings): XDG paths, ports, OTel
+├── logging_config.py setup_logging(): rich console on stderr + rotating file
+├── tracing.py       configure_tracing(), trace_span(), JSONL span exporter
+├── version.py       __version__, written at build time from the git tag
 ├── templates.py     template registry + search-path resolution
 ├── skill_content.py assembles `mcp-htmleditor skill` output
 ├── mcp_server.py    FastMCP server with 6 tools
-├── http_server.py   stdlib HTTP server (ThreadingHTTPServer)
+├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/
-│   ├── to_pptx.py   HTML → PPTX: slide detection, charter chrome, block flow, renderers
+│   ├── to_pptx.py   HTML to PPTX: slide detection, charter chrome, block flow, renderers
 │   ├── pptx_style.py      Box geometry, CSS/colour parsing, themes, typographic scale
 │   ├── pptx_components.py table grid (spans), Gantt maths, low level pptx helpers
-│   ├── to_docx.py   HTML → DOCX via pandoc (single title, charter, diagnostics)
-│   └── reference_docx.py  generates/caches a charter reference.docx for pandoc
+│   ├── to_docx.py   HTML to DOCX via pandoc (single title, charter, diagnostics)
+│   ├── reference_docx.py  generates/caches a charter reference.docx for pandoc
+│   ├── docx_header_footer.py  repeated Word header/footer parts of a charter
+│   └── docx_assets.py     base64 assets embedded in the reference documents
 └── static/
     ├── editor.html      iframe shell + toolbar
     ├── editor.js        polling, rich-text, slide insert, doc-block insert, image embed, drag-reorder blocks + move arch-nodes
@@ -210,12 +276,27 @@ src/mcp_htmleditor/
     ├── doc-blocks.js    document block definitions (title, subtitle, h1-h5, paragraph, table, list)
     └── editor.css       toolbar, overlay, picker styles
 templates/          versioned templates (bootstrap + reference)
+tests/              pytest suite (see .agent_docs/testing.md)
 tools/              maintenance scripts
                     gen_ei_bootstrap.py  regenerate the EI bootstrap from the EI reference
                     check_ei_insert.py   browser check of EI slide insertion (logo + numbering)
 skill/              skill docs (served by `mcp-htmleditor skill`)
 dynamic-skills/     dynamic Pi skill + routing doc (installed to ~/.pi/agent/dynamic-skills)
+.agent_docs/        detailed docs for AI agents (python, makefile, architecture, ...)
+Dockerfile, docker-compose.yml, docker-compose.prod.yml
+Makefile            single entry point for every operation
 ```
+
+## Documentation
+
+- `AGENTS.md`: compact index for AI agents (commands, conventions, doc index)
+- `.agent_docs/python.md`: Python standards and documented deviations
+- `.agent_docs/makefile.md`: every make target and install override
+- `.agent_docs/architecture.md`: module map, save path, export pipeline
+- `.agent_docs/observability.md`: logs, span inventory, OTLP export
+- `.agent_docs/testing.md`: test map, coverage, export regression set
+- `.agent_docs/docker.md`: image, compose, container checks
+- `.agent_docs/html-conventions.md`: invariants the exporters rely on
 
 ## How it works
 

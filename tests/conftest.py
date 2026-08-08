@@ -7,7 +7,20 @@ from pathlib import Path
 
 import pytest
 
+from mcp_htmleditor import config as config_module
 from mcp_htmleditor import state as state_module
+
+
+@pytest.fixture(autouse=True)
+def reset_settings() -> Iterator[None]:
+    """Drop the memoized Settings around each test.
+
+    Settings are memoized on an environment signature, so a test that sets
+    HTMLEDITOR_* variables must not hand its instance over to the next one.
+    """
+    config_module.reset_settings_cache()
+    yield
+    config_module.reset_settings_cache()
 
 
 @pytest.fixture
@@ -36,8 +49,7 @@ def html_file(tmp_path: Path) -> Path:
     """Write a minimal HTML file into tmp_path and return its path."""
     path = tmp_path / "doc.html"
     path.write_text(
-        "<!DOCTYPE html>\n<html><head><title>t</title></head>"
-        "<body><p>hello</p></body></html>",
+        "<!DOCTYPE html>\n<html><head><title>t</title></head><body><p>hello</p></body></html>",
         encoding="utf-8",
     )
     return path

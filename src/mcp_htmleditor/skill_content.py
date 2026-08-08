@@ -52,9 +52,6 @@ def build_skill_content() -> str:
     for rel in _SUBDOCS:
         path = skill / rel
         if path.is_file():
-            parts.append(
-                f"\n\n---\n\n<!-- ===== {rel} ===== -->\n\n"
-                + path.read_text(encoding="utf-8").rstrip()
-            )
+            parts.append(f"\n\n---\n\n<!-- ===== {rel} ===== -->\n\n" + path.read_text(encoding="utf-8").rstrip())
 
     return "\n".join(parts) + "\n"

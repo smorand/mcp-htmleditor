@@ -253,10 +253,11 @@ Rien n'est uploadé sur un serveur; l'image est lue localement et insérée comm
 ### Côté LLM (écriture directe)
 ```python
 import base64, mimetypes
+
 path = "image.png"
 mime = mimetypes.guess_type(path)[0] or "image/png"
-b64  = base64.b64encode(open(path, "rb").read()).decode()
-img  = f'<img src="data:{mime};base64,{b64}" data-editable="resize,reposition" style="max-width:100%;height:auto;" />'
+b64 = base64.b64encode(open(path, "rb").read()).decode()
+img = f'<img src="data:{mime};base64,{b64}" data-editable="resize,reposition" style="max-width:100%;height:auto;" />'
 ```
 
 **Règle absolue:** ne jamais référencer une image par chemin relatif ou URL externe si le document doit être partagé. Toujours base64.

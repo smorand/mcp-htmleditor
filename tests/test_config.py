@@ -10,9 +10,13 @@ from mcp_htmleditor import config
 def test_defaults_without_env(monkeypatch) -> None:
     """Without env overrides, paths follow XDG defaults under $HOME."""
     for var in [
-        "HTMLEDITOR_TEMPLATES_DIR", "HTMLEDITOR_LOG_DIR", "HTMLEDITOR_BIN_DIR",
-        "HTMLEDITOR_PORT", "HTMLEDITOR_POLL_INTERVAL",
-        "XDG_CONFIG_HOME", "XDG_CACHE_HOME",
+        "HTMLEDITOR_TEMPLATES_DIR",
+        "HTMLEDITOR_LOG_DIR",
+        "HTMLEDITOR_BIN_DIR",
+        "HTMLEDITOR_PORT",
+        "HTMLEDITOR_POLL_INTERVAL",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
     ]:
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: Path("/home/tester")))

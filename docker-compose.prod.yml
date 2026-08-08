@@ -1,0 +1,16 @@
+# Production overlay: builds the image locally with the version injected.
+# Usage: APP_VERSION=$(git describe --tags --always) \
+#          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  htmleditor:
+    build:
+      context: .
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+    image: ${DOCKER_PREFIX:-}${PROJECT_NAME:-mcp-htmleditor}:${DOCKER_TAG:-latest}
+    restart: always
+    environment:
+      HTMLEDITOR_HOST: 0.0.0.0
+      HTMLEDITOR_OTEL_DESTINATION: ${HTMLEDITOR_OTEL_DESTINATION:-}
+      HTMLEDITOR_OTEL_API_KEY: ${HTMLEDITOR_OTEL_API_KEY:-}

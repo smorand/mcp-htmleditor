@@ -12,6 +12,11 @@ Generated files are cached under ``~/.cache/mcp-htmleditor/reference`` (see
 ``config.reference_dir``), keyed by a fingerprint of the charter definition plus
 the pandoc version, so editing a charter or upgrading pandoc regenerates them.
 
+A charter may also carry a repeated Word header and footer (logo, brand rule,
+page number). Those live in their own archive parts, injected into the same
+reference document; see :mod:`.docx_header_footer` for how pandoc carries them
+over to the exported file.
+
 Charter keys match the ``data-doc-template`` attribute of the document
 ``<article>``: ``perso``, ``ei``. A document without that attribute uses the
 standard charter, which has no reference document: pandoc defaults apply.
@@ -22,7 +27,9 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import logging
 import os
+import re
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -32,22 +39,54 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..config import reference_dir
+from ..tracing import trace_span
+from . import docx_header_footer as hf
+from .docx_assets import EI_LOGO_PNG_BASE64
+
+logger = logging.getLogger(__name__)
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 
 STYLES_PART = "word/styles.xml"
+DOCUMENT_PART = "word/document.xml"
+DOCUMENT_RELS_PART = "word/_rels/document.xml.rels"
+CONTENT_TYPES_PART = "[Content_Types].xml"
 
 #: Version of the patching logic. Bump it when the generated XML changes, so
 #: cached reference documents are rebuilt even if no charter was edited.
-GENERATOR_VERSION = "2"
+GENERATOR_VERSION = "3"
+
+# Opening tag of the single w:sectPr of pandoc's default reference document,
+# matched tolerantly (attributes, self-closing form).
+_SECTPR_OPEN = re.compile(r"<w:sectPr\b[^>]*?(/?)>")
+_SECTPR_START = "<w:sectPr>"
+_SECTPR_CLOSE = "</w:sectPr>"
 
 # Schema child order of w:style (CT_Style), truncated after w:tblStylePr.
 _STYLE_ORDER: tuple[str, ...] = (
-    "name", "aliases", "basedOn", "next", "link", "autoRedefine", "hidden",
-    "uiPriority", "semiHidden", "unhideWhenUsed", "qFormat", "locked",
-    "personal", "personalCompose", "personalReply", "rsid", "pPr", "rPr",
-    "tblPr", "trPr", "tcPr", "tblStylePr",
+    "name",
+    "aliases",
+    "basedOn",
+    "next",
+    "link",
+    "autoRedefine",
+    "hidden",
+    "uiPriority",
+    "semiHidden",
+    "unhideWhenUsed",
+    "qFormat",
+    "locked",
+    "personal",
+    "personalCompose",
+    "personalReply",
+    "rsid",
+    "pPr",
+    "rPr",
+    "tblPr",
+    "trPr",
+    "tcPr",
+    "tblStylePr",
 )
 
 # Schema child order of w:rPr (EG_RPrBase), limited to what we emit.
@@ -55,13 +94,41 @@ _RPR_ORDER: tuple[str, ...] = ("rFonts", "b", "bCs", "i", "iCs", "caps", "color"
 
 # Schema child order of w:pPr (CT_PPr), limited to what we touch.
 _PPR_ORDER: tuple[str, ...] = (
-    "pStyle", "keepNext", "keepLines", "pageBreakBefore", "framePr",
-    "widowControl", "numPr", "suppressLineNumbers", "pBdr", "shd", "tabs",
-    "suppressAutoHyphens", "kinsoku", "wordWrap", "overflowPunct",
-    "topLinePunct", "autoSpaceDE", "autoSpaceDN", "bidi", "adjustRightInd",
-    "snapToGrid", "spacing", "ind", "contextualSpacing", "mirrorIndents",
-    "suppressOverlap", "jc", "textDirection", "textAlignment",
-    "textboxTightWrap", "outlineLvl", "divId", "cnfStyle", "rPr", "sectPr",
+    "pStyle",
+    "keepNext",
+    "keepLines",
+    "pageBreakBefore",
+    "framePr",
+    "widowControl",
+    "numPr",
+    "suppressLineNumbers",
+    "pBdr",
+    "shd",
+    "tabs",
+    "suppressAutoHyphens",
+    "kinsoku",
+    "wordWrap",
+    "overflowPunct",
+    "topLinePunct",
+    "autoSpaceDE",
+    "autoSpaceDN",
+    "bidi",
+    "adjustRightInd",
+    "snapToGrid",
+    "spacing",
+    "ind",
+    "contextualSpacing",
+    "mirrorIndents",
+    "suppressOverlap",
+    "jc",
+    "textDirection",
+    "textAlignment",
+    "textboxTightWrap",
+    "outlineLvl",
+    "divId",
+    "cnfStyle",
+    "rPr",
+    "sectPr",
 )
 
 # Schema child order of w:tblStylePr (CT_TblStylePr).
@@ -69,8 +136,19 @@ _TBLSTYLEPR_ORDER: tuple[str, ...] = ("pPr", "rPr", "tblPr", "trPr", "tcPr")
 
 # Schema child order of w:tcPr (CT_TcPrBase), limited to what we touch.
 _TCPR_ORDER: tuple[str, ...] = (
-    "cnfStyle", "tcW", "gridSpan", "hMerge", "vMerge", "tcBorders", "shd",
-    "noWrap", "tcMar", "textDirection", "tcFitText", "vAlign", "hideMark",
+    "cnfStyle",
+    "tcW",
+    "gridSpan",
+    "hMerge",
+    "vMerge",
+    "tcBorders",
+    "shd",
+    "noWrap",
+    "tcMar",
+    "textDirection",
+    "tcFitText",
+    "vAlign",
+    "hideMark",
 )
 
 
@@ -125,6 +203,11 @@ class Charter:
         body_size_pt: Body text size in points.
         styles: Word style id (``Title``, ``Heading1``, ...) to its traits.
         table: Header-row traits of the table style, or None to keep pandoc's.
+        header: Repeated Word header, or None for none.
+        footer: Repeated Word footer, or None for none.
+        page: Page size and margins, or None to keep the reader defaults. A
+            charter with a header needs one: the header is drawn inside the top
+            margin, which must be widened to make room for it.
     """
 
     key: str
@@ -133,6 +216,14 @@ class Charter:
     body_size_pt: float
     styles: Mapping[str, StyleSpec] = field(default_factory=dict)
     table: TableSpec | None = None
+    header: hf.HeaderSpec | None = None
+    footer: hf.FooterSpec | None = None
+    page: hf.PageSpec | None = None
+
+    @property
+    def has_page_furniture(self) -> bool:
+        """Whether the charter provides a repeated Word header or footer."""
+        return self.header is not None or self.footer is not None
 
 
 PERSO = Charter(
@@ -150,6 +241,9 @@ PERSO = Charter(
         "Heading5": StyleSpec(11, color="C27BA0"),
     },
     table=TableSpec(header_fill="1155CC"),
+    # The HTML charter has no letterhead, so only a discreet centred page number.
+    footer=hf.FooterSpec(layout="center", color="666666", size_pt=9),
+    page=hf.PageSpec(top=1134, bottom=1418, left=1417, right=1417),
 )
 
 EI = Charter(
@@ -167,6 +261,31 @@ EI = Charter(
         "Heading5": StyleSpec(11, color="50565B", caps=True),
     },
     table=TableSpec(header_fill="003A8D"),
+    # Mirrors .ei-doc-head: blue rule, logo, brand mention, orange rule.
+    header=hf.HeaderSpec(
+        brand="Euro-Information",
+        brand_color="003A8D",
+        brand_size_pt=9,
+        brand_caps=True,
+        logo=hf.LogoSpec(
+            data_base64=EI_LOGO_PNG_BASE64,
+            width_emu=hf.millimetres_to_emu(11.9),
+            height_emu=hf.millimetres_to_emu(11.0),
+        ),
+        top_rule=hf.RuleSpec(color="003A8D", size_eighth_pt=36),
+        bottom_rule=hf.RuleSpec(color="FBAE40", size_eighth_pt=12),
+    ),
+    # Mirrors .ei-doc-foot: hairline, document title left, page number right.
+    footer=hf.FooterSpec(
+        layout="split",
+        color="8A9099",
+        size_pt=9,
+        top_rule=hf.RuleSpec(color="DBE3F0", size_eighth_pt=6),
+    ),
+    # Top margin much wider than the HTML @page rule: the header lives inside
+    # it (12.5 mm offset, about 13 mm of letterhead), so 33 mm leaves the body a
+    # visible gap below the orange rule on continuation pages.
+    page=hf.PageSpec(top=1871, bottom=1418, left=1417, right=1417),
 )
 
 CHARTERS: Mapping[str, Charter] = {PERSO.key: PERSO, EI.key: EI}
@@ -190,6 +309,22 @@ def charter_for(key: str | None) -> Charter | None:
     if not key:
         return None
     return CHARTERS.get(key.strip().lower())
+
+
+def has_page_furniture(key: str | None) -> bool:
+    """Whether the charter of a key ships a repeated Word header or footer.
+
+    Callers use this to decide whether the decorative HTML blocks may be dropped
+    from the exported body: removing them is only safe when Word reproduces them.
+
+    Args:
+        key: Charter key read from ``data-doc-template``.
+
+    Returns:
+        True when the charter exists and declares a header or a footer.
+    """
+    charter = charter_for(key)
+    return charter is not None and charter.has_page_furniture
 
 
 def reference_docx_for(key: str | None) -> Path | None:
@@ -216,9 +351,11 @@ def reference_docx_for(key: str | None) -> Path | None:
         # Per-process staging name: two concurrent exports must not clobber
         # each other's partially written archive.
         staging = target.with_name(f".{target.name}.{os.getpid()}.tmp")
-        build_reference_docx(charter, staging)
-        staging.replace(target)
-    except (OSError, subprocess.SubprocessError, ET.ParseError, KeyError):
+        with trace_span("export.reference_docx", {"export.charter": charter.key, "file.path": str(target)}):
+            build_reference_docx(charter, staging)
+            staging.replace(target)
+    except (OSError, subprocess.SubprocessError, ET.ParseError, KeyError, ValueError) as exc:
+        logger.warning("Reference docx generation failed for charter %s: %s", charter.key, exc)
         return None
     return target
 
@@ -236,14 +373,19 @@ def build_reference_docx(charter: Charter, destination: Path) -> None:
             reference document.
         KeyError: If the default reference document has no styles part.
         ET.ParseError: If the styles part is not well-formed XML.
+        ValueError: If the default reference document has no section properties
+            to hang the header and footer references on.
     """
     with tempfile.TemporaryDirectory(prefix="htmleditor-ref-") as tmp:
         base = Path(tmp) / "reference.docx"
         base.write_bytes(default_reference_bytes())
         with zipfile.ZipFile(base) as archive:
-            styles = archive.read(STYLES_PART)
-        patched = patch_styles_xml(styles, charter)
-        _copy_zip_with_replacement(base, destination, STYLES_PART, patched)
+            replacements = {STYLES_PART: patch_styles_xml(archive.read(STYLES_PART), charter)}
+            if charter.has_page_furniture or charter.page is not None:
+                replacements[DOCUMENT_PART] = patch_document_xml(archive.read(DOCUMENT_PART), charter)
+                replacements[DOCUMENT_RELS_PART] = patch_document_rels_xml(archive.read(DOCUMENT_RELS_PART), charter)
+                replacements[CONTENT_TYPES_PART] = patch_content_types_xml(archive.read(CONTENT_TYPES_PART), charter)
+        _copy_zip(base, destination, replacements, page_furniture_parts(charter))
 
 
 def default_reference_bytes() -> bytes:
@@ -253,12 +395,16 @@ def default_reference_bytes() -> bytes:
         FileNotFoundError: If pandoc is not available in PATH.
         subprocess.CalledProcessError: If pandoc exits with a non-zero code.
     """
-    completed = subprocess.run(
-        ["pandoc", "--print-default-data-file", "reference.docx"],
-        capture_output=True,
-        check=True,
-    )
-    return completed.stdout
+    with trace_span("tool.pandoc", {"tool.operation": "print-default-reference"}) as span:
+        # Fixed argument list, no shell. pandoc is resolved from PATH on purpose:
+        # it is an external, user installed requirement, not a bundled binary.
+        completed = subprocess.run(
+            ["pandoc", "--print-default-data-file", "reference.docx"],  # noqa: S607
+            capture_output=True,
+            check=True,
+        )
+        span.set_attribute("file.size", len(completed.stdout))
+        return completed.stdout
 
 
 def patch_styles_xml(styles_xml: bytes, charter: Charter) -> bytes:
@@ -293,6 +439,128 @@ def patch_styles_xml(styles_xml: bytes, charter: Charter) -> bytes:
     _patch_table_style(root, charter)
     serialized: bytes = ET.tostring(root, encoding="UTF-8", xml_declaration=True)
     return serialized
+
+
+def patch_document_xml(document_xml: bytes, charter: Charter) -> bytes:
+    """Return ``word/document.xml`` with the header, footer and page geometry.
+
+    The header and footer references and the page geometry are written into the
+    single ``w:sectPr`` of the reference document, in schema order: the
+    references first, then the existing ``w:footnotePr``, then ``w:pgSz`` and
+    ``w:pgMar`` last. Pandoc reuses that ``w:sectPr`` verbatim for the document
+    it produces, which is what makes the letterhead repeat on every page.
+
+    Args:
+        document_xml: Raw content of the ``word/document.xml`` part.
+        charter: Charter to apply.
+
+    Returns:
+        The patched XML.
+
+    Raises:
+        ValueError: If the part declares no section properties.
+    """
+    text = document_xml.decode("utf-8")
+    opening = _SECTPR_OPEN.search(text)
+    if opening is None:
+        raise ValueError("reference document has no w:sectPr to attach a header to")
+    if opening.group(1):
+        # Self-closing form: expand it first so children can be inserted.
+        text = f"{text[: opening.start()]}{_SECTPR_START}{_SECTPR_CLOSE}{text[opening.end() :]}"
+        insert_at = opening.start() + len(_SECTPR_START)
+    else:
+        insert_at = opening.end()
+    references = hf.sectpr_references(
+        has_header=charter.header is not None,
+        has_footer=charter.footer is not None,
+    )
+    text = f"{text[:insert_at]}{references}{text[insert_at:]}"
+    page = "" if charter.page is None else hf.sectpr_page(charter.page)
+    if page:
+        close = text.index(_SECTPR_CLOSE, insert_at)
+        text = f"{text[:close]}{page}{text[close:]}"
+    return text.encode("utf-8")
+
+
+def patch_document_rels_xml(rels_xml: bytes, charter: Charter) -> bytes:
+    """Return ``word/_rels/document.xml.rels`` with the header and footer relations.
+
+    Args:
+        rels_xml: Raw content of the relationships part.
+        charter: Charter to apply.
+
+    Returns:
+        The patched XML.
+
+    Raises:
+        ValueError: If the part is not a relationships document.
+    """
+    entries = hf.document_rels_entries(
+        has_header=charter.header is not None,
+        has_footer=charter.footer is not None,
+    )
+    return _insert_before_close(rels_xml, "</Relationships>", entries)
+
+
+def patch_content_types_xml(content_types_xml: bytes, charter: Charter) -> bytes:
+    """Return ``[Content_Types].xml`` declaring the injected parts.
+
+    Pandoc rebuilds this part for the exported document, deriving media types on
+    its own; the declarations matter so the reference document is a valid DOCX in
+    its own right and can be opened for inspection.
+
+    Args:
+        content_types_xml: Raw content of the content types part.
+        charter: Charter to apply.
+
+    Returns:
+        The patched XML.
+
+    Raises:
+        ValueError: If the part is not a content types document.
+    """
+    entries = hf.content_type_entries(
+        has_header=charter.header is not None,
+        has_footer=charter.footer is not None,
+        has_logo=charter.header is not None and charter.header.logo is not None,
+    )
+    return _insert_before_close(content_types_xml, "</Types>", entries)
+
+
+def page_furniture_parts(charter: Charter) -> dict[str, bytes]:
+    """Return the archive members carrying the header, footer and logo.
+
+    Args:
+        charter: Charter to render.
+
+    Returns:
+        Archive member name to content; empty when the charter has no header and
+        no footer.
+    """
+    tab = hf.DEFAULT_CONTENT_WIDTH_TWIPS if charter.page is None else charter.page.content_width
+    parts: dict[str, bytes] = {}
+    if charter.header is not None:
+        parts[hf.HEADER_PART] = hf.build_header_xml(charter.header, charter.font, tab)
+        if charter.header.logo is not None:
+            parts[hf.HEADER_RELS_PART] = hf.build_header_rels_xml()
+            parts[hf.LOGO_PART] = charter.header.logo.to_bytes()
+    if charter.footer is not None:
+        parts[hf.FOOTER_PART] = hf.build_footer_xml(charter.footer, charter.font, tab)
+    return parts
+
+
+def _insert_before_close(xml: bytes, closing_tag: str, entries: str) -> bytes:
+    """Return ``xml`` with ``entries`` spliced in just before ``closing_tag``.
+
+    Raises:
+        ValueError: If the closing tag is absent.
+    """
+    if not entries:
+        return xml
+    text = xml.decode("utf-8")
+    if closing_tag not in text:
+        raise ValueError(f"reference document part has no {closing_tag}")
+    return text.replace(closing_tag, f"{entries}{closing_tag}", 1).encode("utf-8")
 
 
 def _patch_document_defaults(root: ET.Element, charter: Charter) -> None:
@@ -435,26 +703,43 @@ def _fingerprint(charter: Charter) -> str:
 def _pandoc_version() -> str:
     """Return the first line of ``pandoc --version``, or an empty string."""
     try:
-        completed = subprocess.run(["pandoc", "--version"], capture_output=True, check=True, text=True)
-    except (OSError, subprocess.SubprocessError):
+        # Fixed argument list, no shell; pandoc resolved from PATH (see above).
+        completed = subprocess.run(
+            ["pandoc", "--version"],  # noqa: S607
+            capture_output=True,
+            check=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("pandoc version unavailable: %s", exc)
         return ""
     lines = completed.stdout.splitlines()
     return lines[0].strip() if lines else ""
 
 
-def _copy_zip_with_replacement(source: Path, destination: Path, part: str, content: bytes) -> None:
-    """Copy a DOCX archive, substituting one part and preserving every other entry.
+def _copy_zip(
+    source: Path,
+    destination: Path,
+    replacements: Mapping[str, bytes],
+    additions: Mapping[str, bytes],
+) -> None:
+    """Copy a DOCX archive, substituting some parts and appending new ones.
+
+    Every member not named in ``replacements`` is copied byte for byte, which is
+    what keeps the pandoc conventions (numbering, theme, settings) intact.
 
     Args:
         source: Archive to copy.
         destination: Archive to write.
-        part: Archive member to replace (for example ``word/styles.xml``).
-        content: New content of that member.
+        replacements: Member name to new content, for members already present.
+        additions: Member name to content, for members to create.
     """
     with (
         zipfile.ZipFile(source) as reader,
         zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as writer,
     ):
         for item in reader.infolist():
-            data = content if item.filename == part else reader.read(item.filename)
-            writer.writestr(item, data)
+            data = replacements.get(item.filename)
+            writer.writestr(item, reader.read(item.filename) if data is None else data)
+        for name, content in additions.items():
+            writer.writestr(name, content)

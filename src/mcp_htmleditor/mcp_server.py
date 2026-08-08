@@ -1,11 +1,14 @@
 """MCP server for html-editor.
 
-Exposes 6 tools for LLM agents to control the WYSIWYG editor.
+Exposes 6 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
 from __future__ import annotations
 
+import logging
 import webbrowser
+from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
@@ -16,6 +19,9 @@ from .http_server import (
     stop_http_server,
 )
 from .state import get_state
+from .tracing import trace_span
+
+logger = logging.getLogger(__name__)
 
 mcp: FastMCP = FastMCP("html-editor")
 
@@ -35,26 +41,27 @@ def start_server(file: str, port: int = 7842) -> dict[str, Any]:
     Returns:
         Dict with keys: ok, url, file, port, started (bool).
     """
-    from pathlib import Path
-
     abs_file = str(Path(file).resolve())
     state = get_state()
 
-    already_running = is_server_running() and state.current_file == abs_file
+    with trace_span("mcp.start_server", {"file.path": abs_file, "server.port": port}) as span:
+        already_running = is_server_running() and state.current_file == abs_file
 
-    started = start_http_server(abs_file, port) if not already_running else False
+        started = start_http_server(abs_file, port) if not already_running else False
 
-    url = f"http://localhost:{port}/"
-    if not already_running:
-        webbrowser.open(url)
+        url = f"http://localhost:{port}/"
+        if not already_running:
+            webbrowser.open(url)
 
-    return {
-        "ok": True,
-        "url": url,
-        "file": abs_file,
-        "port": port,
-        "started": started,
-    }
+        span.set_attribute("server.started", started)
+        logger.info("start_server file=%s port=%d started=%s", abs_file, port, started)
+        return {
+            "ok": True,
+            "url": url,
+            "file": abs_file,
+            "port": port,
+            "started": started,
+        }
 
 
 @mcp.tool()
@@ -64,7 +71,8 @@ def stop_server() -> dict[str, Any]:
     Returns:
         Dict with key: ok.
     """
-    stop_http_server()
+    with trace_span("mcp.stop_server"):
+        stop_http_server()
     return {"ok": True}
 
 
@@ -76,14 +84,15 @@ def get_status() -> dict[str, Any]:
         Dict with keys: file, port, pid, update_in_progress, mtime, running.
     """
     state = get_state()
-    return {
-        "file": state.current_file,
-        "port": state.port,
-        "pid": state.server_pid,
-        "update_in_progress": state.update_in_progress,
-        "mtime": state.get_mtime(),
-        "running": is_server_running(),
-    }
+    with trace_span("mcp.get_status", {"server.running": is_server_running()}):
+        return {
+            "file": state.current_file,
+            "port": state.port,
+            "pid": state.server_pid,
+            "update_in_progress": state.update_in_progress,
+            "mtime": state.get_mtime(),
+            "running": is_server_running(),
+        }
 
 
 @mcp.tool()
@@ -99,11 +108,11 @@ def open_file(file: str) -> dict[str, Any]:
     Returns:
         Dict with keys: ok, file.
     """
-    from pathlib import Path
-
     abs_file = str(Path(file).resolve())
     state = get_state()
-    state.set_file(abs_file)
+    with trace_span("mcp.open_file", {"file.path": abs_file}):
+        state.set_file(abs_file)
+    logger.info("open_file %s", abs_file)
     return {"ok": True, "file": abs_file}
 
 
@@ -119,7 +128,8 @@ def update_start() -> dict[str, Any]:
         Dict with key: ok.
     """
     state = get_state()
-    state.set_update_flag(True)
+    with trace_span("mcp.update_start", {"file.path": state.current_file or ""}):
+        state.set_update_flag(True)
     return {"ok": True}
 
 
@@ -134,10 +144,16 @@ def update_end() -> dict[str, Any]:
         Dict with key: ok.
     """
     state = get_state()
-    state.set_update_flag(False)
+    with trace_span("mcp.update_end", {"file.path": state.current_file or ""}):
+        state.set_update_flag(False)
     return {"ok": True}
 
 
 def run_mcp_server() -> None:
-    """Entry point: run the MCP server over stdio transport."""
+    """Entry point: run the MCP server over stdio transport.
+
+    Logging goes to stderr and to the log file only: stdout carries the MCP
+    protocol frames.
+    """
+    logger.info("Starting MCP server (stdio transport)")
     mcp.run(transport="stdio")

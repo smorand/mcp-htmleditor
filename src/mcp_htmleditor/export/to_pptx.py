@@ -40,6 +40,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
+from ..tracing import trace_span
 from .pptx_components import (
     GANTT_DATES_PX,
     GANTT_LABEL_PX,
@@ -100,9 +101,7 @@ SKIP_TAGS = frozenset(
 )
 """Tags never exported: code, decorations and interactive shell widgets."""
 
-SHELL_CLASSES = frozenset(
-    {"toolbar", "shell-header", "status-bar", "nav-arrow", "stage", "slide-frame"}
-)
+SHELL_CLASSES = frozenset({"toolbar", "shell-header", "status-bar", "nav-arrow", "stage", "slide-frame"})
 """Classes of the navigation shell, outside of any slide content."""
 
 BLOCK_TAGS = frozenset(
@@ -184,6 +183,7 @@ class ExportReport:
 
     slide_count: int = 0
     warnings: list[str] = field(default_factory=list)
+    charter: str | None = None
 
     def warn(self, message: str) -> None:
         """Record a dropped or approximated item.
@@ -206,6 +206,22 @@ def to_pptx(input_html: str, output_pptx: str) -> ExportReport:
         An :class:`ExportReport` with the number of slides written and the list
         of warnings (missing images, unsupported components, empty documents).
     """
+    with trace_span("export.pptx", {"file.path": str(Path(input_html).resolve())}) as span:
+        report = _build_pptx(input_html, output_pptx)
+        span.set_attribute("slide.count", report.slide_count)
+        span.set_attribute("warning.count", len(report.warnings))
+        logger.info(
+            "PPTX export: %s -> %s (%d slide(s), %d warning(s))",
+            input_html,
+            output_pptx,
+            report.slide_count,
+            len(report.warnings),
+        )
+        return report
+
+
+def _build_pptx(input_html: str, output_pptx: str) -> ExportReport:
+    """Do the actual HTML to PPTX conversion (see :func:`to_pptx`)."""
     source = Path(input_html)
     soup = BeautifulSoup(source.read_text(encoding="utf-8"), "html.parser")
     report = ExportReport()
@@ -218,7 +234,7 @@ def to_pptx(input_html: str, output_pptx: str) -> ExportReport:
     articles = find_slides(soup)
     if not articles:
         report.warn(
-            "Aucun element data-type=\"slide\" ni article.slide trouve: "
+            'Aucun element data-type="slide" ni article.slide trouve: '
             "le corps du document est exporte comme une slide unique."
         )
         body = soup.body or soup
@@ -236,9 +252,11 @@ def to_pptx(input_html: str, output_pptx: str) -> ExportReport:
         _SlideBuilder(context, slide, article, index).build()
 
     report.slide_count = len(prs.slides)
+    report.charter = resolver.theme.key
     out = Path(output_pptx)
     out.parent.mkdir(parents=True, exist_ok=True)
-    prs.save(str(out))
+    with trace_span("file.write", {"file.path": str(out), "export.format": "pptx"}):
+        prs.save(str(out))
     return report
 
 
@@ -251,11 +269,7 @@ def find_slides(soup: BeautifulSoup) -> list[Tag]:
     """
     tagged = [el for el in soup.find_all(attrs={"data-type": "slide"}) if isinstance(el, Tag)]
     if not tagged:
-        tagged = [
-            el
-            for el in soup.find_all(["article", "section"])
-            if isinstance(el, Tag) and has_class(el, "slide")
-        ]
+        tagged = [el for el in soup.find_all(["article", "section"]) if isinstance(el, Tag) and has_class(el, "slide")]
     return [el for el in tagged if not _has_slide_ancestor(el, tagged)]
 
 
@@ -385,10 +399,10 @@ class _SlideBuilder:
         foot = self.article.find(class_="slide-foot")
         if isinstance(foot, Tag):
             self._render_ei_foot(foot)
-        host = self.article.find(class_="slide-inner")
-        container = host if isinstance(host, Tag) else self.article
-        if isinstance(host, Tag):
-            self._consume(host, deep=False)
+        inner_host = self.article.find(class_="slide-inner")
+        container = inner_host if isinstance(inner_host, Tag) else self.article
+        if isinstance(inner_host, Tag):
+            self._consume(inner_host, deep=False)
         content = inner.inset_px(40, 30, 40, 50)
         return [_Region(content, self._children(container))]
 
@@ -415,11 +429,7 @@ class _SlideBuilder:
         heights = {"logo-cm": 26.0, "logo-cic": 24.0, "logo-ei": 34.0}
         left_group = container.find(class_="logos-left")
         left_images = list(left_group.find_all("img")) if isinstance(left_group, Tag) else []
-        right_images = [
-            img
-            for img in container.find_all("img")
-            if img not in left_images and isinstance(img, Tag)
-        ]
+        right_images = [img for img in container.find_all("img") if img not in left_images and isinstance(img, Tag)]
 
         cursor = 48.0 * PX_IN
         for img in left_images:
@@ -484,8 +494,7 @@ class _SlideBuilder:
             footer_top = SLIDE_H_IN - 40.0 * PX_IN
             self._rect(
                 Box(0.0, footer_top, SLIDE_W_IN, 40.0 * PX_IN),
-                fill=self._element_color(footer)
-                or (self.theme.surface if is_light(background) else background),
+                fill=self._element_color(footer) or (self.theme.surface if is_light(background) else background),
                 line=self.theme.border,
             )
             self._render_footer_texts(footer, footer_top)
@@ -510,12 +519,8 @@ class _SlideBuilder:
                 )
             else:
                 rule_y = cursor + height + 14.0 * PX_IN
-                regions.append(
-                    _Region(Box(pad_x, cursor, content_w, height), self._children(header))
-                )
-            self._rect(
-                Box(0.0, rule_y, SLIDE_W_IN, rule_h), fill=rule_color or self.theme.primary
-            )
+                regions.append(_Region(Box(pad_x, cursor, content_w, height), self._children(header)))
+            self._rect(Box(0.0, rule_y, SLIDE_W_IN, rule_h), fill=rule_color or self.theme.primary)
             cursor = rule_y + rule_h + 22.0 * PX_IN
 
         body = self.article.find(class_="slide-body")
@@ -634,15 +639,11 @@ class _SlideBuilder:
         if has_class(element, *TILE_CLASSES):
             return True
         props = self.res.props(element)
-        return bool(
-            color_of(props, FILL_KEYS, self.res) or color_of(props, BAR_KEYS, self.res)
-        )
+        return bool(color_of(props, FILL_KEYS, self.res) or color_of(props, BAR_KEYS, self.res))
 
     def _has_block_children(self, element: Tag) -> bool:
         """Tell whether an element contains children that become their own block."""
-        return any(
-            isinstance(child, Tag) and self._is_block_child(child) for child in element.children
-        )
+        return any(isinstance(child, Tag) and self._is_block_child(child) for child in element.children)
 
     @staticmethod
     def _is_block_child(child: Tag) -> bool:
@@ -912,9 +913,7 @@ class _SlideBuilder:
             self._rect(cell, fill=fill)
             text = segment.get_text(" ", strip=True)
             if text and width > 0.3:
-                style = replace(
-                    self.res.style(segment), size=9.0, bold=True, align="center", space_after=0
-                )
+                style = replace(self.res.style(segment), size=9.0, bold=True, align="center", space_after=0)
                 _, frame = self._textbox(cell, anchor="middle")
                 self._write(frame, [_Para(style, [(text, style)])])
             cursor += width
@@ -1014,9 +1013,7 @@ class _SlideBuilder:
         head_h = 24.0 * PX_IN
         label_w = min(GANTT_LABEL_PX * PX_IN, box.width * 0.3)
         dates_w = (
-            min(GANTT_DATES_PX * PX_IN, box.width * 0.16)
-            if element.find(class_="gantt-dates") is not None
-            else 0.0
+            min(GANTT_DATES_PX * PX_IN, box.width * 0.16) if element.find(class_="gantt-dates") is not None else 0.0
         )
         track_x = box.left + label_w
         track_w = max(box.width - label_w - dates_w, 0.5)
@@ -1039,9 +1036,7 @@ class _SlideBuilder:
         for index, row in enumerate(rows):
             top = track_top + index * row_h
             if row.label is not None:
-                self._render_text(
-                    Box(box.left, top, label_w - 0.08, row_h), row.label, anchor="middle"
-                )
+                self._render_text(Box(box.left, top, label_w - 0.08, row_h), row.label, anchor="middle")
             for task in row.tasks:
                 left_pct, width_pct = gantt_geometry(task, period)
                 bar = Box(
@@ -1072,9 +1067,11 @@ class _SlideBuilder:
         if not isinstance(head, Tag):
             return
         track = head.find(class_="gantt-track")
-        cells = self._children(track) if isinstance(track, Tag) else [
-            cell for cell in self._children(head) if not has_class(cell, "gantt-label-col")
-        ]
+        cells = (
+            self._children(track)
+            if isinstance(track, Tag)
+            else [cell for cell in self._children(head) if not has_class(cell, "gantt-label-col")]
+        )
         cells = [cell for cell in cells if cell.get_text(strip=True)]
         if not cells:
             return
@@ -1122,11 +1119,7 @@ class _SlideBuilder:
         """Extract the rows of a Gantt chart, with a flat task fallback."""
         rows: list[GanttRow] = []
         for row in element.find_all(class_="gantt-row"):
-            tasks = [
-                task
-                for task in row.find_all(attrs={"data-type": "gantt-task"})
-                if isinstance(task, Tag)
-            ]
+            tasks = [task for task in row.find_all(attrs={"data-type": "gantt-task"}) if isinstance(task, Tag)]
             label = row.find(class_="gantt-label")
             dates = row.find(class_="gantt-dates")
             rows.append(
@@ -1142,7 +1135,7 @@ class _SlideBuilder:
             if isinstance(task, Tag):
                 rows.append(GanttRow(label=None, dates=None, tasks=[task]))
         if not rows:
-            self.ctx.report.warn("Gantt sans tache data-type=\"gantt-task\": bloc ignore.")
+            self.ctx.report.warn('Gantt sans tache data-type="gantt-task": bloc ignore.')
         return rows
 
     def _render_arch(self, box: Box, element: Tag) -> None:
@@ -1164,7 +1157,7 @@ class _SlideBuilder:
             elif has_class(child, "arch-edge-label") or str(child.get("data-type") or "") == "arch-edge":
                 self._render_arch_label(box, child)
         if not nodes:
-            self.ctx.report.warn("Schema sans noeud data-type=\"arch-node\": seul le cadre est exporte.")
+            self.ctx.report.warn('Schema sans noeud data-type="arch-node": seul le cadre est exporte.')
 
     def _node_box(self, container: Box, element: Tag, default_w: float, default_h: float) -> Box:
         """Resolve the box of a positioned child, in the container reference.
@@ -1516,7 +1509,7 @@ class _SlideBuilder:
             return None
         try:
             picture = self.slide.shapes.add_picture(source, 0, 0)
-        except Exception as exc:  # noqa: BLE001 - python-pptx raises bare Exception
+        except Exception as exc:
             self.ctx.report.warn(f"Image non decodable ignoree: {exc}")
             return None
         aspect = picture.width / picture.height if picture.height else None
@@ -1538,7 +1531,7 @@ class _SlideBuilder:
             source.seek(0)
         try:
             picture = self.slide.shapes.add_picture(source, Inches(box.left), Inches(box.top))
-        except Exception as exc:  # noqa: BLE001 - python-pptx raises bare Exception
+        except Exception as exc:
             self.ctx.report.warn(f"Image non inseree ({exc}): {src[:40]}")
             return None
         natural = picture.width / picture.height if picture.height else 1.0
@@ -1568,7 +1561,6 @@ class _SlideBuilder:
         picture.left = Inches(box.left + (box.width - width) / 2.0)
         picture.top = Inches(box.top + (box.height - height) / 2.0)
         return picture
-
 
 
 __all__ = ["ExportReport", "find_slides", "to_pptx"]

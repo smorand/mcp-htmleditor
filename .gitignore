@@ -1,34 +1,64 @@
-
-__pycache__/
-.coverage
-.DS_Store
-.env
-.idea/
-.mcp_state.json
-.Python
-.python-version
-.venv/
-.vscode/
-*.docx.test
-*.egg
-*.egg-info/
-*.pptx.test
-*.pyc
-*.pyd
-*.pyo
-*.swo
-*.swp
-**/.mcp_state.json
-/tmp/
-# Env
-# IDE
-# macOS
+# =============================================================================
 # mcp-htmleditor .gitignore
-# Python
-# State file (written next to current HTML file)
-# Test artifacts
+# =============================================================================
+# NOTE: uv.lock is NOT ignored, it is committed for reproducible builds.
+# NOTE: src/mcp_htmleditor/version.py is NOT ignored, it holds "dev" in the
+#       working tree and is overwritten at build time.
+
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
 build/
 dist/
+wheels/
+*.egg
+*.egg-info/
+
+# Tests and coverage
+.cache
+.coverage
+.coverage.*
+coverage.xml
 htmlcov/
-uv.lock
+*.docx.test
+*.pptx.test
+
+# Tool caches
+.dmypy.json
+dmypy.json
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Environments
+.env
+.env.local
+.env.*.local
+.python-version
+.venv/
+env/
 venv/
+
+# Secrets (never commit)
+*.key
+*.pem
+
+# State file (written next to the current HTML file)
+.mcp_state.json
+**/.mcp_state.json
+
+# Docker bind mount for documents
+/data/
+
+# IDE
+.idea/
+.vscode/
+*.swo
+*.swp
+
+# macOS
+.DS_Store

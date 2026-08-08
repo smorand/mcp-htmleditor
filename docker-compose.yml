@@ -1,0 +1,27 @@
+# Docker Compose configuration for mcp-htmleditor
+# Build with: make docker-build
+# Start with: make run-up      Stop with: make run-down
+#
+# The editor serves ./data/document.html; drop your HTML file there or override
+# the command. HTMLEDITOR_HOST must stay 0.0.0.0 so the published port answers.
+
+services:
+  htmleditor:
+    image: ${DOCKER_PREFIX:-}${PROJECT_NAME:-mcp-htmleditor}:${DOCKER_TAG:-latest}
+    container_name: mcp-htmleditor
+    ports:
+      - "7842:7842"
+    restart: unless-stopped
+    environment:
+      HTMLEDITOR_HOST: 0.0.0.0
+      HTMLEDITOR_PORT: "7842"
+      HTMLEDITOR_POLL_INTERVAL: "1000"
+      # HTMLEDITOR_OTEL_DESTINATION: http://collector:4318/v1/traces
+      # HTMLEDITOR_OTEL_API_KEY: change-me
+    volumes:
+      - ./data:/data
+      - htmleditor-cache:/var/cache/mcp-htmleditor
+    command: ["serve", "--no-browser", "/data/document.html"]
+
+volumes:
+  htmleditor-cache:

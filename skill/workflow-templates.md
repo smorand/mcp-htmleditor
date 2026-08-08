@@ -106,6 +106,7 @@ Si les images sont référencées par chemin relatif et ne se trouvent pas au bo
 2. Ou convertir les images en base64:
    ```python
    import base64
+
    with open("media/img1.png", "rb") as f:
        b64 = base64.b64encode(f.read()).decode()
    # Remplacer src="media/img1.png" par src="data:image/png;base64,{b64}"

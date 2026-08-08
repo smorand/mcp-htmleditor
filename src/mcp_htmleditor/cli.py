@@ -1,17 +1,38 @@
-"""CLI entry point for mcp-htmleditor."""
+"""CLI entry point for mcp-htmleditor.
+
+``click.echo`` carries the user facing output (what the human asked for) while
+``logging`` carries the technical diagnostics; ``-v`` raises the log level to
+DEBUG, ``-q`` silences everything but errors. Logging and tracing are configured
+once, in the group callback, and the resulting settings are passed down.
+"""
 
 from __future__ import annotations
 
+import logging
 import os
 import webbrowser
 from pathlib import Path
 
 import click
 
+from .config import get_settings
+from .logging_config import setup_logging
+from .tracing import configure_tracing, trace_span
+from .version import __version__
+
+logger = logging.getLogger(__name__)
+
 
 @click.group()
-def main() -> None:
+@click.version_option(__version__, "-V", "--version", prog_name="mcp-htmleditor")
+@click.option("-v", "--verbose", count=True, help="Augmenter la verbosite des logs (-v = DEBUG).")
+@click.option("-q", "--quiet", is_flag=True, help="Ne journaliser que les erreurs.")
+def main(verbose: int, quiet: bool) -> None:
     """mcp-htmleditor: WYSIWYG HTML editor with MCP server support."""
+    settings = get_settings()
+    setup_logging(verbosity=verbose, is_quiet=quiet, settings=settings)
+    configure_tracing(settings)
+    logger.debug("mcp-htmleditor %s starting (log dir: %s)", __version__, settings.log_dir)
 
 
 @main.command("skill")
@@ -41,7 +62,16 @@ def templates_cmd() -> None:
 @click.argument("output_file")
 @click.option("--serve", is_flag=True, help="Ouvrir l'éditeur sur le fichier créé.")
 @click.option("--port", default=None, type=int, help="HTTP port (avec --serve).")
-def new_cmd(template: str, output_file: str, serve: bool, port: int | None) -> None:
+@click.option("--host", default=None, help="Adresse d'écoute (avec --serve).")
+@click.option("--no-browser", is_flag=True, help="Ne pas ouvrir le navigateur (avec --serve).")
+def new_cmd(  # noqa: PLR0913, PLR0917 - one parameter per CLI flag, click passes them by name
+    template: str,
+    output_file: str,
+    serve: bool,
+    port: int | None,
+    host: str | None,
+    no_browser: bool,
+) -> None:
     """Create a new file from a template.
 
     TEMPLATE is a template key (see `mcp-htmleditor templates`): ei, carbon, doc.
@@ -55,9 +85,7 @@ def new_cmd(template: str, output_file: str, serve: bool, port: int | None) -> N
         src = template_path(template)
     except KeyError:
         keys = ", ".join(k for k, _ in list_templates())
-        raise click.ClickException(
-            f"Template inconnu: '{template}'. Templates disponibles: {keys}"
-        ) from None
+        raise click.ClickException(f"Template inconnu: '{template}'. Templates disponibles: {keys}") from None
     except FileNotFoundError as exc:
         raise click.ClickException(f"Fichier template manquant: {exc}") from None
 
@@ -65,12 +93,21 @@ def new_cmd(template: str, output_file: str, serve: bool, port: int | None) -> N
     if dest.exists():
         raise click.ClickException(f"Le fichier existe déjà: {dest}")
     dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dest)
+    with trace_span("file.write", {"file.path": str(dest), "template.key": template}) as span:
+        shutil.copyfile(src, dest)
+        span.set_attribute("file.size", dest.stat().st_size)
+    logger.info("Created %s from template %s", dest, template)
     click.echo(f"Créé: {dest}  (template: {template})")
 
     if serve:
-        from .config import default_port
-        _serve_file(str(dest), port if port is not None else default_port(), None)
+        settings = get_settings()
+        _serve_file(
+            str(dest),
+            port if port is not None else settings.port,
+            None,
+            host if host is not None else settings.host,
+            open_browser=not no_browser,
+        )
 
 
 @main.command("mcp")
@@ -87,23 +124,30 @@ def mcp_cmd() -> None:
 @main.command("serve")
 @click.argument("file", type=click.Path(exists=True, dir_okay=False))
 @click.option("--port", default=None, type=int, help="HTTP port (défaut: HTMLEDITOR_PORT ou 7842).")
+@click.option("--host", default=None, help="Adresse d'écoute (défaut: HTMLEDITOR_HOST ou localhost).")
 @click.option(
     "--poll",
     default=None,
     type=int,
     help="Polling interval in ms (overrides HTMLEDITOR_POLL_INTERVAL env var).",
 )
-def serve_cmd(file: str, port: int | None, poll: int | None) -> None:
+@click.option("--no-browser", is_flag=True, help="Ne pas ouvrir le navigateur (serveur distant, conteneur).")
+def serve_cmd(file: str, port: int | None, host: str | None, poll: int | None, no_browser: bool) -> None:
     """Open an HTML file in the WYSIWYG browser editor.
 
     FILE is the path to the HTML file to edit.
     """
-    from .config import default_port
+    settings = get_settings()
+    _serve_file(
+        file,
+        port if port is not None else settings.port,
+        poll,
+        host if host is not None else settings.host,
+        open_browser=not no_browser,
+    )
 
-    _serve_file(file, port if port is not None else default_port(), poll)
 
-
-def _serve_file(file: str, port: int, poll: int | None) -> None:
+def _serve_file(file: str, port: int, poll: int | None, host: str, *, open_browser: bool = True) -> None:
     """Start the HTTP server on a file and block until Ctrl+C."""
     import time
 
@@ -118,14 +162,14 @@ def _serve_file(file: str, port: int, poll: int | None) -> None:
     if poll is not None:
         state.poll_interval = poll
 
-    click.echo(f"Starting editor server on http://localhost:{port}/")
+    click.echo(f"Starting editor server on http://{host}:{port}/")
     click.echo(f"Editing: {abs_file}")
     click.echo("Press Ctrl+C to stop.")
 
-    start_http_server(abs_file, port)
+    start_http_server(abs_file, port, host)
 
-    url = f"http://localhost:{port}/"
-    webbrowser.open(url)
+    if open_browser:
+        webbrowser.open(f"http://{host}:{port}/")
 
     try:
         while True:
@@ -133,6 +177,7 @@ def _serve_file(file: str, port: int, poll: int | None) -> None:
     except KeyboardInterrupt:
         click.echo("\nStopping server.")
         from .http_server import stop_http_server
+
         stop_http_server()
 
 
@@ -140,7 +185,7 @@ def _serve_file(file: str, port: int, poll: int | None) -> None:
 @click.argument("format", type=click.Choice(["pptx", "docx"]))
 @click.argument("input_file", type=click.Path(exists=True, dir_okay=False))
 @click.argument("output_file")
-def export_cmd(format: str, input_file: str, output_file: str) -> None:
+def export_cmd(format: str, input_file: str, output_file: str) -> None:  # noqa: A002 - CLI argument name
     """Export an HTML file to PPTX or DOCX.
 
     FORMAT is one of: pptx, docx
@@ -148,37 +193,46 @@ def export_cmd(format: str, input_file: str, output_file: str) -> None:
     OUTPUT_FILE is the destination file path.
     """
     if format == "pptx":
-        from .export.to_pptx import to_pptx
-
-        click.echo(f"Exporting {input_file} → {output_file} (PPTX)")
-        report = to_pptx(input_file, output_file)
-        for warning in report.warnings:
-            click.echo(f"Attention: {warning}", err=True)
-        if report.slide_count == 0:
-            raise click.ClickException(
-                "Aucune slide exportee: verifiez que le document contient des elements "
-                'data-type="slide".'
-            )
-        click.echo(f"Done. {report.slide_count} slide(s) exportee(s).")
+        _export_pptx(input_file, output_file)
     else:
-        import subprocess
+        _export_docx(input_file, output_file)
 
-        from .export.to_docx import to_docx
 
-        click.echo(f"Exporting {input_file} → {output_file} (DOCX via pandoc)")
-        try:
-            result = to_docx(input_file, output_file)
-        except FileNotFoundError:
-            message = "pandoc introuvable dans le PATH: installez pandoc pour exporter en DOCX."
-            raise click.ClickException(message) from None
-        except subprocess.CalledProcessError as exc:
-            detail = (exc.stderr or "").strip() or f"code de sortie {exc.returncode}"
-            raise click.ClickException(f"pandoc a echoue: {detail}") from None
+def _export_pptx(input_file: str, output_file: str) -> None:
+    """Run the PPTX export and print its report."""
+    from .export.to_pptx import to_pptx
 
-        if result.reference_docx is not None:
-            click.echo(f"Charte: {result.charter} (reference.docx: {result.reference_docx})")
-        elif result.charter is None:
-            click.echo("Charte: standard (styles pandoc par defaut)")
-        for warning in result.warnings:
-            click.echo(f"Attention: {warning}", err=True)
-        click.echo("Done.")
+    click.echo(f"Exporting {input_file} → {output_file} (PPTX)")
+    report = to_pptx(input_file, output_file)
+    for warning in report.warnings:
+        click.echo(f"Attention: {warning}", err=True)
+    if report.slide_count == 0:
+        raise click.ClickException(
+            'Aucune slide exportee: verifiez que le document contient des elements data-type="slide".'
+        )
+    click.echo(f"Done. {report.slide_count} slide(s) exportee(s).")
+
+
+def _export_docx(input_file: str, output_file: str) -> None:
+    """Run the DOCX export and print its report."""
+    import subprocess
+
+    from .export.to_docx import to_docx
+
+    click.echo(f"Exporting {input_file} → {output_file} (DOCX via pandoc)")
+    try:
+        result = to_docx(input_file, output_file)
+    except FileNotFoundError:
+        message = "pandoc introuvable dans le PATH: installez pandoc pour exporter en DOCX."
+        raise click.ClickException(message) from None
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or "").strip() or f"code de sortie {exc.returncode}"
+        raise click.ClickException(f"pandoc a echoue: {detail}") from None
+
+    if result.reference_docx is not None:
+        click.echo(f"Charte: {result.charter} (reference.docx: {result.reference_docx})")
+    elif result.charter is None:
+        click.echo("Charte: standard (styles pandoc par defaut)")
+    for warning in result.warnings:
+        click.echo(f"Attention: {warning}", err=True)
+    click.echo("Done.")

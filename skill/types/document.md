@@ -216,9 +216,34 @@ regeneres si absents. Une charte inconnue ou une generation impossible (pandoc
 indisponible) n'echoue pas: l'export continue avec les styles pandoc par defaut et
 affiche un avertissement.
 
-Non transporte, meme avec la charte: l'en-tete et le pied de page EI (blocs dans le
-flux, donc du corps de texte dans Word, pas un en-tete de page repete), et le filet
-`<hr>` qui devient un filet horizontal pleine largeur.
+**L'en-tete et le pied de page EI deviennent un vrai en-tete Word repete (corrige).**
+Le `reference.docx` embarque desormais `word/header1.xml` et `word/footer1.xml`,
+references depuis le `w:sectPr` (`w:headerReference` / `w:footerReference`); pandoc
+reutilise ce `w:sectPr`, donc Word et LibreOffice repetent le bloc sur **chaque page**.
+
+| Charte | En-tete Word | Pied de page Word |
+|---|---|---|
+| `ei` | filet bleu #003A8D, logo EI (PNG dans `word/media/`), mention EURO-INFORMATION a droite en #003A8D, filet orange #FBAE40 | filet fin, titre du document a gauche (champ `TITLE`), `Page N` a droite (champ `PAGE`), en gris |
+| `perso` | aucun (la charte HTML n'a pas d'en-tete) | `Page N` centre en gris (champ `PAGE`) |
+| absent | aucun | aucun |
+
+Consequences a connaitre:
+
+- Les blocs `.ei-doc-head` et `.ei-doc-foot` sont **retires du corps** au pretraitement
+  quand le `reference.docx` a bien ete genere, sinon ils sortiraient deux fois. Si la
+  generation echoue, ils restent dans le corps: on perd l'en-tete repete, jamais
+  l'information.
+- Le texte de l'en-tete/pied Word vient de la charte, pas du HTML: editer la mention
+  `.ei-doc-head` dans l'editeur ne change pas l'en-tete Word (seul le titre du document
+  suit, via le champ `TITLE`).
+- Les chartes `ei` et `perso` fixent aussi la geometrie de page (A4, marges laterales
+  25 mm; marge haute 33 mm pour `ei` afin de loger l'en-tete). La charte standard garde
+  la geometrie par defaut de pandoc.
+- Le numero de page est un champ Word dynamique, donc juste apres une insertion de
+  contenu.
+
+Toujours non transporte: le filet `<hr>` du corps, qui devient un filet horizontal
+pleine largeur.
 
 **Figures en PNG, jamais en SVG.** Pandoc ne sait pas dimensionner un SVG (il lui
 faudrait `rsvg-convert`) et Word ancien ne l'affiche pas. L'export detecte les SVG
@@ -249,13 +274,17 @@ python3 -c "import zipfile; print(zipfile.ZipFile('/tmp/test-perso.docx').read('
 Les templates document embarquent un bloc `@media print` (marges `@page 20mm 25mm`,
 fond blanc, pas d'ombre, `break-after: avoid` sur les titres, `break-inside: avoid`
 sur les figures et les lignes de tableau, `thead` repete via
-`display: table-header-group`). Consequence a connaitre: **l'en-tete du template EI
-(filet bleu, logo, filet orange) n'apparait que sur la premiere page**, en impression
-comme a l'export DOCX. C'est un bloc dans le flux, pas un en-tete de page; il n'y a
-pas de solution CSS fiable (les elements `position: fixed` ne sont plus repetes par
-Chrome headless). Un vrai en-tete Word repete demanderait un `reference.docx` avec un
-`headerReference`, ce que la generation de charte actuelle ne fait pas (elle ne patche
-que `word/styles.xml`).
+`display: table-header-group`). Consequence a connaitre: **a l'impression du HTML,
+l'en-tete du template EI (filet bleu, logo, filet orange) n'apparait que sur la
+premiere page**. C'est un bloc dans le flux, pas un en-tete de page, et il n'y a pas
+de solution CSS fiable (les elements `position: fixed` ne sont plus repetes par Chrome
+headless).
+
+A l'export DOCX, en revanche, cet en-tete est repete sur chaque page: le
+`reference.docx` genere embarque un vrai `word/header1.xml` et un `word/footer1.xml`
+references depuis le `w:sectPr` (voir la section export DOCX ci-dessus). Si un rendu
+papier repete est necessaire, passer par l'export DOCX plutot que par l'impression du
+HTML.
 
 ## Mise en page
 

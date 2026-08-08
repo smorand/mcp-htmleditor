@@ -50,9 +50,14 @@ class GanttRow:
     tasks: list[Tag]
 
 
-def month_index(value: str | None) -> int | None:
-    """Convert a ``YYYY-MM`` string to an absolute month index."""
-    match = _MONTH_RE.search(str(value or ""))
+def month_index(value: str | list[str] | None) -> int | None:
+    """Convert a ``YYYY-MM`` string to an absolute month index.
+
+    The union accepts a bs4 attribute value as is: ``Tag.get`` returns a list for
+    multi valued attributes, and only its first item can carry a date.
+    """
+    raw = (value[0] if value else None) if isinstance(value, list) else value
+    match = _MONTH_RE.search(str(raw or ""))
     if not match:
         return None
     return int(match.group(1)) * 12 + int(match.group(2)) - 1
@@ -186,10 +191,7 @@ class TableGrid:
         colgroup = self.element.find("colgroup")
         if isinstance(colgroup, Tag):
             for col in colgroup.find_all("col"):
-                weights.append(
-                    parse_pct(style_props(col).get("width", ""))
-                    or to_float(col.get("data-col-width"))
-                )
+                weights.append(parse_pct(style_props(col).get("width", "")) or to_float(col.get("data-col-width")))
         if len(weights) != self.column_count or sum(weights) <= 0 or min(weights) <= 0:
             return []
         return weights
@@ -294,9 +296,7 @@ def set_cell_border(cell: Any, edge: str, color: str, width_pt: float = 0.75) ->
     tag = qn(f"a:ln{edge}")
     for existing in properties.findall(tag):
         properties.remove(existing)
-    line = properties.makeelement(
-        tag, {"w": str(int(width_pt * 12700)), "cap": "flat", "cmpd": "sng", "algn": "ctr"}
-    )
+    line = properties.makeelement(tag, {"w": str(int(width_pt * 12700)), "cap": "flat", "cmpd": "sng", "algn": "ctr"})
     solid = line.makeelement(qn("a:solidFill"), {})
     solid.append(solid.makeelement(qn("a:srgbClr"), {"val": color}))
     line.append(solid)

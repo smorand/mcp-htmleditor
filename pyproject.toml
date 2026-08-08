@@ -5,14 +5,21 @@ build-backend = "hatchling.build"
 [project]
 name = "mcp-htmleditor"
 version = "0.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 description = "MCP server + WYSIWYG HTML editor for LLM-assisted document creation"
 license = { text = "MIT" }
+authors = [{ name = "Sebastien MORAND", email = "seb.morand@gmail.com" }]
+readme = "README.md"
 dependencies = [
     "fastmcp>=2.0",
     "python-pptx>=1.0",
     "beautifulsoup4>=4.12",
     "click>=8.0",
+    "pydantic-settings>=2.7",
+    "rich>=13.9",
+    "opentelemetry-api>=1.29",
+    "opentelemetry-sdk>=1.29",
+    "opentelemetry-exporter-otlp-proto-http>=1.29",
 ]
 
 [project.scripts]
@@ -23,7 +30,10 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "pytest>=8.0",
+    "pytest-asyncio>=0.24",
     "pytest-cov>=5.0",
+    "bandit>=1.7",
+    "pre-commit>=4.0",
     "types-beautifulsoup4",
 ]
 
@@ -35,25 +45,95 @@ include = [
 ]
 
 # Bundle repo-root templates/ and skill/ into the package so a plain
-# `pip install` ships them (resolved as a fallback after ~/.config).
+# install ships them (resolved as a fallback after ~/.config).
 [tool.hatch.build.targets.wheel.force-include]
 "templates" = "mcp_htmleditor/templates"
 "skill" = "mcp_htmleditor/skill"
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 line-length = 120
+src = ["src", "tests", "tools"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RET", "PTH"]
+select = [
+    "A",    # builtins shadowing
+    "ANN",  # missing annotations
+    "ARG",  # unused arguments
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "DTZ",  # naive datetimes
+    "E",    # pycodestyle errors
+    "ERA",  # commented-out code
+    "F",    # pyflakes
+    "I",    # import sorting
+    "N",    # pep8 naming
+    "PL",   # pylint
+    "PTH",  # pathlib over os.path
+    "RET",  # return simplifications
+    "RUF",  # ruff specific
+    "S",    # bandit
+    "SIM",  # simplifications
+    "T20",  # print statements
+    "UP",   # pyupgrade
+    "W",    # pycodestyle warnings
+]
+ignore = [
+    # The codebase is French-facing: messages and docstrings stay as written.
+    "RUF001", # ambiguous unicode character in string
+    "RUF002", # ambiguous unicode character in docstring
+    "RUF003", # ambiguous unicode character in comment
+    # python-pptx and bs4 expose untyped objects; mypy strict already governs the
+    # typed surface, annotating those parameters Any is the honest description.
+    "ANN401", # dynamically typed expression (Any) in an argument
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Lazy imports keep `mcp-htmleditor --help` and the MCP handshake fast: pptx,
+# bs4 and pandoc machinery are only imported by the subcommand that needs them.
+"src/mcp_htmleditor/cli.py" = ["PLC0415"]
+# Module level server singleton: http.server owns the thread, not the caller.
+# The artifact stripper walks a fixed list of artifact kinds, one branch each.
+"src/mcp_htmleditor/http_server.py" = ["PLW0603", "PLR0912"]
+# One renderer per HTML component: the dispatch is intentionally wide and flat,
+# renderers share a uniform signature, and the geometry thresholds (inches on the
+# 13.333 x 7.5 in canvas) are far more readable inline than behind a constant.
+"src/mcp_htmleditor/export/to_pptx.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
+"src/mcp_htmleditor/export/pptx_style.py" = ["PLR2004"]
+"src/mcp_htmleditor/export/pptx_components.py" = ["PLR2004"]
+# ElementTree parses word/styles.xml produced locally by pandoc, not user input.
+"src/mcp_htmleditor/export/reference_docx.py" = ["S314"]
+"src/mcp_htmleditor/export/docx_header_footer.py" = ["S314"]
+"src/mcp_htmleditor/tracing.py" = ["PLC0415"] # OTLP exporter imported on demand
+"tests/**" = [
+    "ANN001",  # fixtures are typed by pytest itself where it matters
+    "ANN201",  # test functions return None implicitly
+    "ANN202",
+    "ARG001",  # fixtures requested for their side effect only
+    "ARG002",
+    "ARG005",  # monkeypatch stubs must match the patched signature
+    "PLC0415", # imports inside a test keep the fixture order explicit
+    "PLR2004", # comparing against literal expectations is the point of a test
+    "S101",    # assert is the test API
+    "S104",    # asserting on the 0.0.0.0 container bind address is the point
+    "S314",    # parses locally generated DOCX parts
+]
+"tools/**" = [
+    "PLC0415", # playwright is an optional, tool-only dependency
+    "PLR2004",
+    "T201",    # maintenance scripts print their report
+    "S603",    # they drive local, hardcoded commands
+    "S607",
+]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_return_any = true
 no_implicit_reexport = true
+plugins = ["pydantic.mypy"]
 # click and fastmcp ship untyped decorators; strict mode would otherwise flag
 # every @click.command / @mcp.tool() as "untyped-decorator". This is a local,
 # single-user tool, so we relax only this one sub-check, not strictness overall.
@@ -63,8 +143,16 @@ disallow_untyped_decorators = false
 module = ["bs4.*", "pptx.*", "fastmcp.*", "click.*"]
 ignore_missing_imports = true
 
+# python-pptx ships py.typed but leaves its constructors and helpers unannotated
+# (RGBColor.from_string, Inches, ...), so strict mode would reject every call
+# into the library. Skipping the import treats it as untyped, which is what it is.
+[[tool.mypy.overrides]]
+module = ["pptx.*"]
+follow_imports = "skip"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 # Always test the working tree, never a previously installed (non-editable) copy
 # of the package that would shadow src/ in site-packages.
 pythonpath = ["src"]
@@ -74,11 +162,23 @@ source = ["src/mcp_htmleditor"]
 omit = [
     "src/mcp_htmleditor/cli.py",
     "src/mcp_htmleditor/mcp_server.py",
+    "src/mcp_htmleditor/__main__.py",
 ]
 
 [tool.coverage.report]
-fail_under = 70
+fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
 ]
+
+[tool.bandit]
+exclude_dirs = [".venv", "build", "dist", "tests"]
+# Justified, project wide skips (rationale kept here so it is reviewable in one
+# place rather than scattered as `# nosec` comments):
+#   B404, B603, B607: the only subprocess launched is pandoc, an external tool the
+#     user installs and which is resolved from PATH by design. Every call uses a
+#     fixed argument list, never a shell, and never interpolates document content.
+#   B314, B405, B406: the XML parsed is word/*.xml taken from a DOCX that pandoc
+#     just produced locally in the same command, not untrusted remote input.
+skips = ["B314", "B404", "B405", "B406", "B603", "B607"]

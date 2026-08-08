@@ -19,6 +19,14 @@ Two things pandoc cannot do on its own, handled here:
    charter (fonts, heading colours, underlines, table header) is lost. The
    charter is detected from ``data-doc-template`` and a matching reference
    document is generated on the fly (see :mod:`.reference_docx`).
+3. **Repeated letterhead.** An HTML letterhead is a block in the page flow, so
+   pandoc turns it into body paragraphs printed once, above the title. The
+   reference document carries a real Word header and footer instead (see
+   :mod:`.docx_header_footer`), which Word repeats on every page; the now
+   redundant HTML blocks (``.ei-doc-head``, ``.ei-doc-foot``) are therefore
+   dropped from the body. They are dropped only when the reference document was
+   actually built and its charter really provides that letterhead, so a failed
+   generation degrades to the old output rather than losing the information.
 
 The preprocessed HTML is written to a temporary file; ``--resource-path`` keeps
 relative image references resolvable from the original directory.
@@ -26,6 +34,7 @@ relative image references resolvable from the original directory.
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import tempfile
@@ -34,9 +43,16 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from .reference_docx import charter_for, reference_docx_for
+from ..tracing import trace_span
+from .reference_docx import charter_for, has_page_furniture, reference_docx_for
+
+logger = logging.getLogger(__name__)
 
 SVG_ADVICE = "Regle: figures en PNG, jamais en SVG."
+
+#: Decorative blocks that a Word header or footer replaces. They are removed from
+#: the body only when the charter really ships that Word letterhead.
+PAGE_FURNITURE_SELECTORS: tuple[str, ...] = (".ei-doc-head", ".ei-doc-foot")
 
 
 @dataclass(frozen=True)
@@ -49,6 +65,8 @@ class PreprocessedHtml:
         subtitle: Text of ``.doc-subtitle``, or None when absent.
         charter: Value of ``data-doc-template``, or None for the standard charter.
         warnings: Diagnostics found while reading the HTML (SVG figures).
+        stripped_furniture: Number of decorative letterhead blocks removed from
+            the body because Word repeats them as a header or a footer.
     """
 
     html: str
@@ -56,6 +74,7 @@ class PreprocessedHtml:
     subtitle: str | None
     charter: str | None
     warnings: tuple[str, ...]
+    stripped_furniture: int = 0
 
 
 @dataclass(frozen=True)
@@ -92,44 +111,79 @@ def to_docx(input_html: str, output_docx: str) -> DocxExportResult:
     """
     input_path = Path(input_html).resolve()
     output_path = Path(output_docx)
-    prepared = preprocess_html(input_path.read_text(encoding="utf-8", errors="replace"))
+    with trace_span("export.docx", {"file.path": str(input_path)}) as span:
+        source = input_path.read_text(encoding="utf-8", errors="replace")
+        charter_key = detect_charter(source)
+        span.set_attribute("export.charter", charter_key or "standard")
 
-    warnings = list(prepared.warnings)
-    reference = reference_docx_for(prepared.charter)
-    if prepared.charter and reference is None:
-        warnings.append(_charter_warning(prepared.charter))
+        reference = reference_docx_for(charter_key)
+        # Dropping the decorative blocks is only safe once Word really reproduces
+        # them: a charter without a letterhead, or a reference document that
+        # could not be built, keeps them in the body.
+        strip = reference is not None and has_page_furniture(charter_key)
+        prepared = preprocess_html(source, strip_page_furniture=strip)
 
-    handle, staging_name = tempfile.mkstemp(prefix="htmleditor-docx-", suffix=".html")
-    os.close(handle)
-    staging = Path(staging_name)
-    try:
-        staging.write_text(prepared.html, encoding="utf-8")
-        command = [
-            "pandoc",
-            "-f",
-            "html",
-            str(staging),
-            "-o",
-            str(output_path),
-            "--standalone",
-            "--resource-path",
-            str(input_path.parent),
-        ]
-        if prepared.title:
-            command += ["--metadata", f"title={prepared.title}"]
-        if prepared.subtitle:
-            command += ["--metadata", f"subtitle={prepared.subtitle}"]
-        if reference is not None:
-            command += [f"--reference-doc={reference}"]
-        completed = subprocess.run(command, capture_output=True, check=True, text=True)
-    finally:
-        staging.unlink(missing_ok=True)
+        warnings = list(prepared.warnings)
+        if charter_key and reference is None:
+            warnings.append(_charter_warning(charter_key))
 
-    warnings.extend(pandoc_warnings(completed.stderr))
-    return DocxExportResult(charter=prepared.charter, reference_docx=reference, warnings=tuple(warnings))
+        handle, staging_name = tempfile.mkstemp(prefix="htmleditor-docx-", suffix=".html")
+        os.close(handle)
+        staging = Path(staging_name)
+        try:
+            staging.write_text(prepared.html, encoding="utf-8")
+            command = [
+                "pandoc",
+                "-f",
+                "html",
+                str(staging),
+                "-o",
+                str(output_path),
+                "--standalone",
+                "--resource-path",
+                str(input_path.parent),
+            ]
+            if prepared.title:
+                command += ["--metadata", f"title={prepared.title}"]
+            if prepared.subtitle:
+                command += ["--metadata", f"subtitle={prepared.subtitle}"]
+            if reference is not None:
+                command += [f"--reference-doc={reference}"]
+            with trace_span("tool.pandoc", {"tool.operation": "html-to-docx", "file.path": str(output_path)}):
+                # Fixed argument list, pandoc resolved from PATH: no shell involved.
+                completed = subprocess.run(command, capture_output=True, check=True, text=True)  # noqa: S603
+        finally:
+            staging.unlink(missing_ok=True)
+
+        warnings.extend(pandoc_warnings(completed.stderr))
+        span.set_attribute("warning.count", len(warnings))
+        logger.info(
+            "DOCX export: %s -> %s (charte: %s, %d warning(s))",
+            input_path,
+            output_path,
+            prepared.charter or "standard",
+            len(warnings),
+        )
+        return DocxExportResult(charter=prepared.charter, reference_docx=reference, warnings=tuple(warnings))
 
 
-def preprocess_html(html: str) -> PreprocessedHtml:
+def detect_charter(html: str) -> str | None:
+    """Return the charter key declared by a document, or None.
+
+    Read before preprocessing, because whether the decorative letterhead blocks
+    may be dropped from the body depends on the reference document built for that
+    charter.
+
+    Args:
+        html: HTML source of the document.
+
+    Returns:
+        The ``data-doc-template`` value, or None when absent or empty.
+    """
+    return _charter_of(BeautifulSoup(html, "html.parser"))
+
+
+def preprocess_html(html: str, *, strip_page_furniture: bool = False) -> PreprocessedHtml:
     """Lift the document title and subtitle out of the HTML body.
 
     ``.doc-title`` and ``.doc-subtitle`` are removed from the body and returned
@@ -140,6 +194,10 @@ def preprocess_html(html: str) -> PreprocessedHtml:
 
     Args:
         html: HTML source of the document.
+        strip_page_furniture: Whether to also remove the decorative letterhead
+            blocks (:data:`PAGE_FURNITURE_SELECTORS`). Pass True only when the
+            reference document really reproduces them as a Word header or footer,
+            otherwise the information is simply lost.
 
     Returns:
         The preprocessed HTML with the extracted metadata and diagnostics.
@@ -157,19 +215,35 @@ def preprocess_html(html: str) -> PreprocessedHtml:
     if title and soup.title is not None:
         soup.title.string = title
 
-    charter_el = soup.select_one("[data-doc-template]")
-    charter = None
-    if charter_el is not None:
-        value = str(charter_el.get("data-doc-template", "")).strip()
-        charter = value or None
+    stripped = _strip_page_furniture(soup) if strip_page_furniture else 0
 
     return PreprocessedHtml(
         html=str(soup),
         title=title or None,
         subtitle=subtitle or None,
-        charter=charter,
+        charter=_charter_of(soup),
         warnings=warnings,
+        stripped_furniture=stripped,
     )
+
+
+def _charter_of(soup: BeautifulSoup) -> str | None:
+    """Return the ``data-doc-template`` value of a parsed document, or None."""
+    charter_el = soup.select_one("[data-doc-template]")
+    if charter_el is None:
+        return None
+    value = str(charter_el.get("data-doc-template", "")).strip()
+    return value or None
+
+
+def _strip_page_furniture(soup: BeautifulSoup) -> int:
+    """Remove the decorative letterhead blocks, returning how many were removed."""
+    removed = 0
+    for selector in PAGE_FURNITURE_SELECTORS:
+        for element in soup.select(selector):
+            element.decompose()
+            removed += 1
+    return removed
 
 
 def svg_warnings(soup: BeautifulSoup) -> tuple[str, ...]:
@@ -189,11 +263,15 @@ def svg_warnings(soup: BeautifulSoup) -> tuple[str, ...]:
     for image in soup.find_all("img"):
         source = str(image.get("src", ""))
         if source.lower().split("?")[0].endswith(".svg"):
-            warnings.append(f"Image SVG detectee ({source}): pandoc ne peut pas la dimensionner "
-                            f"et Word ancien ne l'affiche pas. {SVG_ADVICE}")
+            warnings.append(
+                f"Image SVG detectee ({source}): pandoc ne peut pas la dimensionner "
+                f"et Word ancien ne l'affiche pas. {SVG_ADVICE}"
+            )
         elif source.lower().startswith("data:image/svg"):
-            warnings.append(f"Image SVG en base64 detectee: pandoc ne peut pas la dimensionner "
-                            f"et Word ancien ne l'affiche pas. {SVG_ADVICE}")
+            warnings.append(
+                f"Image SVG en base64 detectee: pandoc ne peut pas la dimensionner "
+                f"et Word ancien ne l'affiche pas. {SVG_ADVICE}"
+            )
     if soup.find("svg") is not None:
         warnings.append(f"Balise <svg> en ligne detectee: pandoc l'ignore a l'export DOCX. {SVG_ADVICE}")
     return tuple(warnings)
@@ -219,7 +297,8 @@ def pandoc_warnings(stderr: str) -> tuple[str, ...]:
 def _charter_warning(charter: str) -> str:
     """Return the warning shown when a charter cannot be applied."""
     if charter_for(charter) is None:
-        return (f"Charte '{charter}' inconnue: export avec les styles pandoc par defaut "
-                f"(chartes connues: perso, ei).")
-    return (f"Charte '{charter}' non appliquee: generation du reference.docx impossible, "
-            f"export avec les styles pandoc par defaut.")
+        return f"Charte '{charter}' inconnue: export avec les styles pandoc par defaut (chartes connues: perso, ei)."
+    return (
+        f"Charte '{charter}' non appliquee: generation du reference.docx impossible, "
+        f"export avec les styles pandoc par defaut."
+    )

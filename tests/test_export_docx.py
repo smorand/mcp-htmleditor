@@ -16,8 +16,10 @@ from pathlib import Path
 
 import pytest
 
+from mcp_htmleditor.export import docx_header_footer as hf
 from mcp_htmleditor.export import reference_docx as ref
 from mcp_htmleditor.export.to_docx import (
+    detect_charter,
     pandoc_warnings,
     preprocess_html,
     svg_warnings,
@@ -54,6 +56,53 @@ PLAIN_HTML = """<!DOCTYPE html>
 </html>
 """
 
+# The Euro-Information charter draws its letterhead in the page flow: those two
+# blocks are what the Word header and footer replace.
+EI_HTML = """<!DOCTYPE html>
+<html lang="fr" data-doc-type="document">
+<head><meta charset="UTF-8" /><title>Onglet</title></head>
+<body>
+  <article data-type="document" data-doc-template="ei">
+    <div class="ei-doc-head">
+      <div class="ei-doc-logo"><img src="data:image/png;base64,AAAA" alt="Euro Information" /></div>
+      <div class="ei-doc-brand" data-editable="text">Euro-Information</div>
+    </div>
+    <div class="ei-doc-body">
+      <h1 class="doc-title" data-editable="text">Note de cadrage</h1>
+      <p class="doc-subtitle" data-editable="text">Secteur H, aout 2026</p>
+      <h1 class="doc-h1">1. Objet</h1>
+      <p>Un paragraphe.</p>
+    </div>
+    <div class="ei-doc-foot">
+      <span data-editable="text">Euro-Information</span>
+      <span data-editable="text">Confidentiel</span>
+    </div>
+  </article>
+</body>
+</html>
+"""
+
+MINIMAL_DOCUMENT = (
+    '<?xml version="1.0" encoding="utf-8"?>'
+    f'<w:document xmlns:w="{W}" xmlns:r="{ref.R_NS}"><w:body><w:p /><w:sectPr>'
+    '<w:footnotePr><w:numRestart w:val="eachSect" /></w:footnotePr>'
+    "</w:sectPr></w:body></w:document>"
+).encode()
+
+MINIMAL_RELS = (
+    b'<?xml version="1.0" encoding="UTF-8"?>'
+    b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    b'<Relationship Type="x" Id="rId1" Target="styles.xml" /></Relationships>'
+)
+
+MINIMAL_CONTENT_TYPES = (
+    b'<?xml version="1.0" encoding="UTF-8"?>'
+    b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    b'<Default Extension="xml" ContentType="application/xml" /></Types>'
+)
+
+BARE = ref.Charter(key="bare", label="Bare", font="Arial", body_size_pt=11)
+
 MINIMAL_STYLES = (
     '<?xml version="1.0" encoding="UTF-8"?>'
     f'<w:styles xmlns:w="{W}">'
@@ -87,6 +136,17 @@ def _paragraphs(docx: Path) -> list[tuple[str, str]]:
         text = "".join(re.findall(r"<w:t[^>]*>(.*?)</w:t>", block, re.S))
         pairs.append((style.group(1) if style else "", text))
     return pairs
+
+
+def _sectpr_tags(document_xml: bytes) -> list[str]:
+    """Return the w:-tag names inside the w:sectPr, in document order.
+
+    Nested tags are included; assertions therefore compare relative positions
+    rather than the exact list.
+    """
+    block = re.search(r"<w:sectPr\b[^>]*>(.*)</w:sectPr>", document_xml.decode("utf-8"), re.S)
+    assert block is not None
+    return re.findall(r"<w:(\w+)", block.group(1))
 
 
 def _style(root: ET.Element, style_id: str) -> ET.Element:
@@ -258,7 +318,10 @@ def test_patch_styles_xml_colours_the_table_header() -> None:
 def test_patch_styles_xml_inserts_alignment_in_schema_order() -> None:
     """w:jc must sit after w:spacing and before w:outlineLvl."""
     charter = ref.Charter(
-        key="test", label="Test", font="Arial", body_size_pt=11,
+        key="test",
+        label="Test",
+        font="Arial",
+        body_size_pt=11,
         styles={"Heading1": ref.StyleSpec(18, align="center")},
     )
     root = ET.fromstring(ref.patch_styles_xml(MINIMAL_STYLES, charter))
@@ -417,3 +480,280 @@ def test_to_docx_warns_about_svg_figures(monkeypatch, tmp_path: Path) -> None:
     result = to_docx(str(source), str(output))
 
     assert any("SVG" in warning and "PNG" in warning for warning in result.warnings)
+
+
+# ── repeated Word header and footer ───────────────────────────────────────────
+
+
+def test_charters_declare_the_letterhead_they_can_reproduce() -> None:
+    """Only the charters that ship a Word header or footer say so."""
+    assert ref.EI.has_page_furniture is True
+    assert ref.PERSO.has_page_furniture is True
+    assert BARE.has_page_furniture is False
+    assert ref.has_page_furniture("ei") is True
+    assert ref.has_page_furniture("EI") is True
+    assert ref.has_page_furniture("perso") is True
+    assert ref.has_page_furniture("acme") is False
+    assert ref.has_page_furniture(None) is False
+
+
+def test_ei_charter_builds_a_header_a_footer_and_a_logo() -> None:
+    """The Euro-Information charter injects the four letterhead parts."""
+    parts = ref.page_furniture_parts(ref.EI)
+
+    assert set(parts) == {hf.HEADER_PART, hf.FOOTER_PART, hf.HEADER_RELS_PART, hf.LOGO_PART}
+    assert parts[hf.LOGO_PART].startswith(b"\x89PNG\r\n")
+    assert b"Euro-Information" in parts[hf.HEADER_PART]
+    assert f'r:embed="{hf.LOGO_REL_ID}"'.encode() in parts[hf.HEADER_PART]
+    assert b'w:color="003A8D"' in parts[hf.HEADER_PART]  # blue rule and brand
+    assert b'w:color="FBAE40"' in parts[hf.HEADER_PART]  # orange rule
+    assert b"media/header-logo.png" in parts[hf.HEADER_RELS_PART]
+
+
+def test_perso_charter_builds_a_footer_only() -> None:
+    """The Perso charter has no letterhead, so no header part is produced."""
+    parts = ref.page_furniture_parts(ref.PERSO)
+
+    assert set(parts) == {hf.FOOTER_PART}
+    assert b'w:jc w:val="center"' in parts[hf.FOOTER_PART]
+
+
+def test_a_charter_without_letterhead_builds_no_part() -> None:
+    """A charter with neither header nor footer injects nothing."""
+    assert ref.page_furniture_parts(BARE) == {}
+
+
+def test_the_page_number_is_a_dynamic_word_field() -> None:
+    """The footer holds a real PAGE field, not a frozen number."""
+    footer = ref.page_furniture_parts(ref.EI)[hf.FOOTER_PART].decode()
+
+    assert '<w:instrText xml:space="preserve"> PAGE </w:instrText>' in footer
+    assert 'w:fldCharType="begin"' in footer
+    assert 'w:fldCharType="separate"' in footer
+    assert 'w:fldCharType="end"' in footer
+    # The document title comes from a field too, so it follows the real title.
+    assert '<w:instrText xml:space="preserve"> TITLE </w:instrText>' in footer
+
+
+def test_the_ei_footer_splits_title_and_page_number_on_a_tab_stop() -> None:
+    """The split layout aligns the page number on the right text edge."""
+    footer = ref.page_furniture_parts(ref.EI)[hf.FOOTER_PART].decode()
+    page = ref.EI.page
+    assert page is not None
+
+    assert f'<w:tab w:val="right" w:pos="{page.content_width}" />' in footer
+    assert "<w:tab />" in footer
+    assert 'w:jc w:val="center"' not in footer
+
+
+def test_header_and_footer_parts_are_well_formed_xml() -> None:
+    """Both parts parse, so Word will not reject the archive."""
+    for content in ref.page_furniture_parts(ref.EI).values():
+        if content.startswith(b"<?xml"):
+            ET.fromstring(content)
+
+
+def test_patch_document_xml_references_the_letterhead_in_schema_order() -> None:
+    """References come first, page geometry last, footnotePr untouched between."""
+    patched = ref.patch_document_xml(MINIMAL_DOCUMENT, ref.EI)
+    tags = _sectpr_tags(patched)
+
+    assert tags.index("headerReference") < tags.index("footerReference") < tags.index("footnotePr")
+    assert tags.index("footnotePr") < tags.index("pgSz") < tags.index("pgMar")
+    assert f'r:id="{hf.HEADER_REL_ID}"'.encode() in patched
+    assert f'r:id="{hf.FOOTER_REL_ID}"'.encode() in patched
+    assert b'w:w="11906"' in patched
+
+
+def test_patch_document_xml_omits_the_header_reference_for_perso() -> None:
+    """A charter without a header gets a footer reference only."""
+    tags = _sectpr_tags(ref.patch_document_xml(MINIMAL_DOCUMENT, ref.PERSO))
+
+    assert "headerReference" not in tags
+    assert "footerReference" in tags
+
+
+def test_patch_document_xml_expands_a_self_closing_sectpr() -> None:
+    """A reference document with an empty w:sectPr is still usable."""
+    document = MINIMAL_DOCUMENT.replace(
+        b'<w:sectPr><w:footnotePr><w:numRestart w:val="eachSect" /></w:footnotePr></w:sectPr>',
+        b"<w:sectPr />",
+    )
+
+    patched = ref.patch_document_xml(document, ref.EI)
+
+    ET.fromstring(patched)
+    assert _sectpr_tags(patched)[:2] == ["headerReference", "footerReference"]
+
+
+def test_patch_document_xml_rejects_a_document_without_section_properties() -> None:
+    """A missing w:sectPr is reported instead of producing a broken archive."""
+    with pytest.raises(ValueError, match="w:sectPr"):
+        ref.patch_document_xml(b"<w:document><w:body /></w:document>", ref.EI)
+
+
+def test_patch_document_rels_declares_the_header_and_footer() -> None:
+    """Both relationships are appended, keeping the existing ones."""
+    patched = ref.patch_document_rels_xml(MINIMAL_RELS, ref.EI).decode()
+
+    assert f'Id="{hf.HEADER_REL_ID}"' in patched
+    assert f'Id="{hf.FOOTER_REL_ID}"' in patched
+    assert 'Target="header1.xml"' in patched
+    assert 'Target="styles.xml"' in patched
+    ET.fromstring(patched)
+
+
+def test_patch_content_types_declares_the_injected_parts() -> None:
+    """Header, footer and PNG media get their content type."""
+    patched = ref.patch_content_types_xml(MINIMAL_CONTENT_TYPES, ref.EI).decode()
+
+    assert f'PartName="/{hf.HEADER_PART}"' in patched
+    assert f'PartName="/{hf.FOOTER_PART}"' in patched
+    assert 'Extension="png"' in patched
+    ET.fromstring(patched)
+
+
+def test_patch_content_types_leaves_a_bare_charter_alone() -> None:
+    """A charter with no injected part does not touch the content types."""
+    assert ref.patch_content_types_xml(MINIMAL_CONTENT_TYPES, BARE) == MINIMAL_CONTENT_TYPES
+    assert ref.patch_document_rels_xml(MINIMAL_RELS, BARE) == MINIMAL_RELS
+
+
+# ── letterhead blocks removed from the body ───────────────────────────────────
+
+
+def test_preprocess_keeps_the_letterhead_blocks_by_default() -> None:
+    """Without a Word letterhead the decorative blocks must stay in the body.
+
+    This is the fallback path: if the reference document could not be built, the
+    information is still exported, in the body, as before.
+    """
+    prepared = preprocess_html(EI_HTML)
+
+    assert 'class="ei-doc-head"' in prepared.html
+    assert 'class="ei-doc-foot"' in prepared.html
+    assert prepared.stripped_furniture == 0
+
+
+def test_preprocess_drops_the_letterhead_blocks_when_asked() -> None:
+    """With a Word letterhead the decorative blocks leave the body."""
+    prepared = preprocess_html(EI_HTML, strip_page_furniture=True)
+
+    assert 'class="ei-doc-head"' not in prepared.html
+    assert 'class="ei-doc-foot"' not in prepared.html
+    assert "Confidentiel" not in prepared.html
+    assert prepared.stripped_furniture == 2
+    # The document itself is untouched.
+    assert "1. Objet" in prepared.html
+    assert prepared.title == "Note de cadrage"
+
+
+def test_detect_charter_reads_the_key_without_preprocessing() -> None:
+    """The charter is known before the HTML is rewritten."""
+    assert detect_charter(EI_HTML) == "ei"
+    assert detect_charter(CHARTER_HTML) == "perso"
+    assert detect_charter(PLAIN_HTML) is None
+
+
+# ── end-to-end letterhead ─────────────────────────────────────────────────────
+
+
+@needs_pandoc
+def test_reference_docx_carries_a_header_and_a_footer_for_ei(monkeypatch, tmp_path: Path) -> None:
+    """The generated Euro-Information reference document holds the letterhead."""
+    monkeypatch.setenv("HTMLEDITOR_CACHE_DIR", str(tmp_path))
+
+    reference = ref.reference_docx_for("ei")
+
+    assert reference is not None
+    with zipfile.ZipFile(reference) as archive:
+        names = set(archive.namelist())
+        document = archive.read(ref.DOCUMENT_PART).decode()
+        footer = archive.read(hf.FOOTER_PART).decode()
+    assert hf.HEADER_PART in names
+    assert hf.FOOTER_PART in names
+    assert hf.LOGO_PART in names
+    assert hf.HEADER_RELS_PART in names
+    assert "headerReference" in document
+    assert "footerReference" in document
+    assert " PAGE " in footer
+
+
+@needs_pandoc
+def test_reference_docx_carries_a_footer_only_for_perso(monkeypatch, tmp_path: Path) -> None:
+    """The Perso reference document has a page number but no header."""
+    monkeypatch.setenv("HTMLEDITOR_CACHE_DIR", str(tmp_path))
+
+    reference = ref.reference_docx_for("perso")
+
+    assert reference is not None
+    with zipfile.ZipFile(reference) as archive:
+        names = set(archive.namelist())
+        document = archive.read(ref.DOCUMENT_PART).decode()
+    assert hf.HEADER_PART not in names
+    assert hf.FOOTER_PART in names
+    assert "headerReference" not in document
+    assert "footerReference" in document
+
+
+@needs_pandoc
+def test_to_docx_repeats_the_ei_letterhead_and_drops_it_from_the_body(monkeypatch, tmp_path: Path) -> None:
+    """Pandoc carries the header and footer over; the body loses the duplicates."""
+    monkeypatch.setenv("HTMLEDITOR_CACHE_DIR", str(tmp_path))
+    source = tmp_path / "doc.html"
+    source.write_text(EI_HTML, encoding="utf-8")
+    output = tmp_path / "doc.docx"
+
+    result = to_docx(str(source), str(output))
+
+    assert result.charter == "ei"
+    with zipfile.ZipFile(output) as archive:
+        names = set(archive.namelist())
+        document = archive.read("word/document.xml").decode()
+    assert hf.HEADER_PART in names
+    assert hf.FOOTER_PART in names
+    assert hf.LOGO_PART in names
+    assert "headerReference" in document
+    assert "footerReference" in document
+    # The letterhead is no longer body content.
+    assert "Confidentiel" not in document
+    assert "1. Objet" in document
+
+
+@needs_pandoc
+def test_to_docx_keeps_the_letterhead_in_the_body_without_a_reference(monkeypatch, tmp_path: Path) -> None:
+    """A reference document that cannot be built must not cost information."""
+    monkeypatch.setenv("HTMLEDITOR_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr("mcp_htmleditor.export.to_docx.reference_docx_for", lambda key: None)
+    source = tmp_path / "doc.html"
+    source.write_text(EI_HTML, encoding="utf-8")
+    output = tmp_path / "doc.docx"
+
+    result = to_docx(str(source), str(output))
+
+    assert result.reference_docx is None
+    with zipfile.ZipFile(output) as archive:
+        names = set(archive.namelist())
+        document = archive.read("word/document.xml").decode()
+    assert hf.HEADER_PART not in names
+    assert "Confidentiel" in document
+
+
+@needs_pandoc
+def test_to_docx_without_charter_gains_no_letterhead(monkeypatch, tmp_path: Path) -> None:
+    """Non-regression: the standard charter keeps the plain pandoc section."""
+    monkeypatch.setenv("HTMLEDITOR_CACHE_DIR", str(tmp_path))
+    source = tmp_path / "plain.html"
+    source.write_text(PLAIN_HTML, encoding="utf-8")
+    output = tmp_path / "plain.docx"
+
+    to_docx(str(source), str(output))
+
+    with zipfile.ZipFile(output) as archive:
+        names = set(archive.namelist())
+        document = archive.read("word/document.xml").decode()
+    assert hf.HEADER_PART not in names
+    assert hf.FOOTER_PART not in names
+    assert "headerReference" not in document
+    assert "footerReference" not in document
+    assert "pgSz" not in document

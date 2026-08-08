@@ -1,0 +1,38 @@
+# =============================================================================
+# PRE-COMMIT HOOKS
+# =============================================================================
+# Install: uv run pre-commit install
+# Run all: uv run pre-commit run --all-files
+#
+# All three hooks are local and go through `uv run`, so they use the exact ruff
+# and mypy pinned in uv.lock (no drift between the hook and `make check`).
+# The upstream ruff-pre-commit mirror would create its own pip environment, which
+# also breaks on machines whose pip.conf sets `user = true`.
+
+repos:
+  - repo: local
+    hooks:
+      # Ruff: linting (replaces Flake8 and isort)
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      # Ruff: formatting (replaces Black)
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
+      # mypy: strict type checking on the package
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [src/]

@@ -75,9 +75,7 @@ class EditorState:
             self.current_file = data.get("current_file", self.current_file)
             self.port = data.get("port", self.port)
             self.server_pid = data.get("server_pid", self.server_pid)
-            self.update_in_progress = data.get(
-                "update_in_progress", self.update_in_progress
-            )
+            self.update_in_progress = data.get("update_in_progress", self.update_in_progress)
             self.poll_interval = data.get("poll_interval", self.poll_interval)
         except (json.JSONDecodeError, OSError):
             pass

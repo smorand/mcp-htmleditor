@@ -55,12 +55,7 @@ def _png(width: int, height: int, color: tuple[int, int, int] = (0, 58, 141)) ->
 
     header = struct.pack(">2I5B", width, height, 8, 2, 0, 0, 0)
     raw = b"".join(b"\x00" + bytes(color) * width for _ in range(height))
-    return (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", header)
-        + chunk(b"IDAT", zlib.compress(raw))
-        + chunk(b"IEND", b"")
-    )
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 
 
 def _data_uri(width: int = 8, height: int = 4) -> str:
@@ -211,9 +206,7 @@ def section_deck(tmp_path: Path) -> Path:
 def ei_deck(tmp_path: Path) -> Path:
     """Write a compact Euro-Information deck exercising the whole charter."""
     path = tmp_path / "ei.html"
-    path.write_text(
-        EI_DECK.format(cover=_data_uri(16, 9), logo=_data_uri(4, 4)), encoding="utf-8"
-    )
+    path.write_text(EI_DECK.format(cover=_data_uri(16, 9), logo=_data_uri(4, 4)), encoding="utf-8")
     return path
 
 
@@ -232,12 +225,7 @@ def _all_text(prs: Presentation) -> str:
 
 def _pictures(prs: Presentation) -> list[object]:
     """Return every picture shape of a presentation."""
-    return [
-        shape
-        for slide in prs.slides
-        for shape in slide.shapes
-        if shape.shape_type == MSO_SHAPE_TYPE.PICTURE
-    ]
+    return [shape for slide in prs.slides for shape in slide.shapes if shape.shape_type == MSO_SHAPE_TYPE.PICTURE]
 
 
 # ---------------------------------------------------------------------------
@@ -248,8 +236,7 @@ def _pictures(prs: Presentation) -> list[object]:
 def test_find_slides_matches_any_tag_with_the_attribute() -> None:
     """Detection is attribute based, so <article> counts like <section>."""
     soup = BeautifulSoup(
-        '<body><article data-type="slide">a</article>'
-        '<section data-type="slide">b</section></body>',
+        '<body><article data-type="slide">a</article><section data-type="slide">b</section></body>',
         "html.parser",
     )
     assert len(find_slides(soup)) == 2
@@ -339,8 +326,7 @@ def test_document_without_slides_warns_and_keeps_content(tmp_path: Path) -> None
     """A document with no slide element yields one slide plus a warning."""
     source = tmp_path / "plain.html"
     source.write_text(
-        "<html><body><h1>Just a doc</h1><p>text</p>"
-        "<script>const x = 1;</script></body></html>",
+        "<html><body><h1>Just a doc</h1><p>text</p><script>const x = 1;</script></body></html>",
         encoding="utf-8",
     )
     out = tmp_path / "plain.pptx"
@@ -383,8 +369,7 @@ def test_relative_images_resolve_against_the_html_file(tmp_path: Path, monkeypat
     (assets / "chart.png").write_bytes(_png(8, 4))
     source = assets / "deck.html"
     source.write_text(
-        '<html><body><article data-type="slide">'
-        '<img src="chart.png"></article></body></html>',
+        '<html><body><article data-type="slide"><img src="chart.png"></article></body></html>',
         encoding="utf-8",
     )
     elsewhere = tmp_path / "elsewhere"
@@ -435,9 +420,7 @@ def test_annotations_are_positioned_inside_the_image(tmp_path: Path) -> None:
 
     slide = Presentation(str(out)).slides[0]
     picture = next(s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE)
-    annotation = next(
-        s for s in slide.shapes if s.has_text_frame and s.text_frame.text == "middle"
-    )
+    annotation = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text == "middle")
     assert picture.left <= annotation.left <= picture.left + picture.width
     assert picture.top <= annotation.top <= picture.top + picture.height
 
@@ -480,8 +463,7 @@ def _month(year: int, month: int) -> int:
 def test_gantt_geometry_prefers_inline_percentages() -> None:
     """Inline left/width percentages win, they are what the browser renders."""
     soup = BeautifulSoup(
-        '<div data-type="gantt-task" data-start="2024-01" data-end="2024-12"'
-        ' style="margin-left:10%; width:30%"></div>',
+        '<div data-type="gantt-task" data-start="2024-01" data-end="2024-12" style="margin-left:10%; width:30%"></div>',
         "html.parser",
     )
     task = soup.div
@@ -502,9 +484,7 @@ def test_arch_nodes_become_autoshapes(section_deck: Path, tmp_path: Path) -> Non
     assert str(node.line.color.rgb) == "0F62FE"
 
 
-def test_arch_edges_become_segments_tips_and_labels(
-    section_deck: Path, tmp_path: Path
-) -> None:
+def test_arch_edges_become_segments_tips_and_labels(section_deck: Path, tmp_path: Path) -> None:
     """CSS connectors become thin rectangles, arrow heads and labels."""
     out = tmp_path / "deck.pptx"
     to_pptx(str(section_deck), str(out))
@@ -646,8 +626,7 @@ def test_style_resolver_indexes_classes_without_leaking_compounds() -> None:
 def test_style_resolver_applies_inline_overrides() -> None:
     """Inline declarations win over the class and tag scales."""
     soup = BeautifulSoup(
-        '<p class="slide-subtitle" style="font-size:20px; color:#FF0000;'
-        ' font-weight:700; text-align:center">x</p>',
+        '<p class="slide-subtitle" style="font-size:20px; color:#FF0000; font-weight:700; text-align:center">x</p>',
         "html.parser",
     )
     node = soup.find("p")
@@ -686,8 +665,7 @@ def test_ei_charter_is_drawn(ei_deck: Path, tmp_path: Path) -> None:
     ovals = [
         shape
         for shape in prs.slides[2].shapes
-        if shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE
-        and shape.auto_shape_type == MSO_SHAPE.OVAL
+        if shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE and shape.auto_shape_type == MSO_SHAPE.OVAL
     ]
     assert len(ovals) == 1  # the footer logo ring
     # the footer title is uppercased by the charter (text-transform: uppercase)
@@ -702,9 +680,7 @@ def test_ei_cover_places_every_logo(ei_deck: Path, tmp_path: Path) -> None:
     slide = Presentation(str(out)).slides[0]
     pictures = [s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE]
     assert len(pictures) == 4
-    left_logos = sorted(
-        (s.left, s.width) for s in pictures if s.top > Inches(6.0) and s.left < Inches(6.0)
-    )
+    left_logos = sorted((s.left, s.width) for s in pictures if s.top > Inches(6.0) and s.left < Inches(6.0))
     assert len(left_logos) == 2
     first, second = left_logos
     assert first[0] + first[1] <= second[0]
@@ -715,11 +691,7 @@ def test_ei_gantt_keeps_scale_labels_and_legend(ei_deck: Path, tmp_path: Path) -
     out = tmp_path / "ei.pptx"
     to_pptx(str(ei_deck), str(out))
 
-    texts = {
-        shape.text_frame.text
-        for shape in Presentation(str(out)).slides[2].shapes
-        if shape.has_text_frame
-    }
+    texts = {shape.text_frame.text for shape in Presentation(str(out)).slides[2].shapes if shape.has_text_frame}
     assert {"T1", "T2", "Cadrage", "Jan a Fev", "Socle"} <= texts
     assert any(text.startswith("Jan") and "\u2192" in text for text in texts)
 

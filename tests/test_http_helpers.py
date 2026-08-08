@@ -52,10 +52,7 @@ def test_strip_removes_contenteditable() -> None:
 
 def test_strip_removes_extension_attrs() -> None:
     """Browser-extension attributes (Grammarly, Translate) are stripped."""
-    html = (
-        "<p _msttexthash='123' data-gramm='false' data-gr-id='9' "
-        "_msthidden='1'>text</p>"
-    )
+    html = "<p _msttexthash='123' data-gramm='false' data-gr-id='9' _msthidden='1'>text</p>"
     out = _strip_editor_artifacts(html)
     assert "_msttexthash" not in out
     assert "data-gramm" not in out
@@ -66,11 +63,7 @@ def test_strip_removes_extension_attrs() -> None:
 
 def test_strip_clears_duplicated_slide_options() -> None:
     """Dynamically-generated <option> nodes in #slide-select are cleared."""
-    html = (
-        "<select id='slide-select'>"
-        "<option>Slide 1</option><option>Slide 2</option>"
-        "</select>"
-    )
+    html = "<select id='slide-select'><option>Slide 1</option><option>Slide 2</option></select>"
     out = _strip_editor_artifacts(html)
     assert "slide-select" in out
     assert "<option" not in out
@@ -111,8 +104,7 @@ def test_rebuild_preserves_existing_head(tmp_path: Path) -> None:
     """The head of the existing file is carried into the rebuilt document."""
     src = tmp_path / "doc.html"
     src.write_text(
-        "<!DOCTYPE html><html><head><title>Keep Me</title>"
-        "<style>.a{}</style></head><body><p>old</p></body></html>",
+        "<!DOCTYPE html><html><head><title>Keep Me</title><style>.a{}</style></head><body><p>old</p></body></html>",
         encoding="utf-8",
     )
     out = _rebuild_full_html("<p>new</p>", str(src))
@@ -125,8 +117,7 @@ def test_rebuild_preserves_doc_type_attr(tmp_path: Path) -> None:
     """data-doc-type on <html> is preserved in the rebuilt document."""
     src = tmp_path / "pres.html"
     src.write_text(
-        '<!DOCTYPE html><html data-doc-type="presentation">'
-        "<head><meta charset='UTF-8'></head><body></body></html>",
+        "<!DOCTYPE html><html data-doc-type=\"presentation\"><head><meta charset='UTF-8'></head><body></body></html>",
         encoding="utf-8",
     )
     out = _rebuild_full_html("<section>s</section>", str(src))

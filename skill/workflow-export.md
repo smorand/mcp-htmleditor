@@ -117,9 +117,16 @@ génère un `reference.docx` à la charte, puis appelle pandoc.
   voit un SVG (fichier, base64 ou balise `<svg>`) et remonte aussi les avertissements de
   pandoc à l'écran. Les images **base64 PNG sont bien embarquées** dans `word/media/`,
   comme dans l'export PPTX.
-- Les en-têtes et pieds de page décoratifs (par exemple `.ei-doc-head` / `.ei-doc-foot`
-  du template EI) restent du **contenu de corps** (logo inline avant le titre, pied de
-  page en fin de document): ce ne sont pas des en-têtes Word répétés sur chaque page.
+- **En-tête et pied de page Word répétés**: le `reference.docx` embarque
+  `word/header1.xml` et `word/footer1.xml`, référencés depuis le `w:sectPr`
+  (`w:headerReference` / `w:footerReference`) que pandoc réutilise. Résultat: en charte
+  `ei`, filet bleu + logo EI + mention EURO-INFORMATION en en-tête et titre du document
+  + `Page N` en pied, sur **chaque page**; en charte `perso`, `Page N` centré. Les blocs
+  décoratifs `.ei-doc-head` / `.ei-doc-foot` sont retirés du corps pour éviter le
+  doublon, sauf si la génération du `reference.docx` a échoué (dans ce cas ils restent
+  dans le corps, comme avant). Le numéro de page est un vrai champ Word `PAGE`, le titre
+  un champ `TITLE`: ils se recalculent. Le texte de l'en-tête vient de la charte, pas du
+  HTML édité.
 - Les styles CSS inline (couleurs de fond de bloc, filets décoratifs) sont approximés.
 - Les éléments `data-type="gantt"` et `data-type="arch-diagram"` peuvent être mal rendus.
 - Les images avec chemin relatif doivent exister sur disque au moment de l'export; elles
@@ -129,13 +136,15 @@ génère un `reference.docx` à la charte, puis appelle pandoc.
 
 | `data-doc-template` | Charte |
 |---|---|
-| `perso` | Arial; Title 22pt noir gras souligné centré; Subtitle 15pt #666666; H1 18pt noir gras souligné; H2 #1155cc; H3 #6d9eeb; H4 #b4a7d6; H5 #c27ba0; corps 11pt; en-tête de tableau #1155cc |
-| `ei` | Segoe UI; Title 24pt #003A8D gras; Subtitle 13pt #50565B; H1 18pt #003A8D; H2 #284AAA; H3 #285C99; H4 #50565B; H5 #50565B majuscules; corps 11pt; en-tête de tableau #003A8D |
-| absent | standard: styles pandoc par défaut |
+| `perso` | Arial; Title 22pt noir gras souligné centré; Subtitle 15pt #666666; H1 18pt noir gras souligné; H2 #1155cc; H3 #6d9eeb; H4 #b4a7d6; H5 #c27ba0; corps 11pt; en-tête de tableau #1155cc; A4, pied de page `Page N` centré |
+| `ei` | Segoe UI; Title 24pt #003A8D gras; Subtitle 13pt #50565B; H1 18pt #003A8D; H2 #284AAA; H3 #285C99; H4 #50565B; H5 #50565B majuscules; corps 11pt; en-tête de tableau #003A8D; A4, en-tête logo EI + EURO-INFORMATION, pied titre + `Page N` |
+| absent | standard: styles pandoc par défaut, aucun en-tête, géométrie de page inchangée |
 
 Les `reference.docx` sont générés à partir de celui de pandoc
 (`pandoc --print-default-data-file reference.docx`), patchés dans `word/styles.xml`
-(module `export/reference_docx.py`) et mis en cache dans
+pour la charte et dans `word/document.xml` + `word/_rels/document.xml.rels` +
+`[Content_Types].xml` pour l'en-tête et le pied (modules `export/reference_docx.py` et
+`export/docx_header_footer.py`), puis mis en cache dans
 `~/.cache/mcp-htmleditor/reference/`. Pour forcer une régénération: supprimer ce dossier.
 Ajouter une charte = ajouter un `Charter` dans `export/reference_docx.py` et bumper
 `GENERATOR_VERSION` si la logique de patch change.
