@@ -93,6 +93,28 @@
       margin: 40px 72px 0; padding-top: 12px; border-top: 1px solid #dbe3f0;
       font-size: 9pt; color: #8a9099; display: flex; justify-content: space-between;
     }
+
+    /* Figures: <figure> + <figcaption> deviennent CaptionedFigure + ImageCaption en Word */
+    article[data-type="document"] figure { margin: 20px 0; }
+    article[data-type="document"] figure img { max-width: 100%; display: block; margin: 0 auto; }
+    article[data-type="document"] figcaption {
+      font-size: 9.5pt; color: var(--ei-gray); text-align: center; margin-top: 6px;
+    }
+
+    /* Impression: marges de page, pas d'ombre, pas de coupure dans les blocs */
+    @page { margin: 20mm 25mm; }
+    @media print {
+      body { background: #ffffff; }
+      article[data-type="document"] {
+        margin: 0; max-width: none; padding: 0 0 24px; box-shadow: none;
+      }
+      .ei-doc-head { padding: 10px 0; }
+      .ei-doc-body { padding: 20px 0 0; }
+      .ei-doc-foot { margin: 28px 0 0; }
+      h1, h2, h3, h4, h5 { break-after: avoid; page-break-after: avoid; }
+      figure, tr, li { break-inside: avoid; page-break-inside: avoid; }
+      thead { display: table-header-group; }
+    }
   </style>
 </head>
 <body>

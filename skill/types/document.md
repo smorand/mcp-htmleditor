@@ -134,6 +134,7 @@ aucun attribut supplementaire (seul l'ordre des balises change).
 | `<pre><code>` | Bloc de code |
 | `<table data-type="table">` | Tableau (voir `types/tables.md`) |
 | `<img>` | Image inline (base64 pour la portabilite) |
+| `<figure>` + `<figcaption>` | Illustration avec legende (mappee en Word: CaptionedFigure + ImageCaption) |
 
 Tous les elements textuels doivent porter `data-editable="text"` pour etre
 editables via le navigateur.
@@ -161,23 +162,68 @@ les references de bas de page (`texte<sup>1</sup>`) et les formules
 En mode edition, le bouton "Image" et le glisser-deposer embarquent l'image en
 base64 (single-page, document autonome).
 
-## Export DOCX: styles de heading preserves
+## Export DOCX: styles Word reellement produits
 
-L'export passe par pandoc (`export/to_docx.py`, `pandoc -f html ... --standalone`).
-Pandoc mappe nativement:
+L'export passe par pandoc (`export/to_docx.py`, `pandoc -f html ...`), avec deux
+traitements maison: le HTML est pretraite pour ne produire qu'un seul titre, et un
+`reference.docx` est genere a la volee pour transporter la charte. Mapping verifie
+avec pandoc 3.10 (styles lus dans `word/document.xml`):
 
-| Balise HTML | Style Word |
-|-------------|-----------|
-| premier `<h1>` (titre) | Title |
-| `<h1>` | Heading 1 |
-| `<h2>` | Heading 2 |
-| `<h3>` | Heading 3 |
-| `<h4>` | Heading 4 |
-| `<h5>` | Heading 5 |
-| `<p>` | corps de texte |
-| `<table>` | tableau Word |
-| `<ul>`/`<ol>` | liste |
-| `<sup>`/`<sub>` | exposant / indice |
+| Source HTML | Style Word produit |
+|-------------|--------------------|
+| `h1.doc-title` | **Title** (une seule fois, via metadonnee pandoc) |
+| `p.doc-subtitle` | **Subtitle** (style Word natif) |
+| `<h1>` du corps (hors `.doc-title`) | Heading1 |
+| `<h2>` | Heading2 |
+| `<h3>` | Heading3 |
+| `<h4>` | Heading4 |
+| `<h5>` | Heading5 |
+| `<p>` | FirstParagraph (premier apres un titre) puis BodyText |
+| `<ul>` / `<ol>` | Compact + numbering (puces / numeros conserves) |
+| `<table>` + `<thead>` | tableau Word, ligne d'en-tete repetee (`tblHeader`) |
+| `<colgroup><col style="width:X%">` | largeurs de colonnes proportionnelles, table a 100% |
+| `<sup>` / `<sub>` | runs `vertAlign` superscript / subscript |
+| `<b>` / `<i>` / `<u>` | gras / italique / souligne |
+| `<figure>` + `<figcaption>` | CaptionedFigure + ImageCaption |
+| `<blockquote>` | BlockText |
+| `<pre><code>` | SourceCode |
+| `<img src="data:image/png;base64,...">` | image PNG embarquee dans `word/media/` |
+| `<hr>` | paragraphe vide avec filet horizontal |
+
+**Titre unique (corrige).** Pandoc tire le style Word `Title` de la metadonnee lue
+dans `<head><title>`, et le `<h1 class="doc-title">` du corps devenait en plus un
+`Heading1`: le titre sortait deux fois. L'export extrait maintenant `.doc-title` et
+`.doc-subtitle` du corps, les passe en metadonnee pandoc (`--metadata title=` /
+`subtitle=`) et exporte le HTML restant. Resultat: `Title` puis `Subtitle`, une seule
+fois, et le sous-titre gagne un vrai style Word au lieu d'un paragraphe ordinaire.
+Rien a changer dans les templates: garder le `<title>` dans le `<head>` (onglet du
+navigateur) et le `<h1 class="doc-title">` dans le corps (rendu HTML).
+
+**La charte est transportee (corrige).** L'export lit `data-doc-template` sur
+l'`<article>`, genere un `reference.docx` pour cette charte et le passe a pandoc via
+`--reference-doc`. Sont reproduits dans Word: police, tailles, couleurs et
+soulignements de `Title`, `Subtitle`, `Heading1`..`Heading5`, taille du corps, et fond
+de la ligne d'en-tete des tableaux.
+
+| `data-doc-template` | Charte appliquee |
+|---|---|
+| `perso` | Arial, Title 22pt noir gras souligne centre, H1 18pt noir gras souligne, H2 #1155cc, H3 #6d9eeb, H4 #b4a7d6, H5 #c27ba0, en-tete de tableau #1155cc |
+| `ei` | Segoe UI, Title 24pt #003A8D gras, H1 18pt #003A8D, H2 #284AAA, H3 #285C99, H4/H5 #50565B (H5 en majuscules), en-tete de tableau #003A8D |
+| absent | charte standard: styles pandoc par defaut, aucun `reference.docx` |
+
+Les `reference.docx` sont mis en cache dans `~/.cache/mcp-htmleditor/reference/` et
+regeneres si absents. Une charte inconnue ou une generation impossible (pandoc
+indisponible) n'echoue pas: l'export continue avec les styles pandoc par defaut et
+affiche un avertissement.
+
+Non transporte, meme avec la charte: l'en-tete et le pied de page EI (blocs dans le
+flux, donc du corps de texte dans Word, pas un en-tete de page repete), et le filet
+`<hr>` qui devient un filet horizontal pleine largeur.
+
+**Figures en PNG, jamais en SVG.** Pandoc ne sait pas dimensionner un SVG (il lui
+faudrait `rsvg-convert`) et Word ancien ne l'affiche pas. L'export detecte les SVG
+(fichier, base64, balise `<svg>` en ligne) et avertit; les avertissements de pandoc
+sont eux aussi remontes a l'ecran.
 
 Verification:
 
@@ -185,9 +231,31 @@ Verification:
 mcp-htmleditor new doc-perso /tmp/test-perso.html
 mcp-htmleditor export docx /tmp/test-perso.html /tmp/test-perso.docx
 pandoc /tmp/test-perso.docx -t markdown | grep -E '^#{1,6} '
+python3 -c "import zipfile,re; d=zipfile.ZipFile('/tmp/test-perso.docx').read('word/document.xml').decode(); print(sorted(set(re.findall(r'w:pStyle w:val=\"([^\"]+)\"', d))))"
 ```
 
-La hierarchie de headings (`#`, `##`, ..., `#####`) doit etre preservee.
+La hierarchie de headings (`#`, `##`, ..., `#####`) doit etre preservee, la liste de
+styles doit contenir `Title`, `Subtitle`, `Heading1`..`Heading5`, et le texte du titre
+ne doit apparaitre qu'une fois (jamais en `Heading1`).
+
+Pour verifier la charte reellement embarquee:
+
+```bash
+python3 -c "import zipfile; print(zipfile.ZipFile('/tmp/test-perso.docx').read('word/styles.xml').decode()[:2000])" | grep -o 'w:ascii="[^\"]*"' | head -1
+```
+
+## Impression du HTML
+
+Les templates document embarquent un bloc `@media print` (marges `@page 20mm 25mm`,
+fond blanc, pas d'ombre, `break-after: avoid` sur les titres, `break-inside: avoid`
+sur les figures et les lignes de tableau, `thead` repete via
+`display: table-header-group`). Consequence a connaitre: **l'en-tete du template EI
+(filet bleu, logo, filet orange) n'apparait que sur la premiere page**, en impression
+comme a l'export DOCX. C'est un bloc dans le flux, pas un en-tete de page; il n'y a
+pas de solution CSS fiable (les elements `position: fixed` ne sont plus repetes par
+Chrome headless). Un vrai en-tete Word repete demanderait un `reference.docx` avec un
+`headerReference`, ce que la generation de charte actuelle ne fait pas (elle ne patche
+que `word/styles.xml`).
 
 ## Mise en page
 

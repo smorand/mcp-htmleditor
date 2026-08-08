@@ -133,6 +133,19 @@ def test_rebuild_preserves_doc_type_attr(tmp_path: Path) -> None:
     assert 'data-doc-type="presentation"' in out
 
 
+def test_rebuild_preserves_lang_attr(tmp_path: Path) -> None:
+    """lang on <html> survives a browser save (pandoc uses it as Word language)."""
+    src = tmp_path / "doc.html"
+    src.write_text(
+        '<!DOCTYPE html><html lang="fr" data-doc-type="document">'
+        "<head><meta charset='UTF-8'></head><body></body></html>",
+        encoding="utf-8",
+    )
+    out = _rebuild_full_html("<article>a</article>", str(src))
+    assert 'lang="fr"' in out
+    assert 'data-doc-type="document"' in out
+
+
 def test_rebuild_default_head_when_missing(tmp_path: Path) -> None:
     """A file without a head yields a minimal default head."""
     src = tmp_path / "nohead.html"

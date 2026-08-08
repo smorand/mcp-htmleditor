@@ -15,14 +15,15 @@ PI_SKILLS_DIR ?= $(HOME)/.pi/agent/dynamic-skills/html-editor
 
 .DEFAULT_GOAL := help
 
-.PHONY: sync install install-skill uninstall lint lint-fix format typecheck test test-cov check run clean help
+.PHONY: sync install install-skill uninstall lint lint-fix format typecheck test test-cov check run bootstrap-ei clean help
 
 sync: ## Install the package in editable mode with dev dependencies
 	$(PYTHON) -m pip install -e .
 
 install: ## Install CLI (~/.local/bin), templates (~/.config), logs dir (~/.cache), and Pi skill
 	@echo "==> Installing mcp-htmleditor package"
-	$(PYTHON) -m pip install --user .
+	@# --force-reinstall so a stale copy in site-packages can never shadow new sources.
+	$(PYTHON) -m pip install --user --force-reinstall .
 	@echo "==> Ensuring bin dir on PATH: $(BIN_DIR)"
 	@mkdir -p $(BIN_DIR)
 	@# pip --user installs the console script under the user base bin; symlink into BIN_DIR if needed
@@ -81,6 +82,9 @@ run: ## Show CLI usage
 	@echo "  mcp-htmleditor mcp                       Start the MCP server (stdio)"
 	@echo "  mcp-htmleditor export pptx in.html out.pptx"
 	@echo "  mcp-htmleditor export docx in.html out.docx"
+
+bootstrap-ei: ## Regenerate the EI slides bootstrap from the EI reference template
+	$(PYTHON) tools/gen_ei_bootstrap.py
 
 clean: ## Remove build/test/cache artifacts
 	rm -rf build dist *.egg-info src/*.egg-info

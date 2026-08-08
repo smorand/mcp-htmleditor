@@ -867,7 +867,9 @@ async function saveContent() {
    Insère/supprime des slides typées et maintient la cohérence:
    - ids séquentiels slide-0..slide-N
    - const TOTAL et slideNames[] dans le <script> de navigation
-   - eyebrow "Slide 0N / TT" et footer "Slide N / TT"
+   - eyebrow "Slide 0N / TT"
+   - pied de page Carbon .slide-footer-right ("Slide N / TT")
+   - pied de page EI .slide-foot-page ("N")
    - <option> du dropdown (régénérées par le JS du template)
    ============================================================ */
 
@@ -940,15 +942,22 @@ function insertSlide(layoutKey, position) {
 }
 
 /** Replace EI template asset placeholders with data URIs already embedded
- *  in the document, so inserted slides reuse the same cover/logos. */
+ *  in the document, so inserted slides reuse the same cover/logos.
+ *
+ *  Two sources, in order: an existing element of the document (a slide already
+ *  carrying the asset), then the `data-asset-*` fallback on <html>. The fallback
+ *  is what makes a freshly created file work: a bootstrap with a single title
+ *  slide has no `.slide-foot-logo img` to copy the chevrons from. */
 function resolveTemplateAssets(html, doc) {
   const grab = sel => { const el = doc.querySelector(sel); return el ? el.getAttribute('src') : ''; };
+  const fallback = name => doc.documentElement.getAttribute('data-asset-' + name) || '';
+  const asset = (sel, name) => grab(sel) || fallback(name);
   const map = {
-    '{{COVER}}':    grab('.slide-cover-img'),
-    '{{CM}}':       grab('img.logo-cm'),
-    '{{CIC}}':      grab('img.logo-cic'),
-    '{{EI}}':       grab('img.logo-ei'),
-    '{{CHEVRONS}}': grab('.slide-foot-logo img'),
+    '{{COVER}}':    asset('.slide-cover-img', 'cover'),
+    '{{CM}}':       asset('img.logo-cm', 'cm'),
+    '{{CIC}}':      asset('img.logo-cic', 'cic'),
+    '{{EI}}':       asset('img.logo-ei', 'ei'),
+    '{{CHEVRONS}}': asset('.slide-foot-logo img', 'chevrons'),
   };
   Object.entries(map).forEach(([ph, uri]) => { html = html.split(ph).join(uri || ''); });
   return html;
@@ -980,19 +989,24 @@ function renumberSlides(doc) {
     slide.id = id;
     slide.setAttribute('data-id', id);
 
-    // eyebrow "… Slide 0N / TT"
+    // eyebrow "… Slide 0N / TT" (les formes "{{N}} / {{TT}}" issues d'un layout
+    // fraîchement inséré sont résolues par la même passe)
     const eyebrow = slide.querySelector('.slide-eyebrow');
     if (eyebrow) {
       eyebrow.textContent = eyebrow.textContent.replace(
-        /Slide\s*\d+\s*\/\s*\d+/i,
+        /Slide\s*(?:\d+|\{\{N\}\})\s*\/\s*(?:\d+|\{\{TT\}\})/i,
         `Slide ${String(i + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`
       );
       // If no "Slide N / TT" pattern existed, leave text untouched.
     }
 
-    // footer "Slide N / TT"
+    // Carbon footer: "Slide N / TT"
     const footer = slide.querySelector('.slide-footer-right');
     if (footer) footer.textContent = `Slide ${i + 1} / ${total}`;
+
+    // EI footer: page number alone ("N"), on the slides that carry a foot
+    const footPage = slide.querySelector('.slide-foot-page');
+    if (footPage) footPage.textContent = String(i + 1);
 
     // active state: keep first active
     slide.classList.toggle('active', i === 0);

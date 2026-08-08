@@ -153,17 +153,21 @@ LAYOUT_SETS.carbon = {
           <h1 class="slide-h1" data-editable="text">Titre du <strong>schéma</strong></h1>
         </div>
         <div class="slide-body">
+          <!-- Connecteur ancré par calcul: bord droit de A (36, 47) vers bord gauche de B (64, 47).
+               Voir skill/types/arch-diagram.md, jamais de flèche en glyphe posée à l'estime. -->
           <div data-type="arch-diagram"
                style="position:relative; min-height:280px; border:1px dashed #e0e0e0; padding:24px;">
             <div data-type="arch-node" data-label="Composant A" data-shape="box"
-                 data-x="12.0" data-y="40.0"
-                 style="position:absolute; left:12.0%; top:40.0%; border:2px solid #0f62fe; background:#edf5ff; padding:12px 24px; font-weight:600; color:#161616;">
+                 data-x="12.0" data-y="38.0" data-width="24.0" data-height="18.0"
+                 style="position:absolute; left:12.0%; top:38.0%; width:24.0%; height:18.0%; box-sizing:border-box; display:flex; align-items:center; justify-content:center; border:2px solid #0f62fe; background:#edf5ff; font-weight:600; color:#161616;">
               Composant A
             </div>
-            <span style="position:absolute; left:41.0%; top:44.0%; font-size:28px; color:#525252;">→</span>
+            <div data-type="arch-edge" data-from="Composant A" data-to="Composant B" data-style="solid"
+                 style="position:absolute; left:36.0%; top:47.0%; width:28.0%; height:0; border-top:1.5px solid #525252;"></div>
+            <div style="position:absolute; left:64.0%; top:47.0%; width:0; height:0; border-left:7px solid #525252; border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; transform:translate(-100%,-50%);"></div>
             <div data-type="arch-node" data-label="Composant B" data-shape="box"
-                 data-x="58.0" data-y="40.0"
-                 style="position:absolute; left:58.0%; top:40.0%; border:2px solid #161616; background:#f4f4f4; padding:12px 24px; font-weight:600; color:#161616;">
+                 data-x="64.0" data-y="38.0" data-width="24.0" data-height="18.0"
+                 style="position:absolute; left:64.0%; top:38.0%; width:24.0%; height:18.0%; box-sizing:border-box; display:flex; align-items:center; justify-content:center; border:2px solid #161616; background:#f4f4f4; font-weight:600; color:#161616;">
               Composant B
             </div>
           </div>
@@ -179,9 +183,16 @@ LAYOUT_SETS.carbon = {
 /* ============================================================
    Euro-Information layouts
    Reproduit le design EI: couverture image + logos, section bleue,
-   contenu/agenda/diagram avec cadre bleu arrondi + logo rond au coin.
+   contenu/agenda/diagram avec cadre bleu (10px) et intérieur arrondi 16px,
+   plus l'anneau de logo au coin bas-gauche.
    Le logo rond ({{CHEVRONS}}) et la couverture ({{COVER}}) sont récupérés
-   depuis le document actif à l'insertion (voir editor.js insertSlide).
+   depuis le document actif à l'insertion, ou à défaut depuis les attributs
+   data-asset-* de <html> (voir editor.js resolveTemplateAssets).
+   Markup du logo obligatoire: .slide-foot-logo > .logo-disc > img, seul
+   dimensionné par le CSS du template (16px). Sans .logo-disc, l'image sort
+   du disque blanc.
+   Compteur EI: eyebrow « Catégorie · Slide 0N / TT » + .slide-foot-page,
+   les deux étant remis à jour par renumberSlides().
    ============================================================ */
 LAYOUT_SETS.ei = {
 
@@ -215,7 +226,7 @@ LAYOUT_SETS.ei = {
       <article class="slide" id="{{ID}}" data-type="slide" data-id="{{ID}}"
                data-slide-type="agenda" data-title="Plan">
         <div class="slide-inner">
-          <div class="slide-eyebrow" data-editable="text">Sommaire</div>
+          <div class="slide-eyebrow" data-editable="text">Sommaire · Slide {{N}} / {{TT}}</div>
           <h1 class="slide-h1" data-editable="text">Plan de la <span>présentation</span></h1>
           <div class="slide-title-rule"></div>
           <div class="slide-body" data-editable="text">
@@ -227,7 +238,7 @@ LAYOUT_SETS.ei = {
           </div>
         </div>
         <div class="slide-foot">
-          <div class="slide-foot-logo"><img src="{{CHEVRONS}}" alt="EI"></div>
+          <div class="slide-foot-logo"><span class="logo-disc"><img src="{{CHEVRONS}}" alt="EI"></span></div>
           <span class="slide-foot-page">{{N}}</span>
           <span class="slide-foot-title" data-editable="text">Meeting Title · Mois Année</span>
         </div>
@@ -258,7 +269,7 @@ LAYOUT_SETS.ei = {
       <article class="slide" id="{{ID}}" data-type="slide" data-id="{{ID}}"
                data-slide-type="content" data-title="Titre de la slide">
         <div class="slide-inner">
-          <div class="slide-eyebrow" data-editable="text">Section</div>
+          <div class="slide-eyebrow" data-editable="text">Section · Slide {{N}} / {{TT}}</div>
           <h1 class="slide-h1" data-editable="text">Titre de la <span>slide</span></h1>
           <div class="slide-title-rule"></div>
           <div class="slide-body" data-editable="text">
@@ -270,7 +281,7 @@ LAYOUT_SETS.ei = {
           </div>
         </div>
         <div class="slide-foot">
-          <div class="slide-foot-logo"><img src="{{CHEVRONS}}" alt="EI"></div>
+          <div class="slide-foot-logo"><span class="logo-disc"><img src="{{CHEVRONS}}" alt="EI"></span></div>
           <span class="slide-foot-page">{{N}}</span>
           <span class="slide-foot-title" data-editable="text">Meeting Title · Mois Année</span>
         </div>
@@ -285,24 +296,28 @@ LAYOUT_SETS.ei = {
       <article class="slide" id="{{ID}}" data-type="slide" data-id="{{ID}}"
                data-slide-type="diagram" data-title="Schéma">
         <div class="slide-inner">
-          <div class="slide-eyebrow" data-editable="text">Architecture</div>
+          <div class="slide-eyebrow" data-editable="text">Architecture · Slide {{N}} / {{TT}}</div>
           <h1 class="slide-h1" data-editable="text">Titre du <span>schéma</span></h1>
           <div class="slide-title-rule"></div>
           <div class="slide-body">
+            <!-- Connecteur ancré par calcul: bord droit de A (36, 47) vers bord gauche de B (64, 47).
+                 Voir skill/types/arch-diagram.md, jamais de flèche en glyphe posée à l'estime. -->
             <div data-type="arch-diagram"
                  style="position:relative; min-height:220px;">
               <div data-type="arch-node" data-label="Composant A" data-shape="box"
-                   data-x="12.0" data-y="40.0"
-                   style="position:absolute; left:12.0%; top:40.0%; border:2px solid #003A8D; background:#eef3fb; padding:12px 24px; font-weight:700; color:#003A8D;">Composant A</div>
-              <span style="position:absolute; left:41.0%; top:44.0%; font-size:28px; color:#284AAA;">→</span>
+                   data-x="12.0" data-y="38.0" data-width="24.0" data-height="18.0"
+                   style="position:absolute; left:12.0%; top:38.0%; width:24.0%; height:18.0%; box-sizing:border-box; display:flex; align-items:center; justify-content:center; border:2px solid #003A8D; background:#eef3fb; font-weight:700; color:#003A8D;">Composant A</div>
+              <div data-type="arch-edge" data-from="Composant A" data-to="Composant B" data-style="solid"
+                   style="position:absolute; left:36.0%; top:47.0%; width:28.0%; height:0; border-top:1.5px solid #284AAA;"></div>
+              <div style="position:absolute; left:64.0%; top:47.0%; width:0; height:0; border-left:7px solid #284AAA; border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; transform:translate(-100%,-50%);"></div>
               <div data-type="arch-node" data-label="Composant B" data-shape="box"
-                   data-x="58.0" data-y="40.0"
-                   style="position:absolute; left:58.0%; top:40.0%; border:2px solid #284AAA; background:#f4f6f9; padding:12px 24px; font-weight:700; color:#003A8D;">Composant B</div>
+                   data-x="64.0" data-y="38.0" data-width="24.0" data-height="18.0"
+                   style="position:absolute; left:64.0%; top:38.0%; width:24.0%; height:18.0%; box-sizing:border-box; display:flex; align-items:center; justify-content:center; border:2px solid #284AAA; background:#f4f6f9; font-weight:700; color:#003A8D;">Composant B</div>
             </div>
           </div>
         </div>
         <div class="slide-foot">
-          <div class="slide-foot-logo"><img src="{{CHEVRONS}}" alt="EI"></div>
+          <div class="slide-foot-logo"><span class="logo-disc"><img src="{{CHEVRONS}}" alt="EI"></span></div>
           <span class="slide-foot-page">{{N}}</span>
           <span class="slide-foot-title" data-editable="text">Meeting Title · Mois Année</span>
         </div>

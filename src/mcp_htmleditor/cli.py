@@ -151,11 +151,34 @@ def export_cmd(format: str, input_file: str, output_file: str) -> None:
         from .export.to_pptx import to_pptx
 
         click.echo(f"Exporting {input_file} → {output_file} (PPTX)")
-        to_pptx(input_file, output_file)
-        click.echo("Done.")
+        report = to_pptx(input_file, output_file)
+        for warning in report.warnings:
+            click.echo(f"Attention: {warning}", err=True)
+        if report.slide_count == 0:
+            raise click.ClickException(
+                "Aucune slide exportee: verifiez que le document contient des elements "
+                'data-type="slide".'
+            )
+        click.echo(f"Done. {report.slide_count} slide(s) exportee(s).")
     else:
+        import subprocess
+
         from .export.to_docx import to_docx
 
         click.echo(f"Exporting {input_file} → {output_file} (DOCX via pandoc)")
-        to_docx(input_file, output_file)
+        try:
+            result = to_docx(input_file, output_file)
+        except FileNotFoundError:
+            message = "pandoc introuvable dans le PATH: installez pandoc pour exporter en DOCX."
+            raise click.ClickException(message) from None
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or "").strip() or f"code de sortie {exc.returncode}"
+            raise click.ClickException(f"pandoc a echoue: {detail}") from None
+
+        if result.reference_docx is not None:
+            click.echo(f"Charte: {result.charter} (reference.docx: {result.reference_docx})")
+        elif result.charter is None:
+            click.echo("Charte: standard (styles pandoc par defaut)")
+        for warning in result.warnings:
+            click.echo(f"Attention: {warning}", err=True)
         click.echo("Done.")

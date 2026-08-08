@@ -119,6 +119,25 @@
       border-bottom: 1px solid #dddddd;
     }
     table[data-type="table"] tbody tr:nth-child(even) td { background: #f5f8ff; }
+
+    /* Figures: <figure> + <figcaption> deviennent CaptionedFigure + ImageCaption en Word */
+    article[data-type="document"] figure { margin: 20px 0; }
+    article[data-type="document"] figure img { max-width: 100%; display: block; margin: 0 auto; }
+    article[data-type="document"] figcaption {
+      font-size: 9.5pt; color: #666666; text-align: center; margin-top: 6px;
+    }
+
+    /* Impression: marges de page, pas d'ombre, pas de coupure dans les blocs */
+    @page { margin: 20mm 25mm; }
+    @media print {
+      body { background: #ffffff; }
+      article[data-type="document"] {
+        margin: 0; max-width: none; padding: 0; box-shadow: none;
+      }
+      h1, h2, h3, h4, h5 { break-after: avoid; page-break-after: avoid; }
+      figure, tr, li { break-inside: avoid; page-break-inside: avoid; }
+      thead { display: table-header-group; }
+    }
   </style>
 </head>
 <body>
@@ -158,6 +177,11 @@
     </p>
 
     <table data-type="table">
+      <colgroup>
+        <col data-col-width="50" style="width:50%;" />
+        <col data-col-width="25" style="width:25%;" />
+        <col data-col-width="25" style="width:25%;" />
+      </colgroup>
       <thead>
         <tr>
           <th>Colonne 1</th>

@@ -89,6 +89,28 @@ mcp-htmleditor export pptx input.html output.pptx
 mcp-htmleditor export docx input.html output.docx
 ```
 
+The PPTX export writes one 16:9 slide (13.333 x 7.5 in) per element carrying
+`data-type="slide"`, with a fallback on `article.slide` for older templates. The
+navigation shell, `<script>` and `<style>` are never exported. It detects the
+charter of the document (Euro-Information, IBM Carbon, generic), draws the slide
+chrome (frames, footers, logo ring, header rule), then flows the content: text at
+the typographic scale of the template, tile grids, callouts, native tables with
+`colspan` / `rowspan` merges, real Gantt bars, diagram nodes as autoshapes with
+their connectors, annotated images with the annotations placed in the image frame.
+Base64 images are embedded and relative paths resolve against the HTML file. The
+command prints the slide count, lists every skipped item and exits non zero when
+no slide could be written. Full breakdown of what is faithful, approximated or
+lost: `skill/workflow-export.md`.
+
+The DOCX export carries the document charter into Word. The charter is read from
+`data-doc-template` on the document `<article>` (`perso`, `ei`), a matching
+`reference.docx` is generated from pandoc's own default (fonts, heading sizes and
+colours, underlines, table header fill) and cached in
+`~/.cache/mcp-htmleditor/reference/`. A document without that attribute keeps the
+default pandoc styles. The title is emitted once (Word `Title`, then `Subtitle`),
+not duplicated as a `Heading1`. SVG figures and pandoc warnings are reported:
+figures must be PNG, never SVG.
+
 ## MCP Tools
 
 | Tool | Description |
@@ -117,7 +139,8 @@ templates/
 │   └── document-ei-empty.html     key: doc-ei    (Euro-Information, Segoe UI)
 └── reference/                     rich examples to clone (read-only via server)
     ├── slides/
-    │   ├── euro-information.html   EI: title + agenda + content, embedded logos
+    │   ├── euro-information.html   EI: title + agenda + content, embedded logos (CSS source of the `ei` bootstrap)
+    │   ├── example-ei-complete.html EI: 9 slides, gantt, arch diagram, table, annotated image
     │   ├── ibm-carbon.html         IBM Carbon: 9 slides, all components
     │   ├── presentation-standard.html
     │   └── roadmap-one-pager.html
@@ -129,6 +152,13 @@ templates/
 
 Add your own templates by dropping files into `~/.config/mcp-htmleditor/templates/`
 or by committing to `templates/` in this repo.
+
+`bootstrap/slides-ei-empty.html` is **generated**, not hand written: it is derived from
+`reference/slides/euro-information.html` by `tools/gen_ei_bootstrap.py` (`make bootstrap-ei`),
+which keeps the reference as the single source of the EI charter CSS, trims the deck down to
+the title slide, and copies the EI chevrons data URI onto `<html data-asset-chevrons>` so a
+slide inserted into a brand new file still gets its footer logo. Edit the reference, then
+run `make bootstrap-ei`; never patch the bootstrap directly.
 
 ## HTML data-types
 
@@ -168,8 +198,11 @@ src/mcp_htmleditor/
 ├── http_server.py   stdlib HTTP server (ThreadingHTTPServer)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/
-│   ├── to_pptx.py   HTML → PPTX via python-pptx
-│   └── to_docx.py   HTML → DOCX via pandoc
+│   ├── to_pptx.py   HTML → PPTX: slide detection, charter chrome, block flow, renderers
+│   ├── pptx_style.py      Box geometry, CSS/colour parsing, themes, typographic scale
+│   ├── pptx_components.py table grid (spans), Gantt maths, low level pptx helpers
+│   ├── to_docx.py   HTML → DOCX via pandoc (single title, charter, diagnostics)
+│   └── reference_docx.py  generates/caches a charter reference.docx for pandoc
 └── static/
     ├── editor.html      iframe shell + toolbar
     ├── editor.js        polling, rich-text, slide insert, doc-block insert, image embed, drag-reorder blocks + move arch-nodes
@@ -177,6 +210,9 @@ src/mcp_htmleditor/
     ├── doc-blocks.js    document block definitions (title, subtitle, h1-h5, paragraph, table, list)
     └── editor.css       toolbar, overlay, picker styles
 templates/          versioned templates (bootstrap + reference)
+tools/              maintenance scripts
+                    gen_ei_bootstrap.py  regenerate the EI bootstrap from the EI reference
+                    check_ei_insert.py   browser check of EI slide insertion (logo + numbering)
 skill/              skill docs (served by `mcp-htmleditor skill`)
 dynamic-skills/     dynamic Pi skill + routing doc (installed to ~/.pi/agent/dynamic-skills)
 ```

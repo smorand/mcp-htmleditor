@@ -118,6 +118,28 @@
       font-size: 9pt; color: #8a9099;
       display: flex; justify-content: space-between;
     }
+
+    /* Figures: <figure> + <figcaption> deviennent CaptionedFigure + ImageCaption en Word */
+    article[data-type="document"] figure { margin: 20px 0; }
+    article[data-type="document"] figure img { max-width: 100%; display: block; margin: 0 auto; }
+    article[data-type="document"] figcaption {
+      font-size: 9.5pt; color: var(--ei-gray); text-align: center; margin-top: 6px;
+    }
+
+    /* Impression: marges de page, pas d'ombre, pas de coupure dans les blocs */
+    @page { margin: 20mm 25mm; }
+    @media print {
+      body { background: #ffffff; }
+      article[data-type="document"] {
+        margin: 0; max-width: none; padding: 0 0 24px; box-shadow: none;
+      }
+      .ei-doc-head { padding: 10px 0; }
+      .ei-doc-body { padding: 20px 0 0; }
+      .ei-doc-foot { margin: 28px 0 0; }
+      h1, h2, h3, h4, h5 { break-after: avoid; page-break-after: avoid; }
+      figure, tr, li { break-inside: avoid; page-break-inside: avoid; }
+      thead { display: table-header-group; }
+    }
   </style>
 </head>
 <body>
@@ -143,8 +165,8 @@
 
       <h2 class="doc-h2" data-editable="text">Premiere section</h2>
       <p data-editable="text">
-        Le heading 2 est en bleu secondaire. La hierarchie de titres suit un degrade
-        de bleus EI, du plus fonce au plus clair.
+        Le heading 2 est en bleu secondaire. Les niveaux 1 a 3 suivent un degrade de
+        bleus EI, du plus fonce au plus clair; les niveaux 4 et 5 passent en gris.
       </p>
 
       <h3 class="doc-h3" data-editable="text">Sous-section</h3>
@@ -156,6 +178,11 @@
 
       <h4 class="doc-h4" data-editable="text">Detail</h4>
       <table data-type="table">
+        <colgroup>
+          <col data-col-width="50" style="width:50%;" />
+          <col data-col-width="25" style="width:25%;" />
+          <col data-col-width="25" style="width:25%;" />
+        </colgroup>
         <thead>
           <tr>
             <th>Indicateur</th>

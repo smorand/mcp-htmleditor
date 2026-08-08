@@ -6,6 +6,8 @@ XDG Base Directory specification:
     bin       ~/.local/bin                         (install target, informational)
     templates ~/.config/mcp-htmleditor/templates   HTMLEDITOR_TEMPLATES_DIR
     logs      ~/.cache/mcp-htmleditor/logs          HTMLEDITOR_LOG_DIR
+    cache     ~/.cache/mcp-htmleditor               HTMLEDITOR_CACHE_DIR
+    reference ~/.cache/mcp-htmleditor/reference     (generated pandoc reference.docx)
     state     next to the edited HTML file          (.mcp_state.json)
 
 Other env vars:
@@ -66,6 +68,22 @@ def log_dir() -> Path:
     ~/.cache/mcp-htmleditor/logs.
     """
     return _env_path("HTMLEDITOR_LOG_DIR", xdg_cache_home() / APP_NAME / "logs")
+
+
+def cache_dir() -> Path:
+    """Application cache directory.
+
+    Override with HTMLEDITOR_CACHE_DIR; default ~/.cache/mcp-htmleditor.
+    """
+    return _env_path("HTMLEDITOR_CACHE_DIR", xdg_cache_home() / APP_NAME)
+
+
+def reference_dir() -> Path:
+    """Directory holding the generated pandoc reference.docx files.
+
+    Default ~/.cache/mcp-htmleditor/reference (follows HTMLEDITOR_CACHE_DIR).
+    """
+    return cache_dir() / "reference"
 
 
 def bin_dir() -> Path:

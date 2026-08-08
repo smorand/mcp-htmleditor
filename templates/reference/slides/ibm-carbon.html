@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-doc-type="presentation">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -285,6 +285,11 @@
     flex: 1;
   }
 
+  /* Slide dense: paddings resserres pour tenir dans la hauteur utile (voir
+     skill/types/slides.md, section hauteur utile). Usage: class="slide dense". */
+  .slide.dense .slide-header { padding: 22px var(--cds-spacing-08) 18px; }
+  .slide.dense .slide-body { padding: 18px var(--cds-spacing-08); }
+
   /* Carbon grid helpers */
   .cds-grid { display: grid; gap: var(--cds-spacing-05); }
   .cols-2 { grid-template-columns: 1fr 1fr; }
@@ -338,6 +343,14 @@
   }
   .cds-structured-list tbody tr:last-child td { border-bottom: none; }
   .cds-structured-list tbody tr:hover td { background: var(--ibm-gray-10); }
+  /* Variante dense: le padding par defaut fait deborder une table de 5 lignes
+     accompagnee d'une notification hors de la hauteur utile de la slide. */
+  .cds-structured-list.compact tbody td { padding: 8px var(--cds-spacing-05); }
+
+  /* Agenda list */
+  .agenda-list { width: 100%; border-collapse: collapse; }
+  .agenda-list td { padding: 12px 8px; border-bottom: 1px solid var(--cds-border-subtle-01); font-size: 15px; color: var(--cds-text-primary); }
+  .agenda-list td.num { width: 56px; font-weight: 700; color: var(--ibm-blue-60); font-size: 20px; }
 
   /* Inline code */
   .cds-code {
@@ -354,6 +367,7 @@
   .tag-green  { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#d1fae5; color:#065f46; }
   .tag-purple { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#ede9fe; color:#5b21b6; }
   .tag-gray   { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#e0e0e0; color:#525252; }
+  .tag-red    { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#ffd7d9; color:#a2191f; }
 
   /* Hero stat */
   .stat-grid { display:grid; grid-template-columns: repeat(3,1fr); gap: var(--cds-spacing-05); margin-top: var(--cds-spacing-05); }
@@ -372,6 +386,55 @@
   }
   .cds-notification .notif-title { font-size: 13px; font-weight: 600; color: var(--ibm-blue-70); }
   .cds-notification .notif-body  { font-size: 12.5px; color: var(--cds-text-secondary); margin-top: 2px; }
+  .cds-notification.success { border-left-color: #198038; background: #defbe6; }
+  .cds-notification.success .notif-title { color: #0e6027; }
+  .cds-notification.warning { border-left-color: #f1c21b; background: #fdf6dd; }
+  .cds-notification.warning .notif-title { color: #8e6a00; }
+  .cds-notification.error { border-left-color: #da1e28; background: #fff1f1; }
+  .cds-notification.error .notif-title { color: #a2191f; }
+
+  /* Gantt: les pourcentages des barres sont relatifs a la piste (.gantt-track),
+     jamais a la ligne entiere, sinon la colonne de libelles fausse l'echelle. */
+  .gantt-scale { display: flex; margin-bottom: var(--cds-spacing-03); }
+  .gantt-scale .gantt-label-col { width: 172px; flex-shrink: 0; }
+  .gantt-scale .q { flex: 1; text-align: center; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--cds-text-secondary); border-left: 1px solid var(--ibm-gray-20); }
+  .gantt-row { display: flex; align-items: center; margin-bottom: 6px; }
+  .gantt-row .gantt-label { width: 172px; flex-shrink: 0; font-size: 12px; color: var(--cds-text-primary); padding-right: var(--cds-spacing-04); }
+  .gantt-track {
+    flex: 1; position: relative; height: 26px; background: var(--ibm-gray-10);
+    background-image: linear-gradient(to right, var(--ibm-gray-20) 0 1px, transparent 1px 100%);
+    background-size: 25% 100%;
+  }
+  .gantt-bar {
+    position: absolute; top: 0; height: 26px; display: flex; align-items: center; padding: 0 8px;
+    font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden;
+  }
+
+  /* Schema d'architecture: noeuds, formes, connecteurs, pointes, libelles.
+     data-shape et data-style ont un rendu reel grace aux selecteurs d'attribut. */
+  .arch-node {
+    box-sizing: border-box; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    font-size: 11.5px; font-weight: 700; line-height: 1.25; padding: 4px 6px;
+  }
+  .arch-node small, .arch-node-label { display: block; font-weight: 400; font-size: 10px; margin-top: 2px; color: var(--cds-text-secondary); }
+  .arch-box,      .arch-node[data-shape="box"]      { border-radius: 0; }
+  .arch-circle,   .arch-node[data-shape="circle"]   { border-radius: 50%; }
+  .arch-cylinder, .arch-node[data-shape="cylinder"] { border-radius: 8px / 20px; }
+  .arch-cloud,    .arch-node[data-shape="cloud"]    { border-radius: 50px; }
+  .arch-diamond,  .arch-node[data-shape="diamond"]  { transform: rotate(45deg); }
+  .arch-diamond > *, .arch-node[data-shape="diamond"] > * { transform: rotate(-45deg); }
+  .arch-edge { position: absolute; }
+  .arch-line-h { height: 0; border-top: 1.5px solid var(--ibm-blue-60); }
+  .arch-line-v { width: 0; border-left: 1.5px solid var(--ibm-blue-60); }
+  .arch-line-h.dashed, .arch-line-v.dashed, .arch-edge[data-style="dashed"] { border-style: dashed; }
+  .arch-line-h.dotted, .arch-line-v.dotted, .arch-edge[data-style="dotted"] { border-style: dotted; }
+  .arch-tip   { width: 0; height: 0; }
+  .arch-tip-r { border-left: 7px solid var(--ibm-blue-60);   border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; }
+  .arch-tip-l { border-right: 7px solid var(--ibm-blue-60);  border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; }
+  .arch-tip-d { border-top: 7px solid var(--ibm-blue-60);    border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; }
+  .arch-tip-u { border-bottom: 7px solid var(--ibm-blue-60); border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; }
+  .arch-edge-label { position: absolute; font-size: 9.5px; color: var(--cds-text-secondary); white-space: nowrap; }
 
   /* Context window bar */
   .cw-bar { display:flex; border:1px solid var(--cds-border-subtle-01); overflow:hidden; height: 32px; margin-top: var(--cds-spacing-04); border-radius:2px; }
@@ -402,6 +465,10 @@
   }
   .slide-footer-left  { font-size: 11.5px; color: var(--cds-text-secondary); }
   .slide-footer-right { font-size: 11.5px; color: var(--cds-text-placeholder); }
+  /* Slide sans .slide-body (couverture, coupure de section): sans cet espace, le filet
+     bleu bas du .slide-header se retrouve plaque contre la bordure du .slide-footer et
+     se lit comme une double bordure parasite. */
+  .slide-header + .slide-footer { margin-top: 64px; }
 
   /* ── Status bar ─────────────────────────────────────────────── */
   .status-bar {
@@ -453,17 +520,8 @@
   <!-- Dropdown select -->
   <span class="cds-select-label">Diapositive :</span>
   <div class="cds-select-wrapper">
-    <select class="cds-select" id="slide-select" onchange="goToSlide(this.value)">
-      <option value="0">01 — IBM Bob, c'est quoi ?</option>
-      <option value="1">02 — Capacités clés</option>
-      <option value="2">03 — Le système de Modes</option>
-      <option value="3">04 — Sources d'information</option>
-      <option value="4">05 — Outils natifs</option>
-      <option value="5">06 — LLMs & Routing</option>
-      <option value="6">07 — Pour les profils non-développeurs</option>
-      <option value="7">08 — Gouvernance Enterprise</option>
-      <option value="8">09 — Démarrage rapide : l'écran d'accueil</option>
-    </select>
+    <!-- Les options sont generees par buildOptions() depuis slideNames: ne pas les ecrire ici. -->
+    <select class="cds-select" id="slide-select" onchange="goToSlide(this.value)"></select>
     <svg class="cds-select-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
       <path d="M8 11L3 6h10z"/>
     </svg>
@@ -475,12 +533,12 @@
   <button class="cds-btn-icon" onclick="goToSlide(0)" title="Première diapositive">
     <svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zm3.5 6 7-6v12z"/></svg>
   </button>
-  <button class="cds-btn-icon" id="btn-last" onclick="goToSlide(7)" title="Dernière diapositive">
+  <button class="cds-btn-icon" id="btn-last" onclick="goToLast()" title="Dernière diapositive">
     <svg viewBox="0 0 16 16"><path d="M12 2h2v12h-2zm-2.5 6-7 6V2z"/></svg>
   </button>
 
   <!-- Progress tag -->
-  <span class="cds-tag" id="progress-tag">1 / 8</span>
+  <span class="cds-tag" id="progress-tag">1 / 9</span>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -497,11 +555,12 @@
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 1 — IBM Bob c'est quoi?   -->
     <!-- ════════════════════════════════ -->
-    <article class="slide active" id="slide-0">
+    <article class="slide active" id="slide-0" data-type="slide" data-id="slide-0"
+             data-slide-type="title" data-title="IBM Bob, c'est quoi ?">
       <div class="slide-header">
-        <div class="slide-eyebrow">Introduction · Slide 01 / 08</div>
-        <h1 class="slide-h1">IBM <strong>Bob</strong></h1>
-        <p class="slide-subtitle">Un partenaire IA pour l'ensemble du cycle de développement logiciel (SDLC), conçu pour augmenter vos workflows sans remplacer le jugement humain.</p>
+        <div class="slide-eyebrow" data-editable="text">Introduction · Slide 01 / 09</div>
+        <h1 class="slide-h1" data-editable="text">IBM <strong>Bob</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Un partenaire IA pour l'ensemble du cycle de développement logiciel (SDLC), conçu pour augmenter vos workflows sans remplacer le jugement humain.</p>
       </div>
       <div class="slide-body">
         <div class="stat-grid">
@@ -543,19 +602,20 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
-        <span class="slide-footer-right">Slide 1 / 8</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 1 / 9</span>
       </div>
     </article>
 
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 2 — Capacités clés        -->
     <!-- ════════════════════════════════ -->
-    <article class="slide" id="slide-1">
+    <article class="slide" id="slide-1" data-type="slide" data-id="slide-1"
+             data-slide-type="content" data-title="Capacités clés">
       <div class="slide-header">
-        <div class="slide-eyebrow">Fonctionnalités · Slide 02 / 08</div>
-        <h1 class="slide-h1">Capacités <strong>clés</strong></h1>
-        <p class="slide-subtitle">Les grandes fonctionnalités qui structurent le produit IBM Bob.</p>
+        <div class="slide-eyebrow" data-editable="text">Fonctionnalités · Slide 02 / 09</div>
+        <h1 class="slide-h1" data-editable="text">Capacités <strong>clés</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Les grandes fonctionnalités qui structurent le produit IBM Bob.</p>
       </div>
       <div class="slide-body">
         <div class="cds-grid cols-2">
@@ -592,19 +652,20 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
-        <span class="slide-footer-right">Slide 2 / 8</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 2 / 9</span>
       </div>
     </article>
 
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 3 — Modes                 -->
     <!-- ════════════════════════════════ -->
-    <article class="slide" id="slide-2">
+    <article class="slide" id="slide-2" data-type="slide" data-id="slide-2"
+             data-slide-type="content" data-title="Le système de Modes">
       <div class="slide-header">
-        <div class="slide-eyebrow">Architecture · Slide 03 / 08</div>
-        <h1 class="slide-h1">Le système de <strong>Modes</strong></h1>
-        <p class="slide-subtitle">Chaque mode est une personnalité spécialisée qui adapte le comportement, les outils autorisés et les instructions de Bob.</p>
+        <div class="slide-eyebrow" data-editable="text">Architecture · Slide 03 / 09</div>
+        <h1 class="slide-h1" data-editable="text">Le système de <strong>Modes</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Chaque mode est une personnalité spécialisée qui adapte le comportement, les outils autorisés et les instructions de Bob.</p>
       </div>
       <div class="slide-body">
         <table class="cds-structured-list">
@@ -663,19 +724,20 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
-        <span class="slide-footer-right">Slide 3 / 8</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 3 / 9</span>
       </div>
     </article>
 
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 4 — Sources info          -->
     <!-- ════════════════════════════════ -->
-    <article class="slide" id="slide-3">
+    <article class="slide" id="slide-3" data-type="slide" data-id="slide-3"
+             data-slide-type="content" data-title="Sources d'information">
       <div class="slide-header">
-        <div class="slide-eyebrow">Contexte · Slide 04 / 08</div>
-        <h1 class="slide-h1">Sources d'<strong>information</strong></h1>
-        <p class="slide-subtitle">Bob ne suppose rien — il lit les sources réelles via les Context Mentions et les mécanismes de chargement automatique.</p>
+        <div class="slide-eyebrow" data-editable="text">Contexte · Slide 04 / 09</div>
+        <h1 class="slide-h1" data-editable="text">Sources d'<strong>information</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Bob ne suppose rien — il lit les sources réelles via les Context Mentions et les mécanismes de chargement automatique.</p>
       </div>
       <div class="slide-body">
         <p style="font-size:13px; color:var(--cds-text-secondary); margin-bottom:8px;">Fenêtre de contexte : <strong>270 000 tokens</strong></p>
@@ -703,19 +765,20 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
-        <span class="slide-footer-right">Slide 4 / 8</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 4 / 9</span>
       </div>
     </article>
 
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 5 — Outils natifs         -->
     <!-- ════════════════════════════════ -->
-    <article class="slide" id="slide-4">
+    <article class="slide" id="slide-4" data-type="slide" data-id="slide-4"
+             data-slide-type="content" data-title="Outils natifs">
       <div class="slide-header">
-        <div class="slide-eyebrow">Outils · Slide 05 / 08</div>
-        <h1 class="slide-h1">Outils <strong>natifs</strong></h1>
-        <p class="slide-subtitle">Bob agit sur votre environnement via un ensemble d'outils built-in organisés en catégories fonctionnelles.</p>
+        <div class="slide-eyebrow" data-editable="text">Outils · Slide 05 / 09</div>
+        <h1 class="slide-h1" data-editable="text">Outils <strong>natifs</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Bob agit sur votre environnement via un ensemble d'outils built-in organisés en catégories fonctionnelles.</p>
       </div>
       <div class="slide-body">
         <div class="cds-grid cols-2">
@@ -752,19 +815,20 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
-        <span class="slide-footer-right">Slide 5 / 8</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 5 / 9</span>
       </div>
     </article>
 
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 6 — LLMs & Routing        -->
     <!-- ════════════════════════════════ -->
-    <article class="slide" id="slide-5">
+    <article class="slide" id="slide-5" data-type="slide" data-id="slide-5"
+             data-slide-type="content" data-title="LLMs &amp; Routing">
       <div class="slide-header">
-        <div class="slide-eyebrow">Infrastructure IA · Slide 06 / 08</div>
-        <h1 class="slide-h1">LLMs &amp; <strong>Routing</strong></h1>
-        <p class="slide-subtitle">Bob utilise plusieurs Large Language Models. La sélection est automatique et transparente — l'utilisateur ne choisit pas le modèle.</p>
+        <div class="slide-eyebrow" data-editable="text">Infrastructure IA · Slide 06 / 09</div>
+        <h1 class="slide-h1" data-editable="text">LLMs &amp; <strong>Routing</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Bob utilise plusieurs Large Language Models. La sélection est automatique et transparente — l'utilisateur ne choisit pas le modèle.</p>
       </div>
       <div class="slide-body">
         <div class="cds-grid cols-2">
@@ -797,19 +861,20 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
-        <span class="slide-footer-right">Slide 6 / 8</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 6 / 9</span>
       </div>
     </article>
 
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 7 — Non-développeurs      -->
     <!-- ════════════════════════════════ -->
-    <article class="slide" id="slide-6">
+    <article class="slide" id="slide-6" data-type="slide" data-id="slide-6"
+             data-slide-type="content" data-title="Profils non-développeurs">
       <div class="slide-header">
-        <div class="slide-eyebrow">Valeur métier · Slide 07 / 08</div>
-        <h1 class="slide-h1">Profils <strong>non-développeurs</strong></h1>
-        <p class="slide-subtitle">Bob n'est pas réservé aux ingénieurs. Le système de modes et le langage naturel ouvrent ses capacités à tous les profils.</p>
+        <div class="slide-eyebrow" data-editable="text">Valeur métier · Slide 07 / 09</div>
+        <h1 class="slide-h1" data-editable="text">Profils <strong>non-développeurs</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Bob n'est pas réservé aux ingénieurs. Le système de modes et le langage naturel ouvrent ses capacités à tous les profils.</p>
       </div>
       <div class="slide-body">
         <table class="cds-structured-list">
@@ -857,19 +922,20 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
-        <span class="slide-footer-right">Slide 7 / 8</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
+        <span class="slide-footer-right">Slide 7 / 9</span>
       </div>
     </article>
 
     <!-- ════════════════════════════════ -->
     <!-- SLIDE 8 — Enterprise            -->
     <!-- ════════════════════════════════ -->
-    <article class="slide" id="slide-7">
+    <article class="slide" id="slide-7" data-type="slide" data-id="slide-7"
+             data-slide-type="content" data-title="Gouvernance Enterprise">
       <div class="slide-header">
-        <div class="slide-eyebrow">Gouvernance · Slide 08 / 09</div>
-        <h1 class="slide-h1">Plan <strong>Enterprise</strong></h1>
-        <p class="slide-subtitle">Fonctionnalités dédiées aux organisations : gestion des équipes, contrôle des dépenses et observabilité complète.</p>
+        <div class="slide-eyebrow" data-editable="text">Gouvernance · Slide 08 / 09</div>
+        <h1 class="slide-h1" data-editable="text">Plan <strong>Enterprise</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Fonctionnalités dédiées aux organisations : gestion des équipes, contrôle des dépenses et observabilité complète.</p>
       </div>
       <div class="slide-body">
         <div class="cds-grid cols-2">
@@ -902,7 +968,7 @@
         </div>
       </div>
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
         <span class="slide-footer-right">Slide 8 / 9</span>
       </div>
     </article>
@@ -910,11 +976,12 @@
     <!-- ════════════════════════════════════════════════ -->
     <!-- SLIDE 9 — Démarrage rapide : l'écran d'accueil  -->
     <!-- ════════════════════════════════════════════════ -->
-    <article class="slide" id="slide-8">
+    <article class="slide" id="slide-8" data-type="slide" data-id="slide-8"
+             data-slide-type="diagram" data-title="Démarrage rapide : l'écran d'accueil">
       <div class="slide-header">
-        <div class="slide-eyebrow">Démarrage rapide · Slide 09 / 09</div>
-        <h1 class="slide-h1">L'écran d'accueil <strong>Bob IDE</strong></h1>
-        <p class="slide-subtitle">Trois actions essentielles pour démarrer immédiatement depuis la page Welcome de Bob IDE.</p>
+        <div class="slide-eyebrow" data-editable="text">Démarrage rapide · Slide 09 / 09</div>
+        <h1 class="slide-h1" data-editable="text">L'écran d'accueil <strong>Bob IDE</strong></h1>
+        <p class="slide-subtitle" data-editable="text">Trois actions essentielles pour démarrer immédiatement depuis la page Welcome de Bob IDE.</p>
       </div>
       <div class="slide-body" style="padding: 12px 20px 8px; display:flex; flex-direction:column; gap:10px;">
 
@@ -1129,7 +1196,7 @@
 
       </div><!-- /.slide-body -->
       <div class="slide-footer">
-        <span class="slide-footer-left">IBM Bob · Présentation</span>
+        <span class="slide-footer-left" data-editable="text">IBM Bob · Présentation</span>
         <span class="slide-footer-right">Slide 9 / 9</span>
       </div>
     </article>
@@ -1170,6 +1237,18 @@
     "Démarrage rapide : l'écran d'accueil"
   ];
 
+  // Regenere les options du dropdown (vide d'abord pour eviter les doublons)
+  function buildOptions() {
+    const sel = document.getElementById('slide-select');
+    sel.innerHTML = '';
+    slideNames.forEach((name, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = String(i + 1).padStart(2, '0') + ' — ' + name;
+      sel.appendChild(opt);
+    });
+  }
+
   function render() {
     // Hide all slides
     document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
@@ -1209,6 +1288,9 @@
     render();
   }
 
+  // Derniere slide: derive de TOTAL, jamais d'index en dur dans le HTML
+  function goToLast() { goToSlide(TOTAL - 1); }
+
   // Keyboard navigation
   document.addEventListener('keydown', e => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  navigate(1);
@@ -1218,6 +1300,7 @@
   });
 
   // Init
+  buildOptions();
   render();
 </script>
 </body>

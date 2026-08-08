@@ -39,17 +39,24 @@ templates/
 └── reference/                    ← exemples complets (à consulter/cloner)
     ├── slides/
     │   ├── euro-information.html  ← EI: titre + agenda + contenu, logos embarqués
+    │   ├── example-ei-complete.html ← EI: 9 slides, gantt, schéma, tableau, image annotée
     │   ├── ibm-carbon.html        ← IBM Carbon: 9 slides, tous les composants
     │   ├── presentation-standard.html
     │   └── roadmap-one-pager.html
     └── documents/
         ├── report-standard.html   ← rapport standard générique
         ├── perso.html             ← charte Perso: titre/sous-titre + h1-h5 + tableau + liste
-        └── euro-information.html   ← document EI: en-tête bleu + logo, headings bleus
+        ├── euro-information.html   ← document EI: en-tête bleu + logo, headings bleus
+        ├── example-perso-complete.html ← exemple riche Perso (3 pages, figure PNG, sup/sub)
+        └── example-ei-complete.html    ← exemple riche EI (3 pages, figure PNG, sup/sub)
 ```
 
 Les fichiers `bootstrap/` sont le point de départ minimal. Les fichiers `reference/`
 sont des exemples riches: le LLM peut s'en inspirer pour cloner des layouts.
+`bootstrap/slides-ei-empty.html` est **généré** depuis
+`reference/slides/euro-information.html` par `tools/gen_ei_bootstrap.py` (`make bootstrap-ei`):
+la référence est la source unique du CSS de la charte EI. Ne pas éditer le bootstrap à la
+main, sinon les deux divergent et `new ei` ne rend plus la charte validée.
 **Ces fichiers sont en lecture seule via le serveur** (une sauvegarde vers un chemin
 contenant `templates/` est ignorée).
 
@@ -177,9 +184,12 @@ mcp-htmleditor export docx input.html output.docx
 | `templates/bootstrap/slides-empty.html` | Template minimal présentation |
 | `templates/bootstrap/document-empty.html` | Template minimal document |
 | `templates/reference/slides/ibm-carbon.html` | **Template de référence IBM Carbon** (9 slides complètes, tous composants) |
-| `templates/reference/slides/euro-information.html` | **Template de référence Euro-Information** (3 slides: titre, agenda, contenu; logos CM/CIC/EI embarqués) |
+| `templates/reference/slides/euro-information.html` | **Template de référence Euro-Information** (3 slides: titre, agenda, contenu; logos CM/CIC/EI embarqués; source du CSS du bootstrap `ei`) |
+| `templates/reference/slides/example-ei-complete.html` | **Exemple complet Euro-Information** (9 slides: couverture, agenda, section, tuiles, schéma d'architecture ancré, Gantt aligné, tableau, image annotée, clôture) |
 | `templates/reference/slides/presentation-standard.html` | Template 4 slides standard |
 | `templates/reference/slides/roadmap-one-pager.html` | Template roadmap one-pager |
 | `templates/reference/documents/report-standard.html` | Template rapport standard générique |
 | `templates/reference/documents/perso.html` | **Template document charte Perso** (titre/sous-titre, h1-h5 colorés, tableau, liste) |
 | `templates/reference/documents/euro-information.html` | **Template document Euro-Information** (en-tête bleu + logo, headings bleus, Segoe UI) |
+| `templates/reference/documents/example-perso-complete.html` | Exemple complet charte Perso: 3 pages, h1-h5, listes, tableau avec `colgroup`, figure PNG base64, sup/sub |
+| `templates/reference/documents/example-ei-complete.html` | Exemple complet charte EI: 3 pages, en-tête EI, h1-h5, tableau, figure PNG base64, sup/sub |

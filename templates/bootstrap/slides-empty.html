@@ -3,7 +3,8 @@
   IBM Carbon Slides — Template bootstrap vide
   Usage: copier ce fichier, renseigner data-title sur chaque section,
          ajouter les slides dans .slide-frame, mettre à jour TOTAL et slideNames.
-  Référence complète: skill/templates/reference/slides/ibm-carbon.html
+  Référence complète (catalogue de composants): templates/reference/slides/ibm-carbon.html
+  Contrainte de hauteur utile et conventions dense/compact: skill/types/slides.md
 -->
 <html lang="fr" data-doc-type="presentation">
 <head>
@@ -92,12 +93,20 @@
   .slide-h1 strong { font-weight:600; }
   .slide-subtitle { margin-top:var(--cds-spacing-04); font-size:16px; color:var(--cds-text-secondary); line-height:1.5; max-width:600px; }
   .slide-body { padding:var(--cds-spacing-07) var(--cds-spacing-08); flex:1; }
+  /* Slide dense: paddings resserres pour tenir dans la hauteur utile (voir
+     skill/types/slides.md, section hauteur utile). Usage: class="slide dense". */
+  .slide.dense .slide-header { padding:22px var(--cds-spacing-08) 18px; }
+  .slide.dense .slide-body { padding:18px var(--cds-spacing-08); }
   .slide-footer {
     height:40px; padding:0 var(--cds-spacing-08); border-top:1px solid var(--cds-border-subtle-01);
     display:flex; align-items:center; justify-content:space-between; background:var(--ibm-gray-10); flex-shrink:0;
   }
   .slide-footer-left { font-size:11.5px; color:var(--cds-text-secondary); }
   .slide-footer-right { font-size:11.5px; color:var(--cds-text-placeholder); }
+  /* Slide sans .slide-body (couverture, coupure de section): sans cet espace, le filet
+     bleu bas du .slide-header se retrouve plaque contre la bordure du .slide-footer et
+     se lit comme une double bordure parasite. */
+  .slide-header + .slide-footer { margin-top:64px; }
   .cds-grid { display:grid; gap:var(--cds-spacing-05); }
   .cols-2 { grid-template-columns:1fr 1fr; }
   .cols-3 { grid-template-columns:1fr 1fr 1fr; }
@@ -110,13 +119,21 @@
   .cds-structured-list thead th { background:var(--ibm-gray-100); color:var(--cds-inverse-text); font-size:12px; font-weight:600; text-align:left; padding:var(--cds-spacing-03) var(--cds-spacing-05); letter-spacing:.04em; text-transform:uppercase; }
   .cds-structured-list tbody td { font-size:13px; padding:var(--cds-spacing-04) var(--cds-spacing-05); border-bottom:1px solid var(--cds-border-subtle-01); color:var(--cds-text-primary); vertical-align:top; }
   .cds-structured-list tbody tr:last-child td { border-bottom:none; }
+  /* Variante dense: le padding par defaut fait deborder une table de 5 lignes
+     accompagnee d'une notification hors de la hauteur utile de la slide. */
+  .cds-structured-list.compact tbody td { padding:8px var(--cds-spacing-05); }
+  .agenda-list { width:100%; border-collapse:collapse; }
+  .agenda-list td { padding:12px 8px; border-bottom:1px solid var(--cds-border-subtle-01); font-size:15px; color:var(--cds-text-primary); }
+  .agenda-list td.num { width:56px; font-weight:700; color:var(--ibm-blue-60); font-size:20px; }
   .cds-notification { display:flex; gap:var(--cds-spacing-04); padding:var(--cds-spacing-04) var(--cds-spacing-05); border-left:4px solid var(--ibm-blue-60); background:var(--ibm-blue-10); margin-top:var(--cds-spacing-05); }
   .cds-notification .notif-title { font-size:13px; font-weight:600; color:var(--ibm-blue-70); }
   .cds-notification .notif-body { font-size:12.5px; color:var(--cds-text-secondary); margin-top:2px; }
   .cds-notification.success { border-left-color:#198038; background:#defbe6; }
   .cds-notification.success .notif-title { color:#0e6027; }
   .cds-notification.warning { border-left-color:#f1c21b; background:#fdf6dd; }
+  .cds-notification.warning .notif-title { color:#8e6a00; }
   .cds-notification.error { border-left-color:#da1e28; background:#fff1f1; }
+  .cds-notification.error .notif-title { color:#a2191f; }
   .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--cds-spacing-05); margin-top:var(--cds-spacing-05); }
   .stat-card { background:var(--ibm-gray-10); border-left:4px solid var(--ibm-blue-60); padding:var(--cds-spacing-05); }
   .stat-value { font-size:32px; font-weight:300; color:var(--ibm-blue-60); line-height:1; }
@@ -127,6 +144,56 @@
   .tag-purple { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#ede9fe; color:#5b21b6; }
   .tag-gray { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#e0e0e0; color:#525252; }
   .tag-red { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:100px; background:#ffd7d9; color:#a2191f; }
+  /* Barre de repartition proportionnelle */
+  .cw-bar { display:flex; border:1px solid var(--cds-border-subtle-01); overflow:hidden; height:32px; margin-top:var(--cds-spacing-04); border-radius:2px; }
+  .cw-seg { display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff; overflow:hidden; white-space:nowrap; padding:0 6px; }
+  /* Pastilles de mention */
+  .mention-wrap { display:flex; flex-wrap:wrap; gap:var(--cds-spacing-03); margin-top:var(--cds-spacing-04); }
+  .mention-pill {
+    display:inline-flex; align-items:center; gap:var(--cds-spacing-02);
+    padding:var(--cds-spacing-02) var(--cds-spacing-04);
+    background:var(--ibm-gray-10); border:1px solid var(--cds-border-subtle-01);
+    font-size:12px; color:var(--cds-text-primary);
+  }
+  .mention-pill code { font-family:var(--cds-font-family-mono); font-size:11.5px; color:var(--ibm-blue-60); }
+  .mention-pill span { color:var(--cds-text-secondary); font-size:11.5px; }
+  /* Gantt: les pourcentages des barres sont relatifs a la piste (.gantt-track),
+     jamais a la ligne entiere, sinon la colonne de libelles fausse l'echelle. */
+  .gantt-scale { display:flex; margin-bottom:var(--cds-spacing-03); }
+  .gantt-scale .gantt-label-col { width:172px; flex-shrink:0; }
+  .gantt-scale .q { flex:1; text-align:center; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--cds-text-secondary); border-left:1px solid var(--ibm-gray-20); }
+  .gantt-row { display:flex; align-items:center; margin-bottom:6px; }
+  .gantt-row .gantt-label { width:172px; flex-shrink:0; font-size:12px; color:var(--cds-text-primary); padding-right:var(--cds-spacing-04); }
+  .gantt-track { flex:1; position:relative; height:26px; background:var(--ibm-gray-10);
+    background-image:linear-gradient(to right, var(--ibm-gray-20) 0 1px, transparent 1px 100%);
+    background-size:25% 100%; }
+  .gantt-bar { position:absolute; top:0; height:26px; display:flex; align-items:center; padding:0 8px;
+    font-size:11px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; }
+  /* Schema d'architecture: noeuds, formes, connecteurs, pointes, libelles.
+     data-shape et data-style ont un rendu reel grace aux selecteurs d'attribut. */
+  .arch-node {
+    box-sizing:border-box; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    font-size:11.5px; font-weight:700; line-height:1.25; padding:4px 6px;
+  }
+  .arch-node small, .arch-node-label { display:block; font-weight:400; font-size:10px; margin-top:2px; color:var(--cds-text-secondary); }
+  .arch-box, .arch-node[data-shape="box"] { border-radius:0; }
+  .arch-circle, .arch-node[data-shape="circle"] { border-radius:50%; }
+  .arch-cylinder, .arch-node[data-shape="cylinder"] { border-radius:8px / 20px; }
+  .arch-cloud, .arch-node[data-shape="cloud"] { border-radius:50px; }
+  .arch-diamond, .arch-node[data-shape="diamond"] { transform:rotate(45deg); }
+  .arch-diamond > *, .arch-node[data-shape="diamond"] > * { transform:rotate(-45deg); }
+  .arch-edge { position:absolute; }
+  .arch-line-h { height:0; border-top:1.5px solid var(--ibm-blue-60); }
+  .arch-line-v { width:0; border-left:1.5px solid var(--ibm-blue-60); }
+  .arch-line-h.dashed, .arch-line-v.dashed, .arch-edge[data-style="dashed"] { border-style:dashed; }
+  .arch-line-h.dotted, .arch-line-v.dotted, .arch-edge[data-style="dotted"] { border-style:dotted; }
+  .arch-tip { width:0; height:0; }
+  .arch-tip-r { border-left:7px solid var(--ibm-blue-60); border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; }
+  .arch-tip-l { border-right:7px solid var(--ibm-blue-60); border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; }
+  .arch-tip-d { border-top:7px solid var(--ibm-blue-60); border-left:4.5px solid transparent; border-right:4.5px solid transparent; }
+  .arch-tip-u { border-bottom:7px solid var(--ibm-blue-60); border-left:4.5px solid transparent; border-right:4.5px solid transparent; }
+  .arch-edge-label { position:absolute; font-size:9.5px; color:var(--cds-text-secondary); white-space:nowrap; }
   .status-bar { height:24px; background:var(--ibm-gray-100); display:flex; align-items:center; padding:0 var(--cds-spacing-05); gap:var(--cds-spacing-05); flex-shrink:0; border-top:1px solid #393939; }
   .status-bar span { font-size:11px; color:#8d8d8d; }
   .status-bar .status-active { color:#42be65; }

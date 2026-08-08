@@ -65,13 +65,15 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Always test the working tree, never a previously installed (non-editable) copy
+# of the package that would shadow src/ in site-packages.
+pythonpath = ["src"]
 
 [tool.coverage.run]
 source = ["src/mcp_htmleditor"]
 omit = [
     "src/mcp_htmleditor/cli.py",
     "src/mcp_htmleditor/mcp_server.py",
-    "src/mcp_htmleditor/export/to_docx.py",
 ]
 
 [tool.coverage.report]

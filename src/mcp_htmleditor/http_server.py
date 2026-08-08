@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -344,9 +345,15 @@ def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
 
     GrapesJS returns body content only. This function wraps it in a proper
     document, preserving the head of the existing file when available.
+
+    Attributes of the original ``<html>`` tag that carry meaning downstream are
+    preserved: ``lang`` (pandoc turns it into the Word document language, so
+    losing it makes an exported DOCX default to en-US), ``data-doc-type``
+    (drives the editor mode) and every ``data-asset-*`` (fallback data URIs used
+    when inserting a slide, see resolveTemplateAssets in static/editor.js).
     """
     head_content: str = ""
-    doc_type_attr = ""
+    html_attrs = ""
 
     if current_file:
         try:
@@ -356,14 +363,16 @@ def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
             head_end = existing.lower().find("</head>")
             if head_start != -1 and head_end != -1:
                 head_content = existing[head_start : head_end + 7]
-            # Extract data-doc-type from <html> tag
+            # Extract lang + data-doc-type from the <html> tag
             html_tag_end = existing.lower().find(">", existing.lower().find("<html"))
             if html_tag_end != -1:
                 html_tag = existing[: html_tag_end + 1]
-                import re
-                m = re.search(r'data-doc-type=["\']([^"\']+)["\']', html_tag)
-                if m:
-                    doc_type_attr = f' data-doc-type="{m.group(1)}"'
+                for attr in ("lang", "data-doc-type"):
+                    m = re.search(rf'{attr}=["\']([^"\']+)["\']', html_tag)
+                    if m:
+                        html_attrs += f' {attr}="{m.group(1)}"'
+                for name, value in re.findall(r'(data-asset-[a-z0-9-]+)="([^"]*)"', html_tag):
+                    html_attrs += f' {name}="{value}"'
         except OSError:
             pass
 
@@ -372,7 +381,7 @@ def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
 
     return (
         f"<!DOCTYPE html>\n"
-        f"<html{doc_type_attr}>\n"
+        f"<html{html_attrs}>\n"
         f"{head_content}\n"
         f"<body>\n{canvas_html}\n</body>\n"
         f"</html>\n"

@@ -14,115 +14,243 @@ pas d'attribut cryptique: le LLM lit `data-x`/`data-y` directement et sans ambig
 et l'humain peut déplacer les boîtes à la souris en mode édition (l'éditeur réécrit
 `data-x`/`data-y` + `left`/`top` en %). LLM et humain travaillent sur le même format.
 
-### Exemple d'un nœud après déplacement
+**Donner aussi `data-width`/`data-height` et les `width`/`height` en %.** Sans taille
+explicite, la boîte prend la largeur de son texte, ses bords sont inconnus, et aucun
+connecteur ne peut être ancré dessus.
+
+### Exemple d'un nœud
 
 ```html
-<div data-type="arch-node" data-label="API" data-shape="box"
-     data-x="42.5" data-y="30.0"
-     style="position:absolute; left:42.5%; top:30.0%; border:2px solid #0f62fe;
-            background:#edf5ff; padding:12px 24px; font-weight:600; color:#161616;">
-  API
+<div data-type="arch-node" class="arch-node" data-label="Serveur MCP" data-shape="box"
+     data-x="27.0" data-y="2.0" data-width="21.0" data-height="15.0"
+     style="position:absolute; left:27.0%; top:2.0%; width:21.0%; height:15.0%;
+            border:2px solid #003A8D; background:#e6ecf7; color:#003A8D; border-radius:4px;">
+  Serveur MCP<small>transport stdio</small>
 </div>
 ```
 
-Le LLM qui produit ou modifie un schéma doit respecter ce format: toujours poser
-`data-x`/`data-y` (0-100, 1 décimale) ET le `left`/`top` en % correspondant. Un nœud
-sans `data-x`/`data-y` reçoit une position par défaut au premier déplacement humain.
+```css
+.arch-node {
+  box-sizing:border-box; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center;
+  font-size:11.5px; font-weight:700; line-height:1.25; padding:4px 6px;
+}
+.arch-node small { display:block; font-weight:400; font-size:9.5px; margin-top:2px; opacity:.85; }
+```
 
-## Structure HTML avec exemple
+---
+
+## Connecteurs: méthode d'ancrage (obligatoire)
+
+Les flèches en glyphes Unicode (`→`, `⇓`) posées « à l'estime » produisent des liaisons
+coupées et des libellés posés sur les boîtes. La méthode validée est purement CSS et
+entièrement calculable.
+
+### 1. Calculer les bords du nœud
+
+Pour un nœud `(x, y, w, h)` en % du conteneur:
+
+| Point d'ancrage | Coordonnées |
+|---|---|
+| bord gauche, milieu vertical | `(x, y + h/2)` |
+| bord droit, milieu vertical | `(x + w, y + h/2)` |
+| bord haut, milieu horizontal | `(x + w/2, y)` |
+| bord bas, milieu horizontal | `(x + w/2, y + h)` |
+
+Pour la boîte de l'exemple ci-dessus: bord droit `(48.0, 9.5)`, bord bas `(37.5, 17.0)`.
+Nommer ces valeurs une fois (`ROW1_MID = 9.5`) et les réutiliser: toutes les boîtes d'une
+même rangée partagent le même milieu vertical, donc un unique segment horizontal.
+
+### 2. Tracer le segment en ligne CSS
+
+Un trait est un `div` sans surface, avec une seule bordure. Pas de SVG, pas de glyphe.
+
+```css
+.arch-edge   { position:absolute; }
+.arch-line-h { height:0; border-top:1.5px solid #284AAA; }
+.arch-line-v { width:0;  border-left:1.5px solid #284AAA; }
+.arch-line-h.dashed { border-top-style:dashed; }
+.arch-line-v.dashed { border-left-style:dashed; }
+```
+
+- horizontal: `style="left:X1%; top:Y%; width:(X2-X1)%;"`
+- vertical: `style="left:X%; top:Y1%; height:(Y2-Y1)%;"`
+
+Un coude est la simple juxtaposition d'un segment vertical et d'un segment horizontal
+qui partagent leur point de rencontre.
+
+### 3. Poser la pointe de flèche
+
+Triangle CSS, ancré par `transform` pour que sa pointe touche exactement le bord visé:
+
+```css
+.arch-tip   { width:0; height:0; }
+.arch-tip-r { border-left:7px solid #284AAA;  border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; }
+.arch-tip-l { border-right:7px solid #284AAA; border-top:4.5px solid transparent; border-bottom:4.5px solid transparent; }
+.arch-tip-d { border-top:7px solid #284AAA;   border-left:4.5px solid transparent; border-right:4.5px solid transparent; }
+.arch-tip-u { border-bottom:7px solid #284AAA; border-left:4.5px solid transparent; border-right:4.5px solid transparent; }
+```
+
+| Direction | `transform` | Sens de la flèche |
+|---|---|---|
+| `r` | `translate(-100%,-50%)` | vers la droite, pointe sur le bord gauche de la cible |
+| `l` | `translate(0,-50%)` | vers la gauche, pointe sur le bord droit de la cible |
+| `d` | `translate(-50%,-100%)` | vers le bas, pointe sur le bord haut de la cible |
+| `u` | `translate(-50%,0)` | vers le haut, pointe sur le bord bas de la cible |
+
+Le `left`/`top` de la pointe est le point d'ancrage de la cible, pas la fin du segment:
+c'est le `transform` qui la recule de sa propre taille. Une flèche bidirectionnelle est
+un segment plus deux pointes opposées.
+
+### 4. Déporter le libellé
+
+```css
+.arch-edge-label { position:absolute; font-size:9.5px; color:#50565B; white-space:nowrap; }
+```
+
+Un libellé centré sur un intervalle de 4 à 5 % de large déborde toujours sous les boîtes
+voisines. Règles:
+
+- **Rangée horizontale**: fixer une ligne de libellés unique **sous** les boîtes
+  (`top = y + h + 2`), et centrer chaque libellé sur le milieu de son segment avec
+  `transform:translateX(-50%)`.
+- **Segment vertical**: poser le libellé **à côté** du trait (`left = x + 2`), à mi-hauteur,
+  sans `transform`.
+- Ne jamais placer un libellé dans la bande verticale occupée par les boîtes d'une rangée.
+
+---
+
+## Exemple complet et calculable
+
+Trois nœuds, une rangée plus une descente en coude. Toutes les valeurs découlent des
+formules de bord: rangée 1 en `y=2, h=15` donc `ROW1_MID = 9.5`; boîte centrale en
+`y=42, h=17` donc `FILE_MID = 50.5`.
 
 ```html
-<div data-type="arch-diagram"
-     style="position:relative; width:100%; min-height:300px; padding:20px; font-family:Arial,sans-serif;">
+<div data-type="arch-diagram" style="position:relative; width:100%; height:100%; min-height:250px;">
 
-  <!-- Nœud -->
-  <div data-type="arch-node"
-       data-label="API Gateway"
-       data-shape="box"
-       data-x="10" data-y="40"
-       data-width="20" data-height="10"
-       style="position:absolute; left:10%; top:40%; width:20%; box-sizing:border-box;
-              border:2px solid #333; padding:12px; text-align:center;
-              background:#f5f5f5; border-radius:4px; font-weight:bold;">
-    API Gateway
-  </div>
+  <!-- Nœuds: A (1→22), B (27→48), Fichier (26→74) -->
+  <div data-type="arch-node" class="arch-node" data-label="Agent LLM" data-shape="box"
+       data-x="1.0" data-y="2.0" data-width="21.0" data-height="15.0"
+       style="position:absolute; left:1.0%; top:2.0%; width:21.0%; height:15.0%;
+              border:2px solid #003A8D; background:#003A8D; color:#fff; border-radius:4px;">Agent LLM</div>
 
-  <!-- Flèche (élément HTML simple) -->
-  <div style="position:absolute; left:30%; top:44%; font-size:24px; color:#666;">→</div>
+  <div data-type="arch-node" class="arch-node" data-label="Serveur MCP" data-shape="box"
+       data-x="27.0" data-y="2.0" data-width="21.0" data-height="15.0"
+       style="position:absolute; left:27.0%; top:2.0%; width:21.0%; height:15.0%;
+              border:2px solid #003A8D; background:#e6ecf7; color:#003A8D; border-radius:4px;">Serveur MCP</div>
 
-  <!-- Nœud destination -->
-  <div data-type="arch-node"
-       data-label="Service Auth"
-       data-shape="box"
-       data-x="35" data-y="40"
-       data-width="20" data-height="10"
-       style="position:absolute; left:35%; top:40%; width:20%; box-sizing:border-box;
-              border:2px solid #4a90d9; padding:12px; text-align:center;
-              background:#e8f0fe; border-radius:4px; font-weight:bold;">
-    Service Auth
-  </div>
+  <div data-type="arch-node" class="arch-node" data-label="Fichier HTML" data-shape="box"
+       data-x="26.0" data-y="42.0" data-width="48.0" data-height="17.0"
+       style="position:absolute; left:26.0%; top:42.0%; width:48.0%; height:17.0%;
+              border:2px solid #FBAE40; background:#fff6e6; color:#8a5b00; border-radius:4px;">Fichier HTML</div>
+
+  <!-- A → B: bord droit de A (22, 9.5) vers bord gauche de B (27, 9.5) -->
+  <div data-type="arch-edge" data-from="agent-llm" data-to="serveur-mcp" data-style="solid"
+       class="arch-edge arch-line-h" style="left:22.0%; top:9.5%; width:5.0%;"></div>
+  <div class="arch-edge arch-tip arch-tip-r" style="left:27.0%; top:9.5%; transform:translate(-100%,-50%);"></div>
+  <div class="arch-edge-label" style="left:24.5%; top:19.0%; transform:translateX(-50%);">MCP stdio</div>
+
+  <!-- A → Fichier: descente depuis le bas de A (11.5, 17) puis coude vers la droite -->
+  <div class="arch-edge arch-line-v" style="left:11.5%; top:17.0%; height:33.5%;"></div>
+  <div class="arch-edge arch-line-h" style="left:11.5%; top:50.5%; width:14.5%;"></div>
+  <div class="arch-edge arch-tip arch-tip-r" style="left:26.0%; top:50.5%; transform:translate(-100%,-50%);"></div>
+  <div class="arch-edge-label" style="left:13.5%; top:42.0%;">écriture directe</div>
 
 </div>
 ```
+
+Détail des calculs: bord bas de A = `1 + 21/2 = 11.5` en x, `2 + 15 = 17` en y; la descente
+va de `17` à `FILE_MID = 50.5`, donc `height = 33.5`; le coude court de `11.5` au bord
+gauche du fichier `26`, donc `width = 14.5`.
+
+Schéma complet à 7 nœuds et 12 connecteurs, vérifié par capture:
+`templates/reference/slides/example-ei-complete.html`, slide « Architecture mcp-htmleditor ».
+
+### Contrôle avant de livrer
+
+1. Chaque segment part d'un bord calculé et arrive sur un bord calculé, jamais sur une
+   valeur arrondie « à l'œil ».
+2. Aucun trait ne traverse une boîte à laquelle il n'est pas connecté: router dans les
+   couloirs vides entre rangées et entre colonnes.
+3. Aucun libellé ne recouvre une boîte ni un autre libellé.
+4. Capture d'écran relue: une liaison coupée en morceaux se voit immédiatement.
+
+---
 
 ## Shapes disponibles
 
 | Valeur `data-shape` | Rendu CSS | Usage |
 |---------------------|-----------|-------|
-| `box` | Rectangle, `border-radius:0` | Service, composant |
+| `box` | Rectangle, `border-radius:0` ou 4px | Service, composant |
 | `circle` | `border-radius:50%` | Acteur, endpoint |
 | `diamond` | `transform:rotate(45deg)` | Décision, condition |
 | `cylinder` | Simulé avec `border-radius` top/bottom | Base de données |
 | `cloud` | `border-radius:50px` + style | Cloud provider |
 
-CSS pour chaque shape:
 ```css
-/* box */
-.arch-box { border-radius: 0; }
-/* circle */
-.arch-circle { border-radius: 50%; width: 80px; height: 80px; display:flex; align-items:center; justify-content:center; }
-/* diamond */
-.arch-diamond { transform: rotate(45deg); }
+.arch-box      { border-radius: 0; }
+.arch-circle   { border-radius: 50%; width: 80px; height: 80px; display:flex; align-items:center; justify-content:center; }
+.arch-diamond  { transform: rotate(45deg); }
 .arch-diamond .label { transform: rotate(-45deg); }
-/* cylinder */
 .arch-cylinder { border-radius: 8px / 20px; }
-/* cloud */
-.arch-cloud { border-radius: 50px; }
+.arch-cloud    { border-radius: 50px; }
 ```
+
+Attention: une forme non rectangulaire (`circle`, `diamond`) déplace ses bords visuels par
+rapport à sa boîte. Ancrer les connecteurs sur le milieu des bords de la boîte, et accepter
+le petit espace, plutôt que de viser le contour réel.
+
+### Où ce CSS existe déjà, et ce qui est réellement rendu
+
+Dans les deux fichiers de la charte IBM Carbon (`templates/bootstrap/slides-empty.html`,
+copié par `mcp-htmleditor new carbon`, et `templates/reference/slides/ibm-carbon.html`), ce
+CSS est **déjà embarqué**, et doubleé de sélecteurs d'attribut, donc `data-shape` et
+`data-style` suffisent, sans classe ni style inline:
+
+```css
+.arch-circle, .arch-node[data-shape="circle"] { border-radius: 50%; }
+.arch-line-h.dashed, .arch-edge[data-style="dashed"] { border-style: dashed; }
+```
+
+Les 5 formes et les 3 styles de trait ont un rendu visuel vérifié par capture dans ces deux
+fichiers. Deux limites à connaître:
+
+- `circle` sur un nœud dont `data-width` et `data-height` ne donnent pas le même nombre de
+  pixels produit une **ellipse**, pas un cercle. Pour un vrai cercle, poser des dimensions
+  égales en pixels plutôt qu'en pourcentages.
+- `diamond` fait tourner la boîte entière: mettre le texte dans un `<span>` enfant, il est
+  remis d'aplomb par `.arch-node[data-shape="diamond"] > *`.
+
+Dans un document Euro-Information, ce CSS n'existe pas: il faut le déclarer dans la slide
+ou dans le `<style>` du document.
 
 ## Attributs d'un nœud
 
 | Attribut | Description | Exemple |
 |----------|-------------|---------|
-| `data-type="arch-node"` | Identifie un nœud | — |
+| `data-type="arch-node"` | Identifie un nœud | (pas de valeur) |
 | `data-label` | Libellé affiché | `"API Gateway"` |
 | `data-shape` | Forme visuelle | `box`, `circle`, `diamond`, `cylinder`, `cloud` |
-| `data-x` | Position gauche en % (0-100) | `10` |
-| `data-y` | Position haut en % (0-100) | `40` |
-| `data-width` | Largeur en % | `20` |
-| `data-height` | Hauteur en % | `10` |
-| `data-color` | Couleur de fond | `#e8f0fe` |
+| `data-x` | Position gauche en % (0-100) | `27.0` |
+| `data-y` | Position haut en % (0-100) | `2.0` |
+| `data-width` | Largeur en % | `21.0` |
+| `data-height` | Hauteur en % | `15.0` |
+| `data-color` | Couleur de fond | `#e6ecf7` |
 
-## Edges (connexions entre nœuds)
+## Attributs d'un connecteur
 
-En V1, les edges sont des éléments HTML positionnés manuellement (flèches ASCII ou SVG simple):
+| Attribut | Description | Exemple |
+|----------|-------------|---------|
+| `data-type="arch-edge"` | Identifie un connecteur | (pas de valeur) |
+| `data-from` | `data-label` ou id du nœud source | `agent-llm` |
+| `data-to` | `data-label` ou id du nœud cible | `serveur-mcp` |
+| `data-style` | `solid`, `dashed`, `dotted` | `solid` |
+| `data-label` | Libellé de la liaison | `"MCP stdio"` |
 
-```html
-<!-- Flèche horizontale -->
-<div data-type="arch-edge" data-from="node-a" data-to="node-b" data-style="solid"
-     style="position:absolute; left:30%; top:45%; font-size:20px;">→</div>
-
-<!-- Flèche avec label -->
-<div data-type="arch-edge" data-from="node-a" data-to="node-b" data-label="HTTP/REST"
-     style="position:absolute; left:30%; top:45%; font-size:12px; color:#666;">
-  ──── HTTP/REST ────▶
-</div>
-```
-
-Styles d'edge disponibles:
-- `solid`: `────▶`
-- `dashed`: `- - - ▶`
-- `dotted`: `· · · ▶`
+Porter `data-type="arch-edge"` sur **le segment principal** de la liaison. Les segments de
+coude, les pointes et le libellé sont de la décoration: leur donner seulement les classes
+CSS, sinon un connecteur est compté plusieurs fois.
 
 ## Conventions de nommage
 
@@ -136,7 +264,8 @@ Styles d'edge disponibles:
 ```
 [Client] → [Load Balancer] → [API] → [DB]
 ```
-Positionner les nœuds avec `data-x` croissant, `data-y` constant.
+Une rangée: même `data-y` et même `data-height`, `data-x` croissant, un pas régulier
+(par exemple largeur 21 %, gouttière 5 %). Un seul milieu vertical pour tous les segments.
 
 ### Top-to-bottom (hiérarchique)
 ```
@@ -148,10 +277,21 @@ Positionner les nœuds avec `data-x` croissant, `data-y` constant.
        \           /
         [Database]
 ```
-Positionner avec `data-y` croissant, `data-x` pour les branches.
+Rangées empilées: `data-y` croissant avec un couloir vide de 8 à 12 % entre deux rangées
+pour laisser passer les segments horizontaux et les libellés.
 
 ## Conversion PPTX
 
-Nodes → rectangles python-pptx avec le label en textbox.
-Ce qui est **perdu**: shapes custom (circle, diamond), couleurs, edges.
-Ce qui est **préservé**: positions (% → pouces), labels.
+Chaque nœud devient une forme PPTX native, avec la forme déduite de `data-shape`
+(box, circle, diamond, cylinder, cloud), le fond et la bordure lus sur le style,
+le libellé et son sous-libellé (`<small>`, `.arch-node-label`). Les pourcentages
+`data-x` / `data-y` / `data-width` / `data-height` sont interprétés **dans le
+repère du conteneur** `arch-diagram`, jamais dans celui de la slide: le conteneur
+doit donc rester `position:relative` avec une hauteur exploitable.
+
+Les connecteurs sont convertis selon leur écriture: les traits CSS
+(`.arch-line-h`, `.arch-line-v`) deviennent des segments, les pointes
+(`.arch-tip-r/l/u/d`) des triangles, les flèches texte (`→`, `↓`) et les
+`.arch-edge-label` des zones de texte positionnées. `data-from` / `data-to` ne
+sont pas utilisés pour tracer des connecteurs automatiques: la géométrie du HTML
+est reprise telle quelle. Voir `skill/workflow-export.md`.
