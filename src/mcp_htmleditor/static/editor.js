@@ -20,6 +20,8 @@ let lastMtime     = null;
 let wasUpdating   = false;
 let editMode      = false;
 let saveTimer     = null;
+let hasPendingChanges = false; // local edits not yet written to disk
+let selfSaving    = false;     // true while our own POST /content is in flight
 let isPresentation = false;   // detected from data-doc-type
 let isDocument     = false;   // detected from data-doc-type
 let insertPosition = null;    // 'before' | 'after' when slide picker is open
@@ -28,8 +30,31 @@ let lastDocRange   = null;    // saved caret range in document mode
 
 const frame        = document.getElementById('content-frame');
 const overlay      = document.getElementById('update-overlay');
-const savedBadge   = document.getElementById('toolbar-saved');
 const statusDot    = document.getElementById('toolbar-status');
+
+/* Save-state dot colors: green = saved, orange = pending changes,
+   yellow = LLM update in progress. */
+const DOT_SAVED   = '#42be65';
+const DOT_PENDING = '#ff832b';
+const DOT_LLM     = '#f1c21b';
+
+/** Mark the document as having unsaved changes (orange dot). */
+function markPending() {
+  hasPendingChanges = true;
+  if (statusDot) {
+    statusDot.style.color = DOT_PENDING;
+    statusDot.title = 'Modifications non sauvegardees';
+  }
+}
+
+/** Mark the document as saved (green dot). */
+function markSaved() {
+  hasPendingChanges = false;
+  if (statusDot) {
+    statusDot.style.color = DOT_SAVED;
+    statusDot.title = 'Sauvegarde';
+  }
+}
 const editBtn      = document.getElementById('edit-mode-btn');
 const slideActions = document.getElementById('toolbar-slide-actions');
 const docActions   = document.getElementById('toolbar-doc-actions');
@@ -129,13 +154,18 @@ async function pollStatus() {
 
   if (status.update_in_progress) {
     overlay.style.display = 'flex';
-    statusDot.style.color  = '#f1c21b';
+    statusDot.style.color  = DOT_LLM;
+    statusDot.title = 'Modification par l\'agent en cours';
     wasUpdating = true;
   } else {
     overlay.style.display = 'none';
-    statusDot.style.color  = '#42be65';
+    // Only reset to green if nothing is pending locally.
+    if (!hasPendingChanges) markSaved();
     const mtimeChanged = lastMtime !== null && status.mtime !== lastMtime;
-    if ((wasUpdating || mtimeChanged) && !status.update_in_progress) {
+    // Reload only for EXTERNAL changes (agent wrote the file). Never reload
+    // because of our own save: that would flash the iframe and lose the caret.
+    const externalChange = mtimeChanged && !selfSaving && !hasPendingChanges;
+    if ((wasUpdating || externalChange) && !status.update_in_progress) {
       wasUpdating = false;
       lastMtime   = status.mtime;
       reloadFrame();
@@ -766,9 +796,9 @@ function removeLastTableCol(tbl) {
 /* ============================================================
    Save
    ============================================================ */
-function onEditableInput()  { clearTimeout(saveTimer); saveTimer = setTimeout(saveContent, 800); }
+function onEditableInput()  { markPending(); clearTimeout(saveTimer); saveTimer = setTimeout(saveContent, 800); }
 function onEditableBlur()   { clearTimeout(saveTimer); saveContent(); }
-function scheduleSave()     { clearTimeout(saveTimer); saveTimer = setTimeout(saveContent, 600); }
+function scheduleSave()     { markPending(); clearTimeout(saveTimer); saveTimer = setTimeout(saveContent, 600); }
 
 async function saveContent() {
   try {
@@ -807,17 +837,26 @@ async function saveContent() {
     if (ib) ib.style.display = ibDisplay;
     reattachDragArtifacts(detachedDrag);
 
+    selfSaving = true;
     await fetch('/content', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ html }),
     });
 
-    savedBadge.style.display = 'inline';
-    clearTimeout(savedBadge._timer);
-    savedBadge._timer = setTimeout(() => { savedBadge.style.display = 'none'; }, 1500);
+    // Adopt the on-disk mtime produced by our own write, so the next poll
+    // does not mistake it for an external change and reload the iframe.
+    try {
+      const st = await fetch('/status').then(r => r.json());
+      lastMtime = st.mtime;
+    } catch (e) { /* keep previous mtime; worst case one harmless reload */ }
+    selfSaving = false;
+
+    markSaved();
+    saveTimer = null;
 
   } catch (e) {
+    selfSaving = false;
     console.warn('Save failed:', e);
   }
 }

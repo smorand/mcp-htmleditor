@@ -33,11 +33,7 @@ html, body {
 #toolbar-status {
   color: #42be65;
   font-size: 8px;
-}
-
-#toolbar-saved {
-  color: #42be65;
-  font-size: 11px;
+  transition: color 120ms;
 }
 
 /* ── Edit mode toggle button ────────────────────────────── */
