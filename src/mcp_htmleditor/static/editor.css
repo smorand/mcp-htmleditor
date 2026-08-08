@@ -40,19 +40,44 @@ html, body {
   font-size: 11px;
 }
 
-#toolbar-edit-toggle {
-  display: flex;
+/* ── Edit mode toggle button ────────────────────────────── */
+#edit-mode-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   margin-left: auto;
-  cursor: pointer;
+  height: 20px;
+  padding: 0 10px;
+  background: #262626;
   color: #8d8d8d;
+  border: 1px solid #393939;
+  border-radius: 10px;
+  font-family: inherit;
   font-size: 11px;
+  cursor: pointer;
+  transition: background 90ms, color 90ms, border-color 90ms;
 }
-
-#toolbar-edit-toggle:hover { color: #c6c6c6; }
-
-#edit-mode-checkbox { cursor: pointer; accent-color: #0f62fe; }
+#edit-mode-btn .edit-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6f6f6f;
+  transition: background 90ms, box-shadow 90ms;
+}
+#edit-mode-btn:hover {
+  color: #f4f4f4;
+  border-color: #6f6f6f;
+}
+/* Active state: blue pill + glowing dot */
+#edit-mode-btn[aria-pressed="true"] {
+  background: #0f62fe;
+  color: #ffffff;
+  border-color: #0f62fe;
+}
+#edit-mode-btn[aria-pressed="true"] .edit-dot {
+  background: #ffffff;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.9);
+}
 
 /* ── Iframe: full remaining height ───────────────────────────── */
 #content-frame {

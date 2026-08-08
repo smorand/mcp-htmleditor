@@ -30,7 +30,7 @@ const frame        = document.getElementById('content-frame');
 const overlay      = document.getElementById('update-overlay');
 const savedBadge   = document.getElementById('toolbar-saved');
 const statusDot    = document.getElementById('toolbar-status');
-const editCheckbox = document.getElementById('edit-mode-checkbox');
+const editBtn      = document.getElementById('edit-mode-btn');
 const slideActions = document.getElementById('toolbar-slide-actions');
 const docActions   = document.getElementById('toolbar-doc-actions');
 
@@ -49,8 +49,9 @@ const docActions   = document.getElementById('toolbar-doc-actions');
     console.warn('Could not reach /status', e);
   }
 
-  editCheckbox.addEventListener('change', () => {
-    editMode = editCheckbox.checked;
+  editBtn.addEventListener('click', () => {
+    editMode = !editMode;
+    editBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
     applyEditMode();
     updateSlideActionsVisibility();
     updateDocActionsVisibility();
@@ -70,6 +71,12 @@ const docActions   = document.getElementById('toolbar-doc-actions');
   document.querySelector('#block-picker .picker-backdrop').addEventListener('click', closeBlockPicker);
 
   frame.addEventListener('load', onFrameLoad);
+  // The iframe may already be loaded by the time this script runs (race
+  // condition): detect the document/presentation mode immediately in that case.
+  try {
+    const d = frame.contentDocument;
+    if (d && d.readyState === 'complete' && d.documentElement) onFrameLoad();
+  } catch (e) { /* cross-origin or not ready yet; the load event will fire */ }
   setInterval(pollStatus, pollInterval);
 })();
 
@@ -263,13 +270,14 @@ function injectEditorStyles(doc) {
       position: absolute; left: -26px; top: 2px;
       width: 20px; height: 22px;
       display: flex; align-items: center; justify-content: center;
-      cursor: grab; color: #a8a8a8; font-size: 14px; line-height: 1;
+      cursor: grab; color: #c6c6c6; font-size: 14px; line-height: 1;
       border-radius: 3px; user-select: none;
-      opacity: 0; transition: opacity 80ms, color 80ms, background 80ms;
+      opacity: 0.55; transition: opacity 80ms, color 80ms, background 80ms;
     }
     ._mcp_drag_host { position: relative; }
-    ._mcp_drag_host:hover > ._mcp_drag_handle { opacity: 1; }
-    ._mcp_drag_handle:hover { color: #0f62fe; background: #edf5ff; }
+    ._mcp_drag_host:hover > ._mcp_drag_handle { opacity: 1; color: #525252; }
+    ._mcp_drag_handle:hover { color: #0f62fe; background: #edf5ff; opacity: 1; }
+    ._mcp_drag_handle:active { cursor: grabbing; }
     ._mcp_dragging { opacity: 0.45; }
     ._mcp_drop_indicator {
       height: 0; border: none; border-top: 2px solid #0f62fe;
