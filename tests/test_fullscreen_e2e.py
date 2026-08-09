@@ -129,14 +129,33 @@ def _progress(page: Page) -> str:
     return str(_inner(page, "doc.getElementById('progress-tag').textContent"))
 
 
+def _visual_rect(page: Page, selector: str = ".slide.active") -> list[float]:
+    """Return [width, height] of `selector`'s getBoundingClientRect (reflects CSS transforms)."""
+    return list(
+        _inner(
+            page,
+            f"(() => {{ const r = doc.querySelector('{selector}').getBoundingClientRect();"
+            " return [r.width, r.height]; })()",
+        )
+    )  # type: ignore[arg-type]
+
+
 @needs_chromium
 def test_fullscreen_hides_toolbar_and_fills_the_screen(page: Page, deck_server: str) -> None:
-    """E2E-038: entering fullscreen masks the nav bar and fills the screen."""
+    """E2E-038: entering fullscreen masks the nav bar and zooms the slide to fill the screen.
+
+    The slide keeps its native 960x540 design box (no stretching, which would
+    grow the container without growing fonts/cards - the exact "no zoom"
+    regression a real user hit) and is scaled uniformly via a CSS custom
+    property (--fs-scale) computed by updateFullscreenScale(), the same way
+    PowerPoint/Keynote zoom their slide to fit the display.
+    """
     page.set_viewport_size({"width": 1600, "height": 900})
     page.goto(deck_server, wait_until="networkidle")
     page.wait_for_selector("#present-btn")
 
     assert _inner(page, "getComputedStyle(doc.querySelector('.toolbar')).display") != "none"
+    assert _visual_rect(page) == [960, 540]
 
     page.click("#present-btn")
     page.wait_for_timeout(300)
@@ -144,8 +163,15 @@ def test_fullscreen_hides_toolbar_and_fills_the_screen(page: Page, deck_server: 
     assert _inner(page, "doc.fullscreenElement ? doc.fullscreenElement.tagName : null") == "HTML"
     assert _inner(page, "getComputedStyle(doc.querySelector('.toolbar')).display") == "none"
     assert _inner(page, "getComputedStyle(doc.querySelector('.nav-arrow')).display") == "none"
-    assert _inner(page, "getComputedStyle(doc.querySelector('.slide.active')).height") == "900px"
     assert _inner(page, "getComputedStyle(doc.body).backgroundColor") == "rgb(0, 0, 0)"
+
+    # The design box itself never changes size (still 960x540 in layout
+    # terms); the VISUAL box (getBoundingClientRect, which reflects the
+    # transform) must now fill the 1600x900 viewport exactly, uniformly on
+    # both axes since 1600/960 == 900/540 == 5/3 here (no distortion).
+    scale = float(_inner(page, "getComputedStyle(doc.documentElement).getPropertyValue('--fs-scale')"))
+    assert scale == pytest.approx(1600 / 960)
+    assert _visual_rect(page) == pytest.approx([1600, 900])
 
 
 @needs_chromium

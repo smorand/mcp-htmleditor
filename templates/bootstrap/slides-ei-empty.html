@@ -204,9 +204,15 @@
   :fullscreen .nav-arrow { display:none !important; }
   :fullscreen .stage { background:#000; }
   :fullscreen .slide-frame { padding:0; }
+  /* Zoom uniforme (comme PowerPoint): la slide garde sa taille de conception
+     (960x540) et est agrandie via transform scale au lieu d'être étirée —
+     sinon le conteneur grandit mais les polices/cartes en px restent
+     minuscules avec du vide autour. --fs-scale est calculé par
+     updateFullscreenScale() plus bas dans le script. */
   :fullscreen .slide {
-    max-width:none; width:100%; height:100vh;
-    border:none; box-shadow:none; max-height:100vh;
+    border:none; box-shadow:none;
+    transform: scale(var(--fs-scale, 1));
+    transform-origin: center center;
   }
   :fullscreen body { background:#000; }
 </style>
@@ -294,7 +300,27 @@
     document.getElementById('nav-prev').disabled = current === 0;
     document.getElementById('btn-next').disabled = current === TOTAL - 1;
     document.getElementById('nav-next').disabled = current === TOTAL - 1;
+    updateFullscreenScale();
   }
+
+  // Plein écran = zoom uniforme, pas un étirement: la slide garde sa taille de
+  // conception (960x540) et --fs-scale (transform scale, voir CSS) l'agrandit
+  // pour remplir l'écran comme PowerPoint, polices et cartes comprises.
+  function updateFullscreenScale() {
+    const slide = document.querySelector('.slide.active');
+    const root = document.documentElement;
+    if (!document.fullscreenElement || !slide) {
+      root.style.removeProperty('--fs-scale');
+      return;
+    }
+    root.style.setProperty('--fs-scale', '1'); // mesurer la taille naturelle avant de recalculer
+    const rect = slide.getBoundingClientRect();
+    const scale = Math.min(window.innerWidth / rect.width, window.innerHeight / rect.height);
+    root.style.setProperty('--fs-scale', String(scale));
+  }
+
+  document.addEventListener('fullscreenchange', updateFullscreenScale);
+  window.addEventListener('resize', updateFullscreenScale);
 
   function navigate(dir) {
     const next = current + dir;
