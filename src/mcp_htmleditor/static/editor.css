@@ -75,6 +75,30 @@ html, body {
   box-shadow: 0 0 5px rgba(255, 255, 255, 0.9);
 }
 
+/* ── Present button ─────────────────────────────────── */
+#present-btn {
+  display: none; /* shown only for presentations via JS */
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-left: 6px;
+  height: 20px;
+  padding: 0 10px;
+  background: #262626;
+  color: #8d8d8d;
+  border: 1px solid #393939;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 90ms, color 90ms, border-color 90ms;
+}
+#present-btn:hover {
+  background: #0f62fe;
+  color: #ffffff;
+  border-color: #0f62fe;
+}
+
 /* ── Iframe: full remaining height ───────────────────────────── */
 #content-frame {
   display: block;

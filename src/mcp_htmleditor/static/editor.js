@@ -56,6 +56,7 @@ function markSaved() {
   }
 }
 const editBtn      = document.getElementById('edit-mode-btn');
+const presentBtn   = document.getElementById('present-btn');
 const slideActions = document.getElementById('toolbar-slide-actions');
 const docActions   = document.getElementById('toolbar-doc-actions');
 
@@ -80,6 +81,18 @@ const docActions   = document.getElementById('toolbar-doc-actions');
     applyEditMode();
     updateSlideActionsVisibility();
     updateDocActionsVisibility();
+  });
+
+  // Present button: fullscreen the iframe (only visible for presentations)
+  presentBtn.addEventListener('click', () => {
+    frame.requestFullscreen
+      ? frame.requestFullscreen()
+      : frame.webkitRequestFullscreen && frame.webkitRequestFullscreen();
+  });
+  frame.addEventListener('fullscreenchange', () => {
+    presentBtn.title = document.fullscreenElement
+      ? 'Quitter la présentation (ESC)'
+      : 'Mode présentation plein écran';
   });
 
   // Slide action buttons
@@ -130,6 +143,7 @@ function onFrameLoad() {
    ============================================================ */
 function updateSlideActionsVisibility() {
   slideActions.style.display = (isPresentation && editMode) ? 'inline-flex' : 'none';
+  presentBtn.style.display   = isPresentation ? 'inline-flex' : 'none';
 }
 
 /* ============================================================
