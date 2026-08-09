@@ -86,7 +86,10 @@
     flex-direction:column; animation:fadein 200ms ease; overflow-y:auto; max-height:100%;
   }
   .slide.active { display:flex; }
-  @keyframes fadein { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  /* translate (pas transform) pour ne jamais entrer en conflit avec le
+     scale du plein écran ci-dessous: ce sont deux propriétés CSS indépendantes,
+     l'animation d'entrée ne peut plus écraser le zoom pendant ses 200ms. */
+  @keyframes fadein { from { opacity:0; translate:0 6px; } to { opacity:1; translate:0 0; } }
   .slide-header { padding:var(--cds-spacing-07) var(--cds-spacing-08); border-bottom:4px solid var(--ibm-blue-60); }
   .slide-eyebrow { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ibm-blue-60); margin-bottom:var(--cds-spacing-03); }
   .slide-h1 { font-size:36px; font-weight:300; line-height:1.2; color:var(--cds-text-primary); letter-spacing:-.01em; }
@@ -210,7 +213,7 @@
      du vide autour. --fs-scale est calculé par updateFullscreenScale(). */
   :fullscreen .slide {
     border:none; box-shadow:none;
-    transform: scale(var(--fs-scale, 1));
+    scale: var(--fs-scale, 1);
     transform-origin: center center;
   }
   :fullscreen body { background:#000; }
