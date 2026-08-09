@@ -24,6 +24,27 @@ avant d'écrire sur disque:
 **Le fichier sur disque est toujours propre.** L'agent n'a pas à se préoccuper des
 artefacts d'édition humaine.
 
+## Une modification humaine trouvée sur le fichier est volontaire
+
+Si l'agent relit le fichier et trouve une valeur, un texte ou une structure
+différente de ce qu'il avait écrit ou de ce à quoi il s'attendait, **ce n'est
+pas une erreur à corriger**: l'humain a édité le document via le browser entre
+deux tâches de l'agent. Ne jamais "remettre la bonne valeur" ou revenir à un
+état antérieur sans qu'on le demande explicitement — l'agent écraserait un
+choix humain volontaire en croyant réparer un bug.
+
+- **Traiter la version actuelle du fichier comme la vérité.** Elle reflète la
+  dernière intention, humaine ou LLM, peu importe laquelle.
+- **Ne jamais diffuser un "correctif" silencieux** qui rétablit une ancienne
+  valeur parce qu'elle ne correspond plus à ce que l'agent avait produit.
+- **Poser la question si le changement semble contradictoire** avec la demande
+  en cours (ex: l'humain a supprimé une slide que l'agent doit maintenant
+  modifier, ou changé un chiffre qui casse la cohérence d'un tableau). Ne pas
+  deviner à la place de l'utilisateur.
+- Cette règle s'applique aussi entre deux appels d'outils dans une même
+  session: toujours relire le fichier avant d'écrire, ne jamais réutiliser un
+  contenu HTML en mémoire qui daterait d'avant une édition humaine.
+
 ---
 
 ## Partir d'un template bootstrap
