@@ -66,6 +66,31 @@ ignored: those files are meant to be copied, not edited. The write itself is tra
 
 Validate JS with `node --check src/mcp_htmleditor/static/*.js`.
 
+### Fullscreen presentation mode (gotcha)
+
+The present button fullscreens the *inner* document (`frame.contentDocument.
+documentElement`), not the `<iframe>` element, so the slide template's own
+`:fullscreen .toolbar/.nav-arrow/.slide` CSS (defined inside the served HTML,
+not in `editor.css`) is what hides the nav bar and resizes the slide to fill
+the screen. Two things are required for this to work, both easy to regress:
+
+- The `<iframe>` in `editor.html` needs `sandbox="... allow-fullscreen"`
+  (plus `allow="fullscreen"` / `allowfullscreen` for older engines). A
+  sandboxed iframe without `allow-fullscreen` silently denies
+  `requestFullscreen()` on its content; `editor.js` then falls back to
+  fullscreening the `<iframe>` element itself in the *parent* document,
+  where the slide template's `:fullscreen` CSS never matches anything
+  (wrong document) — the toolbar stays visible and the slide keeps its
+  normal padded size.
+- Entering fullscreen does not move keyboard focus into the iframe, so the
+  slide template's own arrow-key `keydown` listener (`navigate()`) never
+  fires if focus stays on the outer `#present-btn`. `editor.js` calls
+  `frame.focus()` after fullscreen is granted, and additionally forwards
+  arrow/space/escape keydowns from the *parent* document straight into the
+  iframe's `navigate()`/`goToSlide()` globals whenever `document.
+  fullscreenElement` is set, so navigation works regardless of which
+  document actually holds focus in a given browser.
+
 ## Templates and tools
 
 Template resolution order: `HTMLEDITOR_TEMPLATES_DIR`, then

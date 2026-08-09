@@ -149,6 +149,23 @@ html, body {
   background: #ffffff;
 }
 
+/* ── Fallback fullscreen (parent shell) ──────────────────────────
+   Normally requestFullscreen() targets the document INSIDE the
+   iframe (see editor.js), so the slide template's own :fullscreen
+   CSS hides its toolbar and resizes the slide to fill the screen.
+   If that ever fails (browser without allow-fullscreen sandbox
+   support) and editor.js falls back to fullscreening the <iframe>
+   element itself, hide the outer shell chrome here too so the
+   fallback still looks like a real presentation instead of a
+   half-fullscreen page with the toolbar still showing. */
+#content-frame:fullscreen {
+  height: 100vh;
+}
+body:has(#content-frame:fullscreen) #toolbar,
+body:has(#content-frame:fullscreen) #update-overlay {
+  display: none !important;
+}
+
 /* ── Update overlay ──────────────────────────────────────────── */
 #update-overlay {
   position: fixed;

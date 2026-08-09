@@ -86,12 +86,26 @@ const docActions   = document.getElementById('toolbar-doc-actions');
   });
 
   // Present button: fullscreen the inner document (not the iframe element)
-  // so keyboard events stay inside the iframe's own document.
+  // so keyboard events stay inside the iframe's own document. Fullscreen
+  // alone does NOT move keyboard focus there, so the click on this button
+  // (which lives in the parent shell) would otherwise keep focus on the
+  // button itself and the slide's own arrow-key navigation would never
+  // fire: explicitly focus the iframe once fullscreen is granted.
   presentBtn.addEventListener('click', () => {
     try {
       const inner = frame.contentDocument && frame.contentDocument.documentElement;
-      if (inner && inner.requestFullscreen) inner.requestFullscreen();
-      else if (inner && inner.webkitRequestFullscreen) inner.webkitRequestFullscreen();
+      if (inner && inner.requestFullscreen) {
+        inner.requestFullscreen().then(() => frame.focus()).catch(() => {
+          frame.requestFullscreen
+            ? frame.requestFullscreen()
+            : frame.webkitRequestFullscreen && frame.webkitRequestFullscreen();
+        });
+      } else if (inner && inner.webkitRequestFullscreen) {
+        inner.webkitRequestFullscreen();
+        frame.focus();
+      } else {
+        throw new Error('Fullscreen API unavailable on inner document');
+      }
     } catch (e) {
       // fallback: fullscreen the iframe element itself
       frame.requestFullscreen
@@ -100,9 +114,36 @@ const docActions   = document.getElementById('toolbar-doc-actions');
     }
   });
   document.addEventListener('fullscreenchange', () => {
+    // Re-assert focus on every transition into fullscreen (covers the case
+    // where the user re-enters via the iframe's own 'f' shortcut too).
+    if (document.fullscreenElement) frame.focus();
     presentBtn.title = document.fullscreenElement
       ? 'Quitter la présentation (ESC)'
       : 'Mode présentation plein écran';
+  });
+
+  // Safety net: some browsers never move keyboard focus into the iframe's
+  // document once fullscreen starts (frame.focus() above is not reliable
+  // everywhere), so the slide template's own keydown listener never sees
+  // the keypress. While presenting, forward arrow/space/escape keys typed
+  // in the PARENT document straight into the iframe's navigate()/goToSlide()
+  // globals. Keydown events fired *inside* the iframe never bubble up to
+  // this listener (separate document), so there is no double-handling.
+  document.addEventListener('keydown', (e) => {
+    if (!document.fullscreenElement) return;
+    const win = frame.contentWindow;
+    if (!win) return;
+    if ((e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') && typeof win.navigate === 'function') {
+      e.preventDefault();
+      win.navigate(1);
+    } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowUp') && typeof win.navigate === 'function') {
+      e.preventDefault();
+      win.navigate(-1);
+    } else if (e.key === 'Home' && typeof win.goToSlide === 'function') {
+      win.goToSlide(0);
+    } else if (e.key === 'Escape') {
+      document.exitFullscreen && document.exitFullscreen();
+    }
   });
 
   // Export buttons
