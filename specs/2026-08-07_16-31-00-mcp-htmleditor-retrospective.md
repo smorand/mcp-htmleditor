@@ -165,6 +165,22 @@ Scénarios reconstruits à partir du contrat réellement implémenté (README, s
 - [EXC-007b] Port déjà occupé par un autre process → pas de comportement de repli documenté/testé (gap).
 **Cross-scenario notes:** Précondition de tous les autres scénarios côté agent.
 
+### SC-008: Présenter une slide en plein écran depuis le navigateur
+**Actor:** Utilisateur humain
+**Preconditions:** Fichier au format présentation (`data-doc-type="presentation"`) chargé et affiché dans le navigateur, au moins une slide active.
+**Flow:**
+1. L'utilisateur clique le bouton "Mode présentation plein écran" de la toolbar shell (`#present-btn`), ou appuie sur la touche `f`/`F` alors que le focus est dans le document de la slide.
+2. Le système met en plein écran natif (Fullscreen API) le **document interne de l'iframe** (pas l'élément `<iframe>` lui-même), pour que le CSS `:fullscreen` du template (masquage toolbar/flèches, slide 100vh sans padding, fond noir) s'applique dans le bon document.
+3. Le système bascule le focus clavier sur l'iframe pour que les raccourcis de navigation de la slide (flèches, espace, Home, End, Echap) fonctionnent.
+4. L'utilisateur navigue avec les flèches (←/→/↑/↓), la barre d'espace, `Home`/`End`, indépendamment de l'élément qui détient réellement le focus clavier côté navigateur.
+5. L'utilisateur quitte le plein écran avec `Echap` ou en ré-appuyant sur le bouton présentation.
+**Postconditions:** La slide occupe 100% de l'écran sans aucune barre d'interface visible; la navigation clavier fonctionne de bout en bout comme dans un vrai logiciel de présentation (PowerPoint/Keynote); la sortie du plein écran restaure l'affichage normal (toolbar, flèches, padding).
+**Exceptions:**
+- [EXC-008a] L'iframe de rendu est en `sandbox` sans le jeton `allow-fullscreen` → l'API Fullscreen refuse la requête sur le document interne; le système retombe sur la mise en plein écran de l'élément `<iframe>` côté document parent, ce qui **casse silencieusement** le contrat: le CSS `:fullscreen` du template ne s'applique plus (document différent), la toolbar/les flèches restent visibles et la slide garde sa taille/padding normaux. **Bug réel rencontré et corrigé** (voir DEC-011): le `sandbox` doit inclure explicitement `allow-fullscreen` (+ `allow="fullscreen"`/`allowfullscreen` pour compatibilité).
+- [EXC-008b] Le focus clavier ne bascule pas automatiquement dans l'iframe à l'entrée en plein écran (`requestFullscreen()` ne déplace pas le focus) → les touches flèches ne sont capturées par aucun gestionnaire et la présentation reste bloquée sur la première slide. **Bug réel rencontré et corrigé** (voir DEC-011): `frame.focus()` après l'obtention du plein écran, plus un relais de touches (`document` parent → `navigate()`/`goToSlide()` de l'iframe) tant que `document.fullscreenElement` est actif, quel que soit l'élément qui détient réellement le focus.
+- [EXC-008c] Aucune slide active au moment du passage en plein écran (deck vide) → comportement non spécifié, non testé (gap, voir TBD-009).
+**Cross-scenario notes:** Peut être déclenché à tout moment pendant SC-003 (édition navigateur); sortir du plein écran ne doit pas perdre la position de navigation (slide courante conservée).
+
 ## 6. Functional Requirements
 
 ### FR-001 [EARS-E]: Création de document depuis un template
@@ -368,6 +384,32 @@ Scénarios reconstruits à partir du contrat réellement implémenté (README, s
 - **Business Rules:** Zéro chevauchement de routage avec les skills d'export pptx/docx existantes (documenté dans `dynamic-skills/html-editor/SKILL.md`).
 - **Priority:** Should-have
 
+### FR-026 [EARS-E]: Mode présentation plein écran
+> WHEN l'utilisateur déclenche le mode présentation (bouton `#present-btn` ou touche `f`/`F`) THE système SHALL mettre en plein écran natif le **document interne de l'iframe** (`frame.contentDocument.documentElement`), et non l'élément `<iframe>` lui-même.
+
+- **Inputs:** Clic sur le bouton présentation, ou touche clavier `f`/`F`.
+- **Outputs:** Le document de la slide passe en plein écran (Fullscreen API); `document.fullscreenElement` côté parent répond avec l'élément `<iframe>` (propagation standard entre navigateur imbriqué), et `frame.contentDocument.fullscreenElement` côté interne répond avec `<html>`.
+- **Business Rules:** L'élément `<iframe id="content-frame">` DOIT déclarer `sandbox="... allow-fullscreen"` (+ `allow="fullscreen"`/`allowfullscreen`): sans ce jeton, l'API Fullscreen refuse la requête sur le document interne (comportement de navigateur standard pour un iframe sandboxé), et le fallback existant (plein écran de l'`<iframe>` côté parent) ne déclenche jamais le CSS `:fullscreen` du template puisqu'il vit dans un autre document.
+- **Priority:** Must-have
+- **Rationale:** Le CSS `:fullscreen .toolbar/.nav-arrow/.slide` qui masque la navigation et redimensionne la slide est écrit dans le `<style>` du template HTML lui-même (servi dans l'iframe), pas dans `editor.css` (document parent). Le pseudo-élément `:fullscreen` ne traverse jamais une frontière de document: il faut donc impérativement que ce soit le document interne qui passe effectivement en plein écran.
+
+### FR-027 [EARS-U]: Habillage visuel du mode plein écran
+> The système SHALL masquer, pendant le plein écran, la barre de navigation de la slide (sélecteur "Diapositive :", flèches précédent/suivant, compteur "N / TT") et redimensionner la slide active pour occuper 100% de la fenêtre sur fond noir, sans marge ni padding.
+
+- **Inputs:** État `:fullscreen` du document interne.
+- **Outputs:** Slide seule, plein écran, fond noir — comportement équivalent à PowerPoint/Keynote en mode présentation.
+- **Business Rules:** Règles CSS `:fullscreen .toolbar, :fullscreen .nav-arrow { display:none !important; }`, `:fullscreen .slide-frame { padding:0; }`, `:fullscreen .slide { width:100%; height:100vh; max-width:none; border:none; box-shadow:none; }`, `:fullscreen body { background:#000; }` — présentes dans les templates `ei` et `carbon` (bootstrap et référence). Un filet de sécurité côté document parent (`editor.css`, sélecteur `body:has(#content-frame:fullscreen) #toolbar`) masque également la toolbar shell si jamais le fallback (plein écran de l'`<iframe>`) devait se produire malgré FR-026.
+- **Priority:** Must-have
+
+### FR-028 [EARS-U]: Navigation clavier indépendante du focus pendant le plein écran
+> The système SHALL router les touches `ArrowRight`/`ArrowDown`/`Espace` (slide suivante), `ArrowLeft`/`ArrowUp` (slide précédente), `Home`/`End` (première/dernière slide) et `Echap` (quitter le plein écran) vers les fonctions de navigation de la slide (`navigate()`, `goToSlide()`) pendant tout le temps où `document.fullscreenElement` est actif, quel que soit l'élément DOM qui détient effectivement le focus clavier.
+
+- **Inputs:** Événements `keydown` capturés soit par le document interne de l'iframe (gestionnaire natif du template), soit par le document parent (`editor.js`) si le focus n'a pas basculé dans l'iframe.
+- **Outputs:** Changement de slide active, mise à jour du compteur et du dropdown; sortie du plein écran sur `Echap`.
+- **Business Rules:** `editor.js` appelle `frame.focus()` juste après l'obtention du plein écran (et à chaque `fullscreenchange`) pour tenter de placer le focus dans l'iframe; en complément, un gestionnaire `keydown` sur le document PARENT relaie directement les touches vers `frame.contentWindow.navigate()`/`goToSlide()` tant que `document.fullscreenElement` est renseigné. Les événements clavier ne traversant jamais une frontière de document (pas de bulles entre iframe et parent), les deux mécanismes ne peuvent pas se déclencher en double sur un même appui de touche.
+- **Priority:** Must-have
+- **Rationale:** `requestFullscreen()` ne déplace jamais automatiquement le focus clavier vers le document mis en plein écran (comportement standard, non garanti identique entre navigateurs); sans ce relais, le clic initial sur `#present-btn` laisse le focus sur ce bouton (document parent) et aucune touche flèche n'atteint jamais le gestionnaire de navigation du template.
+
 ## 7. Non-Functional Requirements
 
 ### 7.1 Performance
@@ -381,7 +423,7 @@ Scénarios reconstruits à partir du contrat réellement implémenté (README, s
 
 ### 7.3 Usability
 - Toolbar rich-text minimaliste (24px, sans boutons de navigation redondants — ajusté au commit 5).
-- Mode plein écran type PowerPoint pour la présentation des slides (ajouté commit 21-22).
+- Mode plein écran type PowerPoint pour la présentation des slides (ajouté commit 21-22, spécifié en FR-026 à FR-028 et SC-008; deux régressions réelles — toolbar visible en plein écran, navigation clavier inopérante — corrigées post-rétrospective, voir DEC-011).
 - Indicateur visuel d'état de sauvegarde (point orange "en cours" → vert "sauvegardé"), sans rechargement de l'iframe sur ses propres sauvegardes (anti-flicker, commit 18).
 - Pas d'exigence d'accessibilité (WCAG) documentée ni testée — gap.
 - Pas d'internationalisation logicielle: seule la langue du contenu (`lang="fr"`) est gérée pour l'export pandoc; l'UI éditeur elle-même n'est pas testée en anglais.
@@ -448,6 +490,7 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
 | SC-005 | FR-015, FR-016, FR-017, FR-018 | E2E-016 | E2E-017, E2E-018, E2E-019 | E2E-020 |
 | SC-006 | FR-001, FR-002, FR-011, FR-012 | E2E-021 | E2E-022 | — |
 | SC-007 | FR-009, FR-010, FR-024 | E2E-023 | E2E-024, E2E-025 | E2E-026 |
+| SC-008 | FR-026, FR-027, FR-028 | E2E-038 | E2E-039, E2E-040 | E2E-041 |
 | (transverse) | FR-019, FR-020 | E2E-027 | E2E-028, E2E-029 | E2E-030 |
 | (transverse) | FR-021 | E2E-031 | E2E-032 | E2E-033 |
 | (transverse) | FR-022, FR-023 | E2E-034 | E2E-035 | E2E-036 |
@@ -498,14 +541,18 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
 | E2E-035 | Existant (`test_tracing.py::test_exporter_reports_failure_on_unwritable_path`) | Failure | (transverse) | FR-022 | Medium |
 | E2E-036 | Nouveau (revue manuelle) | Edge | (transverse) | FR-023 | High |
 | E2E-037 | Existant (`test_skill_content.py::test_build_skill_content_includes_index_and_subdocs`) | Happy | (transverse) | FR-025 | Low |
+| E2E-038 | Nouveau (browser e2e) | Happy | SC-008 | FR-026, FR-027 | Critical |
+| E2E-039 | Nouveau (régression, bug réel corrigé) | Failure | SC-008 | FR-026 | Critical |
+| E2E-040 | Nouveau (régression, bug réel corrigé) | Failure | SC-008 | FR-028 | Critical |
+| E2E-041 | Nouveau (browser e2e) | Edge | SC-008 | FR-028 | Medium |
 
 **Coverage Statistics:**
-- Happy path: 11 tests
-- Failure/error: 13 tests
-- Edge cases: 13 tests
-- Happy:Failure ratio: 1:1.18 (failure ≥ happy, conforme à la règle)
+- Happy path: 12 tests
+- Failure/error: 15 tests
+- Edge cases: 14 tests
+- Happy:Failure ratio: 1:1.25 (failure ≥ happy, conforme à la règle)
 - Tests existants réutilisés: 30 (déjà présents dans `tests/*.py`)
-- Tests nouveaux à écrire: 7 (E2E-002, E2E-004 à E2E-006, E2E-009, E2E-011, E2E-014, E2E-023 à E2E-025, E2E-036) — principalement des tests d'intégration MCP stdio et navigateur, gap identifié dès la Phase 0 (aucun test de ce type n'existe aujourd'hui).
+- Tests nouveaux à écrire: 11 (E2E-002, E2E-004 à E2E-006, E2E-009, E2E-011, E2E-014, E2E-023 à E2E-025, E2E-036, E2E-038 à E2E-041) — intégration MCP stdio, navigateur, et plein écran (E2E-038 à E2E-041, aucun test automatisé n'existait pour ce mode alors que deux régressions réelles s'y sont produites, cf. DEC-011).
 
 ### 12.2 New Test Specifications (gaps à combler en priorité)
 
@@ -634,6 +681,62 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
 - **Cleanup:** Supprimer `secret.html`, `out.pptx`, purger la ligne de trace de test.
 - **Priority:** High
 
+#### E2E-038: Entrer en plein écran masque la navigation et remplit l'écran
+- **Category:** Core Journey
+- **Scenario:** SC-008
+- **Requirements:** FR-026, FR-027
+- **Preconditions:** Serveur HTTP servant un fichier `deck.html` (template `ei` ou `carbon`) avec 3 slides, ouvert dans un navigateur avec viewport `1600x900`.
+- **Steps:**
+  - Given la page est chargée, `document.fullscreenElement` est `null`, et le `.toolbar` interne est visible (`display` calculé ≠ `none`).
+  - When l'utilisateur clique `#present-btn`.
+  - Then `frame.contentDocument.fullscreenElement` (document interne de l'iframe) devient l'élément `<html>` (pas `null`).
+  - And le `.toolbar` et les `.nav-arrow` internes ont un `display` calculé égal à `none`.
+  - And la `.slide.active` a une hauteur calculée égale à `900px` (100vh du viewport) et un `background-color` de la page égal à `rgb(0, 0, 0)`.
+- **Cleanup:** `Escape` pour sortir du plein écran.
+- **Priority:** Critical
+
+#### E2E-039: Régression — iframe sandbox sans allow-fullscreen casse le masquage de la toolbar
+- **Category:** Error (régression, bug réel observé et corrigé, cf. DEC-011)
+- **Scenario:** SC-008
+- **Requirements:** FR-026
+- **Preconditions:** Variante de `editor.html` dont l'attribut `sandbox` de `#content-frame` NE contient PAS `allow-fullscreen` (reproduction du bug avant correctif).
+- **Steps:**
+  - Given cette variante est servie et chargée dans le navigateur.
+  - When l'utilisateur clique `#present-btn`.
+  - Then `frame.contentDocument.fullscreenElement` reste `null` (la requête sur le document interne est refusée).
+  - And `document.fullscreenElement` (document parent) devient l'élément `<iframe id="content-frame">` (fallback).
+  - And le `.toolbar` interne reste visible (`display` calculé ≠ `none`) — assertion qui doit **échouer** tant que le bug est reproduit, et confirme la régression si elle repasse au vert après une modification future de `editor.html`.
+- **Cleanup:** Aucun.
+- **Priority:** Critical
+
+#### E2E-040: Régression — navigation clavier inopérante si le focus reste hors iframe
+- **Category:** Error (régression, bug réel observé et corrigé, cf. DEC-011)
+- **Scenario:** SC-008
+- **Requirements:** FR-028
+- **Preconditions:** Serveur servant `deck.html` (3 slides), navigateur en plein écran via `#present-btn`, focus clavier volontairement forcé sur un élément du document PARENT (ex. `document.body.focus()` côté parent après l'entrée en plein écran, pour simuler un navigateur où le focus ne bascule jamais dans l'iframe).
+- **Steps:**
+  - Given le compteur interne `#progress-tag` affiche `"1 / 3"`.
+  - When la touche `ArrowRight` est envoyée au niveau du document PARENT (focus hors iframe).
+  - Then `#progress-tag` (document interne) affiche `"2 / 3"`.
+  - And une seconde touche `ArrowRight` fait passer l'affichage à `"3 / 3"`.
+  - And une touche `ArrowLeft` le fait revenir à `"2 / 3"`.
+- **Cleanup:** `Escape` pour sortir du plein écran.
+- **Priority:** Critical
+
+#### E2E-041: Sortie du plein écran conserve la slide courante
+- **Category:** Edge Case / State Transition
+- **Scenario:** SC-008
+- **Requirements:** FR-028
+- **Preconditions:** Serveur servant `deck.html` (3 slides), navigateur en plein écran, navigation jusqu'à la slide 3 via `ArrowRight` × 2.
+- **Steps:**
+  - Given `#progress-tag` affiche `"3 / 3"` en plein écran.
+  - When l'utilisateur appuie sur `Escape`.
+  - Then `document.fullscreenElement` (parent) et `frame.contentDocument.fullscreenElement` (interne) redeviennent tous deux `null`.
+  - And `#progress-tag` affiche toujours `"3 / 3"` (la position de navigation n'est pas réinitialisée à la sortie).
+  - And le `.toolbar` et les `.nav-arrow` internes redeviennent visibles (`display` calculé ≠ `none`).
+- **Cleanup:** Aucun.
+- **Priority:** Medium
+
 ## 15. Open Questions & TBDs
 
 - **TBD-001**: Comportement exact si `mcp-htmleditor new` cible un fichier déjà existant (écrasement silencieux observé dans le code, jamais explicitement testé ni documenté comme voulu).
@@ -644,6 +747,8 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
 - **TBD-006**: Pas de garde-fou serveur empêchant une écriture concurrente humain/LLM pendant `update_in_progress=true` — uniquement une convention documentaire ("ne jamais écraser sans demander").
 - **TBD-007**: Pas de stratégie de reprise si le process serveur meurt alors que `server_pid` reste persisté (état orphelin potentiel dans `.mcp_state.json`).
 - **TBD-008**: `HTMLEDITOR_HOST=0.0.0.0` par défaut en conteneur Docker sans authentification — à valider si le service est un jour exposé au-delà de `localhost`.
+- **TBD-009**: Comportement du mode plein écran (SC-008) si aucune slide n'est active au moment du basculement (deck vide ou HTML malformé) — non spécifié, non testé (EXC-008c).
+- **TBD-010**: E2E-038 à E2E-041 (mode plein écran) ne sont pas encore implémentés comme tests automatisés dans `tests/` — validés manuellement en Playwright ad hoc et par confirmation visuelle utilisateur au moment de la correction (DEC-011), mais aucun test pérenne n'existe encore dans la suite versionnée.
 
 ## 16. Glossary
 
@@ -668,6 +773,7 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
 | **Annotated image** | Image avec callouts positionnés en % relatif à l'image. | Section 3 |
 | **EditorState** | Singleton en mémoire + fichier `.mcp_state.json`, source de vérité de l'état serveur courant. | Sections 6, 8 |
 | **Settings** | Instance pydantic-settings mémoïsée, unique point de lecture de la configuration `HTMLEDITOR_*`. | Sections 6, 7, 8 |
+| **Plein écran (mode présentation)** | État Fullscreen API du document interne de l'iframe, déclenché via `#present-btn` ou la touche `f`; masque la navigation et remplit l'écran comme PowerPoint/Keynote. Requiert `allow-fullscreen` sur le `sandbox` de l'iframe et un relais de focus/touches côté document parent (voir DEC-011). | Sections 5 (SC-008), 6 (FR-026–028), 12 |
 
 ## 17. Interview Decisions Log
 
@@ -683,3 +789,4 @@ Aucune interview live n'a eu lieu (document rétrospectif). Les décisions ci-de
 - **DEC-008:** Règle produit "modification humaine trouvée = volontaire, jamais écrasée sans le demander" plutôt qu'un mécanisme de verrouillage ou de merge automatique. **Rationale:** simplicité, respecte l'autonomie de l'éditeur humain; documenté dans le tout dernier commit (`docs: une modification humaine trouvée dans le fichier est volontaire`, 2026-08-09 21:08). **Alternatives considérées:** verrouillage exclusif serveur, merge automatique de diffs HTML (aucun implémenté, jugés disproportionnés pour l'usage mono-utilisateur). **Round:** 2c (scénarios d'échec/conflit).
 - **DEC-009:** Pas de CI centralisée; `make check` local + hooks pre-commit comme seule porte de qualité. **Rationale:** projet personnel solo, pas de collaborateur à bloquer à l'entrée d'un repo distant; le coût d'une CI n'est pas justifié à ce stade. **Alternatives considérées:** GitHub Actions (non mis en place). **Round:** 4 (NFR déploiement).
 - **DEC-010:** Configuration strictement centralisée dans `Settings` (pydantic-settings), interdiction documentée de lire `os.environ` ailleurs. **Rationale:** testabilité (mémoïzation par signature d'env, fixtures `reset_settings`), un seul point de vérité pour tous les chemins XDG. **Alternatives considérées:** lecture directe de variables d'environnement au point d'usage (rejetée par convention explicite dans AGENTS.md). **Round:** 4 (NFR sécurité/config).
+- **DEC-011:** Fix post-rétrospectif du mode plein écran (SC-008, FR-026 à FR-028), trouvé lors d'une relecture manuelle par l'utilisateur ("je m'attends à ça... comme un vrai powerpoint") et non couvert initialement par cette spécification. Deux bugs réels composés: (1) l'iframe `#content-frame` était `sandbox` sans `allow-fullscreen`, donc `requestFullscreen()` sur le document interne (où vit le CSS `:fullscreen` du template) était refusé par spécification navigateur, et le code retombait sur le plein écran de l'`<iframe>` côté document PARENT, où ce CSS ne s'applique jamais (mauvais document); (2) même une fois le bon document ciblé, `requestFullscreen()` ne déplace jamais le focus clavier, donc le gestionnaire `keydown` natif du template (flèches) ne recevait aucun événement puisque le focus restait sur le bouton `#present-btn` du document parent. **Fix:** ajout de `allow-fullscreen` au `sandbox` (+ `allow="fullscreen"`/`allowfullscreen`), `frame.focus()` après obtention du plein écran, et un relais de touches côté document parent vers `navigate()`/`goToSlide()` de l'iframe tant que `document.fullscreenElement` est actif. **Alternatives considérées:** réécrire la navigation entièrement côté document parent (rejeté, dupliquerait la logique déjà présente dans chaque template au lieu de la réutiliser via `contentWindow`). **Validation:** test Playwright scriptable (`1/3 → 2/3 → 3/3 → 2/3`) puis confirmation visuelle directe de l'utilisateur en navigateur réel. **Leçon:** cette fonctionnalité était mentionnée au Scope (3.1) et en NFR Usability (7.3) mais n'avait ni scénario (SC-XXX) ni FR ni test E2E dédiés dans la version initiale de cette spécification — corrigé ici via SC-008/FR-026–028/E2E-038–041. **Round:** rétrospectif, post-publication (hors interview initiale).
