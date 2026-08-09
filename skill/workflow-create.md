@@ -301,3 +301,41 @@ feat: ajout schéma architecture microservices slide 4
 | Export DOCX optimal | médiocre | oui |
 | Scrolling continu | non | oui |
 | Template de référence | ibm-carbon.html | report-standard.html |
+
+---
+
+## Validation visuelle obligatoire
+
+**Après chaque modification substantielle, valider le rendu dans le navigateur.**
+Ne pas considérer une slide ou un document comme terminé sans avoir vérifié
+visuellement. Utiliser `agent-browser` (ou Playwright) pour ouvrir
+`http://localhost:7842` et inspecter le rendu réel.
+
+### Ce qu'il faut vérifier
+
+| Problème fréquent | Symptôme à détecter |
+|---|---|
+| Contenu qui déborde | Texte coupé, scroll inattendu dans une slide, body qui dépasse le cadre |
+| Fontes trop grandes | Le texte remplit plus de la moitié de la zone corps, l'eyebrow ou le titre écrase tout |
+| Fontes trop petites | Le contenu est illisible, les cellules de tableau sont minuscules |
+| Artefacts du template | Placeholder "Contenu de la slide…", textes "Titre de la présentation" non remplacés, slide-eyebrow "Section · Slide 01 / 01" inchangé |
+| Alignement cassé | Flèches d'un schéma d'architecture décalées, barres de Gantt qui ne correspondent pas aux colonnes, tuiles de largeur inégale |
+| Slide trop dense | Plus de 3 niveaux de contenu imbriqués, grille 4 colonnes sur slide compacte |
+| Document mal structuré | H1 utilisé comme titre de section alors qu'un H2 suffirait, liste sans contexte |
+
+### Procédure avec agent-browser
+
+```
+1. start_server(file="mon-fichier.html")  # si pas encore démarré
+2. Ouvrir http://localhost:7842 avec agent-browser / Playwright
+3. Naviguer sur chaque slide (touches → ou boutons prev/next)
+4. Capturer un screenshot de chaque slide problématique
+5. Corriger dans le HTML, update_start / écrire / update_end
+6. Revalider la slide corrigée
+```
+
+> Ne pas se fier au HTML seul: les hauteurs de slide, les tailles de fonte
+> relatives et les positions CSS ne sont visibles qu'une fois rendu dans le
+> navigateur. Un agent qui écrit du HTML sans valider produit régulièrement
+> des slides dont la moitié du contenu est hors cadre ou des schémas avec
+> des connecteurs décalés.

@@ -1,5 +1,28 @@
 # Workflow: exporter en PPTX ou DOCX
 
+## Deux voies d'export
+
+### Via le navigateur (recommandé)
+
+Quand l'éditeur est ouvert (`mcp-htmleditor serve` ou `start_server`), la toolbar
+affiche un bouton **PPTX** (orange) ou **DOCX** (bleu) selon le type de document.
+Cliquer déclenche le téléchargement directement — aucun agent, aucune CLI.
+
+> **Prérequis**: le navigateur doit être ouvert sur l'éditeur.
+> Utiliser `agent-browser` si l'utilisateur demande un export sans avoir
+> le navigateur sous la main: l'agent ouvre l'éditeur, clique le bouton,
+> récupère le fichier téléchargé.
+
+### Via la CLI (sans navigateur)
+
+```bash
+# Export PPTX
+mcp-htmleditor export pptx input.html output.pptx
+
+# Export DOCX
+mcp-htmleditor export docx input.html output.docx
+```
+
 ## Choisir le format
 
 | Critère | PPTX | DOCX |
@@ -11,16 +34,6 @@
 | Gantt, schémas archi | formes natives éditables | perte de structure |
 
 **Règle**: `data-doc-type="presentation"` → exporter en PPTX. `data-doc-type="document"` → exporter en DOCX.
-
-## Commande CLI
-
-```bash
-# Export PPTX
-mcp-htmleditor export pptx input.html output.pptx
-
-# Export DOCX
-mcp-htmleditor export docx input.html output.docx
-```
 
 ## Ce que fait l'export PPTX
 

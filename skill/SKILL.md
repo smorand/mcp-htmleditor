@@ -87,6 +87,7 @@ paragraphe, tableau, liste). Règles détaillées: `skill/types/slides.md` et
 4. **Toujours reconstruire le HTML complet** (DOCTYPE + head + body) quand on écrit dans le fichier.
 5. **Les chemins d'images doivent être relatifs au fichier HTML** ou en base64 pour la portabilité.
 6. **Ne jamais démarrer un second serveur** si `get_status` indique déjà `running: true` sur le bon port.
+7. **Valider le rendu visuellement** après chaque modification substantielle: utiliser `agent-browser` ou Playwright sur `http://localhost:7842`. Vérifier débordements, fontes, alignements, artefacts du template non remplacés. Voir `skill/workflow-create.md` § Validation visuelle.
 
 ---
 
