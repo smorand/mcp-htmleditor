@@ -694,19 +694,21 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
   - And la `.slide.active` a une hauteur calculée égale à `900px` (100vh du viewport) et un `background-color` de la page égal à `rgb(0, 0, 0)`.
 - **Cleanup:** `Escape` pour sortir du plein écran.
 - **Priority:** Critical
+- **Implémenté dans:** `tests/test_fullscreen_e2e.py::test_fullscreen_hides_toolbar_and_fills_the_screen`.
 
-#### E2E-039: Régression — iframe sandbox sans allow-fullscreen casse le masquage de la toolbar
+#### E2E-039: Régression — filet de sécurité parent si le plein écran interne est indisponible
 - **Category:** Error (régression, bug réel observé et corrigé, cf. DEC-011)
 - **Scenario:** SC-008
-- **Requirements:** FR-026
-- **Preconditions:** Variante de `editor.html` dont l'attribut `sandbox` de `#content-frame` NE contient PAS `allow-fullscreen` (reproduction du bug avant correctif).
+- **Requirements:** FR-026, FR-027
+- **Implémentation réelle (ajustée après implémentation):** Chromium headless piloté par Playwright/CDP ne fait pas respecter de manière fiable la restriction `sandbox` sans `allow-fullscreen` comme le ferait un vrai navigateur interactif (vérifié empiriquement: reproduire le `sandbox` cassé dans un test automatisé laisse quand même `requestFullscreen()` réussir sur le document interne). Le test ne peut donc pas forcer honnêtement le mécanisme exact de refus côté sandbox de bout en bout en automatisé. Il teste à la place la partie déterministe et réellement garantissable du contrat: le filet de sécurité CSS côté document parent (`editor.css`, `body:has(#content-frame:fullscreen) #toolbar`) qui doit masquer la toolbar shell si jamais le chemin de repli (plein écran de l'`<iframe>` elle-même) est pris, quelle qu'en soit la raison.
+- **Preconditions:** Deck EI à 3 slides servi normalement.
 - **Steps:**
-  - Given cette variante est servie et chargée dans le navigateur.
-  - When l'utilisateur clique `#present-btn`.
-  - Then `frame.contentDocument.fullscreenElement` reste `null` (la requête sur le document interne est refusée).
-  - And `document.fullscreenElement` (document parent) devient l'élément `<iframe id="content-frame">` (fallback).
-  - And le `.toolbar` interne reste visible (`display` calculé ≠ `none`) — assertion qui doit **échouer** tant que le bug est reproduit, et confirme la régression si elle repasse au vert après une modification future de `editor.html`.
+  - Given `#toolbar` (document parent) est visible.
+  - When le test appelle directement `document.getElementById('content-frame').requestFullscreen()` (simulation du chemin de repli d'`editor.js`, sans passer par le bouton).
+  - Then `document.fullscreenElement.id === 'content-frame'`.
+  - And `#toolbar` a un `display` calculé égal à `none`.
 - **Cleanup:** Aucun.
+- **Implémenté dans:** `tests/test_fullscreen_e2e.py::test_fallback_shell_hides_toolbar_if_inner_fullscreen_is_unavailable`.
 - **Priority:** Critical
 
 #### E2E-040: Régression — navigation clavier inopérante si le focus reste hors iframe
@@ -722,6 +724,7 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
   - And une touche `ArrowLeft` le fait revenir à `"2 / 3"`.
 - **Cleanup:** `Escape` pour sortir du plein écran.
 - **Priority:** Critical
+- **Implémenté dans:** `tests/test_fullscreen_e2e.py::test_navigation_keys_work_even_if_focus_never_reaches_the_iframe`.
 
 #### E2E-041: Sortie du plein écran conserve la slide courante
 - **Category:** Edge Case / State Transition
@@ -736,6 +739,7 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
   - And le `.toolbar` et les `.nav-arrow` internes redeviennent visibles (`display` calculé ≠ `none`).
 - **Cleanup:** Aucun.
 - **Priority:** Medium
+- **Implémenté dans:** `tests/test_fullscreen_e2e.py::test_exiting_fullscreen_keeps_the_current_slide_and_restores_the_ui`.
 
 ## 15. Open Questions & TBDs
 
@@ -748,7 +752,7 @@ La skill complète (`skill/SKILL.md` + `workflow-*.md` + `types/*.md`) fait offi
 - **TBD-007**: Pas de stratégie de reprise si le process serveur meurt alors que `server_pid` reste persisté (état orphelin potentiel dans `.mcp_state.json`).
 - **TBD-008**: `HTMLEDITOR_HOST=0.0.0.0` par défaut en conteneur Docker sans authentification — à valider si le service est un jour exposé au-delà de `localhost`.
 - **TBD-009**: Comportement du mode plein écran (SC-008) si aucune slide n'est active au moment du basculement (deck vide ou HTML malformé) — non spécifié, non testé (EXC-008c).
-- **TBD-010**: E2E-038 à E2E-041 (mode plein écran) ne sont pas encore implémentés comme tests automatisés dans `tests/` — validés manuellement en Playwright ad hoc et par confirmation visuelle utilisateur au moment de la correction (DEC-011), mais aucun test pérenne n'existe encore dans la suite versionnée.
+- **TBD-010** (résolu): E2E-038 à E2E-041 sont implémentés dans `tests/test_fullscreen_e2e.py` (pytest-playwright, Chromium headless via `make sync` / `uv run playwright install chromium`), et tournent dans `make test`/`make check`. Limite documentée dans le test lui-même et dans `.agent_docs/testing.md`: Chromium headless piloté par Playwright/CDP ne fait pas respecter de manière fiable la restriction `sandbox` sans `allow-fullscreen` comme un vrai navigateur interactif, donc E2E-039 teste le filet de sécurité côté parent plutôt que le mécanisme exact de refus du sandbox.
 
 ## 16. Glossary
 
@@ -789,4 +793,4 @@ Aucune interview live n'a eu lieu (document rétrospectif). Les décisions ci-de
 - **DEC-008:** Règle produit "modification humaine trouvée = volontaire, jamais écrasée sans le demander" plutôt qu'un mécanisme de verrouillage ou de merge automatique. **Rationale:** simplicité, respecte l'autonomie de l'éditeur humain; documenté dans le tout dernier commit (`docs: une modification humaine trouvée dans le fichier est volontaire`, 2026-08-09 21:08). **Alternatives considérées:** verrouillage exclusif serveur, merge automatique de diffs HTML (aucun implémenté, jugés disproportionnés pour l'usage mono-utilisateur). **Round:** 2c (scénarios d'échec/conflit).
 - **DEC-009:** Pas de CI centralisée; `make check` local + hooks pre-commit comme seule porte de qualité. **Rationale:** projet personnel solo, pas de collaborateur à bloquer à l'entrée d'un repo distant; le coût d'une CI n'est pas justifié à ce stade. **Alternatives considérées:** GitHub Actions (non mis en place). **Round:** 4 (NFR déploiement).
 - **DEC-010:** Configuration strictement centralisée dans `Settings` (pydantic-settings), interdiction documentée de lire `os.environ` ailleurs. **Rationale:** testabilité (mémoïzation par signature d'env, fixtures `reset_settings`), un seul point de vérité pour tous les chemins XDG. **Alternatives considérées:** lecture directe de variables d'environnement au point d'usage (rejetée par convention explicite dans AGENTS.md). **Round:** 4 (NFR sécurité/config).
-- **DEC-011:** Fix post-rétrospectif du mode plein écran (SC-008, FR-026 à FR-028), trouvé lors d'une relecture manuelle par l'utilisateur ("je m'attends à ça... comme un vrai powerpoint") et non couvert initialement par cette spécification. Deux bugs réels composés: (1) l'iframe `#content-frame` était `sandbox` sans `allow-fullscreen`, donc `requestFullscreen()` sur le document interne (où vit le CSS `:fullscreen` du template) était refusé par spécification navigateur, et le code retombait sur le plein écran de l'`<iframe>` côté document PARENT, où ce CSS ne s'applique jamais (mauvais document); (2) même une fois le bon document ciblé, `requestFullscreen()` ne déplace jamais le focus clavier, donc le gestionnaire `keydown` natif du template (flèches) ne recevait aucun événement puisque le focus restait sur le bouton `#present-btn` du document parent. **Fix:** ajout de `allow-fullscreen` au `sandbox` (+ `allow="fullscreen"`/`allowfullscreen`), `frame.focus()` après obtention du plein écran, et un relais de touches côté document parent vers `navigate()`/`goToSlide()` de l'iframe tant que `document.fullscreenElement` est actif. **Alternatives considérées:** réécrire la navigation entièrement côté document parent (rejeté, dupliquerait la logique déjà présente dans chaque template au lieu de la réutiliser via `contentWindow`). **Validation:** test Playwright scriptable (`1/3 → 2/3 → 3/3 → 2/3`) puis confirmation visuelle directe de l'utilisateur en navigateur réel. **Leçon:** cette fonctionnalité était mentionnée au Scope (3.1) et en NFR Usability (7.3) mais n'avait ni scénario (SC-XXX) ni FR ni test E2E dédiés dans la version initiale de cette spécification — corrigé ici via SC-008/FR-026–028/E2E-038–041. **Round:** rétrospectif, post-publication (hors interview initiale).
+- **DEC-011:** Fix post-rétrospectif du mode plein écran (SC-008, FR-026 à FR-028), trouvé lors d'une relecture manuelle par l'utilisateur ("je m'attends à ça... comme un vrai powerpoint") et non couvert initialement par cette spécification. Deux bugs réels composés: (1) l'iframe `#content-frame` était `sandbox` sans `allow-fullscreen`, donc `requestFullscreen()` sur le document interne (où vit le CSS `:fullscreen` du template) était refusé par spécification navigateur, et le code retombait sur le plein écran de l'`<iframe>` côté document PARENT, où ce CSS ne s'applique jamais (mauvais document); (2) même une fois le bon document ciblé, `requestFullscreen()` ne déplace jamais le focus clavier, donc le gestionnaire `keydown` natif du template (flèches) ne recevait aucun événement puisque le focus restait sur le bouton `#present-btn` du document parent. **Fix:** ajout de `allow-fullscreen` au `sandbox` (+ `allow="fullscreen"`/`allowfullscreen`), `frame.focus()` après obtention du plein écran, et un relais de touches côté document parent vers `navigate()`/`goToSlide()` de l'iframe tant que `document.fullscreenElement` est actif. **Alternatives considérées:** réécrire la navigation entièrement côté document parent (rejeté, dupliquerait la logique déjà présente dans chaque template au lieu de la réutiliser via `contentWindow`). **Validation:** test Playwright scriptable (`1/3 → 2/3 → 3/3 → 2/3`) puis confirmation visuelle directe de l'utilisateur en navigateur réel, puis (à la demande explicite de l'utilisateur, "toujours via make pour tout") pérennisé en 4 tests automatisés dans `tests/test_fullscreen_e2e.py` (pytest-playwright), câblés dans `make sync`/`make test`/`make check`. Au passage, deux dettes de lint préexistantes et sans rapport (`src/mcp_htmleditor/http_server.py`: imports paresseux non ignorés, ligne trop longue, `# noqa` mort) bloquaient `make check` depuis le commit `b63cb6a`; corrigées pour que la porte de qualité fonctionne à nouveau de bout en bout. **Leçon:** cette fonctionnalité était mentionnée au Scope (3.1) et en NFR Usability (7.3) mais n'avait ni scénario (SC-XXX) ni FR ni test E2E dédiés dans la version initiale de cette spécification — corrigé ici via SC-008/FR-026–028/E2E-038–041. **Round:** rétrospectif, post-publication (hors interview initiale).

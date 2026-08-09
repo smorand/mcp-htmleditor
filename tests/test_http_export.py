@@ -11,6 +11,7 @@ from mcp_htmleditor import state as state_module
 def test_export_routes_registered() -> None:
     """GET dispatch table includes /export/pptx and /export/docx."""
     import inspect
+
     from mcp_htmleditor import http_server
 
     src = inspect.getsource(http_server)
@@ -20,12 +21,9 @@ def test_export_routes_registered() -> None:
     assert "_export_docx" in src
 
 
-def test_export_pptx_uses_to_pptx_and_streams(
-    fresh_state: state_module.EditorState, html_file: Path
-) -> None:
+def test_export_pptx_uses_to_pptx_and_streams(fresh_state: state_module.EditorState, html_file: Path) -> None:
     """_export_pptx writes to a tmp file via to_pptx then reads it back."""
     import tempfile
-    from mcp_htmleditor import http_server
 
     fresh_state.set_file(str(html_file))
     fake_bytes = b"PK\x03\x04fake-pptx"
@@ -52,9 +50,7 @@ def test_export_pptx_uses_to_pptx_and_streams(
     assert captured["src"] == str(html_file)
 
 
-def test_export_docx_uses_to_docx_and_streams(
-    fresh_state: state_module.EditorState, html_file: Path
-) -> None:
+def test_export_docx_uses_to_docx_and_streams(fresh_state: state_module.EditorState, html_file: Path) -> None:
     """_export_docx writes to a tmp file via to_docx then reads it back."""
     import tempfile
 

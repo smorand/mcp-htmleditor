@@ -32,6 +32,7 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=5.0",
+    "pytest-playwright>=0.6",
     "bandit>=1.7",
     "pre-commit>=4.0",
     "types-beautifulsoup4",
@@ -94,7 +95,9 @@ ignore = [
 "src/mcp_htmleditor/cli.py" = ["PLC0415"]
 # Module level server singleton: http.server owns the thread, not the caller.
 # The artifact stripper walks a fixed list of artifact kinds, one branch each.
-"src/mcp_htmleditor/http_server.py" = ["PLW0603", "PLR0912"]
+# Export routes lazily import to_pptx/to_docx (python-pptx, pandoc) so `mcp-
+# htmleditor serve` starts fast even when nothing is ever exported.
+"src/mcp_htmleditor/http_server.py" = ["PLW0603", "PLR0912", "PLC0415"]
 # One renderer per HTML component: the dispatch is intentionally wide and flat,
 # renderers share a uniform signature, and the geometry thresholds (inches on the
 # 13.333 x 7.5 in canvas) are far more readable inline than behind a constant.

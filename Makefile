@@ -41,11 +41,13 @@ PI_SKILLS_DIR ?= $(HOME)/.pi/agent/dynamic-skills/html-editor
 # DEPENDENCY MANAGEMENT
 # ============================================================================
 
-## sync: Install/update project dependencies using uv
+## sync: Install/update project dependencies using uv (+ Playwright Chromium for E2E tests)
 sync:
 ifeq ($(HAS_UV),yes)
 	@echo "Syncing dependencies with uv..."
 	@uv sync
+	@echo "Installing Playwright Chromium (fullscreen E2E tests, no-op if already cached)..."
+	@uv run playwright install chromium
 	@echo "Dependencies synced!"
 else
 	@echo "Error: uv not found. Install it from https://docs.astral.sh/uv/"

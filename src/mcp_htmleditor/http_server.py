@@ -204,13 +204,16 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
                 to_pptx(str(src), tmp_path)
             data = Path(tmp_path).read_bytes()
             self.send_response(200)
-            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+            self.send_header(
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            )
             self.send_header("Content-Disposition", f'attachment; filename="{stem}.pptx"')
             self.send_header("Content-Length", str(len(data)))
             self._send_cors_headers()
             self.end_headers()
             self.wfile.write(data)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("PPTX export failed: %s", exc)
             self._send_json({"error": str(exc)}, status=500)
         finally:
@@ -239,7 +242,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._send_cors_headers()
             self.end_headers()
             self.wfile.write(data)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("DOCX export failed: %s", exc)
             self._send_json({"error": str(exc)}, status=500)
         finally:

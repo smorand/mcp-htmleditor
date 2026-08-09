@@ -6,6 +6,9 @@ make test ARGS='-k pptx'  # subset
 make test-cov             # coverage, gate 80 %
 ```
 
+`make sync` also runs `playwright install chromium` (no-op if already cached) so the
+browser E2E tests below can run without a manual step.
+
 `pythonpath = ["src"]` makes the suite read the working tree. Without it a previously
 installed non editable copy shadows `src/` and the suite silently measures old code.
 
@@ -26,6 +29,31 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_skill_content.py` | `mcp-htmleditor skill` assembly |
 | `test_export_pptx.py` | Slide detection on all templates, no `<script>` or shell text in the output, base64 and relative images, table spans and column widths, Gantt geometry, arch node shapes, annotation placement, geometry and style helpers |
 | `test_export_docx.py` | HTML preprocessing (single title), charter detection, `word/styles.xml` patching, header and footer parts, cache and fallbacks, end to end pandoc exports guarded by `skipif` when pandoc is absent |
+| `test_fullscreen_e2e.py` | SC-008 / FR-026-028 (see retrospective spec): fullscreen presentation mode via a real `ThreadingHTTPServer` + real headless Chromium (`pytest-playwright`). Toolbar/nav-arrow hiding, slide filling the screen, keyboard navigation independent of focus, the parent-side fallback CSS safety net, and exit-preserves-position. Guarded by `skipif` when Chromium is not installed |
+
+### Browser E2E (`test_fullscreen_e2e.py`)
+
+Uses `pytest-playwright`'s `page` fixture (headless by default) against a real
+`start_http_server()`/`stop_http_server()` instance on a free port, serving a 3-slide
+deck built from the real `templates/bootstrap/slides-ei-empty.html` (never the
+`~/.config` installed copy: the fixture forces `HTMLEDITOR_TEMPLATES_DIR`). Reaches into
+the content iframe's own document via `document.getElementById('content-frame').
+contentDocument` since the slide template's `:fullscreen` CSS and `navigate()`/
+`goToSlide()` globals live there, not in the parent shell.
+
+One known Playwright/CDP limitation: headless Chromium under automation does not
+reliably enforce a `sandbox` iframe missing `allow-fullscreen` the way a real,
+interactively-driven browser does (verified empirically), so the exact permission
+denial that caused the original bug cannot be forced end to end in this suite. The test
+instead exercises the deterministic part of the contract: the parent-side CSS safety net
+(`body:has(#content-frame:fullscreen) #toolbar` in `editor.css`) that must hide the shell
+toolbar if the fallback (fullscreening the `<iframe>` element itself) is ever taken, for
+whatever reason.
+
+This differs from `tools/check_ei_insert.py`, which stays a manual, screenshot-based
+visual check (its own docstring explains why it is not a unit test): the fullscreen
+contract is fully assertable (computed styles, `fullscreenElement`, counters), so it
+belongs in the automated suite and in `make check` instead.
 
 `trace.set_tracer_provider()` accepts one call per process, so `test_tracing.py` shares a
 single session scoped configuration for the tests that need the global tracer and uses a
