@@ -83,13 +83,21 @@ const docActions   = document.getElementById('toolbar-doc-actions');
     updateDocActionsVisibility();
   });
 
-  // Present button: fullscreen the iframe (only visible for presentations)
+  // Present button: fullscreen the inner document (not the iframe element)
+  // so keyboard events stay inside the iframe's own document.
   presentBtn.addEventListener('click', () => {
-    frame.requestFullscreen
-      ? frame.requestFullscreen()
-      : frame.webkitRequestFullscreen && frame.webkitRequestFullscreen();
+    try {
+      const inner = frame.contentDocument && frame.contentDocument.documentElement;
+      if (inner && inner.requestFullscreen) inner.requestFullscreen();
+      else if (inner && inner.webkitRequestFullscreen) inner.webkitRequestFullscreen();
+    } catch (e) {
+      // fallback: fullscreen the iframe element itself
+      frame.requestFullscreen
+        ? frame.requestFullscreen()
+        : frame.webkitRequestFullscreen && frame.webkitRequestFullscreen();
+    }
   });
-  frame.addEventListener('fullscreenchange', () => {
+  document.addEventListener('fullscreenchange', () => {
     presentBtn.title = document.fullscreenElement
       ? 'Quitter la présentation (ESC)'
       : 'Mode présentation plein écran';
