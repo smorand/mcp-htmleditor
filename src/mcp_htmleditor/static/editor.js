@@ -57,6 +57,8 @@ function markSaved() {
 }
 const editBtn      = document.getElementById('edit-mode-btn');
 const presentBtn   = document.getElementById('present-btn');
+const exportPptxBtn = document.getElementById('export-pptx-btn');
+const exportDocxBtn = document.getElementById('export-docx-btn');
 const slideActions = document.getElementById('toolbar-slide-actions');
 const docActions   = document.getElementById('toolbar-doc-actions');
 
@@ -102,6 +104,10 @@ const docActions   = document.getElementById('toolbar-doc-actions');
       ? 'Quitter la présentation (ESC)'
       : 'Mode présentation plein écran';
   });
+
+  // Export buttons
+  exportPptxBtn.addEventListener('click', () => triggerExport('pptx'));
+  exportDocxBtn.addEventListener('click', () => triggerExport('docx'));
 
   // Slide action buttons
   document.getElementById('btn-insert-before').addEventListener('click', () => openSlidePicker('before'));
@@ -150,8 +156,10 @@ function onFrameLoad() {
    Slide actions visibility (presentation + edit mode only)
    ============================================================ */
 function updateSlideActionsVisibility() {
-  slideActions.style.display = (isPresentation && editMode) ? 'inline-flex' : 'none';
-  presentBtn.style.display   = isPresentation ? 'inline-flex' : 'none';
+  slideActions.style.display   = (isPresentation && editMode) ? 'inline-flex' : 'none';
+  presentBtn.style.display     = isPresentation ? 'inline-flex' : 'none';
+  exportPptxBtn.style.display  = isPresentation ? 'inline-flex' : 'none';
+  exportDocxBtn.style.display  = 'none'; // PPTX only for presentations
 }
 
 /* ============================================================
@@ -161,11 +169,40 @@ function updateDocActionsVisibility() {
   if (docActions) {
     docActions.style.display = (isDocument && editMode) ? 'inline-flex' : 'none';
   }
+  exportDocxBtn.style.display  = isDocument ? 'inline-flex' : 'none';
+  exportPptxBtn.style.display  = isDocument ? 'none' : exportPptxBtn.style.display;
 }
 
 /* ============================================================
-   Polling
+   Export (PPTX / DOCX)
    ============================================================ */
+
+/**
+ * Trigger a file download from /export/{format}.
+ * Uses a temporary <a> so the browser saves the file without navigation.
+ */
+function triggerExport(format) {
+  const btn = format === 'pptx' ? exportPptxBtn : exportDocxBtn;
+  const label = btn.textContent.trim();
+  btn.disabled = true;
+  btn.textContent = '...';
+  fetch('/export/' + format)
+    .then(r => {
+      if (!r.ok) return r.json().then(j => { throw new Error(j.error || r.statusText); });
+      return r.blob();
+    })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const filename = (document.getElementById('toolbar-filename').textContent || 'export').replace(/\.html?$/, '') + '.' + format;
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    })
+    .catch(err => alert('Export ' + format.toUpperCase() + ' échoué : ' + err.message))
+    .finally(() => { btn.disabled = false; btn.textContent = label; });
+}
 async function pollStatus() {
   let status;
   try { status = await fetch('/status').then(r => r.json()); }

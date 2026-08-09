@@ -2,7 +2,8 @@
 
 Serves the editor shell and proxies HTML content reads/writes to the current
 file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
-``/content-frame``, ``/status`` (polling) and ``/health`` (status + version).
+``/content-frame``, ``/status`` (polling), ``/health`` (status + version),
+``/export/pptx`` and ``/export/docx``.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -111,6 +113,10 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._serve_status()
         elif path == "/health":
             self._send_json(health_payload())
+        elif path == "/export/pptx":
+            self._export_pptx()
+        elif path == "/export/docx":
+            self._export_docx()
         else:
             self._not_found()
 
@@ -180,6 +186,64 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._send_json({"error": str(exc)}, status=500)
             return
         self._send_bytes(html.encode("utf-8"), "text/html")
+
+    def _export_pptx(self) -> None:
+        """Generate a PPTX from the current file and return it as a download."""
+        from .export.to_pptx import to_pptx
+
+        state = get_state()
+        if not state.current_file:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return
+        src = Path(state.current_file)
+        stem = src.stem
+        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            with trace_span("export.pptx", {"file.path": str(src)}):
+                to_pptx(str(src), tmp_path)
+            data = Path(tmp_path).read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+            self.send_header("Content-Disposition", f'attachment; filename="{stem}.pptx"')
+            self.send_header("Content-Length", str(len(data)))
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("PPTX export failed: %s", exc)
+            self._send_json({"error": str(exc)}, status=500)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    def _export_docx(self) -> None:
+        """Generate a DOCX from the current file and return it as a download."""
+        from .export.to_docx import to_docx
+
+        state = get_state()
+        if not state.current_file:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return
+        src = Path(state.current_file)
+        stem = src.stem
+        with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            with trace_span("export.docx", {"file.path": str(src)}):
+                to_docx(str(src), tmp_path)
+            data = Path(tmp_path).read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            self.send_header("Content-Disposition", f'attachment; filename="{stem}.docx"')
+            self.send_header("Content-Length", str(len(data)))
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("DOCX export failed: %s", exc)
+            self._send_json({"error": str(exc)}, status=500)
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
 
     def _serve_status(self) -> None:
         """Return JSON status for polling."""
