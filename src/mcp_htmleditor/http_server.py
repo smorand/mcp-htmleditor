@@ -323,6 +323,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         self.send_response(200)
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
+        self._send_no_store_headers()
         self._send_cors_headers()
         self.end_headers()
         self.wfile.write(data)
@@ -331,9 +332,23 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         self.send_response(200)
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
+        self._send_no_store_headers()
         self._send_cors_headers()
         self.end_headers()
         self.wfile.write(data)
+
+    def _send_no_store_headers(self) -> None:
+        """Forbid caching of the editor shell, static JS/CSS and served content.
+
+        This is a live-editing tool: editor.html/editor.js/editor.css change
+        between sessions (bug fixes, new features) and the served document
+        changes on every save. Without explicit no-store, a browser can keep
+        serving a stale cached copy from an already-open tab (no validators
+        such as ETag/Last-Modified were sent either, so heuristic caching
+        could otherwise kick in on a plain reload).
+        """
+        self.send_header("Cache-Control", "no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
 
     def _send_json(self, payload: Any, status: int = 200) -> None:
         data = json.dumps(payload).encode("utf-8")
