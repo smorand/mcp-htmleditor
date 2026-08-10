@@ -80,10 +80,15 @@
   .nav-arrow:disabled { opacity:.25; cursor:not-allowed; }
   .nav-arrow svg { width:20px; height:20px; fill:currentColor; }
   .slide-frame { flex:1; display:flex; align-items:center; justify-content:center; padding:var(--cds-spacing-07); overflow:hidden; }
+  /* Canevas fixe 16:9 (960x540), aligne sur la charte EI: une slide Carbon
+     est desormais une vraie diapositive a taille fixe, pas un document qui
+     grandit avec son contenu. Le contenu qui deborde est rogne (overflow:
+     hidden), jamais scrollé en silence — voir skill/types/slides.md,
+     section "Hauteur utile d'une slide". */
   .slide {
-    display:none; width:100%; max-width:900px; background:var(--cds-background);
+    display:none; width:100%; max-width:960px; aspect-ratio:16/9; background:var(--cds-background);
     border:1px solid var(--cds-border-subtle-01); box-shadow:0 4px 16px rgba(0,0,0,.12);
-    flex-direction:column; animation:fadein 200ms ease; overflow-y:auto; max-height:100%;
+    flex-direction:column; animation:fadein 200ms ease; overflow:hidden;
   }
   .slide.active { display:flex; }
   /* translate (pas transform) pour ne jamais entrer en conflit avec le

@@ -509,32 +509,35 @@ utiliser des classes CSS inline ou des animations CSS locales à la slide.
 5. **La navigation est dans le shell** (toolbar + nav-arrows + status-bar): ne jamais en déplacer les éléments dans le contenu des slides.
 6. **Les annotations rouges** (comme slide 9 ibm-carbon.html) utilisent `stroke="#da1e28"` et des flèches SVG polygones. Voir ibm-carbon.html slide-8 pour le pattern complet.
 7. **Images externes**: utiliser base64 pour la portabilité. Si chemin relatif, documenter la dépendance dans un commentaire HTML.
-8. **Responsive**: les slides ont `max-width: 900px` et `overflow-y: auto`. Le contenu ne doit jamais nécessiter de scroll horizontal.
-9. **Tenir dans la hauteur utile** (voir la section suivante): une slide plus haute scrolle
-   en silence et son pied de page est coupé sans avertissement.
+8. **Canevas fixe 16:9 (960x540)**: les slides des deux chartes (EI et Carbon) ont
+   `aspect-ratio:16/9; max-width:960px; overflow:hidden`, comme une vraie diapositive
+   PowerPoint/Keynote — pas un document qui grandit avec son contenu. Le contenu ne doit
+   jamais nécessiter de scroll, ni horizontal ni vertical.
+9. **Tenir dans la hauteur utile** (voir la section suivante): une slide plus haute que le
+   canevas est **rognée en silence** (`overflow:hidden`, pas de scroll) et son pied de page
+   peut sortir du cadre sans avertissement.
 
 ---
 
 ## Hauteur utile d'une slide (contrainte silencieuse)
 
-Le shell est fixe et consomme 120 px (`shell-header` 48, `toolbar` 48, `status-bar` 24), et
-le `.slide-frame` ajoute 64 px de padding vertical. Une slide dispose donc de:
+Depuis l'alignement des deux chartes sur un canevas fixe, une slide dispose toujours
+d'exactement **540 px de hauteur nette** (960x540, ratio 16:9), quelle que soit la taille
+de la fenêtre ou de l'écran (fixe en CSS, pas dépendante du viewport comme avant). Le
+plein écran (`:fullscreen .slide { scale: var(--fs-scale) }`, voir plus haut) agrandit ce
+même canevas 960x540 de manière uniforme; il ne change ni la hauteur nette disponible ni
+la discipline à respecter en édition.
 
-```
-hauteur_utile = window.innerHeight − 184
-```
+Au-delà de 540 px de contenu, `.slide` a `overflow:hidden`: le contenu est **rogné sans
+aucun message**, et le `.slide-footer` peut sortir du cadre. À l'export PPTX le
+débordement est également tronqué.
 
-Soit **576 px pour un viewport de 760 px**. Au-delà, `.slide` a `overflow-y: auto`: le
-contenu scrolle sans aucun message et le `.slide-footer` sort du cadre. À l'export PPTX le
-débordement est tronqué.
+**Cible: 540 px de hauteur de contenu, dur (pas de marge de tolérance au-delà, contrairement
+à l'ancienne version scrollable de Carbon qui autorisait jusqu'à 576 px avant de scroller).**
 
-**Cible: 540 px de hauteur de contenu, 576 px maximum, viewport minimal 760 px.**
-
-Piège de mesure: en Chrome headless, `--window-size=1200,760` ne donne que 673 px de
-`innerHeight` (87 px consommés par le cadre de fenêtre), donc 489 px utiles seulement.
-Pour capturer dans les conditions cibles, utiliser `--window-size=1200,850` ou plus.
-
-Hauteurs mesurées sur une présentation dense de 9 slides validée par capture:
+Hauteurs mesurées sur une présentation dense de 9 slides validée par capture (mesures
+faites avant l'alignement sur le canevas fixe; à revalider, certaines dépassent déjà le
+nouveau plafond dur de 540 px et seraient rognées):
 
 | Type de slide | Contenu | Hauteur mesurée |
 |---|---|---|
@@ -567,12 +570,16 @@ Vérification: capturer la slide et regarder si le pied de page est visible.
 
 ```bash
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu \
-  --screenshot=/tmp/slide.png --window-size=1200,760 --hide-scrollbars "file:///chemin.html"
+  --screenshot=/tmp/slide.png --window-size=1200,850 --hide-scrollbars "file:///chemin.html"
 ```
 
-Attention: la référence `templates/reference/slides/ibm-carbon.html` est un catalogue de
-composants, ses slides denses mesurent 624 à 773 px et scrollent dans une fenêtre de
-760 px. Copier ses composants, pas sa densité.
+**Attention (décalage documenté, non corrigé):** la référence
+`templates/reference/slides/ibm-carbon.html` est un catalogue de composants **indépendant**
+du bootstrap (fichier autonome, son propre CSS embarqué), pas régénéré depuis lui. Ses
+slides denses mesurent 624 à 773 px, largement au-delà du nouveau plafond dur de 540 px du
+bootstrap, et n'ont **aucun** CSS `:fullscreen` (le plein écran n'y fonctionne pas du tout).
+Copier ses composants en respectant le budget 540 px, jamais sa densité ni son modèle de
+hauteur variable.
 
 ---
 
