@@ -72,3 +72,7 @@ Load only what the task needs.
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`
 (sources in `skill/`, `skill/workflow-*.md`, `skill/types/*.md`).
+
+Specifications live in `specs/*.md` (never modify an existing one, only reference and
+flag inconsistencies). Deferred feature ideas not yet worth a full spec are tracked in
+`specs/BACKLOG.md`.
