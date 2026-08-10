@@ -258,6 +258,16 @@ def default_port() -> int:
     return get_settings().port
 
 
+# Auto-picked when no explicit port is requested and the preferred port (see
+# default_port()) is already taken by another mcp-htmleditor instance, so
+# several presentations can be served concurrently (one process each)
+# without the caller having to hand-pick non-colliding ports. Fixed, not an
+# env-configurable Settings field: this is a coexistence convenience, not a
+# deployment concern like host/port/poll_interval.
+PORT_RANGE_START = 7840
+PORT_RANGE_END = 7849
+
+
 def default_poll_interval() -> int:
     """Default polling interval in ms (HTMLEDITOR_POLL_INTERVAL or 1000)."""
     return get_settings().poll_interval

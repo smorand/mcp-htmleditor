@@ -27,39 +27,51 @@ mcp: FastMCP = FastMCP("html-editor")
 
 
 @mcp.tool()
-def start_server(file: str, port: int = 7842) -> dict[str, Any]:
+def start_server(file: str, port: int | None = None) -> dict[str, Any]:
     """Start the WYSIWYG HTTP server for the given HTML file.
 
-    Idempotent: if the server is already running on the same port with the
-    same file, returns OK without restarting anything. Opens the browser
-    automatically.
+    Idempotent: if the server is already running in this MCP process, returns
+    OK without restarting anything (only the served file is switched). Opens
+    the browser automatically.
 
     Args:
         file: Absolute or relative path to the HTML file to edit.
-        port: TCP port for the HTTP server (default 7842).
+        port: TCP port for the HTTP server. Omit it (default) to auto-pick a
+            free port (preferred default, then 7840-7849): starting several
+            independent ``mcp-htmleditor mcp`` processes, each editing its
+            own file, then lets multiple presentations coexist without
+            colliding on the same port. Pass an explicit port only when you
+            need a specific one; it is used as-is and the call fails clearly
+            if it is already taken.
 
     Returns:
-        Dict with keys: ok, url, file, port, started (bool).
+        Dict with keys: ok, url, file, port, started (bool). `port` is the
+        port actually bound, which may differ from the requested one when
+        it was auto-picked.
     """
     abs_file = str(Path(file).resolve())
     state = get_state()
 
-    with trace_span("mcp.start_server", {"file.path": abs_file, "server.port": port}) as span:
+    with trace_span("mcp.start_server", {"file.path": abs_file}) as span:
         already_running = is_server_running() and state.current_file == abs_file
 
-        started = start_http_server(abs_file, port) if not already_running else False
+        if already_running:
+            started, bound_port = False, state.port
+        else:
+            started, bound_port = start_http_server(abs_file, port)
 
-        url = f"http://localhost:{port}/"
+        url = f"http://localhost:{bound_port}/"
         if not already_running:
             webbrowser.open(url)
 
         span.set_attribute("server.started", started)
-        logger.info("start_server file=%s port=%d started=%s", abs_file, port, started)
+        span.set_attribute("server.port", bound_port)
+        logger.info("start_server file=%s port=%d started=%s", abs_file, bound_port, started)
         return {
             "ok": True,
             "url": url,
             "file": abs_file,
-            "port": port,
+            "port": bound_port,
             "started": started,
         }
 

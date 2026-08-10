@@ -3,7 +3,8 @@
 ## Description
 
 `mcp-htmleditor` est un éditeur WYSIWYG HTML piloté par LLM. Il combine:
-- Un serveur HTTP local (port 7842 par défaut) servant GrapesJS dans le navigateur
+- Un serveur HTTP local (port 7842 par défaut, port libre auto-choisi dans 7840-7849 si
+  occupé, voir « plusieurs présentations en parallèle » plus bas) servant GrapesJS dans le navigateur
 - Un serveur MCP exposant 6 outils pour que l'agent LLM contrôle le fichier HTML
 - Des templates de référence et bootstrap pour démarrer rapidement
 - Un export vers PPTX (python-pptx) et DOCX (pandoc)
@@ -120,7 +121,9 @@ mcp-htmleditor new <template> mon-fichier.html
 # Option --serve pour ouvrir l'éditeur immédiatement:
 mcp-htmleditor new ei ma-presentation.html --serve
 
-# Démarrer l'éditeur visuel sur un fichier existant
+# Demarrer l'editeur visuel sur un fichier existant. Sans --port: port libre
+# auto-choisi (7842 en priorite, sinon 7840-7849) - voir la section
+# "Plusieurs presentations en parallele" plus bas.
 mcp-htmleditor serve path/to/file.html [--port 7842] [--poll 1000]
 
 # Démarrer le serveur MCP (stdio)
@@ -137,12 +140,25 @@ mcp-htmleditor export docx input.html output.docx
 
 | Outil | Description |
 |-------|-------------|
-| `start_server(file, port=7842)` | Démarre le serveur HTTP + ouvre le navigateur. Idempotent. |
+| `start_server(file, port=None)` | Démarre le serveur HTTP + ouvre le navigateur. Idempotent. Sans `port`, un port libre est auto-choisi (7842 en priorité, sinon 7840-7849) — lire le `port` retourné, ne jamais supposer 7842. |
 | `stop_server()` | Arrête le serveur HTTP. |
 | `get_status()` | Retourne l'état: fichier, port, pid, update_in_progress, mtime, running. |
 | `open_file(file)` | Change le fichier servi; le browser recharge automatiquement. |
 | `update_start()` | Positionne le flag `update_in_progress=true`; affiche l'overlay browser. |
 | `update_end()` | Positionne le flag `update_in_progress=false`; le browser recharge le contenu. |
+
+### Plusieurs présentations en parallèle
+
+Chaque `mcp-htmleditor serve <file>` (CLI) ou `mcp-htmleditor mcp` (un par session agent)
+est un process indépendant. Sans `--port`/`port` explicite, il essaie 7842 puis scanne
+7840-7849 pour trouver un port libre: plusieurs présentations peuvent donc cohabiter (une
+par fichier) sans collision, jusqu'à 10 en même temps. Toujours lire le port réellement
+utilisé dans la réponse (`start_server` → champ `port`, ou `mcp-htmleditor serve` → ligne
+`Serving on http://...`) plutôt que de supposer 7842 en dur. Une seule limite: dans une
+même session agent (un seul process `mcp-htmleditor mcp`), un unique serveur peut tourner
+à la fois — `start_server` appelé sur un second fichier bascule le fichier servi plutôt que
+d'ouvrir un second serveur (utiliser `open_file` pour ce cas, ou une session agent distincte
+par présentation si un vrai affichage simultané est nécessaire).
 
 ---
 

@@ -87,6 +87,11 @@ mcp-htmleditor -v serve file.html                 # DEBUG logs (-q for errors on
 mcp-htmleditor serve file.html --host 0.0.0.0 --no-browser   # remote or container
 ```
 
+Without `--port`, a free port is auto-picked (7842 first, then 7840-7849), so several
+presentations can be served at once (one process per file) without colliding on the
+default port — see [Multiple presentations at once](#multiple-presentations-at-once).
+An explicit `--port` is used as-is and fails with a clear error if it is already taken.
+
 Global options come before the subcommand: `-v` / `--verbose` raises the log level,
 `-q` / `--quiet` keeps errors only, `-V` / `--version` prints the version.
 
@@ -152,12 +157,22 @@ figures must be PNG, never SVG.
 
 | Tool | Description |
 |------|-------------|
-| `start_server(file, port=7842)` | Start HTTP server + open browser. Idempotent. |
+| `start_server(file, port=None)` | Start HTTP server + open browser. Idempotent. Without `port`, a free one is auto-picked (7842 first, then 7840-7849) — always read the `port` field of the response, never assume 7842. |
 | `stop_server()` | Stop the HTTP server. |
 | `get_status()` | Current state: file, port, pid, mtime, running. |
 | `open_file(file)` | Switch to a different HTML file. |
 | `update_start()` | Signal modification start (shows overlay in browser). |
 | `update_end()` | Signal modification complete (browser reloads). |
+
+### Multiple presentations at once
+
+Each `mcp-htmleditor serve <file>` (CLI) or `mcp-htmleditor mcp` (one per agent session) is
+an independent process. Without an explicit port, it tries 7842 then scans 7840-7849 for a
+free one, so up to 10 presentations can coexist (one file each) without any manual port
+juggling. Within a *single* agent session (one `mcp-htmleditor mcp` process), only one
+server runs at a time: calling `start_server` on a second file switches the served file
+(use `open_file` for that) rather than opening a second server — run a separate agent
+session per presentation if you need several displayed simultaneously.
 
 ## Templates
 
@@ -220,7 +235,7 @@ Every variable is read through the `Settings` class (pydantic-settings,
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `HTMLEDITOR_HOST` | `localhost` | HTTP bind address (`0.0.0.0` in a container) |
-| `HTMLEDITOR_PORT` | `7842` | Default HTTP port |
+| `HTMLEDITOR_PORT` | `7842` | Preferred HTTP port, tried first before auto-picking a free one in 7840-7849 |
 | `HTMLEDITOR_POLL_INTERVAL` | `1000` | Browser polling interval in ms |
 | `HTMLEDITOR_TEMPLATES_DIR` | `~/.config/mcp-htmleditor/templates` | Templates directory |
 | `HTMLEDITOR_CACHE_DIR` | `~/.cache/mcp-htmleditor` | Cache base (logs, generated `reference.docx`) |
@@ -300,7 +315,7 @@ Makefile            single entry point for every operation
 
 ## How it works
 
-1. The HTTP server serves the editor shell at `http://localhost:7842/`
+1. The HTTP server serves the editor shell at `http://localhost:<port>/` (7842 if free, otherwise an auto-picked free port in 7840-7849, or whatever `--port` was given explicitly)
 2. The target HTML file is rendered as-is inside an iframe (`GET /content-frame`)
 3. In edit mode, editable zones become contenteditable; saves go via `POST /content`
    (the server strips editor artifacts before writing, keeping the file clean)

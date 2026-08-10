@@ -103,7 +103,7 @@ def new_cmd(  # noqa: PLR0913, PLR0917 - one parameter per CLI flag, click passe
         settings = get_settings()
         _serve_file(
             str(dest),
-            port if port is not None else settings.port,
+            port,
             None,
             host if host is not None else settings.host,
             open_browser=not no_browser,
@@ -135,20 +135,27 @@ def mcp_cmd() -> None:
 def serve_cmd(file: str, port: int | None, host: str | None, poll: int | None, no_browser: bool) -> None:
     """Open an HTML file in the WYSIWYG browser editor.
 
-    FILE is the path to the HTML file to edit.
+    FILE is the path to the HTML file to edit. Without --port, a free port is
+    auto-picked (preferred default, then 7840-7849) so several presentations
+    can be served at once without colliding.
     """
     settings = get_settings()
     _serve_file(
         file,
-        port if port is not None else settings.port,
+        port,
         poll,
         host if host is not None else settings.host,
         open_browser=not no_browser,
     )
 
 
-def _serve_file(file: str, port: int, poll: int | None, host: str, *, open_browser: bool = True) -> None:
-    """Start the HTTP server on a file and block until Ctrl+C."""
+def _serve_file(file: str, port: int | None, poll: int | None, host: str, *, open_browser: bool = True) -> None:
+    """Start the HTTP server on a file and block until Ctrl+C.
+
+    `port` is None when the caller did not pass --port explicitly: start_http_server
+    then auto-picks a free port (preferred default, then 7840-7849) instead of always
+    binding the same one, so several presentations can be served concurrently.
+    """
     import time
 
     from .http_server import start_http_server
@@ -162,14 +169,19 @@ def _serve_file(file: str, port: int, poll: int | None, host: str, *, open_brows
     if poll is not None:
         state.poll_interval = poll
 
-    click.echo(f"Starting editor server on http://{host}:{port}/")
     click.echo(f"Editing: {abs_file}")
     click.echo("Press Ctrl+C to stop.")
 
-    start_http_server(abs_file, port, host)
+    try:
+        _started, bound_port = start_http_server(abs_file, port, host)
+    except OSError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Serving on http://{host}:{bound_port}/")
 
     if open_browser:
-        webbrowser.open(f"http://{host}:{port}/")
+        webbrowser.open(f"http://{host}:{bound_port}/")
 
     try:
         while True:

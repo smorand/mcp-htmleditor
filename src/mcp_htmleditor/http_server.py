@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import socket
 import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,7 +22,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from .config import default_host
+from .config import PORT_RANGE_END, PORT_RANGE_START, default_host, default_port
 from .state import get_state
 from .tracing import trace_span
 from .version import __version__
@@ -509,22 +510,74 @@ _server_thread: threading.Thread | None = None
 _server_lock = threading.Lock()
 
 
+def _port_is_free(host: str, port: int) -> bool:
+    """Return True if `port` can be bound on `host` right now."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind((host, port))
+        except OSError:
+            return False
+        return True
+
+
+def find_free_port(host: str, preferred: int) -> int:
+    """Return a free TCP port, so several presentations can coexist.
+
+    Tries `preferred` first (the configured default, HTMLEDITOR_PORT or
+    7842), then scans PORT_RANGE_START..PORT_RANGE_END (7840-7849) in order.
+    Each independent ``mcp-htmleditor serve``/``mcp-htmleditor mcp`` process
+    picks its own free slot, so up to 10 decks can be edited at once without
+    the caller having to hand-pick non-colliding ports.
+
+    Args:
+        host: Bind address to probe against (a port can be free on
+            ``127.0.0.1`` and taken on ``0.0.0.0``, or vice versa).
+        preferred: Port to try first.
+
+    Returns:
+        A currently free port.
+
+    Raises:
+        RuntimeError: every port in the range is taken (10 presentations
+            already running).
+    """
+    candidates = [preferred, *(p for p in range(PORT_RANGE_START, PORT_RANGE_END + 1) if p != preferred)]
+    for candidate in candidates:
+        if _port_is_free(host, candidate):
+            return candidate
+    raise RuntimeError(
+        f"No free port available (tried {preferred} and {PORT_RANGE_START}-{PORT_RANGE_END}): "
+        "10 presentations already running? Stop one or pass an explicit --port."
+    )
+
+
 def start_http_server(
     file: str,
-    port: int = 7842,
+    port: int | None = None,
     host: str | None = None,
-) -> bool:  # pragma: no cover - starts a real server thread
+) -> tuple[bool, int]:  # pragma: no cover - starts a real server thread
     """Start the HTTP server serving the given HTML file.
 
-    Idempotent: if a server is already running on the same port with the
-    same file, this is a no-op and returns False. Returns True if a new
-    server was started.
+    Idempotent: if a server is already running in this process, this is a
+    no-op that just switches the served file (see `open_file`) and returns
+    ``(False, <port already bound>)``.
 
     Args:
         file: HTML file to serve.
-        port: TCP port to bind.
+        port: TCP port to bind. If None (not explicitly requested), a free
+            port is auto-picked (see `find_free_port`) so several
+            independent mcp-htmleditor processes can each serve a different
+            presentation without colliding on the same default port. If
+            explicitly given, it is used as-is: a clear `OSError` is raised
+            if it is already taken, rather than silently falling back.
         host: Bind address; defaults to HTMLEDITOR_HOST (localhost). Use
             ``0.0.0.0`` inside a container so the published port is reachable.
+
+    Returns:
+        ``(started, port)``: `started` is False if a server was already
+        running in this process (no-op); `port` is the TCP port actually
+        bound.
     """
     global _server_instance, _server_thread
 
@@ -536,22 +589,31 @@ def start_http_server(
             # Already running; just update the file
             state.set_file(file)
             logger.info("Server already running, switched file to %s", file)
-            return False
+            return False, state.port
+
+        resolved_port = port if port is not None else find_free_port(bind_host, default_port())
 
         state.set_file(file)
-        state.port = port
+        state.port = resolved_port
         state.server_pid = os.getpid()
         state.save()
 
-        server = ThreadingHTTPServer((bind_host, port), _EditorHandler)
+        try:
+            server = ThreadingHTTPServer((bind_host, resolved_port), _EditorHandler)
+        except OSError as exc:
+            hint = (
+                "pass no --port to auto-pick a free one in "
+                f"{PORT_RANGE_START}-{PORT_RANGE_END}, or choose another port explicitly"
+            )
+            raise OSError(f"Port {resolved_port} is already in use ({hint}): {exc}") from exc
         _server_instance = server
-        logger.info("HTTP server listening on http://%s:%d/ (file: %s)", bind_host, port, file)
+        logger.info("HTTP server listening on http://%s:%d/ (file: %s)", bind_host, resolved_port, file)
 
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         _server_thread = thread
 
-    return True
+    return True, resolved_port
 
 
 def stop_http_server() -> None:  # pragma: no cover - stops a real server thread

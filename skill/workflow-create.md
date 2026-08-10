@@ -329,8 +329,11 @@ feat: ajout schéma architecture microservices slide 4
 
 **Après chaque modification substantielle, valider le rendu dans le navigateur.**
 Ne pas considérer une slide ou un document comme terminé sans avoir vérifié
-visuellement. Utiliser `agent-browser` (ou Playwright) pour ouvrir
-`http://localhost:7842` et inspecter le rendu réel.
+visuellement. Utiliser `agent-browser` (ou Playwright) pour ouvrir l'URL retournée par
+`start_server` et inspecter le rendu réel. Sans port explicite, `start_server` essaie
+7842 puis choisit un port libre dans 7840-7849 (plusieurs présentations peuvent tourner
+en parallèle, une par session agent): toujours lire le champ `port`/`url` retourné, ne
+jamais supposer 7842 en dur.
 
 ### Ce qu'il faut vérifier
 
@@ -347,8 +350,8 @@ visuellement. Utiliser `agent-browser` (ou Playwright) pour ouvrir
 ### Procédure avec agent-browser
 
 ```
-1. start_server(file="mon-fichier.html")  # si pas encore démarré
-2. Ouvrir http://localhost:7842 avec agent-browser / Playwright
+1. start_server(file="mon-fichier.html")  # si pas encore démarré - lire le port retourné
+2. Ouvrir l'URL retournée (http://localhost:<port>) avec agent-browser / Playwright
 3. Naviguer sur chaque slide (touches → ou boutons prev/next)
 4. Capturer un screenshot de chaque slide problématique
 5. Corriger dans le HTML, update_start / écrire / update_end
