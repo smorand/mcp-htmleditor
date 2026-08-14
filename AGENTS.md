@@ -31,6 +31,8 @@ mcp-htmleditor serve file.html [-v|-q] [--host] [--port] [--poll] [--no-browser]
 mcp-htmleditor mcp                         # MCP server (stdio)
 mcp-htmleditor export pptx in.html out.pptx
 mcp-htmleditor export docx in.html out.docx
+mcp-htmleditor arch-layout in.html         # compute arch-diagram positions from topology
+mcp-htmleditor arch-checklist               # print the editable arch-diagram QA checklist
 mcp-htmleditor skill                       # full skill content
 ```
 
@@ -51,6 +53,21 @@ mcp-htmleditor skill                       # full skill content
   is generated, edit the EI reference then `make bootstrap-ei`.
 - After editing anything under `templates/`, run `make install` or export
   `HTMLEDITOR_TEMPLATES_DIR=$PWD/templates`, otherwise the installed copy wins.
+- Every slide template (current and future) must ship fullscreen support (`:fullscreen`
+  CSS, `#btn-present` button, `enterPresentation`/`exitPresentation`/
+  `updateFullscreenScale` JS): see `.agent_docs/html-conventions.md` § Fullscreen. A
+  presentation file missing it (e.g. created before this convention) is a bug to patch,
+  not a valid variant.
+- Architecture diagrams (`data-type="arch-diagram"`) with 4+ nodes or a multi-row flow:
+  never write `data-x`/`data-y` by hand, author the declarative topology (`arch-row` /
+  `arch-node` / `arch-col` / `arch-edge` / `arch-lane` / `arch-spacer`) and run
+  `mcp-htmleditor arch-layout` (or the `layout_arch_diagram` MCP tool) to compute
+  positions. See `skill/types/arch-diagram.md` and `src/mcp_htmleditor/arch_layout.py`.
+  The old manual `data-x`/`data-y` format stays valid for 2-3 node diagrams only.
+- After every `arch-layout` run, spawn a dedicated review sub-agent against
+  `mcp-htmleditor arch-checklist` before considering the diagram done (protocol:
+  `skill/workflow-arch-qa.md`). The checklist itself is user-editable at
+  `~/.config/mcp-htmleditor/arch-checks/arch-diagram-checklist.md`, never in code.
 - `.mcp_state.json` is written next to the edited file. It is gitignored, never commit it.
 - JS has no build step: `node --check src/mcp_htmleditor/static/*.js`.
 - `src/mcp_htmleditor/version.py` stays committed with `"dev"`; the build overwrites it

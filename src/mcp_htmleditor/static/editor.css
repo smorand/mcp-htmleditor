@@ -75,6 +75,36 @@ html, body {
   box-shadow: 0 0 5px rgba(255, 255, 255, 0.9);
 }
 
+/* ── Undo / redo buttons ───────────────────────────── */
+#undo-btn,
+#redo-btn {
+  display: none; /* shown only in edit mode via JS */
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  background: #262626;
+  color: #8d8d8d;
+  border: 1px solid #393939;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 90ms, color 90ms, border-color 90ms;
+}
+#redo-btn { margin-left: 2px; }
+#undo-btn:hover:not(:disabled),
+#redo-btn:hover:not(:disabled) {
+  background: #0f62fe;
+  color: #ffffff;
+  border-color: #0f62fe;
+}
+#undo-btn:disabled,
+#redo-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
 /* ── Present button ─────────────────────────────────── */
 #present-btn {
   display: none; /* shown only for presentations via JS */

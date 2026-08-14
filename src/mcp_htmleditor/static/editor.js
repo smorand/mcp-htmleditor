@@ -27,8 +27,11 @@ let isDocument     = false;   // detected from data-doc-type
 let insertPosition = null;    // 'before' | 'after' when slide picker is open
 let blockPosition  = null;    // 'before' | 'after' when block picker is open
 let lastDocRange   = null;    // saved caret range in document mode
+let archConnectSource = null; // {node, doc} while picking an edge's target node
 
 const frame        = document.getElementById('content-frame');
+const undoBtn       = document.getElementById('undo-btn');
+const redoBtn       = document.getElementById('redo-btn');
 const overlay      = document.getElementById('update-overlay');
 const statusDot    = document.getElementById('toolbar-status');
 
@@ -83,7 +86,12 @@ const docActions   = document.getElementById('toolbar-doc-actions');
     applyEditMode();
     updateSlideActionsVisibility();
     updateDocActionsVisibility();
+    updateUndoRedoVisibility();
   });
+
+  undoBtn.addEventListener('click', () => { if (!undoBtn.disabled) performUndo(); });
+  redoBtn.addEventListener('click', () => { if (!redoBtn.disabled) performRedo(); });
+  updateUndoRedoVisibility();
 
   // Present button: fullscreen the inner document (not the iframe element)
   // so keyboard events stay inside the iframe's own document. Fullscreen
@@ -188,6 +196,21 @@ function onFrameLoad() {
     updateDocActionsVisibility();
     if (editMode) injectEditMode(doc);
     injectContextMenus(doc);
+    // A freshly loaded document (initial load, external agent write, or the
+    // human navigating to a different file) invalidates any snapshot taken
+    // against the PREVIOUS document: never let undo/redo cross that boundary.
+    // EXCEPT: restoreDomSnapshot() below also uses doc.write() on this same
+    // iframe, and Chromium (verified) fires the iframe's own 'load' event on
+    // EVERY doc.write(), exactly like a real navigation. Without this guard,
+    // performUndo()/performRedo() would restore the DOM correctly and then
+    // immediately have onFrameLoad() wipe the very stacks they just updated,
+    // as if a fresh unrelated document had been loaded.
+    if (restoringFromUndo) {
+      doc.addEventListener('keydown', handleUndoRedoKeydown);
+      return;
+    }
+    resetUndoStacks();
+    doc.addEventListener('keydown', handleUndoRedoKeydown);
   } catch (e) {
     console.warn('Could not access iframe content:', e);
   }
@@ -277,6 +300,212 @@ async function pollStatus() {
 
 function reloadFrame() {
   frame.src = '/content-frame?' + Date.now();
+}
+
+/* ============================================================
+   Undo / redo (structural mutations only)
+   ============================================================
+   Scope: DOM-mutating structural operations that have no native undo —
+   arch-node reposition/add/remove/rename/reshape, arch-edge create, image
+   insert, table row/col add/remove, table delete, gantt task add/resize/
+   rename/delete, slide insert/delete, document block insert/reorder/delete.
+
+   Deliberately OUT of scope: plain contenteditable text edits (bold, typing,
+   caret-level changes) and native in-place image resize/reposition when the
+   image lives inside a contenteditable zone — both already have a working
+   native undo stack via the browser's own Ctrl+Z on contenteditable. Pushing
+   our own snapshot on every keystroke would fight that native stack instead
+   of complementing it (see .agent_docs/html-conventions.md § Undo/redo for
+   the exact interaction observed when the two are interleaved).
+
+   Snapshot granularity: the whole iframe document's outerHTML. Simpler and
+   always structurally correct; a document is a single slide deck or article,
+   never large enough (parsed HTML string, not a live tree) for this to be a
+   real perf concern. Capped at UNDO_MAX_DEPTH entries.
+
+   Push BEFORE the mutation runs (pre-mutation state), so undo restores what
+   was there before. Call snapshotForUndo() at the top of every structural
+   mutation handler, synchronously, before touching the DOM. ============================================================ */
+const UNDO_MAX_DEPTH = 50;
+let undoStack = [];
+let redoStack = [];
+// True only during the doc.write() performed by restoreDomSnapshot(), so
+// onFrameLoad() (which Chromium fires again on every doc.write(), verified
+// experimentally: it behaves exactly like a real navigation) can tell an
+// undo/redo-triggered reload apart from a genuinely new document and skip
+// wiping the very stacks the in-flight performUndo()/performRedo() call is
+// updating.
+let restoringFromUndo = false;
+
+/** Serialize the iframe's current DOM state the same way saveContent() does,
+ *  but WITHOUT writing to disk: used as a snapshot payload for undo/redo. */
+function captureDomSnapshot(doc) {
+  const editables = [...doc.querySelectorAll('[contenteditable]')];
+  const backup = editables.map(el => ({
+    el, ce: el.contentEditable,
+    outline: el.style.outline, cursor: el.style.cursor,
+  }));
+  editables.forEach(el => {
+    el.removeAttribute('contenteditable');
+    el.style.outline = ''; el.style.cursor = '';
+  });
+
+  const fb = doc.getElementById('_mcp_format_bar');
+  const ib = doc.getElementById('_mcp_insert_bar');
+  const fbDisplay = fb?.style.display; const ibDisplay = ib?.style.display;
+  if (fb) fb.style.display = 'none';
+  if (ib) ib.style.display = 'none';
+
+  const detachedDrag = detachDragArtifacts(doc);
+
+  const html = doc.documentElement.outerHTML;
+
+  backup.forEach(({ el, ce, outline, cursor }) => {
+    el.contentEditable = ce; el.style.outline = outline; el.style.cursor = cursor;
+  });
+  if (fb) fb.style.display = fbDisplay;
+  if (ib) ib.style.display = ibDisplay;
+  reattachDragArtifacts(detachedDrag);
+
+  return html;
+}
+
+/** Record the CURRENT (pre-mutation) DOM state on the undo stack. Call this
+ *  synchronously right before mutating the DOM for any structural op. Clears
+ *  the redo stack: a fresh mutation invalidates whatever was undone before. */
+function snapshotForUndo() {
+  if (!editMode) return;
+  const doc = frame.contentDocument;
+  if (!doc) return;
+  undoStack.push(captureDomSnapshot(doc));
+  if (undoStack.length > UNDO_MAX_DEPTH) undoStack.shift();
+  redoStack = [];
+  updateUndoRedoButtons();
+}
+
+/** Replace the iframe document's full markup with a previously captured
+ *  snapshot, then re-wire interactivity and persist via the existing save
+ *  path (same POST /content saveContent() already uses for every other
+ *  mutation: no second save mechanism).
+ *
+ *  Rewiring itself (editable zones, drag handles, arch-node drag, context
+ *  menus) is NOT duplicated here: doc.write() makes Chromium (verified,
+ *  see onFrameLoad()'s restoringFromUndo guard) fire the iframe's own
+ *  'load' event exactly like a real navigation, so onFrameLoad() runs and
+ *  does it — the same single rewiring path every other document load goes
+ *  through, deliberately not a second parallel implementation. */
+async function restoreDomSnapshot(html) {
+  const doc = frame.contentDocument;
+  if (!doc) return;
+  const activeTag = doc.activeElement && doc.activeElement.tagName;
+  if (activeTag) doc.activeElement.blur();
+
+  restoringFromUndo = true;
+  const loaded = new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  await loaded;
+  restoringFromUndo = false;
+
+  markPending();
+  await saveContent();
+}
+
+/** Ctrl+Z / Cmd+Z → undo, Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y → redo.
+ *  Only active in edit mode. Never intercepts a keystroke while the user is
+ *  actively typing in a contenteditable region: that keeps the browser's own
+ *  native undo stack in sole control of plain text edits (see module header
+ *  comment). Structural ops fire regardless of where focus is otherwise
+ *  (toolbar buttons, context-menu prompts, arch-node drag handles, …). */
+async function handleUndoRedoKeydown(e) {
+  if (!editMode) return;
+  const isZ = e.key === 'z' || e.key === 'Z';
+  const isY = e.key === 'y' || e.key === 'Y';
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod || (!isZ && !isY)) return;
+
+  const doc = frame.contentDocument;
+  const active = doc && doc.activeElement;
+  const inLiveTextEdit = !!(active && active.isContentEditable);
+  // Let the browser's native undo run inside an actively-edited text zone —
+  // EXCEPT when it has nothing left to undo natively (queryCommandEnabled
+  // returns false once its own history is exhausted): at that point Ctrl+Z
+  // would otherwise do nothing, so fall through to our structural stack.
+  if (inLiveTextEdit) {
+    try {
+      const nativeHasUndo = isZ && !e.shiftKey && doc.queryCommandEnabled('undo');
+      const nativeHasRedo = (isZ && e.shiftKey) || isY;
+      if (isZ && !e.shiftKey && nativeHasUndo) return;
+      if (nativeHasRedo && doc.queryCommandEnabled('redo')) return;
+    } catch (err) {
+      // queryCommandEnabled is not implemented consistently everywhere;
+      // if it throws, be conservative and let the native handler have it.
+      return;
+    }
+  }
+
+  if (isZ && !e.shiftKey) {
+    if (!undoStack.length) return;
+    e.preventDefault();
+    await performUndo();
+  } else if ((isZ && e.shiftKey) || isY) {
+    if (!redoStack.length) return;
+    e.preventDefault();
+    await performRedo();
+  }
+}
+
+async function performUndo() {
+  const doc = frame.contentDocument;
+  if (!doc || !undoStack.length) return;
+  const current = captureDomSnapshot(doc);
+  const previous = undoStack.pop();
+  redoStack.push(current);
+  if (redoStack.length > UNDO_MAX_DEPTH) redoStack.shift();
+  updateUndoRedoButtons();
+  await restoreDomSnapshot(previous);
+}
+
+async function performRedo() {
+  const doc = frame.contentDocument;
+  if (!doc || !redoStack.length) return;
+  const current = captureDomSnapshot(doc);
+  const next = redoStack.pop();
+  undoStack.push(current);
+  if (undoStack.length > UNDO_MAX_DEPTH) undoStack.shift();
+  updateUndoRedoButtons();
+  await restoreDomSnapshot(next);
+}
+
+function updateUndoRedoButtons() {
+  if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+  if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+}
+
+/** The undo/redo buttons are only meaningful in edit mode (same gating as
+ *  handleUndoRedoKeydown): hide them the rest of the time instead of leaving
+ *  a permanently disabled pair in the toolbar. */
+function updateUndoRedoVisibility() {
+  const display = editMode ? 'inline-flex' : 'none';
+  if (undoBtn) undoBtn.style.display = display;
+  if (redoBtn) redoBtn.style.display = display;
+}
+
+/** Reset both stacks: called whenever the iframe loads a genuinely different
+ *  document (initial load, external agent write, navigating to another
+ *  file). A snapshot captured against a PREVIOUS document's DOM would not
+ *  correspond to anything restorable once that document is gone, so it must
+ *  never survive past this boundary. Toggling edit mode off/on within the
+ *  SAME loaded document deliberately does NOT reset the stacks: closing the
+ *  edit toolbar to preview the render and reopening it should not throw away
+ *  undo history. */
+function resetUndoStacks() {
+  undoStack = [];
+  redoStack = [];
+  updateUndoRedoButtons();
 }
 
 /* ============================================================
@@ -666,10 +895,14 @@ function insertImage(doc) {
 function embedImageFile(doc, file, targetEl) {
   const reader = new FileReader();
   reader.onload = () => {
+    snapshotForUndo();
     const dataUri = reader.result;  // data:image/...;base64,...
     const img = `<img src="${dataUri}" alt="${file.name}" data-editable="resize,reposition" style="max-width:100%;height:auto;display:block;margin:8px 0;" />`;
     if (targetEl) {
-      // Dropped onto a specific editable: append there
+      // Dropped onto a specific editable: append there. insertAdjacentHTML,
+      // unlike execCommand('insertHTML', ...), does NOT push a step onto the
+      // browser's native contenteditable undo stack — this is exactly the
+      // structural gap snapshotForUndo() exists to cover for this call site.
       targetEl.insertAdjacentHTML('beforeend', img);
     } else {
       doc.execCommand('insertHTML', false, img);
@@ -740,6 +973,171 @@ function insertLink(doc) {
 /* ============================================================
    Context menus (injected into iframe)
    ============================================================ */
+/* ============================================================
+   Declarative arch-diagram mouse editing (add/remove node, add edge)
+
+   These write the SAME markup the LLM authors (arch-row / arch-node /
+   arch-edge, see skill/types/arch-diagram.md): no position is ever computed
+   here client-side. Every structural change is followed by saveThenLayout(),
+   which persists the DOM then asks the server to run the Python layout
+   engine (POST /arch-layout) exactly as `mcp-htmleditor arch-layout` would,
+   so the browser never reimplements the row/col distribution or the edge
+   routing in JS.
+   ============================================================ */
+
+function isDeclarativeArchDiagram(diagram) {
+  return !!diagram.querySelector('[data-type="arch-row"]');
+}
+
+/** Assign a stable data-id to a node that does not have one yet (older
+    diagrams, or a node added before this feature existed). */
+function ensureNodeId(node, diagram) {
+  if (node.dataset.id) return node.dataset.id;
+  const used = new Set(
+    [...diagram.querySelectorAll('[data-type="arch-node"]')].map(n => n.dataset.id).filter(Boolean)
+  );
+  let n = 0;
+  let id = 'node-0';
+  while (used.has(id)) { n += 1; id = 'node-' + n; }
+  node.dataset.id = id;
+  return id;
+}
+
+/** Persist the DOM, then ask the server to recompute every declarative
+    diagram in the file (the browser never computes positions itself). */
+async function saveThenLayout() {
+  await saveContent();
+  try {
+    const res = await fetch('/arch-layout', { method: 'POST' });
+    const body = await res.json();
+    if (body.warnings && body.warnings.length) {
+      console.warn('arch-layout warnings:', body.warnings);
+    }
+  } catch (e) {
+    console.warn('arch-layout request failed:', e);
+  }
+}
+
+/** ＋ Ajouter nœud (declarative diagram): choose an existing row or a new one,
+    insert a plain arch-node, then recompute positions server-side. */
+function addArchNodeDeclarative(doc, diagram) {
+  const rows = [...diagram.querySelectorAll('[data-type="arch-row"]')];
+  const label = prompt('Libellé du nœud :', 'Nouveau nœud');
+  if (!label) return;
+
+  // Resolve which row to target BEFORE snapshotting: a row-choice prompt can
+  // still be cancelled here, and snapshotForUndo() must only run once the
+  // mutation is certain to happen (a cancelled prompt must never push an
+  // undo entry with nothing to actually undo).
+  let chosenRowNumber = null;
+  if (rows.length > 1) {
+    const indices = rows.map(r => r.dataset.row).join(', ');
+    const chosen = prompt(`Numéro de rangée existante (${indices}), ou un nouveau numéro :`, rows[rows.length - 1].dataset.row);
+    if (chosen === null) return;
+    chosenRowNumber = chosen.trim();
+  }
+
+  snapshotForUndo();
+
+  let targetRow;
+  if (rows.length === 0) {
+    targetRow = doc.createElement('div');
+    targetRow.dataset.type = 'arch-row';
+    targetRow.dataset.row = '0';
+    diagram.insertBefore(targetRow, diagram.firstChild);
+  } else if (rows.length === 1) {
+    targetRow = rows[0];
+  } else {
+    targetRow = rows.find(r => r.dataset.row === chosenRowNumber);
+    if (!targetRow) {
+      targetRow = doc.createElement('div');
+      targetRow.dataset.type = 'arch-row';
+      targetRow.dataset.row = chosenRowNumber;
+      diagram.appendChild(targetRow);
+    }
+  }
+
+  const node = doc.createElement('div');
+  node.dataset.type = 'arch-node';
+  node.dataset.label = label;
+  node.dataset.shape = 'box';
+  ensureNodeId(node, diagram);
+  node.style.cssText = 'border:2px solid #333; background:#f5f5f5; color:#262626; border-radius:4px;';
+  node.textContent = label;
+  targetRow.appendChild(node);
+
+  saveThenLayout();
+}
+
+/** Supprimer: also drop every arch-edge that referenced this node (dangling
+    data-from/data-to would otherwise silently stop rendering a connector). */
+function removeArchNode(doc, diagram, node) {
+  const id = node.dataset.id;
+  if (id) {
+    diagram.querySelectorAll(`[data-type="arch-edge"][data-from="${id}"], [data-type="arch-edge"][data-to="${id}"]`)
+      .forEach(edge => {
+        const edgeId = edge.dataset.edgeId;
+        if (edgeId) diagram.querySelectorAll(`[data-edge-of="${edgeId}"]`).forEach(deco => deco.remove());
+        edge.remove();
+      });
+  }
+  node.remove();
+  saveThenLayout();
+}
+
+/** Enter "pick a target" mode after "➜ Créer une arête depuis ce nœud": the
+    next click on another arch-node of the SAME diagram creates the edge.
+    Escape or clicking the same node cancels. */
+function startArchConnect(doc, sourceNode) {
+  cancelArchConnect(doc);
+  archConnectSource = { node: sourceNode, doc };
+  sourceNode.style.outline = '3px solid #0f62fe';
+  doc.body.style.cursor = 'crosshair';
+
+  const onClick = e => {
+    const target = e.target.closest && e.target.closest('[data-type="arch-node"]');
+    if (!target) return;
+    e.preventDefault();
+    e.stopPropagation();
+    finishArchConnect(doc, target);
+  };
+  const onKey = e => { if (e.key === 'Escape') cancelArchConnect(doc); };
+
+  archConnectSource.onClick = onClick;
+  archConnectSource.onKey = onKey;
+  doc.addEventListener('click', onClick, { capture: true });
+  doc.addEventListener('keydown', onKey);
+}
+
+function cancelArchConnect(doc) {
+  if (!archConnectSource) return;
+  archConnectSource.node.style.outline = '';
+  doc.body.style.cursor = '';
+  doc.removeEventListener('click', archConnectSource.onClick, { capture: true });
+  doc.removeEventListener('keydown', archConnectSource.onKey);
+  archConnectSource = null;
+}
+
+function finishArchConnect(doc, targetNode) {
+  const source = archConnectSource.node;
+  if (targetNode === source) { cancelArchConnect(doc); return; }
+  const diagram = source.closest('[data-type="arch-diagram"]');
+  ensureNodeId(source, diagram);
+  ensureNodeId(targetNode, diagram);
+
+  const label = prompt('Libellé de l\'arête (optionnel) :', '') || '';
+  snapshotForUndo();
+  const edge = doc.createElement('div');
+  edge.dataset.type = 'arch-edge';
+  edge.dataset.from = source.dataset.id;
+  edge.dataset.to = targetNode.dataset.id;
+  if (label) edge.dataset.label = label;
+  diagram.appendChild(edge);
+
+  cancelArchConnect(doc);
+  saveThenLayout();
+}
+
 function injectContextMenus(doc) {
   doc.addEventListener('contextmenu', e => {
     let el = e.target;
@@ -763,40 +1161,58 @@ function getContextMenuItems(dtype, el, doc) {
     case 'gantt-task':
       return [
         { label: 'Agrandir (+20%)', action: () => {
+          snapshotForUndo();
           el.style.width = Math.min(100, (parseFloat(el.style.width) || 30) * 1.2).toFixed(1) + '%';
           scheduleSave();
         }},
         { label: 'Réduire (-20%)',  action: () => {
+          snapshotForUndo();
           el.style.width = Math.max(5,   (parseFloat(el.style.width) || 30) * 0.8).toFixed(1) + '%';
           scheduleSave();
         }},
         { label: 'Renommer', action: () => {
           const name = prompt('Libellé :', el.textContent.trim());
-          if (name !== null) { el.textContent = name; el.dataset.label = name; scheduleSave(); }
+          if (name !== null) { snapshotForUndo(); el.textContent = name; el.dataset.label = name; scheduleSave(); }
         }},
-        { label: 'Supprimer', action: () => { el.remove(); scheduleSave(); }},
+        { label: 'Supprimer', action: () => { snapshotForUndo(); el.remove(); scheduleSave(); }},
       ];
 
-    case 'arch-node':
-      return [
+    case 'arch-node': {
+      const diagram = el.closest('[data-type="arch-diagram"]');
+      const items = [
         { label: 'Renommer', action: () => {
           const name = prompt('Libellé :', el.textContent.trim());
-          if (name !== null) { el.textContent = name; el.dataset.label = name; scheduleSave(); }
+          if (name !== null) { snapshotForUndo(); el.textContent = name; el.dataset.label = name; scheduleSave(); }
         }},
         { label: 'Changer forme', action: () => {
           const shape = prompt('Forme (box/circle/diamond) :', el.dataset.shape || 'box');
-          if (shape) { el.dataset.shape = shape; scheduleSave(); }
+          if (shape) { snapshotForUndo(); el.dataset.shape = shape; scheduleSave(); }
         }},
-        { label: 'Supprimer', action: () => { el.remove(); scheduleSave(); }},
       ];
+      if (diagram && isDeclarativeArchDiagram(diagram)) {
+        ensureNodeId(el, diagram);
+        items.push({ label: '➜ Créer une arête depuis ce nœud', action: () => {
+          startArchConnect(doc, el);
+        }});
+      }
+      items.push({ label: 'Supprimer', action: () => {
+        snapshotForUndo();
+        if (diagram && isDeclarativeArchDiagram(diagram)) {
+          removeArchNode(doc, diagram, el);
+        } else {
+          el.remove(); scheduleSave();
+        }
+      }});
+      return items;
+    }
 
     case 'annotation':
       return [
         { label: 'Éditer texte', action: () => {
           const text = prompt('Texte :', el.textContent.trim());
-          if (text !== null) { el.textContent = text; scheduleSave(); }
+          if (text !== null) { snapshotForUndo(); el.textContent = text; scheduleSave(); }
         }},
-        { label: 'Supprimer', action: () => { el.remove(); scheduleSave(); }},
+        { label: 'Supprimer', action: () => { snapshotForUndo(); el.remove(); scheduleSave(); }},
       ];
 
     case 'table':
@@ -806,6 +1222,7 @@ function getContextMenuItems(dtype, el, doc) {
       return [{ label: '＋ Ajouter tâche', action: () => {
         const label = prompt('Libellé :', 'Nouvelle tâche');
         if (!label) return;
+        snapshotForUndo();
         const task = doc.createElement('div');
         task.dataset.type = 'gantt-task'; task.dataset.label = label;
         task.style.cssText = 'background:#4a90d9;color:white;padding:4px 8px;margin:2px 0;border-radius:3px;width:30%;';
@@ -814,9 +1231,17 @@ function getContextMenuItems(dtype, el, doc) {
       }}];
 
     case 'arch-diagram':
+      if (isDeclarativeArchDiagram(el)) {
+        return [{ label: '＋ Ajouter nœud (rangée existante ou nouvelle)', action: () => {
+          addArchNodeDeclarative(doc, el);
+        }}];
+      }
+      // Legacy diagram (no arch-row yet): keep the historical hand-positioned
+      // node, unrelated to the declarative engine (see skill/types/arch-diagram.md).
       return [{ label: '＋ Ajouter nœud', action: () => {
         const label = prompt('Libellé :', 'Nouveau nœud');
         if (!label) return;
+        snapshotForUndo();
         const node = doc.createElement('div');
         node.dataset.type = 'arch-node'; node.dataset.label = label; node.dataset.shape = 'box';
         node.dataset.x = '40.0'; node.dataset.y = '40.0';
@@ -840,11 +1265,11 @@ function tableContextMenu(tableEl, doc) {
   // Find the table root from any child
   const tbl = tableEl.closest ? tableEl.closest('table') || tableEl : tableEl;
   return [
-    { label: '＋ Ajouter ligne',             action: () => { addTableRow(tbl, doc); scheduleSave(); }},
-    { label: '− Supprimer dernière ligne',   action: () => { removeLastTableRow(tbl); scheduleSave(); }},
-    { label: '＋ Ajouter colonne',           action: () => { addTableCol(tbl, doc); scheduleSave(); }},
-    { label: '− Supprimer dernière colonne', action: () => { removeLastTableCol(tbl); scheduleSave(); }},
-    { label: '✕ Supprimer le tableau',       action: () => { tbl.remove(); scheduleSave(); }},
+    { label: '＋ Ajouter ligne',             action: () => { snapshotForUndo(); addTableRow(tbl, doc); scheduleSave(); }},
+    { label: '− Supprimer dernière ligne',   action: () => { snapshotForUndo(); removeLastTableRow(tbl); scheduleSave(); }},
+    { label: '＋ Ajouter colonne',           action: () => { snapshotForUndo(); addTableCol(tbl, doc); scheduleSave(); }},
+    { label: '− Supprimer dernière colonne', action: () => { snapshotForUndo(); removeLastTableCol(tbl); scheduleSave(); }},
+    { label: '✕ Supprimer le tableau',       action: () => { snapshotForUndo(); tbl.remove(); scheduleSave(); }},
   ];
 }
 
@@ -1043,6 +1468,7 @@ function insertSlide(layoutKey, position) {
   const layout = getLayouts(doc)[layoutKey];
   if (!layout) return;
 
+  snapshotForUndo();
   const slides = getSlides(doc);
   const curIdx = getCurrentSlideIndex(doc);
   const uid = 'slide-' + Date.now();
@@ -1101,6 +1527,7 @@ function deleteCurrentSlide() {
   }
   const curIdx = getCurrentSlideIndex(doc);
   if (!confirm(`Supprimer la slide ${curIdx + 1} ?`)) return;
+  snapshotForUndo();
   slides[curIdx].remove();
   renumberSlides(doc);
   saveContent();
@@ -1239,6 +1666,7 @@ function insertDocBlock(blockKey, position) {
   const article = getDocumentArticle(doc);
   if (!article) return;
 
+  snapshotForUndo();
   const before = (position === 'before');
   const container = article.querySelector('.ei-doc-body') || article;
 
@@ -1388,6 +1816,7 @@ function wireDragHandle(doc, handle, block, container) {
       const after = blockAfterPointer(doc, container, e.clientY);
       removeDropIndicator(doc);
       if (after === _dragBlock) return;
+      snapshotForUndo();
       if (after == null) container.appendChild(_dragBlock);
       else               container.insertBefore(_dragBlock, after);
       scheduleSave();
@@ -1499,7 +1928,12 @@ function makeArchNodeDraggable(doc, node) {
     node.classList.add('_mcp_arch_grabbing');
     node.style.position = 'absolute';
 
+    let moved = false;
     const onMove = ev => {
+      // Snapshot BEFORE the first actual mutation of this drag, not on every
+      // pointermove: one drag gesture is one undo step, not one per pixel.
+      if (!moved) snapshotForUndo();
+      moved = true;
       const x = clampPct(((ev.clientX - offX - rect.left) / rect.width) * 100);
       const y = clampPct(((ev.clientY - offY - rect.top)  / rect.height) * 100);
       applyArchNodePosition(node, x, y);
@@ -1510,6 +1944,10 @@ function makeArchNodeDraggable(doc, node) {
       node.classList.remove('_mcp_arch_grabbing');
       if (wasEditable === null) node.removeAttribute('contenteditable');
       else                      node.setAttribute('contenteditable', wasEditable);
+      // A node actually dragged by a human is locked: a future automatic
+      // recompute (mcp-htmleditor arch-layout / layout_arch_diagram) must
+      // never reposition it again. See arch_layout.py's _write_node_box.
+      if (moved) node.dataset.layout = 'manual';
       scheduleSave();
     };
     doc.addEventListener('pointermove', onMove);

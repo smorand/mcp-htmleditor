@@ -202,6 +202,36 @@
   .agenda-list { width:100%; border-collapse:collapse; }
   .agenda-list td { padding:12px 8px; border-bottom:1px solid #e0e4ea; font-size:16px; color:var(--ei-text); }
   .agenda-list td.num { width:56px; font-weight:700; color:var(--ei-orange); font-size:20px; }
+  /* Lane (swimlane) grouping several arch-row: box derived automatically by the
+     declarative layout engine (mcp-htmleditor arch-layout) from the union of its
+     rows' node boxes, never guessed by hand. See skill/types/arch-diagram.md.
+     The rest of the arch-* CSS (nodes, edges, shapes) is not shipped in the EI
+     charter: declare it in the slide if the diagram needs it. */
+  [data-type="arch-lane"] {
+    position:absolute; box-sizing:border-box; pointer-events:none;
+    border:1.5px dashed var(--ei-gray-dark); border-radius:8px;
+  }
+  [data-type="arch-lane"]::before {
+    content: attr(data-label);
+    position:absolute; top:-16px; left:6px;
+    font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    color: var(--ei-gray-dark);
+    background:#fff; padding:0 4px; border-radius:2px;
+  }
+  [data-type="arch-col"] { position:absolute; box-sizing:border-box; }
+  [data-type="arch-col"][data-label]::before {
+    content: attr(data-label);
+    position:absolute; top:4px; left:8px;
+    font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    color: var(--ei-gray-dark); pointer-events:none;
+  }
+  /* Numbered step badge on an arch-edge (data-step="N"): see slides-empty.html for the
+     rationale, identical rule here so both charters share the same markup contract. */
+  .arch-edge-badge {
+    position:absolute; width:14px; height:14px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:8px; font-weight:700; line-height:1;
+  }
   /* ── Mode présentation (fullscreen) — masquer UI, slide en plein écran ————— */
   :fullscreen .toolbar,
   :fullscreen .nav-arrow { display:none !important; }

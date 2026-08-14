@@ -104,6 +104,17 @@ pickers (title, subtitle, h1-h5, paragraph, table, list). Drag-and-drop editing:
 reorder top-level document blocks with a left-side grip handle (DOM order = visual
 order, no attribute added), and move arch-diagram nodes with the mouse (position
 written as readable `data-x`/`data-y` percentages plus inline `left`/`top` in %).
+Declarative arch-diagrams (with at least one `arch-row`) also support add/remove
+node and add-edge via right-click (see `skill/types/arch-diagram.md` § Édition à
+la souris): every structural change saves then calls the server's `arch-layout`
+engine, the browser never computes a position itself.
+
+Undo/redo (Ctrl+Z / Cmd+Z, Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y), active in edit mode:
+covers every structural mutation above (node move, node/edge/table/gantt-task
+add/remove, slide insert/delete, document block insert/reorder) with a 50-deep
+undo/redo stack. Plain text edits inside a text zone keep using the browser's own
+native undo, untouched by this feature — see `.agent_docs/html-conventions.md` §
+Undo / redo for the exact scope and the native-vs-structural interaction.
 
 ### MCP server (stdio)
 
@@ -131,6 +142,21 @@ mcp-htmleditor export pptx input.html output.pptx
 mcp-htmleditor export docx input.html output.docx
 ```
 
+### Architecture diagram layout
+
+```bash
+mcp-htmleditor arch-layout input.html [--diagram-id ID]
+```
+
+Computes and writes the positions of every declarative architecture diagram
+(`data-type="arch-diagram"` with at least one `arch-row` child) in the file: the LLM
+authors topology only (rows, nodes, edges, optional lanes), never `%` coordinates, and
+this command derives them deterministically — no collision between nodes, straight
+connectors on aligned columns, labels centered on their segment, lane boxes sized from
+the union of the rows they declare. Diagrams with no `arch-row` (legacy, hand authored
+`data-x`/`data-y`) are left untouched, so both formats coexist. See
+`skill/types/arch-diagram.md`.
+
 The PPTX export writes one 16:9 slide (13.333 x 7.5 in) per element carrying
 `data-type="slide"`, with a fallback on `article.slide` for older templates. The
 navigation shell, `<script>` and `<style>` are never exported. It detects the
@@ -143,6 +169,20 @@ Base64 images are embedded and relative paths resolve against the HTML file. The
 command prints the slide count, lists every skipped item and exits non zero when
 no slide could be written. Full breakdown of what is faithful, approximated or
 lost: `skill/workflow-export.md`.
+
+### Architecture diagram QA
+
+```bash
+mcp-htmleditor arch-checklist   # print the resolved checklist + where it lives
+```
+
+After every `arch-layout` run, the agent workflow spawns a dedicated review
+sub-agent that checks the rendered diagram against this checklist (screenshot,
+compare, fix, re-layout, bounded to 2 passes) so the main conversation is not
+polluted by iteration — see `skill/workflow-arch-qa.md`. The checklist itself
+lives at `~/.config/mcp-htmleditor/arch-checks/arch-diagram-checklist.md`
+(seeded once by `make install`, never overwritten on reinstall): add or change
+a control by editing that file directly, no code change or reinstall needed.
 
 The DOCX export carries the document charter into Word. The charter is read from
 `data-doc-template` on the document `<article>` (`perso`, `ei`), a matching
@@ -163,6 +203,7 @@ figures must be PNG, never SVG.
 | `open_file(file)` | Switch to a different HTML file. |
 | `update_start()` | Signal modification start (shows overlay in browser). |
 | `update_end()` | Signal modification complete (browser reloads). |
+| `layout_arch_diagram(file, diagram_id=None)` | Compute and write positions for every declarative architecture diagram in `file` (see [Architecture diagram layout](#architecture-diagram-layout)). |
 
 ### Multiple presentations at once
 
@@ -223,6 +264,8 @@ run `make bootstrap-ei`; never patch the bootstrap directly.
 | `gantt-task` | Single Gantt task bar |
 | `arch-diagram` | Architecture diagram container |
 | `arch-node` | Architecture diagram node |
+| `arch-row` | Declarative layout row (input to `arch-layout`, inert to every exporter) |
+| `arch-lane` | Declarative layout lane/swimlane (input to `arch-layout`, box computed automatically) |
 | `annotation` | Image annotation callout |
 | `annotated-image` | Image + annotations container |
 | `table` | HTML table |
@@ -240,6 +283,7 @@ Every variable is read through the `Settings` class (pydantic-settings,
 | `HTMLEDITOR_PORT` | `7842` | Preferred HTTP port, tried first before auto-picking a free one in 7840-7849 |
 | `HTMLEDITOR_POLL_INTERVAL` | `1000` | Browser polling interval in ms |
 | `HTMLEDITOR_TEMPLATES_DIR` | `~/.config/mcp-htmleditor/templates` | Templates directory |
+| `HTMLEDITOR_ARCH_CHECKS_DIR` | `~/.config/mcp-htmleditor/arch-checks` | Arch-diagram QA checklist directory (edit in place to add/change a control, see `mcp-htmleditor arch-checklist`) |
 | `HTMLEDITOR_CACHE_DIR` | `~/.cache/mcp-htmleditor` | Cache base (logs, generated `reference.docx`) |
 | `HTMLEDITOR_LOG_DIR` | `<cache>/logs` | Log directory (`HTMLEDITOR_LOGS` is an accepted alias) |
 | `HTMLEDITOR_BIN_DIR` | `~/.local/bin` | CLI install target |
@@ -275,7 +319,8 @@ src/mcp_htmleditor/
 ├── version.py       __version__, written at build time from the git tag
 ├── templates.py     template registry + search-path resolution
 ├── skill_content.py assembles `mcp-htmleditor skill` output
-├── mcp_server.py    FastMCP server with 6 tools
+├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
+├── mcp_server.py    FastMCP server with 7 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/

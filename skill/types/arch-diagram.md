@@ -1,5 +1,167 @@
 # Types: Schéma d'architecture
 
+## Format déclaratif (recommandé, à partir de 4 nœuds)
+
+**Ne jamais calculer de position à la main dès qu'un diagramme a un flux à plusieurs
+rangées ou plus de 3 nœuds.** Un moteur de layout déterministe (`arch_layout.py`)
+existe précisément pour ça: le LLM déclare des rangées, des nœuds et des relations,
+jamais de `%`, et une commande calcule tout le reste. Ça élimine par construction les
+bugs récurrents du calcul manuel: superposition de nœuds, flèches penchées, labels
+posés loin de leur flèche, lane qui déborde de son contenu.
+
+### Ce que le LLM écrit
+
+```html
+<div data-type="arch-diagram" data-diagram-id="mcp-arch" style="position:relative; width:100%; height:320px;">
+
+  <div data-type="arch-lane" data-lane-id="edge" data-label="Edge" data-rows="0-1"></div>
+
+  <div data-type="arch-row" data-row="0">
+    <div data-type="arch-node" data-id="agent" data-label="Agent LLM" data-shape="box"
+         style="border:2px solid #003A8D; background:#003A8D; color:#fff; border-radius:4px;"></div>
+    <div data-type="arch-node" data-id="mcp" data-label="Serveur MCP" data-shape="box"
+         style="border:2px solid #003A8D; background:#e6ecf7; color:#003A8D; border-radius:4px;"></div>
+  </div>
+
+  <div data-type="arch-row" data-row="1">
+    <div data-type="arch-node" data-id="file" data-label="Fichier HTML" data-span="2"
+         style="border:2px solid #FBAE40; background:#fff6e6; color:#8a5b00; border-radius:4px;"></div>
+  </div>
+
+  <div data-type="arch-edge" data-from="agent" data-to="mcp" data-label="MCP stdio"></div>
+  <div data-type="arch-edge" data-from="agent" data-to="file" data-label="écriture directe"></div>
+
+</div>
+```
+
+Puis calculer et écrire les positions:
+
+```bash
+mcp-htmleditor arch-layout mon-fichier.html
+```
+
+ou via l'outil MCP `layout_arch_diagram(file, diagram_id=None)`, avant de valider
+visuellement (capture d'écran, cf. `skill/workflow-create.md` § Validation visuelle).
+Les deux appellent la même fonction Python, zéro comportement différent.
+
+### Règles
+
+- **`arch-row`** groupe les nœuds d'une même rangée horizontale (`data-row` = index
+  0-based, ordre non important dans le fichier: le moteur les trie). Poids optionnel
+  `data-height-weight` (défaut 1, rangées égales).
+- **`arch-node`** à l'intérieur d'une rangée: `data-id` obligatoire et unique dans le
+  diagramme (utilisé par les arêtes), `data-label`, `data-shape`, et un `style` pour la
+  seule décoration visuelle (couleur, bordure) — **jamais** `data-x`, `data-y`, `left`,
+  `top`, `width`, `height`: ces attributs sont uniquement la sortie du moteur, les écrire
+  à la main serait immédiatement écrasé au prochain calcul. `data-span` (défaut 1) élargit
+  un nœud sur plusieurs unités de colonne, façon `colspan`.
+- **`arch-edge`** entre deux `data-id`: `data-from`, `data-to`, `data-label` optionnel,
+  `data-style` optionnel (`solid`/`dashed`/`dotted`). Le moteur route un segment droit
+  entre nœuds de la même rangée, et un coude (ou une ligne verticale unique si les deux
+  nœuds sont alignés en colonne) entre rangées adjacentes. La pointe de flèche est
+  toujours posée sur le nœud cible (`data-to`), quel que soit l'ordre visuel gauche/droite.
+- **`arch-lane`** (optionnel): `data-lane-id`, `data-label`, `data-rows="debut-fin"`
+  (index de rangées couvertes, ex. `"0-1"` ou juste `"2"`). Sa boîte est calculée comme
+  l'union des nœuds des rangées couvertes plus un padding fixe — jamais devinée à l'œil,
+  donc jamais trop petite pour son contenu.
+- **`arch-row`/`arch-lane` restent en permanence dans le DOM**, jamais aplatis ni
+  supprimés après calcul: ajouter un nœud à une rangée existante puis relancer
+  `arch-layout` fonctionne sans reconstruire le diagramme.
+- **Invariant CSS dur**: `arch-row`/`arch-lane` ne doivent **jamais** recevoir
+  `position:relative`. Les `%` calculés sur les `arch-node`/`arch-edge` se résolvent
+  contre le conteneur `arch-diagram` de premier niveau, exactement comme l'export PPTX
+  les relit (`export/to_pptx.py::_render_arch`, traversée récursive) — poser
+  `position:relative` sur un wrapper intermédiaire romprait cette parité en silence.
+
+### Primitives avancées (V2): piles imbriquées, alignement, badges d'étape
+
+Trois ajouts pour couvrir les diagrammes narratifs (flux numérotés, cartes avec icône
++ sous-description, colonnes à hauteur mixte) sans sortir du modèle déclaratif:
+
+- **`arch-col`** (pile verticale imbriquée dans un slot de rangée): un enfant direct
+  d'`arch-row` peut être un `arch-col` au lieu d'un `arch-node`. Il occupe un slot de
+  la distribution horizontale (même `data-span`) mais répartit sa propre hauteur entre
+  ses `arch-node` enfants (empilés, poids optionnel `data-height-weight` par enfant).
+  Cas d'usage: une carte large à côté de deux petites cartes empilées dans la même
+  rangée (ex. "Coffre-fort" à côté de "Observabilité"/"Evaluation" empilés).
+  ```html
+  <div data-type="arch-row" data-row="0">
+    <div data-type="arch-node" data-id="vault" data-label="Coffre-fort"></div>
+    <div data-type="arch-col">
+      <div data-type="arch-node" data-id="obs" data-label="Observabilité"></div>
+      <div data-type="arch-node" data-id="eval" data-label="Evaluation"></div>
+    </div>
+  </div>
+  ```
+- **`arch-spacer`** (réservation de largeur invisible): un slot de rangée sans nœud,
+  utilisé pour aligner un nœud d'une rangée sous une colonne précise d'une autre
+  rangée plus large, sans que le nœud isolé s'étale sur toute la largeur.
+  ```html
+  <div data-type="arch-row" data-row="0">
+    <div data-type="arch-node" data-id="proxy" data-label="IA Gen Proxy"></div>
+    <div data-type="arch-spacer"></div>
+    <div data-type="arch-spacer"></div>
+  </div>
+  <div data-type="arch-row" data-row="1">
+    <div data-type="arch-node" data-id="vllm" data-label="vLLM"></div>
+    <div data-type="arch-node" data-id="qwen" data-label="Qwen"></div>
+    <div data-type="arch-node" data-id="slot" data-label="slot libre"></div>
+  </div>
+  ```
+  Ici `proxy` s'aligne exactement sur la colonne de `vllm`, sans chevaucher `qwen`.
+- **`data-step`** sur `arch-edge` (badge numéroté): pose un cercle coloré contenant
+  le numéro au **véritable milieu du segment** (pas au point offset du libellé texte,
+  les deux peuvent coexister). Couleur via `data-color` (défaut bleu). Convention des
+  diagrammes à étapes numérotées (①②③...) avec une légende à côté du schéma.
+  ```html
+  <div data-type="arch-edge" data-from="harness" data-to="gateway"
+       data-step="5" data-color="#2CA02C"></div>
+  ```
+
+Limite connue: le badge (`arch-edge-badge`) n'est pas encore converti à l'export PPTX
+(seul le segment/pointe/label le sont); documenté comme élément perdu à l'export tant
+que `export/to_pptx.py` n'a pas de branche dédiée.
+
+### Édition à la souris (mode édition du navigateur)
+
+En mode édition, un diagramme déclaratif (contenant au moins un `arch-row`) offre des
+actions à la souris symétriques du texte/documents:
+
+- **Clic droit sur le fond du diagramme** → "＋ Ajouter nœud": choisit une rangée
+  existante ou en crée une nouvelle, insère un `arch-node` nu (sans position).
+- **Clic droit sur un nœud** → "Renommer", "Changer forme", "➜ Créer une arête
+  depuis ce nœud" (clique ensuite sur le nœud cible, ou Echap pour annuler),
+  "Supprimer" (retire aussi toute arête qui référençait ce nœud).
+
+Chaque action déclenche automatiquement: sauvegarde du DOM (`saveContent`), puis
+`POST /arch-layout` (le navigateur ne calcule jamais de position lui-même, il
+écrit le même markup déclaratif que le LLM et demande au serveur de le résoudre),
+puis rechargement automatique via le polling existant. Un diagramme legacy (sans
+`arch-row`) garde l'ancien comportement (nœud positionné en dur à la création, à
+`data-x="40.0"`) pour ne rien casser sur les fichiers existants.
+
+### Hors scope V1 (limite documentée, pas un oubli)
+
+- Une arête qui saute plus d'une rangée est routée quand même (même formule de coude),
+  mais **sans vérification** qu'elle ne traverse pas une rangée intermédiaire: le moteur
+  émet un avertissement (`diagrams_updated`/`warnings` du rapport CLI/MCP). Au-delà de 2
+  rangées d'écart, découper le diagramme ou passer par une rangée intermédiaire.
+- Pas de minimisation de croisements: si un diagramme a besoin de ça, c'est qu'il a trop
+  de nœuds pour une slide de toute façon (cf. `skill/types/slides.md` § budget 540 px).
+- Un nœud verrouillé (`data-layout="manual"`, posé automatiquement par un glisser-déposer
+  humain dans le navigateur) garde sa position exacte lors d'un recalcul ultérieur; ses
+  arêtes sont routées depuis sa position réelle, pas depuis la ligne médiane théorique de
+  sa rangée.
+
+---
+
+## Format legacy (diagrammes simples, 2-3 nœuds)
+
+Pour un tout petit schéma (2-3 nœuds, pas de flux multi-rangées), le calcul manuel
+reste valide et documenté ci-dessous — c'est le format que l'exporteur PPTX a toujours
+lu, et qu'un `mcp-htmleditor arch-layout` sur un diagramme sans `arch-row` laisse
+intact (les deux formats coexistent dans le même fichier).
+
 ## Positionnement: data-x / data-y en pourcentages (règle absolue)
 
 Un nœud (`data-type="arch-node"`) porte sa position dans des attributs LISIBLES:
