@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from mcp_htmleditor import arch_layout
 
@@ -658,3 +658,168 @@ def test_check_diagram_clean_on_legacy_markup_without_overlap() -> None:
     assert diagram is not None
 
     assert arch_layout.check_diagram(diagram) == []
+
+
+def _badge(soup: BeautifulSoup, edge_id: str) -> Tag:
+    """Find the step badge decoration generated for one edge id."""
+    badge = soup.find(attrs={"class": "arch-edge-badge", "data-edge-of": edge_id})
+    assert badge is not None
+    assert isinstance(badge, Tag)
+    return badge
+
+
+def _style_pct(element: Tag, prop: str) -> float:
+    """Read one percent value (``left``/``top``) out of an element's inline style."""
+    style = str(element.get("style"))
+    return float(style.split(f"{prop}:")[1].split("%", maxsplit=1)[0])
+
+
+def test_badge_on_stacked_nodes_is_pushed_clear_of_the_narrow_gutter(tmp_path: Path) -> None:
+    """Defect 1 (skill/checks/arch-diagram-checklist.md § Diagrammes multi-flux): a
+    numbered step badge on an edge between two nodes stacked in the same ``arch-col``
+    (NESTED_GUTTER_PCT, 2% — narrower than the badge's own ~14px) must not sit at the
+    raw geometric midpoint, which always overlaps both node borders. It must be pushed
+    to a clear spot beside the pair instead.
+    """
+    spec = """
+    <div data-type="arch-diagram" style="position:relative; width:100%; height:280px;">
+      <div data-type="arch-row" data-row="0">
+        <div data-type="arch-node" data-id="other" data-label="Other"></div>
+        <div data-type="arch-col">
+          <div data-type="arch-node" data-id="top" data-label="Gateway"></div>
+          <div data-type="arch-node" data-id="bottom" data-label="Tools"></div>
+        </div>
+      </div>
+      <div data-type="arch-edge" data-from="top" data-to="bottom" data-step="1" data-color="#17BECF"></div>
+    </div>
+    """
+    path = _write(tmp_path, spec)
+    report = arch_layout.layout_file(path)
+    assert report.warnings == ()
+
+    boxes = _node_boxes(path.read_text(encoding="utf-8"))
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    edge = soup.find(attrs={"data-from": "top", "data-to": "bottom"})
+    assert edge is not None
+    badge = _badge(soup, str(edge.get("data-edge-id")))
+    badge_box = arch_layout.PctBox(
+        x=_style_pct(badge, "left") - 0.1, y=_style_pct(badge, "top") - 0.1, width=0.2, height=0.2
+    )
+
+    assert not badge_box.overlaps(boxes["top"])
+    assert not badge_box.overlaps(boxes["bottom"])
+    assert not badge_box.overlaps(boxes["other"])
+
+
+def test_badge_on_a_comfortable_gutter_keeps_the_geometric_midpoint(tmp_path: Path) -> None:
+    """A badge on an edge with a normal-width column gutter (GUTTER_COL_PCT, 4%, or wider)
+    must NOT be relocated: only the narrow NESTED_GUTTER_PCT stacking case is cramped.
+    """
+    spec = """
+    <div data-type="arch-diagram" style="position:relative; width:100%; height:280px;">
+      <div data-type="arch-row" data-row="0">
+        <div data-type="arch-node" data-id="a" data-label="A"></div>
+        <div data-type="arch-node" data-id="b" data-label="B"></div>
+      </div>
+      <div data-type="arch-edge" data-from="a" data-to="b" data-step="1"></div>
+    </div>
+    """
+    path = _write(tmp_path, spec)
+    arch_layout.layout_file(path)
+
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    edge = soup.find(attrs={"data-from": "a", "data-to": "b"})
+    assert edge is not None
+    badge = _badge(soup, str(edge.get("data-edge-id")))
+    boxes = _node_boxes(path.read_text(encoding="utf-8"))
+
+    # Unrelocated: the badge sits on the segment's own midpoint, between the two boxes.
+    assert boxes["a"].right < _style_pct(badge, "left") < boxes["b"].x
+
+
+def test_side_exit_used_when_target_is_more_horizontal_than_vertical_offset(tmp_path: Path) -> None:
+    """Defect 2 (skill/checks/arch-diagram-checklist.md § Sortie d'arete par le cote): a
+    node stacked in an arch-col (not the row's last node) whose cross-row target sits far
+    more to the side than below/above it must exit through its own left/right edge, not
+    its bottom (which would otherwise force the line to hug a sibling directly beneath it
+    for the entire horizontal leg before turning). The rendered edge must start as an
+    horizontal segment (a side exit), not a vertical one (the old bottom/top elbow).
+    """
+    spec = """
+    <div data-type="arch-diagram" style="position:relative; width:100%; height:280px;">
+      <div data-type="arch-row" data-row="0" data-height-weight="3.0">
+        <div data-type="arch-node" data-id="filler" data-label="Filler" data-span="0.6"></div>
+        <div data-type="arch-col" data-span="1.6">
+          <div data-type="arch-node" data-id="stack_1" data-label="Stack 1"></div>
+          <div data-type="arch-node" data-id="stack_2" data-label="Stack 2"></div>
+          <div data-type="arch-node" data-id="top_stack" data-label="Bottom-most of stack"></div>
+        </div>
+        <div data-type="arch-spacer" data-span="1.0"></div>
+      </div>
+      <div data-type="arch-row" data-row="1" data-height-weight="0.65">
+        <div data-type="arch-node" data-id="filler2" data-label="Filler2" data-span="1.6"></div>
+        <div data-type="arch-node" data-id="target" data-label="Target" data-span="0.9"></div>
+      </div>
+      <div data-type="arch-edge" data-from="top_stack" data-to="target"></div>
+    </div>
+    """
+    path = _write(tmp_path, spec)
+    report = arch_layout.layout_file(path)
+    assert report.warnings == ()
+
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    edge = soup.find(attrs={"data-from": "top_stack", "data-to": "target"})
+    assert edge is not None
+    assert "arch-line-h" in (edge.get("class") or []), "expected a side (horizontal) exit, not a bottom elbow"
+
+    boxes = _node_boxes(path.read_text(encoding="utf-8"))
+    all_boxes = list(boxes.values())
+    assert arch_layout._detect_collisions(all_boxes) == []
+
+
+def test_side_exit_falls_back_to_the_elbow_when_the_channel_is_blocked(tmp_path: Path) -> None:
+    """When neither the right nor the left column gutter beside the source is free (every
+    candidate channel crosses another node), the engine must fall back to the obstacle-
+    checked bottom/top elbow instead of routing a side exit through an occupied column.
+    """
+    spec = """
+    <div data-type="arch-diagram" style="position:relative; width:100%; height:280px;">
+      <div data-type="arch-row" data-row="0">
+        <div data-type="arch-node" data-id="left" data-label="Left"></div>
+        <div data-type="arch-node" data-id="source" data-label="Source"></div>
+        <div data-type="arch-node" data-id="right" data-label="Right"></div>
+      </div>
+      <div data-type="arch-row" data-row="1">
+        <div data-type="arch-node" data-id="below_left" data-label="BelowLeft"></div>
+        <div data-type="arch-node" data-id="below_mid" data-label="BelowMid"></div>
+        <div data-type="arch-node" data-id="target" data-label="Target"></div>
+      </div>
+      <div data-type="arch-edge" data-from="source" data-to="target"></div>
+    </div>
+    """
+    path = _write(tmp_path, spec)
+    report = arch_layout.layout_file(path)
+    assert report.warnings == ()
+
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    boxes = _node_boxes(path.read_text(encoding="utf-8"))
+    edge = soup.find(attrs={"data-from": "source", "data-to": "target"})
+    assert edge is not None
+    edge_id = edge.get("data-edge-id")
+    segments = [edge, *soup.find_all(attrs={"data-edge-of": edge_id})]
+    obstacles = [boxes["left"], boxes["right"], boxes["below_left"], boxes["below_mid"]]
+
+    def _seg_box(el: Any) -> arch_layout.PctBox:
+        style = str(el.get("style"))
+        x = float(style.split("left:")[1].split("%", maxsplit=1)[0])
+        y = float(style.split("top:")[1].split("%", maxsplit=1)[0])
+        width = float(style.split("width:")[1].split("%", maxsplit=1)[0]) if "width:" in style else 0.5
+        height = float(style.split("height:")[1].split("%", maxsplit=1)[0]) if "height:" in style else 0.5
+        return arch_layout.PctBox(x=x, y=y, width=max(width, 0.5), height=max(height, 0.5))
+
+    for seg in segments:
+        if "left:" not in str(seg.get("style") or ""):
+            continue
+        seg_box = _seg_box(seg)
+        for obstacle in obstacles:
+            assert not seg_box.overlaps(obstacle), f"segment {seg} cuts through {obstacle}"
