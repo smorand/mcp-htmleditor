@@ -120,6 +120,20 @@ documented as a known limitation in `skill/types/mail.md`, worked around by clon
 styled section instead of inserting a blank block. See `skill/types/mail.md` for the full
 mail-safe ruleset.
 
+**2026-08 — `website` template added.** Fourth `data-doc-type` value (`presentation`,
+`document`, `mail`'s own `document`+`data-doc-template="mail"`, now `website`), tracked via
+a dedicated `isWebsite` flag in `editor.js` rather than reusing `isDocument`: it needs the
+SAME document block-insert/drag machinery (`getDocumentArticle()` only looks for
+`article[data-type="document"]`, which the website bootstrap also uses) but must show
+NEITHER export button, unlike `mail` which keeps the DOCX button visible even though
+`charter_for("mail")` returns no reference. `updateDocActionsVisibility()` now gates the
+block-insert toolbar on `isDocument || isWebsite`, but the DOCX button stays gated on
+`isDocument` alone. No export code path (`to_pptx.py`, `to_docx.py`) reads `data-doc-type`
+at all, so this is a pure UI-visibility distinction, not an export-format check; a CLI
+`export docx/pptx` invoked directly on a website file is not defended against (out of
+scope, no UI path can trigger it). See `skill/types/website.md` for the full ruleset,
+including the click-target-vs-editable-text separation a working `.site-tab` needs.
+
 ## LLM workflow
 
 ```

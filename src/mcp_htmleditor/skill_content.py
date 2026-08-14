@@ -33,6 +33,7 @@ _SUBDOCS = [
     "types/slides.md",
     "types/document.md",
     "types/mail.md",
+    "types/website.md",
     "types/gantt.md",
     "types/arch-diagram.md",
     "types/annotated-image.md",
