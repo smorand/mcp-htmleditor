@@ -471,6 +471,172 @@ def test_gantt_geometry_prefers_inline_percentages() -> None:
     assert gantt_geometry(task, (_month(2024, 1), 12)) == (10.0, 30.0)
 
 
+# A hand-authored Gantt with no data-type/gantt-row markup: two label+track rows,
+# stacked sub-lane bars (top offsets), a milestone marker line, a hatch-patterned
+# "done" bar, a header row and a legend row as *siblings* of the row stack (not
+# descendants), matching the shape found in the client deck this variant fixes.
+INLINE_GANTT_DECK = """<!DOCTYPE html>
+<html data-doc-type="presentation">
+<body>
+<section data-type="slide" data-id="s1" data-title="Roadmap">
+  <div class="slide-body">
+    <div style="display:flex; margin-left:80px;">
+      <div style="flex:0 0 33.33%; text-align:center;">Jan 26</div>
+      <div style="flex:0 0 33.33%; text-align:center;">Feb 26</div>
+      <div style="flex:0 0 33.33%; text-align:center;">Mar 26</div>
+    </div>
+    <div style="flex:1;">
+      <div style="display:flex; align-items:stretch; min-height:26px;">
+        <div style="flex:0 0 80px;">Alpha</div>
+        <div style="flex:1; position:relative; min-height:26px;">
+          <div style="position:absolute; left:33%; top:0; bottom:0; width:2px; background:#FBAE40;"></div>
+          <div style="position:absolute; left:0%; width:30%; top:2px; height:10px; background:#003A8D;">Design</div>
+          <div style="position:absolute; left:35%; width:30%; top:13px; height:10px; background:#888;
+                      background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0,
+                      rgba(255,255,255,.45) 2px,transparent 2px,transparent 5px);">Done</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:stretch; min-height:15px;">
+        <div style="flex:0 0 80px;">Beta</div>
+        <div style="flex:1; position:relative; min-height:15px;">
+          <div style="position:absolute; left:60%; width:25%; top:2px; height:10px; background:#C0392B;">Build</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:5px;">
+      <span><span style="width:10px; height:8px; background:#003A8D; display:inline-block;"></span>Alpha</span>
+      <span><span style="width:10px; height:8px; background:#C0392B; display:inline-block;"></span>Beta</span>
+      <span><span style="width:10px; height:8px; background:#888;
+            background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.45) 0,
+            rgba(255,255,255,.45) 2px,transparent 2px,transparent 5px); display:inline-block;"></span>Termine</span>
+      <span style="border-left:2px solid #d9dee6; padding-left:8px;">
+        <span style="width:2px; height:11px; background:#FBAE40; display:inline-block;"></span>Aujourd'hui
+      </span>
+    </div>
+  </div>
+</section>
+</body>
+</html>
+"""
+
+
+@pytest.fixture
+def inline_gantt_deck(tmp_path: Path) -> Path:
+    """Write the hand-authored, class-free Gantt deck to disk."""
+    path = tmp_path / "inline-gantt.html"
+    path.write_text(INLINE_GANTT_DECK, encoding="utf-8")
+    return path
+
+
+def test_inline_gantt_bars_are_positioned_shapes(inline_gantt_deck: Path, tmp_path: Path) -> None:
+    """A class-free Gantt is detected structurally: real bars, no fallback table,
+    no giant flattened text block for the whole chart (the original bug)."""
+    out = tmp_path / "deck.pptx"
+    report = to_pptx(str(inline_gantt_deck), str(out))
+
+    assert report.warnings == []
+    slide = Presentation(str(out)).slides[0]
+    assert not any(shape.has_table for shape in slide.shapes)
+    texts = [shape.text_frame.text for shape in slide.shapes if shape.has_text_frame]
+    assert "Design" in texts
+    assert "Build" in texts
+    assert "Done" in texts
+
+
+def test_inline_gantt_stacked_bars_do_not_overlap(inline_gantt_deck: Path, tmp_path: Path) -> None:
+    """Two bars sharing a row (different inline top offsets) land at distinct
+    vertical bands instead of both centering on the row's mid-line."""
+    out = tmp_path / "deck.pptx"
+    to_pptx(str(inline_gantt_deck), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    design = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text == "Design")
+    done = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text == "Done")
+    assert design.top != done.top
+    assert design.top + design.height <= done.top + Inches(0.02)
+
+
+def test_inline_gantt_marker_line_is_a_thin_colored_rect(inline_gantt_deck: Path, tmp_path: Path) -> None:
+    """A markerless absolutely positioned track child (no text) becomes a thin
+    vertical rect at its left percentage, reusing the grid-line primitive."""
+    out = tmp_path / "deck.pptx"
+    to_pptx(str(inline_gantt_deck), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    markers = [
+        s
+        for s in slide.shapes
+        if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE
+        and s.fill.type is not None
+        and str(s.fill.fore_color.rgb) == "FBAE40"
+        and s.width < Inches(0.05)
+    ]
+    # one is the marker line drawn across row 1's track, the other the legend swatch
+    assert len(markers) == 2
+    tops = sorted(s.top for s in markers)
+    assert tops[1] - tops[0] > Inches(0.5)  # the track marker sits well above the legend row
+
+
+def test_inline_gantt_hatch_marks_the_done_bar(inline_gantt_deck: Path, tmp_path: Path) -> None:
+    """A CSS repeating-linear-gradient background becomes a real PPTX pattern
+    fill, both on the bar and on the matching legend swatch."""
+    out = tmp_path / "deck.pptx"
+    to_pptx(str(inline_gantt_deck), str(out))
+
+    from pptx.enum.dml import MSO_FILL_TYPE
+
+    slide = Presentation(str(out)).slides[0]
+    hatched_shapes = [
+        s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE and s.fill.type == MSO_FILL_TYPE.PATTERNED
+    ]
+    assert len(hatched_shapes) == 2  # the "Done" bar and the "Termine" legend swatch
+    done_label = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text == "Done")
+    bar = next(
+        s
+        for s in hatched_shapes
+        if s.top <= done_label.top <= s.top + s.height and s.left <= done_label.left <= s.left + s.width
+    )
+    assert bar is not None
+    assert "Termine" in [shape.text_frame.text for shape in slide.shapes if shape.has_text_frame]
+
+
+def test_inline_gantt_header_and_legend_render_once(inline_gantt_deck: Path, tmp_path: Path) -> None:
+    """The header (month cells) and legend, siblings of the row stack in the
+    DOM, are consumed before the generic block-flow walk reaches them: no
+    duplicate flattened text block, no leftover generic paragraph."""
+    out = tmp_path / "deck.pptx"
+    to_pptx(str(inline_gantt_deck), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    texts = [shape.text_frame.text for shape in slide.shapes if shape.has_text_frame]
+    assert texts.count("Jan 26") == 1
+    assert not any("Jan 26" in t and "Feb 26" in t and "\n" in t for t in texts)
+    assert "Aujourd'hui" in "".join(texts)
+    assert "Alpha" in texts and texts.count("Alpha") == 2  # row label and legend entry
+
+
+def test_inline_gantt_long_label_is_truncated_not_overflowing(tmp_path: Path) -> None:
+    """A label far longer than its narrow bar is shrunk then ellipsised, instead
+    of word-wrapping past the bar's height into the row above/below it (the
+    ghost-text bug the fixed-width, non-wrapping label textbox now avoids)."""
+    deck = INLINE_GANTT_DECK.replace(
+        'left:0%; width:30%; top:2px; height:10px; background:#003A8D;">Design',
+        'left:0%; width:6%; top:2px; height:10px; background:#003A8D;">'
+        "A very long task label that cannot possibly fit in this narrow bar",
+    )
+    source = tmp_path / "long-label.html"
+    source.write_text(deck, encoding="utf-8")
+    out = tmp_path / "deck.pptx"
+
+    to_pptx(str(source), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    label = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text.startswith("A very long"))
+    assert label.text_frame.word_wrap is False
+    assert label.text_frame.text.endswith("\u2026")
+    assert len(label.text_frame.text) < len("A very long task label that cannot possibly fit in this narrow bar")
+
+
 def test_arch_nodes_become_autoshapes(section_deck: Path, tmp_path: Path) -> None:
     """Diagram nodes are real shapes with an outline, and keep their label."""
     out = tmp_path / "deck.pptx"

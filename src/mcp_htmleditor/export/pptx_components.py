@@ -9,7 +9,7 @@ not expose (table cell borders, EMU conversion).
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from bs4 import Tag
@@ -43,11 +43,21 @@ GANTT_DATES_PX = 112.0
 
 @dataclass(frozen=True)
 class GanttRow:
-    """One Gantt line: its label, its optional date column and its bars."""
+    """One Gantt line: its label, its optional date column and its bars.
+
+    ``markers`` and ``track_h_px`` only apply to the custom inline-styled
+    variant (no ``gantt-row``/``gantt-track`` classes, one flex row per lane
+    with absolutely positioned children): vertical milestone lines drawn
+    across the whole row, and the row's own CSS ``min-height`` in pixels so a
+    task's inline ``top``/``height`` can be rescaled into the exported row
+    band. Both are empty/zero for the documented class-based shape.
+    """
 
     label: Tag | None
     dates: Tag | None
     tasks: list[Tag]
+    markers: list[Tag] = field(default_factory=list)
+    track_h_px: float = 0.0
 
 
 def month_index(value: str | list[str] | None) -> int | None:
@@ -92,6 +102,26 @@ def gantt_geometry(task: Tag, period: tuple[int, int]) -> tuple[float, float]:
         return 0.0, 100.0
     end = end if end is not None else start
     return (start - first) / span * 100.0, max((end - start + 1) / span * 100.0, 2.0)
+
+
+def gantt_task_band(task: Tag, track_h_px: float) -> tuple[float, float]:
+    """Return the (top %, height %) of a task bar within its row's track.
+
+    Only meaningful for the custom inline-styled Gantt variant, where several
+    bars stack in sub-lanes inside one row via an inline ``top`` offset (in
+    px) against the row's own CSS ``min-height`` (also px, ``track_h_px``).
+    Falls back to a full-height single band when either measurement is
+    missing, which centers the bar exactly like the documented single-bar
+    row always did.
+    """
+    if track_h_px <= 0.0:
+        return 0.0, 100.0
+    props = style_props(task)
+    top_px = parse_px(props.get("top", ""))
+    height_px = parse_px(props.get("height", "")) or track_h_px
+    top_pct = min(max(top_px / track_h_px * 100.0, 0.0), 100.0)
+    height_pct = min(max(height_px / track_h_px * 100.0, 1.0), 100.0 - top_pct)
+    return top_pct, height_pct
 
 
 # ---------------------------------------------------------------------------

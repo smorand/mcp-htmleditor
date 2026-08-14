@@ -190,3 +190,61 @@ calculée depuis `data-start` / `data-end` sur la période du graphique
 (`data-period-start` / `data-period-end` du conteneur, sinon min et max des
 tâches). `data-depends-on` reste sémantique, aucune flèche de dépendance n'est
 dessinée. Voir `skill/workflow-export.md`.
+
+---
+
+## Variante: Gantt "inline" sans classes (détection structurelle)
+
+Un deck reçu tel quel (pas rédigé avec les conventions ci-dessus) peut construire un
+Gantt entièrement en `style="..."` inline, sans `data-type="gantt"` ni
+`.gantt-row`/`.gantt-track`. L'export le détecte quand même **structurellement**,
+sans exiger d'attribut ou de classe: c'est délibéré, pour rester correct sur un
+fichier qu'on ne peut pas ou ne doit pas réécrire juste pour l'export.
+
+Forme reconnue (voir `_is_inline_gantt`/`_is_inline_gantt_row` dans `to_pptx.py`):
+
+```html
+<div style="display:flex; align-items:stretch; min-height:26px;">
+  <div style="flex:0 0 116px;">Libellé de la ligne</div>          <!-- largeur fixe -->
+  <div style="flex:1; position:relative; min-height:26px;">      <!-- la piste -->
+    <div style="position:absolute; left:33%; top:0; bottom:0;
+                width:2px; background:#FBAE40;"></div>           <!-- repère vertical -->
+    <div style="position:absolute; left:0%; width:30%;
+                top:2px; height:10px; background:#003A8D;">Tâche</div>
+  </div>
+</div>
+```
+
+Au moins deux de ces lignes côte à côte (frères directs d'un même conteneur, sans
+`data-type` ni descendant `.gantt-row`) suffisent à déclencher la détection. L'en-tête
+(cellules de mois) et la légende ne sont **pas** des descendants du conteneur de
+lignes: ce sont des frères, retrouvés par un flex-parent commun
+(`_inline_gantt_sibling`) et **consommés avant** le parcours générique pour éviter
+qu'ils ne soient rendus deux fois (une fois comme bloc générique, une fois par le
+renderer Gantt).
+
+Ce que l'export en tire, en plus du cas documenté ci-dessus:
+
+- **Sous-lignes empilées**: chaque tâche garde son propre `top` (px) contre le
+  `min-height` (px) de sa ligne, converti en bande verticale distincte au lieu de
+  centrer toutes les barres sur l'axe médian de la ligne (`gantt_task_band` dans
+  `pptx_components.py`).
+- **Lignes verticales de repère** (jalon, "aujourd'hui"): un enfant positionné en
+  absolu sans texte devient un trait fin coloré à son `left%`, via le même primitif
+  `_rect` que les séparateurs de trimestre.
+- **Hachures "terminé"**: un `background-image:repeating-linear-gradient(...)`
+  devient un vrai remplissage à motif PPTX (`auto.fill.patterned()`,
+  `MSO_PATTERN_TYPE.WIDE_UPWARD_DIAGONAL`), pas un texte de compromis; la légende
+  applique le même traitement à son pastille si elle porte le même style.
+- **Légende à deux natures d'entrées**: pastille de couleur (catégorie de ligne) et
+  repère fin (jalon), distingués par leur forme (`_is_marker_legend_entry`); les
+  deux se répartissent sur des lignes qui s'enroulent (wrap) plutôt que de forcer
+  une seule ligne qui déborderait de la diapositive sur une légende à 15 entrées.
+- **Libellé de barre trop long pour sa largeur**: réduit jusqu'à 5.5pt (le plancher
+  du gabarit source), puis tronqué avec `…` plutôt que laissé déborder hors de la
+  barre (`word_wrap=False` + `MSO_AUTO_SIZE.NONE`, sinon LibreOffice rend le
+  débordement par-dessus les lignes voisines).
+
+Aucune modification de code n'est nécessaire pour ce cas: aucun attribut `data-*` ni
+classe n'a besoin d'être ajouté au fichier source, la détection est purement
+structurelle. Test de référence: `tests/test_export_pptx.py::test_inline_gantt_*`.
