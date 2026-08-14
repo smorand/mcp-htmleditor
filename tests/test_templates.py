@@ -64,6 +64,14 @@ def test_mail_template_is_mail_safe() -> None:
     assert "display:grid" not in content
     assert "position:absolute" not in content
     assert "<script" not in content
+    # Ignore par le moteur Word d'Outlook (coins carres, ombre perdue); sans
+    # gravite en soi, mais overflow:hidden y laisse le contenu debordant
+    # visible au lieu de le couper: ne jamais s'appuyer sur ce trio pour le
+    # rendu final. Voir skill/types/mail.md.
+    assert "border-radius" not in content
+    assert "overflow:hidden" not in content
+    assert "overflow: hidden" not in content
+    assert "box-shadow" not in content
 
 
 def test_unknown_key_raises_keyerror() -> None:

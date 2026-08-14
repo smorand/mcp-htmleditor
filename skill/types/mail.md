@@ -17,6 +17,16 @@ plus strictes qu'un navigateur:
   fixe (600 a 640px) pour le contenu.
 - **`position:absolute` et `position:fixed` sont a eviter**: pas de support
   fiable, aucun besoin pour un mail (pas de superposition d'elements).
+- **`border-radius`, `overflow:hidden` et `box-shadow` ne sont pas fiables sous
+  Outlook de bureau** (moteur de rendu Word, pas un vrai moteur CSS): les coins
+  restent carres et l'ombre disparait. Sans consequence si le fond du bloc est
+  uniforme (un carre au lieu d'un rectangle a coins arrondis reste lisible),
+  mais ne jamais compter sur `overflow:hidden` pour cacher un debordement de
+  contenu: sous Outlook, le contenu debordant reste visible en dehors du cadre
+  au lieu d'etre coupe. Corrige dans le bootstrap et l'exemple de reference le
+  2026-08 apres relecture: les deux avaient encore ces trois proprietes sur la
+  table conteneur, dupliquees dans ce fichier de skill.
+
 - **Toute couleur de fond, marge, taille de police ou bordure qui compte pour
   le rendu final doit etre inline.** Le `<style>` du template n'est qu'un
   confort d'edition dans le navigateur (permet a l'humain de voir un rendu
@@ -36,7 +46,7 @@ plus strictes qu'un navigateur:
     <tr><td align="center" style="padding:24px 12px;">
 
       <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0"
-             style="width:640px; max-width:640px; background-color:#ffffff; border-radius:8px; overflow:hidden;">
+             style="width:640px; max-width:640px; background-color:#ffffff;">
 
         <tr><td style="…">  <!-- une section = une ligne de table -->
           <h1 data-editable="text" style="…">Titre</h1>
