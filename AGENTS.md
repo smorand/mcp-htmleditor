@@ -25,7 +25,7 @@ CLI (same after `make install`):
 
 ```bash
 mcp-htmleditor --version
-mcp-htmleditor templates                   # ei, carbon, doc, doc-perso, doc-ei, mail
+mcp-htmleditor templates                   # ei, carbon, doc, doc-perso, doc-ei, mail, website
 mcp-htmleditor new ei pres.html --serve
 mcp-htmleditor serve file.html [-v|-q] [--host] [--port] [--poll] [--no-browser]
 mcp-htmleditor mcp                         # MCP server (stdio)

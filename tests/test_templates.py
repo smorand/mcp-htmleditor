@@ -74,6 +74,21 @@ def test_mail_template_is_mail_safe() -> None:
     assert "box-shadow" not in content
 
 
+def test_website_template_is_website_doc_type() -> None:
+    """The 'website' template has its own doc-type (no export button, see editor.js)."""
+    content = template_path("website").read_text(encoding="utf-8")
+    assert 'data-doc-type="website"' in content
+    assert 'data-doc-template="website"' in content
+    assert 'data-type="document"' in content  # reuses the document block/drag machinery
+
+
+def test_website_template_has_common_web_components() -> None:
+    """The 'website' template ships nav, hero, tabs, cards and footer sections."""
+    content = template_path("website").read_text(encoding="utf-8")
+    for marker in ("site-nav", "site-hero", "site-tabs", "site-tab ", "site-cards", "site-footer"):
+        assert marker in content, f"missing {marker!r} in website template"
+
+
 def test_unknown_key_raises_keyerror() -> None:
     """An unknown template key raises KeyError."""
     with pytest.raises(KeyError):

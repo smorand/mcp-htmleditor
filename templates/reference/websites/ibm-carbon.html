@@ -1,0 +1,358 @@
+<!--
+  Reference: catalogue de composants site web, charte IBM Carbon.
+  Usage: cloner la section utile depuis ce fichier (ne pas dupliquer tout le
+  fichier). Le point de depart minimal est templates/bootstrap/website-empty.html.
+  Conventions: skill/types/website.md.
+-->
+<!DOCTYPE html>
+<html lang="fr" data-doc-type="website">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Catalogue de composants — Site web Carbon</title>
+<style>
+  :root {
+    --cds-background:#ffffff; --cds-layer-01:#f4f4f4; --cds-layer-02:#e0e0e0;
+    --cds-border-subtle-01:#e0e0e0; --cds-border-strong-01:#8d8d8d;
+    --cds-text-primary:#161616; --cds-text-secondary:#525252; --cds-text-on-color:#ffffff;
+    --cds-interactive:#0f62fe; --cds-focus:#0f62fe;
+    --ibm-blue-60:#0f62fe; --ibm-blue-70:#0043ce; --ibm-blue-10:#edf5ff;
+    --ibm-gray-10:#f4f4f4; --ibm-gray-20:#e0e0e0; --ibm-gray-100:#161616;
+    --cds-font-family-sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--cds-font-family-sans); color: var(--cds-text-primary); background: var(--cds-background); }
+  a { color: inherit; text-decoration: none; }
+  .catalog-section-title {
+    max-width: 1100px; margin: 56px auto 0; padding: 0 32px 12px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--cds-text-secondary); border-bottom: 1px solid var(--cds-border-subtle-01);
+  }
+
+  /* ── Nav: variante simple (voir bootstrap) ──────────────────── */
+  .site-nav {
+    position: sticky; top: 0; z-index: 10; height: 56px; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 32px; background: var(--ibm-gray-100);
+    border-bottom: 1px solid #393939;
+  }
+  .site-nav-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 16px; font-weight: 600; }
+  .site-nav-brand .dot { width: 20px; height: 20px; border-radius: 4px; background: var(--ibm-blue-60); flex-shrink: 0; }
+  .site-nav-links { display: flex; align-items: center; gap: 28px; }
+  .site-nav-link { font-size: 14px; color: #c6c6c6; cursor: default; }
+  .site-nav-link.active { color: #fff; font-weight: 600; }
+  .site-nav-cta { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; background: var(--ibm-blue-60); color: #fff; font-size: 13px; font-weight: 600; }
+
+  /* ── Nav: variante claire avec sous-menu (dropdown au clic) ─── */
+  .site-nav-light { position: static; background: #fff; border-bottom: 1px solid var(--cds-border-subtle-01); }
+  .site-nav-light .site-nav-link { color: var(--cds-text-secondary); }
+  .site-nav-light .site-nav-link.active { color: var(--ibm-blue-60); }
+  .site-nav-dropdown { position: relative; }
+  .site-nav-dropdown-panel {
+    display: none; position: absolute; top: 100%; left: 0; margin-top: 8px; min-width: 200px;
+    background: #fff; border: 1px solid var(--cds-border-subtle-01); box-shadow: 0 4px 12px rgba(0,0,0,.08); z-index: 20;
+  }
+  .site-nav-dropdown.open .site-nav-dropdown-panel { display: block; }
+  .site-nav-dropdown-item { display: block; padding: 10px 16px; font-size: 13.5px; color: var(--cds-text-primary); }
+  .site-nav-dropdown-item:hover { background: var(--ibm-gray-10); }
+
+  /* ── Nav: menu mobile (bouton hamburger, panneau plein largeur) */
+  .site-nav-mobile-toggle { display: none; background: none; border: none; color: #fff; cursor: pointer; padding: 8px; }
+  .site-nav-mobile-panel { display: none; flex-direction: column; padding: 12px 32px; background: var(--ibm-gray-100); }
+  .site-nav-mobile-panel.open { display: flex; }
+  .site-nav-mobile-panel .site-nav-link { padding: 10px 0; border-bottom: 1px solid #393939; }
+  @media (max-width: 640px) {
+    .site-nav-mobile-toggle { display: inline-flex; }
+    .site-nav-links { display: none; }
+  }
+
+  /* ── Hero (voir bootstrap) ───────────────────────────────────── */
+  .site-hero { padding: 96px 32px; text-align: center; background: var(--ibm-gray-10); }
+  .site-hero-eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ibm-blue-60); margin-bottom: 12px; }
+  .site-hero-title { font-size: 48px; font-weight: 300; line-height: 1.15; letter-spacing: -.01em; max-width: 760px; margin: 0 auto; }
+  .site-hero-title strong { font-weight: 600; }
+  .site-hero-sub { font-size: 18px; color: var(--cds-text-secondary); max-width: 560px; margin: 16px auto 32px; line-height: 1.5; }
+  .site-hero-actions { display: flex; gap: 12px; justify-content: center; }
+  .cds-btn { display: inline-flex; align-items: center; height: 48px; padding: 0 24px; font-size: 14px; font-weight: 400; cursor: default; border: 1px solid transparent; }
+  .cds-btn-primary { background: var(--ibm-blue-60); color: #fff; }
+  .cds-btn-secondary { background: transparent; color: var(--cds-text-primary); border-color: var(--cds-border-strong-01); }
+
+  /* ── Hero: variante split (texte + visuel a droite) ─────────── */
+  .site-hero-split { display: flex; align-items: center; gap: 48px; padding: 80px 32px; max-width: 1100px; margin: 0 auto; text-align: left; }
+  .site-hero-split .site-hero-copy { flex: 1; }
+  .site-hero-split .site-hero-title { margin: 0; text-align: left; max-width: none; }
+  .site-hero-split .site-hero-sub { margin: 16px 0 28px; text-align: left; }
+  .site-hero-split .site-hero-actions { justify-content: flex-start; }
+  .site-hero-visual { flex: 1; height: 280px; background: var(--ibm-gray-10); border-left: 4px solid var(--ibm-blue-60); display: flex; align-items: center; justify-content: center; color: var(--cds-text-secondary); font-size: 13px; }
+
+  /* ── Tabs: horizontal (voir bootstrap) ──────────────────────── */
+  .site-tabs { padding: 64px 32px; max-width: 960px; margin: 0 auto; }
+  .site-tablist { display: flex; gap: 4px; border-bottom: 1px solid var(--cds-border-subtle-01); }
+  .site-tab { padding: 12px 16px; font-size: 14px; color: var(--cds-text-secondary); cursor: pointer; border: none; background: transparent; border-bottom: 2px solid transparent; font-family: inherit; }
+  .site-tab.active { color: var(--ibm-blue-60); border-bottom-color: var(--ibm-blue-60); font-weight: 600; }
+  .site-tabpanel { display: none; padding: 28px 4px; font-size: 15px; line-height: 1.6; color: var(--cds-text-primary); }
+  .site-tabpanel.active { display: block; }
+
+  /* ── Tabs: verticale (liste a gauche, panneau a droite) ─────── */
+  .site-tabs-vertical { display: flex; gap: 32px; padding: 64px 32px; max-width: 960px; margin: 0 auto; }
+  .site-tablist-vertical { display: flex; flex-direction: column; gap: 2px; flex: 0 0 200px; border-right: 1px solid var(--cds-border-subtle-01); }
+  .site-tab-vertical { text-align: left; padding: 12px 16px; font-size: 14px; color: var(--cds-text-secondary); cursor: pointer; border: none; border-left: 3px solid transparent; background: transparent; font-family: inherit; }
+  .site-tab-vertical.active { color: var(--ibm-blue-60); border-left-color: var(--ibm-blue-60); background: var(--ibm-blue-10); font-weight: 600; }
+  .site-tabs-vertical .site-tabpanel { flex: 1; padding: 4px; }
+
+  /* ── Accordeon (FAQ) ─────────────────────────────────────────── */
+  .site-accordion { padding: 0 32px 64px; max-width: 760px; margin: 0 auto; }
+  .site-accordion-item { border-bottom: 1px solid var(--cds-border-subtle-01); }
+  .site-accordion-header { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 16px 4px; font-size: 15px; font-weight: 600; background: none; border: none; cursor: pointer; font-family: inherit; color: var(--cds-text-primary); }
+  .site-accordion-header .chevron { transition: transform 150ms ease; }
+  .site-accordion-item.open .site-accordion-header .chevron { transform: rotate(90deg); }
+  .site-accordion-body { display: none; padding: 0 4px 16px; font-size: 14px; line-height: 1.55; color: var(--cds-text-secondary); }
+  .site-accordion-item.open .site-accordion-body { display: block; }
+
+  /* ── Cartes: grille simple (voir bootstrap) ─────────────────── */
+  .site-cards { padding: 0 32px 64px; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .site-card { background: var(--ibm-gray-10); border-top: 3px solid var(--ibm-blue-60); padding: 24px; }
+  .site-card-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .site-card-body { font-size: 13.5px; color: var(--cds-text-secondary); line-height: 1.55; }
+
+  /* ── Cartes: avec visuel en tete ─────────────────────────────── */
+  .site-cards-media { padding: 0 32px 64px; max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .site-card-media { background: #fff; border: 1px solid var(--cds-border-subtle-01); }
+  .site-card-media-visual { height: 140px; background: var(--ibm-gray-10); display: flex; align-items: center; justify-content: center; color: var(--cds-text-secondary); font-size: 12px; }
+  .site-card-media-body { padding: 18px; }
+
+  /* ── Footer: complet (voir bootstrap) ────────────────────────── */
+  .site-footer { background: var(--ibm-gray-100); color: #c6c6c6; padding: 48px 32px 24px; }
+  .site-footer-cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; max-width: 1100px; margin: 0 auto 32px; }
+  .site-footer-col-title { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 10px; }
+  .site-footer-link { display: block; font-size: 13px; color: #a8a8a8; margin-bottom: 6px; }
+  .site-footer-bottom { max-width: 1100px; margin: 0 auto; border-top: 1px solid #393939; padding-top: 16px; font-size: 12px; color: #8d8d8d; }
+
+  /* ── Footer: minimal (une ligne, pas de colonnes) ────────────── */
+  .site-footer-minimal { background: #fff; border-top: 1px solid var(--cds-border-subtle-01); padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; max-width: 1100px; margin: 0 auto; }
+  .site-footer-minimal .site-footer-link { display: inline; color: var(--cds-text-secondary); margin: 0 0 0 20px; }
+</style>
+</head>
+<body>
+
+<article data-type="document" data-doc-template="website" data-layout="single-column">
+
+<!-- Nav: simple (bootstrap) -->
+<div class="catalog-section-title">Nav — simple</div>
+<nav class="site-nav">
+  <div class="site-nav-brand"><span class="dot"></span><span data-editable="text">Produit</span></div>
+  <div class="site-nav-links">
+    <span class="site-nav-link active" data-editable="text">Accueil</span>
+    <span class="site-nav-link" data-editable="text">Fonctionnalités</span>
+    <span class="site-nav-link" data-editable="text">Tarifs</span>
+  </div>
+  <span class="site-nav-cta" data-editable="text">Essayer gratuitement</span>
+</nav>
+
+<!-- Nav: claire avec sous-menu au clic -->
+<div class="catalog-section-title">Nav — claire, avec sous-menu</div>
+<nav class="site-nav site-nav-light">
+  <div class="site-nav-brand" style="color:var(--cds-text-primary);"><span class="dot"></span><span data-editable="text">Produit</span></div>
+  <div class="site-nav-links">
+    <span class="site-nav-link active" data-editable="text">Accueil</span>
+    <div class="site-nav-dropdown" id="nav-dropdown-1">
+      <button class="site-nav-link" type="button" style="background:none;border:none;font-family:inherit;cursor:pointer;" onclick="document.getElementById('nav-dropdown-1').classList.toggle('open')">
+        <span data-editable="text">Produits</span>
+      </button>
+      <div class="site-nav-dropdown-panel">
+        <span class="site-nav-dropdown-item" data-editable="text">Produit A</span>
+        <span class="site-nav-dropdown-item" data-editable="text">Produit B</span>
+        <span class="site-nav-dropdown-item" data-editable="text">Produit C</span>
+      </div>
+    </div>
+    <span class="site-nav-link" data-editable="text">Contact</span>
+  </div>
+</nav>
+
+<!-- Nav: menu mobile (hamburger) -->
+<div class="catalog-section-title">Nav — menu mobile (reduire la fenetre pour voir le bouton)</div>
+<nav class="site-nav">
+  <div class="site-nav-brand"><span class="dot"></span><span data-editable="text">Produit</span></div>
+  <div class="site-nav-links">
+    <span class="site-nav-link active" data-editable="text">Accueil</span>
+    <span class="site-nav-link" data-editable="text">Fonctionnalités</span>
+  </div>
+  <button class="site-nav-mobile-toggle" type="button" onclick="document.getElementById('nav-mobile-panel').classList.toggle('open')" aria-label="Menu">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect y="3" width="20" height="2"/><rect y="9" width="20" height="2"/><rect y="15" width="20" height="2"/></svg>
+  </button>
+</nav>
+<div class="site-nav-mobile-panel" id="nav-mobile-panel">
+  <span class="site-nav-link" data-editable="text">Accueil</span>
+  <span class="site-nav-link" data-editable="text">Fonctionnalités</span>
+  <span class="site-nav-link" data-editable="text">Tarifs</span>
+</div>
+
+<!-- Hero: centre (bootstrap) -->
+<div class="catalog-section-title">Hero — centré</div>
+<section class="site-hero">
+  <div class="site-hero-eyebrow" data-editable="text">Nouveau</div>
+  <h1 class="site-hero-title" data-editable="text">Le titre principal <strong>de votre site</strong></h1>
+  <p class="site-hero-sub" data-editable="text">Une phrase d'accroche qui explique la proposition de valeur.</p>
+  <div class="site-hero-actions">
+    <span class="cds-btn cds-btn-primary" data-editable="text">Commencer</span>
+    <span class="cds-btn cds-btn-secondary" data-editable="text">En savoir plus</span>
+  </div>
+</section>
+
+<!-- Hero: split texte + visuel -->
+<div class="catalog-section-title">Hero — split (texte + visuel)</div>
+<section class="site-hero-split">
+  <div class="site-hero-copy">
+    <h1 class="site-hero-title" data-editable="text">Un titre aligné <strong>à gauche</strong></h1>
+    <p class="site-hero-sub" data-editable="text">Variante à utiliser quand un visuel (capture d'écran, illustration) accompagne le texte.</p>
+    <div class="site-hero-actions">
+      <span class="cds-btn cds-btn-primary" data-editable="text">Commencer</span>
+    </div>
+  </div>
+  <div class="site-hero-visual" data-editable="text">Visuel / capture d'écran</div>
+</section>
+
+<!-- Tabs: horizontal (bootstrap) -->
+<div class="catalog-section-title">Tabs — horizontal</div>
+<section class="site-tabs">
+  <div class="site-tablist">
+    <button class="site-tab active" onclick="switchSiteTab(this, 'cat-tab-1')" type="button"><span data-editable="text">Vue d'ensemble</span></button>
+    <button class="site-tab" onclick="switchSiteTab(this, 'cat-tab-2')" type="button"><span data-editable="text">Fonctionnalités</span></button>
+    <button class="site-tab" onclick="switchSiteTab(this, 'cat-tab-3')" type="button"><span data-editable="text">Tarifs</span></button>
+  </div>
+  <div class="site-tabpanel active" id="cat-tab-1" data-editable="text">Contenu du premier onglet.</div>
+  <div class="site-tabpanel" id="cat-tab-2" data-editable="text">Contenu du deuxième onglet.</div>
+  <div class="site-tabpanel" id="cat-tab-3" data-editable="text">Contenu du troisième onglet.</div>
+</section>
+
+<!-- Tabs: verticale -->
+<div class="catalog-section-title">Tabs — verticale</div>
+<section class="site-tabs-vertical">
+  <div class="site-tablist-vertical">
+    <button class="site-tab-vertical active" onclick="switchSiteTab(this, 'cat-vtab-1')" type="button"><span data-editable="text">Général</span></button>
+    <button class="site-tab-vertical" onclick="switchSiteTab(this, 'cat-vtab-2')" type="button"><span data-editable="text">Sécurité</span></button>
+    <button class="site-tab-vertical" onclick="switchSiteTab(this, 'cat-vtab-3')" type="button"><span data-editable="text">Facturation</span></button>
+  </div>
+  <div class="site-tabpanel active" id="cat-vtab-1" data-editable="text">Paramètres généraux.</div>
+  <div class="site-tabpanel" id="cat-vtab-2" data-editable="text">Paramètres de sécurité.</div>
+  <div class="site-tabpanel" id="cat-vtab-3" data-editable="text">Paramètres de facturation.</div>
+</section>
+
+<!-- Accordeon (FAQ) -->
+<div class="catalog-section-title">Accordéon (FAQ)</div>
+<section class="site-accordion">
+  <div class="site-accordion-item open">
+    <button class="site-accordion-header" type="button" onclick="this.closest('.site-accordion-item').classList.toggle('open')">
+      <span data-editable="text">Première question fréquente ?</span>
+      <span class="chevron">▸</span>
+    </button>
+    <div class="site-accordion-body" data-editable="text">Réponse à la première question.</div>
+  </div>
+  <div class="site-accordion-item">
+    <button class="site-accordion-header" type="button" onclick="this.closest('.site-accordion-item').classList.toggle('open')">
+      <span data-editable="text">Deuxième question fréquente ?</span>
+      <span class="chevron">▸</span>
+    </button>
+    <div class="site-accordion-body" data-editable="text">Réponse à la deuxième question.</div>
+  </div>
+</section>
+
+<!-- Cartes: grille simple (bootstrap) -->
+<div class="catalog-section-title">Cartes — grille simple</div>
+<section class="site-cards">
+  <div class="site-card">
+    <div class="site-card-title" data-editable="text">Titre de la carte</div>
+    <div class="site-card-body" data-editable="text">Description courte.</div>
+  </div>
+  <div class="site-card">
+    <div class="site-card-title" data-editable="text">Titre de la carte</div>
+    <div class="site-card-body" data-editable="text">Description courte.</div>
+  </div>
+  <div class="site-card">
+    <div class="site-card-title" data-editable="text">Titre de la carte</div>
+    <div class="site-card-body" data-editable="text">Description courte.</div>
+  </div>
+</section>
+
+<!-- Cartes: avec visuel en tete -->
+<div class="catalog-section-title">Cartes — avec visuel</div>
+<section class="site-cards-media">
+  <div class="site-card-media">
+    <div class="site-card-media-visual" data-editable="text">Image</div>
+    <div class="site-card-media-body">
+      <div class="site-card-title" data-editable="text">Titre de la carte</div>
+      <div class="site-card-body" data-editable="text">Description courte.</div>
+    </div>
+  </div>
+  <div class="site-card-media">
+    <div class="site-card-media-visual" data-editable="text">Image</div>
+    <div class="site-card-media-body">
+      <div class="site-card-title" data-editable="text">Titre de la carte</div>
+      <div class="site-card-body" data-editable="text">Description courte.</div>
+    </div>
+  </div>
+  <div class="site-card-media">
+    <div class="site-card-media-visual" data-editable="text">Image</div>
+    <div class="site-card-media-body">
+      <div class="site-card-title" data-editable="text">Titre de la carte</div>
+      <div class="site-card-body" data-editable="text">Description courte.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer: complet (bootstrap) -->
+<div class="catalog-section-title">Footer — complet (colonnes)</div>
+<footer class="site-footer">
+  <div class="site-footer-cols">
+    <div>
+      <div class="site-footer-col-title" data-editable="text">Produit</div>
+      <span class="site-footer-link" data-editable="text">Fonctionnalités</span>
+      <span class="site-footer-link" data-editable="text">Tarifs</span>
+    </div>
+    <div>
+      <div class="site-footer-col-title" data-editable="text">Entreprise</div>
+      <span class="site-footer-link" data-editable="text">À propos</span>
+      <span class="site-footer-link" data-editable="text">Carrières</span>
+    </div>
+    <div>
+      <div class="site-footer-col-title" data-editable="text">Ressources</div>
+      <span class="site-footer-link" data-editable="text">Documentation</span>
+      <span class="site-footer-link" data-editable="text">Support</span>
+    </div>
+    <div>
+      <div class="site-footer-col-title" data-editable="text">Légal</div>
+      <span class="site-footer-link" data-editable="text">Confidentialité</span>
+      <span class="site-footer-link" data-editable="text">Conditions</span>
+    </div>
+  </div>
+  <div class="site-footer-bottom" data-editable="text">&copy; 2026 Produit. Tous droits réservés.</div>
+</footer>
+
+<!-- Footer: minimal -->
+<div class="catalog-section-title">Footer — minimal</div>
+<footer class="site-footer-minimal">
+  <span data-editable="text">&copy; 2026 Produit</span>
+  <div>
+    <span class="site-footer-link" data-editable="text">Confidentialité</span>
+    <span class="site-footer-link" data-editable="text">Conditions</span>
+  </div>
+</footer>
+
+</article>
+
+<script>
+  // Bascule d'onglet (horizontal ou vertical): le clic est porte par le
+  // <button> (onclick, bubbling depuis le <span data-editable> qu'il
+  // contient) - voir skill/types/website.md § Interactivite.
+  function switchSiteTab(btn, panelId) {
+    const scope = btn.closest('.site-tabs, .site-tabs-vertical');
+    if (!scope) return;
+    scope.querySelectorAll('.site-tab, .site-tab-vertical').forEach(t => t.classList.remove('active'));
+    scope.querySelectorAll('.site-tabpanel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const panel = scope.querySelector('#' + panelId);
+    if (panel) panel.classList.add('active');
+  }
+</script>
+
+</body>
+</html>

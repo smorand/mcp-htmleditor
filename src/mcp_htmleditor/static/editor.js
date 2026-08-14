@@ -24,6 +24,7 @@ let hasPendingChanges = false; // local edits not yet written to disk
 let selfSaving    = false;     // true while our own POST /content is in flight
 let isPresentation = false;   // detected from data-doc-type
 let isDocument     = false;   // detected from data-doc-type
+let isWebsite      = false;   // detected from data-doc-type; reuses document block/drag editing, no export
 let insertPosition = null;    // 'before' | 'after' when slide picker is open
 let blockPosition  = null;    // 'before' | 'after' when block picker is open
 let lastDocRange   = null;    // saved caret range in document mode
@@ -192,6 +193,7 @@ function onFrameLoad() {
     const docType = doc.documentElement.getAttribute('data-doc-type');
     isPresentation = docType === 'presentation';
     isDocument     = docType === 'document';
+    isWebsite      = docType === 'website';
     updateSlideActionsVisibility();
     updateDocActionsVisibility();
     if (editMode) injectEditMode(doc);
@@ -230,11 +232,16 @@ function updateSlideActionsVisibility() {
    Document block actions visibility (document + edit mode only)
    ============================================================ */
 function updateDocActionsVisibility() {
+  // A website reuses the document block-insert/drag machinery (getDocumentArticle()
+  // only cares about article[data-type="document"], not the html-level doc-type), but
+  // deliberately gets neither export button: it has no PPTX/DOCX destination by design
+  // (see skill/types/website.md), so nothing here should ever call exportContent() for it.
+  const showDocBlockUi = isDocument || isWebsite;
   if (docActions) {
-    docActions.style.display = (isDocument && editMode) ? 'inline-flex' : 'none';
+    docActions.style.display = (showDocBlockUi && editMode) ? 'inline-flex' : 'none';
   }
   exportDocxBtn.style.display  = isDocument ? 'inline-flex' : 'none';
-  exportPptxBtn.style.display  = isDocument ? 'none' : exportPptxBtn.style.display;
+  exportPptxBtn.style.display  = showDocBlockUi ? 'none' : exportPptxBtn.style.display;
 }
 
 /* ============================================================
@@ -536,7 +543,7 @@ function injectEditMode(doc) {
   createFormatBar(doc);
   createInsertBar(doc);
   enableImageDrop(doc);
-  if (isDocument)     injectDocDragHandles(doc);
+  if (isDocument || isWebsite) injectDocDragHandles(doc);
   if (isPresentation) enableArchNodeDrag(doc);
 }
 
@@ -1626,7 +1633,7 @@ function getDocumentArticle(doc) {
 
 /** Remember the last caret position inside an editable (document mode). */
 function saveDocRange(doc) {
-  if (!isDocument) return;
+  if (!isDocument && !isWebsite) return;
   const sel = doc.getSelection();
   if (sel && sel.rangeCount) lastDocRange = sel.getRangeAt(0).cloneRange();
 }
@@ -1694,7 +1701,7 @@ function insertDocBlock(blockKey, position) {
   });
 
   lastDocRange = null;
-  if (isDocument && editMode) injectDocDragHandles(doc);
+  if ((isDocument || isWebsite) && editMode) injectDocDragHandles(doc);
   saveContent();
 }
 
