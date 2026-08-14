@@ -95,14 +95,20 @@ Après tout calcul de layout (`mcp-htmleditor arch-layout` ou l'outil MCP
       doit correspondre à l'ordre de cette légende.
 - [ ] Les badges numérotés sont-ils tous à la même taille, bien centrés sur le
       trait (pas décalés dans le vide) ?
-- [ ] Un badge numéroté sur une arête reliant deux nœuds empilés dans le même
-      `arch-col` (nœuds adjacents, sans segment de trait — cas connu:
-      `_render_edge` avec `geometry.segments` vide) chevauche-t-il les deux
-      bordures ? Le gutter imbriqué (`NESTED_GUTTER_PCT`, 2 % du col) est trop
-      étroit pour loger un badge (~18px) sans toucher les deux bordures. Si le
-      chiffre reste lisible, c'est un défaut cosmétique mineur acceptable;
-      sinon, restructurer (deux `arch-row` séparées avec `GUTTER_ROW_PCT`, plus
-      large) plutôt que d'empiler les deux nœuds dans un seul col.
+- [x] **CORRIGÉ.** Un badge numéroté sur une arête reliant deux nœuds empilés dans
+      le même `arch-col` (adjacents, gutter `NESTED_GUTTER_PCT` de 2 % du col — trop
+      étroit pour loger le badge de 14px sans toucher les deux bordures) est
+      automatiquement déplacé sur le côté (`_badge_position`), hors de l'emprise
+      des deux nœuds, plutôt que laissé au milieu géométrique invisible. Déclenché
+      par `_vertical_gap` < `BADGE_MIN_GUTTER_PCT` (5 %) quand les deux nœuds sont
+      alignés/superposés horizontalement (`_render_edge`, `arch_layout.py`); un
+      gutter horizontal normal (`GUTTER_COL_PCT`/`GUTTER_ROW_PCT`, 4-6 %) n'est
+      jamais concerné, seul l'empilement vertical dans un col l'est. Repli: si les
+      deux côtés (gauche et droite du couple) sont eux-mêmes occupés par un autre
+      nœud, le badge retombe sur le milieu géométrique (defect cosmétique mineur
+      resté acceptable dans ce cas rare, jamais un blocage). Vérifier visuellement
+      que le badge déplacé reste lisible et proche visuellement de son arête
+      (test `test_badge_on_stacked_nodes_is_pushed_clear_of_the_narrow_gutter`).
 
 ## Nœuds étroits avec icône + libellé (ex. « Utilisateur », acteur seul)
 
@@ -126,19 +132,30 @@ Après tout calcul de layout (`mcp-htmleditor arch-layout` ou l'outil MCP
       wrappant — un libellé qui tient sur un mot reste plus lisible qu'un
       libellé sur deux lignes avec une police réduite.
 
-## Sortie d'arête par le côté plutôt que par le bas (connu, non corrigé)
+## Sortie d'arête par le côté plutôt que par le bas (CORRIGÉ, heuristique)
 
-- [ ] Un nœud empilé dans un `arch-col` (pas le dernier de la pile) dont la
-      cible se trouve dans une rangée suivante ET horizontalement décalée:
-      le moteur (`_adjacent_row_geometry`) sort actuellement par le bas/haut du
-      nœud source, ce qui oblige le trait à longer le bord d'un nœud frère
-      juste en dessous avant de tourner vers la cible. Visuellement correct
-      (aucun croisement, `0 warning`) mais moins direct qu'une sortie par le
-      côté (droite/gauche) suivie d'une descente dans la gouttière de colonne.
-      **Limitation connue du moteur, pas encore corrigée** (choix de sortie
-      toujours bas/haut, jamais côté, quand `row_diff != 0`): à signaler si
-      rencontré, ne pas tenter de fix HTML à la main, ouvrir plutôt un ticket
-      moteur (`_route_edge` / `_adjacent_row_geometry`).
+- [x] **CORRIGÉ (heuristique, pas garanti dans tous les cas).** Quand la cible
+      d'une arête inter-rangées (`row_diff != 0`) est plus décalée
+      horizontalement que verticalement par rapport à la source
+      (`abs(mid_x source - mid_x cible) > abs(mid_y source - mid_y cible)`), le
+      moteur essaie d'abord une sortie par le côté (droite puis gauche,
+      `_side_exit_geometry`): sortie horizontale immédiate au niveau de la
+      source, descente/montée dans la gouttière de colonne la plus proche,
+      entrée horizontale dans la cible. N'est utilisée que si le trajet ne
+      traverse aucun obstacle (`_crosses_any_obstacle`, sur les deux côtés
+      testés); sinon repli automatique sur l'ancien coude bas/haut
+      (`_adjacent_row_geometry`), sans jamais introduire de nouvel
+      avertissement (`_route_edge` / `arch_layout.py`).
+      **Limite connue, résiduelle**: l'heuristique compare seulement `dx` et
+      `dy` des centres, elle ne mesure pas la longueur réelle du chemin
+      candidat vs l'ancien coude — dans un diagramme où les deux gouttières de
+      colonne (gauche et droite de la source) sont bloquées par un autre
+      nœud, le moteur retombe sur le coude bas/haut même si `dx > dy` (cas
+      couvert par `test_side_exit_falls_back_to_the_elbow_when_the_channel_is_blocked`).
+      C'est correct (aucune régression, `0 warning`) mais reste le coude
+      moins direct dans ce cas de bordure; si rencontré fréquemment sur un
+      diagramme donné, envisager de réorganiser les `arch-spacer`/`data-span`
+      pour dégager une gouttière plutôt que d'attendre un fix moteur supplémentaire.
 
 ## Diagramme + contenu de slide qui se chevauchent ou se coupent
 

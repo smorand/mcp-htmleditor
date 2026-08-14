@@ -57,6 +57,29 @@ NESTED_GUTTER_PCT = 2.0
 """Vertical gap between two nodes stacked inside one ``arch-col`` slot (tighter than
 GUTTER_ROW_PCT: a col is a compact sub-stack inside a single row, not a full flow step)."""
 
+BADGE_MIN_GUTTER_PCT = 5.0
+"""Minimum vertical gap (percent of the diagram) required between two node borders
+stacked in the same ``arch-col`` before a numbered step badge (".arch-edge-badge", a
+fixed 14px circle in the bootstrap CSS) fits centered on their shared boundary without
+touching either one. On the diagram heights actually seen in decks using this feature
+(230-320px ``min-height``), 14px is 4.4-6.1% of that height; 5.0% is a representative
+middle value — comfortably above ``NESTED_GUTTER_PCT`` (2.0%, the gutter a stacked pair
+actually gets) so the real cramped case is always caught, while staying well below
+``GUTTER_COL_PCT`` (4.0%) and ``GUTTER_ROW_PCT`` (6.0%): those are horizontal/row gutters
+between genuinely different flow steps, always wide enough for a badge already, and must
+never trigger this override (see ``_vertical_gap``, which only measures the VERTICAL gap: a
+horizontal gap of the same magnitude is a different, already-adequate kind of space).
+See ``_badge_position``, which only overrides the geometric midpoint when the actual
+vertical gap on a given edge falls short of this."""
+
+BADGE_CLEARANCE_PCT = 3.0
+"""Horizontal clearance (percent of the diagram) reserved beside a stacked-node pair
+when a numbered step badge has to be pushed out of a gutter narrower than its own
+rendered size (see ``_badge_position``). The bootstrap CSS draws ".arch-edge-badge"
+at a fixed 14px circle; this constant is an intentionally generous percent-based
+proxy for "half the badge's diameter plus a small margin" that stays correct across
+any diagram width, rather than a pixel value that would only be right at one size."""
+
 _ROW_SLOT_TYPES = frozenset({"arch-node", "arch-col", "arch-spacer"})
 """Element kinds a row's direct children may be, in the declarative format (V2)."""
 
@@ -146,7 +169,11 @@ class EdgeGeometry:
     label_align: str
     """``"center"`` (horizontal segment, ``translateX(-50%)``) or ``"side"`` (vertical segment)."""
     mid_x: float
-    """True on-segment midpoint (no label offset applied): where a numbered step badge sits."""
+    """True on-segment midpoint (no label offset applied): where a numbered step badge sits,
+    UNLESS the source and target nodes are too close together for the badge's own size
+    (``BADGE_MIN_GUTTER_PCT``): ``_render_edge`` then overrides it with ``_badge_position``
+    instead, since this raw midpoint would otherwise sit inside a gutter too narrow to hold
+    a badge without overlapping both nodes' borders."""
     mid_y: float
 
 
@@ -567,6 +594,49 @@ def _adjacent_row_geometry(source: PctBox, target: PctBox, *, source_above: bool
     )
 
 
+def _side_exit_geometry(source: PctBox, target: PctBox, *, exit_right: bool) -> EdgeGeometry:
+    """Route a cross-row connector by leaving ``source`` through its own left/right edge
+    (never its bottom/top), dropping through the column gutter just outside that edge, and
+    entering ``target`` from its near side.
+
+    Chosen over ``_adjacent_row_geometry``'s bottom/top elbow whenever the target is more
+    horizontally than vertically offset from the source (see ``_route_edge``): that elbow's
+    horizontal leg runs the FULL row-to-row gutter rail regardless of how close the two
+    boxes already are in x, which visually reads as "hugging whatever sits directly below
+    source before turning" on a case like ``ia_chat`` (stacked above ``ia_studio`` in the
+    same ``arch-col``) reaching sideways into ``api_iachat``. Exiting through the side
+    instead starts the horizontal motion immediately, at the row's own height, which is
+    both shorter (no detour down to a rail only to come back up/down again) and reads as a
+    single diagonal-ish move instead of a right-angle detour around a sibling.
+
+    The channel sits at ``GUTTER_COL_PCT / 2`` past source's own edge: real free space only
+    when nothing else occupies that gutter's height range, which the caller (``_route_edge``)
+    must verify with ``_crosses_any_obstacle`` before using this geometry, exactly as every
+    other candidate route in this module.
+    """
+    channel_x = source.right + GUTTER_COL_PCT / 2 if exit_right else source.x - GUTTER_COL_PCT / 2
+    source_edge_x = source.right if exit_right else source.x
+    h1 = LineSegment(
+        "h", min(source_edge_x, channel_x), source.mid_y, abs(channel_x - source_edge_x) or GUTTER_COL_PCT / 2
+    )
+    v = LineSegment("v", channel_x, min(source.mid_y, target.mid_y), abs(target.mid_y - source.mid_y))
+    entering_from_right = channel_x >= target.mid_x
+    tip_direction = "l" if entering_from_right else "r"
+    tip_x = target.right if entering_from_right else target.x
+    h2 = LineSegment("h", min(channel_x, tip_x), target.mid_y, abs(channel_x - tip_x))
+    return EdgeGeometry(
+        segments=(h1, v, h2),
+        tip_direction=tip_direction,
+        tip_x=tip_x,
+        tip_y=target.mid_y,
+        label_x=channel_x,
+        label_y=(source.mid_y + target.mid_y) / 2,
+        label_align="side",
+        mid_x=channel_x,
+        mid_y=(source.mid_y + target.mid_y) / 2,
+    )
+
+
 def _detour_geometry(source: PctBox, target: PctBox, rail_y: float) -> EdgeGeometry:
     """Route an elbow through an explicit ``rail_y`` that is not necessarily between
     ``source`` and ``target`` (typically just below an entire row), so the horizontal
@@ -712,6 +782,19 @@ def _route_edge(
         # row's vertical span. Detour below or above the whole row instead.
         return _best_detour(source, target, row_top=row_top, row_height=row_height, obstacles=obstacles)
 
+    if not aligned and abs(source.mid_x - target.mid_x) > abs(source.mid_y - target.mid_y):
+        # More horizontal offset than vertical: a bottom/top elbow's horizontal leg would
+        # run the row-to-row gutter rail for the full dx regardless of how close the two
+        # boxes already are, which reads as hugging a sibling before turning (see
+        # _side_exit_geometry). Try leaving through source's own near side first, in both
+        # directions, and only fall through to the elbow if neither is obstacle-free.
+        toward_target = source.mid_x <= target.mid_x
+        for exit_right in (toward_target, not toward_target):
+            side = _side_exit_geometry(source, target, exit_right=exit_right)
+            channel_x = side.mid_x
+            if 0.0 <= channel_x <= DIAGRAM_MAX_PCT and not _crosses_any_obstacle(side, obstacles):
+                return side
+
     elbow = _adjacent_row_geometry(source, target, source_above=source.mid_y <= target.mid_y)
     if not _crosses_any_obstacle(elbow, obstacles):
         return elbow
@@ -798,21 +881,78 @@ def _clear_edge_decoration(diagram: Tag, edge_id: str) -> None:
         decoration.decompose()
 
 
+def _vertical_gap(source: PctBox, target: PctBox) -> float:
+    """Vertical gap between two node boxes stacked one above the other, in percent of the
+    diagram; ``0.0`` when they share a vertical band (side by side, or overlapping).
+
+    Deliberately vertical-only: a horizontal gap of the same magnitude is a genuine,
+    already wide-enough gutter between flow steps (``GUTTER_COL_PCT``/``GUTTER_ROW_PCT``),
+    never the cramped ``arch-col`` stacking gap (``NESTED_GUTTER_PCT``) this check exists
+    to catch. Used by ``_render_edge`` to decide whether a numbered step badge needs
+    ``_badge_position``'s side offset instead of the geometric midpoint.
+    """
+    return max(0.0, target.y - source.bottom, source.y - target.bottom)
+
+
+def _badge_position(source: PctBox, target: PctBox, obstacles: list[PctBox]) -> tuple[float, float]:
+    """Pick a clear spot for a numbered step badge when the two nodes it marks are too
+    close together for the badge's own size (see ``BADGE_MIN_GUTTER_PCT``): typically two
+    nodes stacked directly one above the other inside the same ``arch-col``, connected by
+    a same-row or adjacent-row edge whose segment collapses to (near) zero length.
+
+    The geometric midpoint between the two node borders sits in that cramped gutter, so it
+    always overlaps both borders. Widening the gutter globally (``NESTED_GUTTER_PCT``) would
+    loosen every stacked-col diagram's spacing just to fix the rare badge case; instead the
+    badge itself is pushed sideways, just outside the pair's combined bounding box, on
+    whichever side (right first, then left) does not collide with another node. Vertically
+    it stays centered on the real border between the two nodes, so it still visually reads
+    as marking that specific boundary.
+    """
+    boundary_y = (source.bottom + target.y) / 2 if source.bottom <= target.y else (target.bottom + source.y) / 2
+    left = min(source.x, target.x)
+    right = max(source.right, target.right)
+    for candidate_x in (right + BADGE_CLEARANCE_PCT, left - BADGE_CLEARANCE_PCT):
+        if not (0.0 <= candidate_x <= DIAGRAM_MAX_PCT):
+            continue
+        probe = PctBox(x=candidate_x - 0.1, y=boundary_y - 0.1, width=0.2, height=0.2)
+        if not any(probe.overlaps(obstacle) for obstacle in obstacles):
+            return candidate_x, boundary_y
+    # Both sides are blocked (or off-diagram): fall back to the geometric midpoint rather
+    # than a coordinate outside 0-100%, a cosmetic overlap beats an invisible badge.
+    return (source.mid_x + target.mid_x) / 2, boundary_y
+
+
+@dataclass(frozen=True, slots=True)
+class _EdgeEndpoints:
+    """The two node boxes an edge connects, plus every other node's box in the diagram.
+
+    Bundled so ``_render_edge`` stays under the project's max-arguments lint budget;
+    only used to compute a step badge's clear spot on a cramped stacked pair (see
+    ``_badge_position``), everything else about rendering comes from ``EdgeGeometry``.
+    """
+
+    source: PctBox
+    target: PctBox
+    obstacles: list[PctBox]
+
+
 def _render_edge(
     soup: BeautifulSoup,
     edge: Tag,
     edge_id: str,
     geometry: EdgeGeometry,
-    edge_style: str,
+    endpoints: _EdgeEndpoints,
 ) -> None:
     """Turn one resolved ``EdgeGeometry`` into DOM elements.
 
     The caller must have already cleared any decoration left by a previous run
     (see ``_clear_edge_decoration``), so this function only ever adds nodes.
     ``data-color`` on the edge (optional) overrides the bootstrap's single
-    fixed accent colour on every piece: segments, tip and label.
+    fixed accent colour on every piece: segments, tip and label. ``endpoints`` is only
+    used for ``_badge_position`` on a cramped stacked pair. ``data-style`` (``dashed``)
+    is read straight off ``edge`` rather than taking a separate parameter.
     """
-    dashed = ["dashed"] if edge_style == "dashed" else []
+    dashed = ["dashed"] if str(edge.get("data-style") or "solid") == "dashed" else []
     color = str(edge.get("data-color") or "") or None
 
     if not geometry.segments:
@@ -845,8 +985,16 @@ def _render_edge(
 
     step = edge.get("data-step")
     if step:
+        source, target, obstacles = endpoints.source, endpoints.target, endpoints.obstacles
         badge_color = str(edge.get("data-color") or "#284AAA")
-        badge_x, badge_y = (round(v, ROUND_NDIGITS) for v in (geometry.mid_x, geometry.mid_y))
+        stacked = abs(source.mid_x - target.mid_x) < ALIGNMENT_TOLERANCE_PCT or (
+            source.x < target.right and target.x < source.right
+        )
+        if stacked and 0.0 < _vertical_gap(source, target) < BADGE_MIN_GUTTER_PCT:
+            raw_badge_x, raw_badge_y = _badge_position(source, target, obstacles)
+        else:
+            raw_badge_x, raw_badge_y = geometry.mid_x, geometry.mid_y
+        badge_x, badge_y = (round(v, ROUND_NDIGITS) for v in (raw_badge_x, raw_badge_y))
         badge = soup.new_tag("div")
         badge["class"] = ["arch-edge-badge"]
         badge["data-edge-of"] = edge_id
@@ -985,7 +1133,6 @@ def _layout_diagram(soup: BeautifulSoup, diagram: Tag) -> tuple[bool, list[str]]
             continue
 
         row_diff = node_row[to_id] - node_row[from_id]
-        edge_style = str(edge.get("data-style") or "solid")
         if abs(row_diff) > 1:
             warnings.append(
                 f"arch-edge {from_id}->{to_id}: traverse {abs(row_diff)} rangees, hors scope V1 "
@@ -996,7 +1143,7 @@ def _layout_diagram(soup: BeautifulSoup, diagram: Tag) -> tuple[bool, list[str]]
             source, target, row_diff=row_diff, row_geom=row_geoms[node_row[from_id]], obstacles=obstacles
         )
         _clear_edge_decoration(diagram, edge_id)
-        _render_edge(soup, edge, edge_id, geometry, edge_style)
+        _render_edge(soup, edge, edge_id, geometry, _EdgeEndpoints(source, target, obstacles))
 
     for lane in diagram.find_all(attrs={"data-type": "arch-lane"}):
         _layout_lane(lane, row_boxes_by_index)
