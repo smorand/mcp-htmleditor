@@ -661,6 +661,35 @@ def test_check_diagram_clean_on_legacy_markup_without_overlap() -> None:
     assert arch_layout.check_diagram(diagram) == []
 
 
+def test_check_diagram_skips_declarative_diagrams_with_nested_col() -> None:
+    """A declarative diagram (arch-row) is out of scope: no false overlap from col-relative coords.
+
+    Two nodes nested in different ``arch-col`` slots both get coordinates near
+    (0, 0) relative to their OWN column (see ``_to_local``). Comparing those
+    raw attributes as if they were diagram-relative would previously flag a
+    false overlap between every such pair, on every declarative diagram.
+    """
+    declarative = """
+    <div data-type="arch-diagram" style="position:relative;">
+      <div data-type="arch-row" data-row="0">
+        <div data-type="arch-col">
+          <div data-type="arch-node" data-id="a" data-label="A"
+               data-x="0" data-y="0" data-width="90" data-height="40"></div>
+        </div>
+        <div data-type="arch-col">
+          <div data-type="arch-node" data-id="b" data-label="B"
+               data-x="0" data-y="0" data-width="90" data-height="40"></div>
+        </div>
+      </div>
+    </div>
+    """
+    soup = BeautifulSoup(declarative, "html.parser")
+    diagram = soup.find(attrs={"data-type": "arch-diagram"})
+    assert diagram is not None
+
+    assert arch_layout.check_diagram(diagram) == []
+
+
 def _badge(soup: BeautifulSoup, edge_id: str) -> Tag:
     """Find the step badge decoration generated for one edge id."""
     badge = soup.find(attrs={"class": "arch-edge-badge", "data-edge-of": edge_id})
