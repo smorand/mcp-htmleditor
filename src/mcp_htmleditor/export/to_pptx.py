@@ -148,6 +148,9 @@ BAR_KEYS = ("border-left-color", "border-left", "border-top-color", "border-top"
 _PX_FLEX_BASIS_RE = re.compile(r"0\s+0\s+(\d+(?:\.\d+)?)px")
 """Matches the fixed-width shorthand (e.g. ``flex:0 0 116px``) of a custom Gantt label cell."""
 
+_FLEX_SHORTHAND_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)(?:\s+(\d+(?:\.\d+)?))?(?:\s+(.+))?$")
+"""Matches the ``flex: <grow> [<shrink>] [<basis>]`` shorthand, all parts optional-ish."""
+
 _ALIGN = {
     "left": PP_ALIGN.LEFT,
     "center": PP_ALIGN.CENTER,
@@ -316,6 +319,21 @@ class _Block:
     max_height: float = 0.0
     flexible: bool = False
     style: TextStyle | None = None
+    columns: list[_Column] | None = None
+
+
+@dataclass(frozen=True)
+class _Column:
+    """One side-by-side column of a flex row block: its own slot and content.
+
+    ``left_offset`` and ``width`` are inches relative to the row box, fixed at
+    measure time: a later height-only shrink of the row (see :meth:`_flow`)
+    never changes them, only the row's rendered height.
+    """
+
+    left_offset: float
+    width: float
+    elements: list[Tag]
 
 
 @dataclass(frozen=True)
@@ -334,6 +352,85 @@ class _Para:
     style: TextStyle
     runs: list[tuple[str, TextStyle]]
     level: int = 0
+
+
+@dataclass(frozen=True)
+class _ColumnBasis:
+    """A column's parsed CSS width hint: either a fixed share, or a grow factor."""
+
+    fraction: float | None = None
+    """Explicit width as a fraction (0-1) of the row's available width."""
+
+    pixels: float | None = None
+    """Explicit width in CSS pixels, takes priority over ``fraction`` when set."""
+
+    grow: float = 1.0
+    """``flex-grow`` factor used to fair-share the leftover space."""
+
+    @property
+    def is_explicit(self) -> bool:
+        """Tell whether this column carries a resolvable fixed width."""
+        return self.fraction is not None or self.pixels is not None
+
+
+def _column_basis(props: dict[str, str]) -> _ColumnBasis:
+    """Parse a column's width hint from its CSS declarations.
+
+    Reads, in order: the ``flex`` shorthand's basis part (``flex:0 0 58%`` /
+    ``...58px``), then a bare ``flex-basis``, then a plain CSS ``width``. A
+    bare ``flex:1`` (or no hint at all) carries no explicit width: the caller
+    fair-shares the leftover space by ``grow``, mirroring the browser's own
+    ``flex:1`` behaviour. This mirrors the CSS trend already used across the
+    codebase's flex rows (see ``_is_inline_gantt_row``'s ``flex:0 0 158px``
+    label cells) generalized to percentages, the shape real decks use for
+    side-by-side content.
+    """
+    flex = props.get("flex", "").strip()
+    grow = 1.0
+    basis_text = ""
+    if flex:
+        match = _FLEX_SHORTHAND_RE.match(flex)
+        if match:
+            grow = float(match.group(1))
+            basis_text = (match.group(3) or "").strip()
+    if not basis_text:
+        basis_text = props.get("flex-basis", "").strip() or props.get("width", "").strip()
+    if "%" in basis_text:
+        return _ColumnBasis(fraction=parse_pct(basis_text) / 100.0, grow=0.0)
+    px = parse_px(basis_text)
+    if px:
+        return _ColumnBasis(pixels=px, grow=0.0)
+    return _ColumnBasis(grow=grow)
+
+
+def _column_widths(res: StyleResolver, columns: list[Tag], width: float, gap: float) -> list[float] | None:
+    """Resolve each column's width in inches, fair-sharing the leftover space.
+
+    Returns ``None`` when not a single column carries any explicit width hint
+    (``flex``, ``flex-basis`` or ``width``): a flex row with zero sizing
+    information on every child is indistinguishable from an ordinary block
+    stack, so the caller falls back to the regular vertical flow instead of
+    guessing equal columns for content that was never meant to be columnar.
+    """
+    total_gap = gap * max(len(columns) - 1, 0)
+    available = max(width - total_gap, 0.01)
+    bases = [_column_basis(res.props(column)) for column in columns]
+    if not any(basis.is_explicit for basis in bases):
+        return None
+    fixed_total = sum(basis.pixels * PX_IN if basis.pixels else (basis.fraction or 0.0) * available for basis in bases)
+    remaining = max(available - fixed_total, 0.0)
+    grow_total = sum(basis.grow for basis in bases if not basis.is_explicit)
+    widths: list[float] = []
+    for basis in bases:
+        if basis.pixels:
+            widths.append(max(basis.pixels * PX_IN, 0.2))
+        elif basis.fraction is not None:
+            widths.append(max(basis.fraction * available, 0.2))
+        elif grow_total > 0:
+            widths.append(max(remaining * basis.grow / grow_total, 0.2))
+        else:
+            widths.append(0.2)
+    return widths
 
 
 # ---------------------------------------------------------------------------
@@ -656,7 +753,86 @@ class _SlideBuilder:
             return [self._panel_block(element, width)]
         if element.name in {"ul", "ol"} or not self._has_block_children(element):
             return self._text_block(element, width)
+        if self._is_flex_row(element):
+            row = self._flex_row_block(element, width)
+            if row is not None:
+                return [row]
         return self._collect_all(self._children(element), width)
+
+    def _is_flex_row(self, element: Tag) -> bool:
+        """Structurally detect a ``display:flex`` row of 2+ side-by-side columns.
+
+        A row is a flex container without an explicit ``flex-direction:
+        column``/``column-reverse`` whose direct children are at least two
+        block-level elements. This is deliberately the same structural,
+        attribute-free detection style as :meth:`_is_inline_gantt`: any deck
+        using a plain CSS flex row for side-by-side content is recognized,
+        not just this one client slide.
+        """
+        props = self.res.props(element)
+        if props.get("display") not in {"flex", "inline-flex"}:
+            return False
+        if props.get("flex-direction", "row").strip() in {"column", "column-reverse"}:
+            return False
+        columns = [child for child in self._children(element) if self._is_block_child(child)]
+        return len(columns) >= 2
+
+    def _flex_row_block(self, element: Tag, width: float) -> _Block | None:
+        """Measure a flex row: each column gets its own width and vertical flow.
+
+        Column widths come from whichever ``flex``/``flex-basis``/``width``
+        the child already carries (see :func:`_column_width`); columns with no
+        resolvable width share the leftover space equally, mirroring the
+        browser's ``flex:1`` fair-share behaviour. Each column's natural
+        height is measured with the *same* :meth:`_collect_all` used for a
+        normal single-column region, so nested content (panels, tables,
+        text) keeps behaving exactly as it does outside a row.
+        """
+        columns_el = [child for child in self._children(element) if self._is_block_child(child)]
+        gap = parse_px(self.res.props(element).get("gap", "") or self.res.props(element).get("column-gap", ""))
+        widths = _column_widths(self.res, columns_el, width, gap * PX_IN)
+        if widths is None:
+            return None
+        columns: list[_Column] = []
+        offset = 0.0
+        heights: list[float] = []
+        min_heights: list[float] = []
+        for child, col_width in zip(columns_el, widths, strict=True):
+            child_elements = self._children(child) if self._is_flex_row_column_wrapper(child) else [child]
+            blocks = self._collect_all(child_elements, col_width)
+            natural = sum(b.height for b in blocks)
+            shrinkable = sum(max(b.height - b.min_height, 0.0) if b.flexible else 0.0 for b in blocks)
+            columns.append(_Column(offset, col_width, child_elements))
+            heights.append(natural)
+            min_heights.append(max(natural - shrinkable, 0.02))
+            offset += col_width + gap * PX_IN
+        if not columns:
+            return None
+        natural_height = max(heights, default=0.02)
+        min_height = max(min_heights, default=0.02)
+        return _Block(
+            "row",
+            element,
+            max(natural_height, 0.02),
+            min_height=min(min_height, natural_height),
+            flexible=True,
+            columns=columns,
+        )
+
+    @staticmethod
+    def _is_flex_row_column_wrapper(child: Tag) -> bool:
+        """Tell whether a column's own children flow directly (no extra block).
+
+        A column that is itself a plain flex/box layout wrapper (no visual
+        decoration of its own: no fill, no border accent, no data-type) is
+        transparent: its children flow as the column content, exactly like
+        the direct children of ``.slide-body`` would. A decorated or typed
+        column (a table, a panel, an arch-diagram, ...) is kept as a single
+        child so its own dedicated renderer still gets to run.
+        """
+        if child.get("data-type"):
+            return False
+        return child.name == "div" and not classes(child)
 
     def _is_panel(self, element: Tag) -> bool:
         """Tell whether an element is a decorated panel (fill or accent bar)."""
@@ -871,8 +1047,24 @@ class _SlideBuilder:
             self._render_annotated_image(box, block.element)
         elif block.kind == "image":
             self._render_image(box, block.element)
+        elif block.kind == "row":
+            self._render_row(box, block)
         else:  # pragma: no cover - defensive, every kind is handled above
             self.ctx.report.warn(f"Composant non supporte ignore: {block.kind}")
+
+    def _render_row(self, box: Box, block: _Block) -> None:
+        """Render a flex row: flow each column independently in its own slot.
+
+        The row's own height may have been grown or shrunk by the parent
+        :meth:`_flow` (flexible blocks absorb free space or give theirs back
+        on overflow); each column reuses that *same* final height as its own
+        available space and runs the regular :meth:`_flow` recursively, so a
+        column whose content still overflows its narrower width shrinks on
+        its own instead of the whole row shrinking uniformly.
+        """
+        for column in block.columns or []:
+            column_box = Box(box.left + column.left_offset, box.top, column.width, box.height)
+            self._flow(_Region(column_box, column.elements))
 
     def _render_text(
         self,

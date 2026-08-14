@@ -8,12 +8,14 @@ instead of silent success).
 from __future__ import annotations
 
 import base64
+import itertools
 import struct
 import zlib
 from pathlib import Path
+from typing import Any
 
 import pytest
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE
 from pptx.util import Inches
@@ -30,6 +32,7 @@ from mcp_htmleditor.export.pptx_style import (
 from mcp_htmleditor.export.to_pptx import (
     SLIDE_H_IN,
     SLIDE_W_IN,
+    _column_widths,
     find_slides,
     to_pptx,
 )
@@ -746,6 +749,153 @@ def test_arch_edges_become_segments_tips_and_labels(section_deck: Path, tmp_path
     texts = {s.text_frame.text for s in slide.shapes if s.has_text_frame}
     assert "HTTP" in texts
     assert "\u2192" in texts
+
+
+# ---------------------------------------------------------------------------
+# Flex row columns
+# ---------------------------------------------------------------------------
+
+FLEX_ROW_DECK = """<!DOCTYPE html>
+<html data-doc-type="presentation">
+<head><meta charset="UTF-8"></head>
+<body>
+<article data-type="slide" data-id="s1" data-title="Two columns">
+  <div class="slide-body"><div style="display:flex;gap:16px;height:100%;">
+    <div style="flex:0 0 60%;">
+      <div>Box One</div>
+      <div>Box Two</div>
+      <div>Box Three</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+      <div class="cds-notification"><div><div class="notif-title">Card One</div>
+        <div class="notif-body">__FILLER__</div></div></div>
+      <div class="cds-notification"><div><div class="notif-title">Card Two</div>
+        <div class="notif-body">__FILLER__</div></div></div>
+      <div class="cds-notification"><div><div class="notif-title">Card Three</div>
+        <div class="notif-body">__FILLER__</div></div></div>
+      <div class="cds-notification"><div><div class="notif-title">Card Four</div>
+        <div class="notif-body">__FILLER__</div></div></div>
+    </div>
+  </div></div>
+</article>
+<article data-type="slide" data-id="s2" data-title="No sizing hint">
+  <div class="slide-body"><div style="display:flex;">
+    <p>Just a paragraph, not a real column layout.</p>
+  </div></div>
+</article>
+</body>
+</html>
+""".replace("__FILLER__", " ".join(["Lorem ipsum dolor sit amet consectetur."] * 8))
+
+
+@pytest.fixture
+def flex_row_deck(tmp_path: Path) -> Path:
+    """Write a compact deck exercising a 60/40 flex row and a false positive."""
+    path = tmp_path / "flex-row.html"
+    path.write_text(FLEX_ROW_DECK, encoding="utf-8")
+    return path
+
+
+def _text_shape(slide: Any, needle: str) -> Any:
+    """Find the shape whose text frame contains ``needle`` (panels wrap title+body)."""
+    for shape in slide.shapes:
+        if shape.has_text_frame and needle in shape.text_frame.text:
+            return shape
+    raise AssertionError(f"no shape contains {needle!r}")
+
+
+def test_flex_row_splits_into_two_independent_columns(flex_row_deck: Path, tmp_path: Path) -> None:
+    """A display:flex row of 2+ sized columns lays out side by side, not stacked."""
+    out = tmp_path / "flex-row.pptx"
+    report = to_pptx(str(flex_row_deck), str(out))
+    assert report.warnings == []
+
+    slide = Presentation(str(out)).slides[0]
+    left_shape = _text_shape(slide, "Box One")
+    right_shape = _text_shape(slide, "Card One")
+    # Side by side: the right column starts at or after the left column's right edge.
+    assert right_shape.left >= left_shape.left + Inches(1.0)
+    assert left_shape.left < Inches(1.0)
+
+
+def test_flex_row_columns_flow_independently_top_to_bottom(flex_row_deck: Path, tmp_path: Path) -> None:
+    """Each column stacks its own children top to bottom, not merged with the other."""
+    out = tmp_path / "flex-row.pptx"
+    to_pptx(str(flex_row_deck), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    box_one = _text_shape(slide, "Box One")
+    box_two = _text_shape(slide, "Box Two")
+    box_three = _text_shape(slide, "Box Three")
+    assert box_one.top < box_two.top < box_three.top
+
+    titles = ["Card One", "Card Two", "Card Three", "Card Four"]
+    cards = [_text_shape(slide, t) for t in titles]
+    for earlier, later in itertools.pairwise(cards):
+        assert earlier.top < later.top
+
+
+def test_flex_row_right_column_cards_do_not_overlap_or_overflow(flex_row_deck: Path, tmp_path: Path) -> None:
+    """The four cards shrink to fit their own narrower column, never overlapping."""
+    out = tmp_path / "flex-row.pptx"
+    to_pptx(str(flex_row_deck), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    panels = [
+        s
+        for s in slide.shapes
+        if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE and s.left > Inches(6.0) and s.width > Inches(1.0)
+    ]
+    assert len(panels) == 4
+    ordered = sorted(panels, key=lambda s: s.top)
+    for earlier, later in itertools.pairwise(ordered):
+        assert earlier.top + earlier.height <= later.top + Inches(0.02)
+    last = ordered[-1]
+    assert last.top + last.height <= Inches(SLIDE_H_IN) + Inches(0.05)
+
+
+def test_flex_row_without_sizing_hints_falls_back_to_the_regular_flow(flex_row_deck: Path, tmp_path: Path) -> None:
+    """A flex container with no flex/width hint on any child is not split into columns.
+
+    Regression guard for the design decision documented in ``_column_widths``:
+    zero sizing information on every child means the shape can't be told apart
+    from an ordinary block stack, so it must flow exactly like one.
+    """
+    out = tmp_path / "flex-row.pptx"
+    to_pptx(str(flex_row_deck), str(out))
+
+    slide = Presentation(str(out)).slides[1]
+    texts = {s.text_frame.text for s in slide.shapes if s.has_text_frame}
+    assert "Just a paragraph, not a real column layout." in texts
+
+
+def test_column_widths_reads_flex_basis_percentages() -> None:
+    """``flex:0 0 58%`` resolves to a fixed fraction, ``flex:1`` fair-shares the rest."""
+    soup = BeautifulSoup(
+        '<div style="display:flex;"><div style="flex:0 0 58%;">a</div><div style="flex:1;">b</div></div>',
+        "html.parser",
+    )
+    row = soup.div
+    assert row is not None
+    columns = [c for c in row.children if isinstance(c, Tag)]
+    resolver = StyleResolver.from_soup(BeautifulSoup("<html></html>", "html.parser"))
+    widths = _column_widths(resolver, columns, 10.0, 0.0)
+    assert widths is not None
+    assert widths[0] == pytest.approx(5.8, abs=0.01)
+    assert widths[1] == pytest.approx(4.2, abs=0.01)
+
+
+def test_column_widths_returns_none_without_any_sizing_hint() -> None:
+    """No column carries flex/width information: caller must not guess columns."""
+    soup = BeautifulSoup(
+        '<div style="display:flex;"><div>a</div><div>b</div></div>',
+        "html.parser",
+    )
+    row = soup.div
+    assert row is not None
+    columns = [c for c in row.children if isinstance(c, Tag)]
+    resolver = StyleResolver.from_soup(BeautifulSoup("<html></html>", "html.parser"))
+    assert _column_widths(resolver, columns, 10.0, 0.0) is None
 
 
 def test_table_merges_spans(section_deck: Path, tmp_path: Path) -> None:
