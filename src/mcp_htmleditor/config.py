@@ -5,6 +5,7 @@ prefixed ``HTMLEDITOR_``, a local ``.env`` file, or the XDG defaults.
 
     bin       ~/.local/bin                          HTMLEDITOR_BIN_DIR
     templates ~/.config/mcp-htmleditor/templates    HTMLEDITOR_TEMPLATES_DIR
+    arch checks ~/.config/mcp-htmleditor/arch-checks HTMLEDITOR_ARCH_CHECKS_DIR
     logs      ~/.cache/mcp-htmleditor/logs          HTMLEDITOR_LOGS, HTMLEDITOR_LOG_DIR
     cache     ~/.cache/mcp-htmleditor               HTMLEDITOR_CACHE_DIR
     reference ~/.cache/mcp-htmleditor/reference     (generated pandoc reference.docx)
@@ -46,6 +47,7 @@ _INT_FALLBACKS = {"port": DEFAULT_PORT, "poll_interval": DEFAULT_POLL_INTERVAL}
 # Every field holding a filesystem path override, validated the same way.
 _PATH_FIELDS = (
     "templates_dir_override",
+    "arch_checks_dir_override",
     "logs_override",
     "log_dir_override",
     "cache_dir_override",
@@ -61,6 +63,7 @@ _SIGNIFICANT_ENV_VARS = (
     "HTMLEDITOR_PORT",
     "HTMLEDITOR_POLL_INTERVAL",
     "HTMLEDITOR_TEMPLATES_DIR",
+    "HTMLEDITOR_ARCH_CHECKS_DIR",
     "HTMLEDITOR_LOGS",
     "HTMLEDITOR_LOG_DIR",
     "HTMLEDITOR_CACHE_DIR",
@@ -99,6 +102,7 @@ class Settings(BaseSettings):
     otel_api_key: str | None = None
 
     templates_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_TEMPLATES_DIR")
+    arch_checks_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_ARCH_CHECKS_DIR")
     logs_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LOGS")
     log_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LOG_DIR")
     cache_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_CACHE_DIR")
@@ -155,6 +159,17 @@ class Settings(BaseSettings):
     def templates_dir(self) -> Path:
         """User templates directory."""
         return self.templates_dir_override or self.config_dir / "templates"
+
+    @property
+    def arch_checks_dir(self) -> Path:
+        """User-editable arch-diagram QA checklist directory.
+
+        Seeded once by ``make install`` (never overwritten on reinstall, unlike
+        the bulk template copy: this file is meant to be edited in place, see
+        ``skill/checks/arch-diagram-checklist.md`` for the bundled default and
+        ``skill/workflow-arch-qa.md`` for how it is used).
+        """
+        return self.arch_checks_dir_override or self.config_dir / "arch-checks"
 
     @property
     def cache_dir(self) -> Path:
@@ -226,6 +241,11 @@ def config_dir() -> Path:
 def templates_dir() -> Path:
     """User templates directory (HTMLEDITOR_TEMPLATES_DIR)."""
     return get_settings().templates_dir
+
+
+def arch_checks_dir() -> Path:
+    """User-editable arch-diagram QA checklist directory (HTMLEDITOR_ARCH_CHECKS_DIR)."""
+    return get_settings().arch_checks_dir
 
 
 def log_dir() -> Path:

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from . import arch_checks
+
 
 def _skill_dir() -> Path:
     """Return the bundled skill directory (repo skill/ or package skill/)."""
@@ -27,6 +29,7 @@ _SUBDOCS = [
     "workflow-create.md",
     "workflow-export.md",
     "workflow-templates.md",
+    "workflow-arch-qa.md",
     "types/slides.md",
     "types/document.md",
     "types/mail.md",
@@ -54,5 +57,12 @@ def build_skill_content() -> str:
         path = skill / rel
         if path.is_file():
             parts.append(f"\n\n---\n\n<!-- ===== {rel} ===== -->\n\n" + path.read_text(encoding="utf-8").rstrip())
+
+    checklist = arch_checks.read_checklist()
+    if checklist:
+        # Read from the resolved, user-editable location (never the bundled
+        # skill/checks/ copy directly): editing the installed file must be
+        # visible here on the very next call, no reinstall.
+        parts.append("\n\n---\n\n<!-- ===== arch-diagram-checklist.md ===== -->\n\n" + checklist.rstrip())
 
     return "\n".join(parts) + "\n"

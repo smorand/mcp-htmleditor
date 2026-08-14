@@ -1413,21 +1413,45 @@ class _SlideBuilder:
         background = self._element_color(element)
         if background:
             self._rect(box, fill=background, line=self.theme.border)
-        nodes = 0
-        for child in element.find_all(True):
-            if not isinstance(child, Tag) or child.name in SKIP_TAGS:
-                continue
-            if str(child.get("data-type") or "") == "arch-node":
-                self._render_arch_node(box, child)
-                nodes += 1
-            elif has_class(child, "arch-line-h", "arch-line-v"):
-                self._render_arch_line(box, child)
-            elif has_class(child, "arch-tip"):
-                self._render_arch_tip(box, child)
-            elif has_class(child, "arch-edge-label") or str(child.get("data-type") or "") == "arch-edge":
-                self._render_arch_label(box, child)
+        nodes = self._render_arch_children(box, element)
         if not nodes:
             self.ctx.report.warn('Schema sans noeud data-type="arch-node": seul le cadre est exporte.')
+
+    def _render_arch_children(self, container: Box, element: Tag) -> int:
+        """Recursively render arch-node/-line/-tip/-label descendants of ``element``.
+
+        Switches ``container`` when descending into an ``arch-col``: in the browser
+        an arch-col is itself ``position:absolute``, which per CSS makes it the
+        containing block for its OWN children's percentages (see
+        ``arch_layout.py``'s ``_to_local`` and ``.agent_docs/html-conventions.md``).
+        Reading a nested node's ``data-x``/``data-y`` against the outer diagram box
+        instead of its col's box would shrink and misplace it exactly like the CSS
+        bug that ``_to_local`` exists to prevent, just in the exported deck instead
+        of the browser. Every other wrapper (``arch-row``, plain decorative divs)
+        stays inert and keeps the same container, matching the browser exactly.
+        """
+        nodes = 0
+        for child in element.find_all(True, recursive=False):
+            if not isinstance(child, Tag) or child.name in SKIP_TAGS:
+                continue
+            dtype = str(child.get("data-type") or "")
+            if dtype == "arch-node":
+                self._render_arch_node(container, child)
+                nodes += 1
+            elif dtype == "arch-col":
+                col_box = self._node_box(container, child, default_w=20.0, default_h=12.0)
+                nodes += self._render_arch_children(col_box, child)
+            elif has_class(child, "arch-line-h", "arch-line-v"):
+                self._render_arch_line(container, child)
+            elif has_class(child, "arch-tip"):
+                self._render_arch_tip(container, child)
+            elif has_class(child, "arch-edge-label") or dtype == "arch-edge":
+                self._render_arch_label(container, child)
+            elif has_class(child, "arch-edge-badge"):
+                self._render_arch_badge(container, child)
+            else:
+                nodes += self._render_arch_children(container, child)
+        return nodes
 
     def _node_box(self, container: Box, element: Tag, default_w: float, default_h: float) -> Box:
         """Resolve the box of a positioned child, in the container reference.
@@ -1500,6 +1524,31 @@ class _SlideBuilder:
         box = Box(anchor.left - size / 2, anchor.top - size / 2, size, size)
         shape = self._rect(box, fill=self._edge_color(tip), shape=MSO_SHAPE.ISOSCELES_TRIANGLE)
         shape.rotation = rotation
+
+    def _render_arch_badge(self, container: Box, badge: Tag) -> None:
+        """Render a numbered step badge (``data-step``) as a small filled circle.
+
+        Mirrors the browser's ``.arch-edge-badge`` (14px circle, centered white
+        bold number, background from the edge's own color): closes the PPTX
+        fidelity gap documented in ``.agent_docs/html-conventions.md`` and the
+        arch-diagram QA checklist.
+        """
+        text = badge.get_text(strip=True)
+        if not text:
+            return
+        props = style_props(badge)
+        x = parse_pct(props.get("left", "0%"))
+        y = parse_pct(props.get("top", "0%"))
+        size = 14.0 * PX_IN
+        anchor = container.pct(x, y, 0.1, 0.1)
+        box = Box(anchor.left - size / 2, anchor.top - size / 2, size, size)
+        fill = color_of(self.res.props(badge), ("background", "background-color"), self.res) or self.theme.primary
+        shape = self._rect(box, fill=fill, shape=MSO_SHAPE.OVAL)
+        frame = shape.text_frame
+        frame.margin_left = frame.margin_right = frame.margin_top = frame.margin_bottom = 0
+        frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+        style = TextStyle(size=8, bold=True, color="FFFFFF", align="center", space_after=0)
+        self._write(frame, [_Para(style, [(text, style)])])
 
     def _render_arch_label(self, container: Box, label: Tag) -> None:
         """Render an edge label, or a text based arrow, inside the diagram."""

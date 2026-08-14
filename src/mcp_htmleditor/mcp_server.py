@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 6 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 7 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -13,6 +13,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+from .arch_layout import layout_file
 from .http_server import (
     is_server_running,
     start_http_server,
@@ -159,6 +160,40 @@ def update_end() -> dict[str, Any]:
     with trace_span("mcp.update_end", {"file.path": state.current_file or ""}):
         state.set_update_flag(False)
     return {"ok": True}
+
+
+@mcp.tool()
+def layout_arch_diagram(file: str, diagram_id: str | None = None) -> dict[str, Any]:
+    """Compute and write the layout of every declarative arch-diagram in a file.
+
+    The LLM authors topology only (arch-row / arch-node / arch-edge / arch-lane,
+    see skill/types/arch-diagram.md), never coordinates. This tool derives the
+    final data-x/data-y/data-width/data-height percentages deterministically:
+    no collision between nodes, straight connectors on aligned columns, labels
+    centered on their segment by construction, lane boxes sized from the union
+    of the rows they declare. Diagrams with no arch-row child (legacy, hand
+    authored data-x/data-y) are left untouched, so both formats coexist.
+
+    Args:
+        file: Path to the HTML file to update in place.
+        diagram_id: Restrict the recompute to the diagram whose data-diagram-id
+            matches, when a file has more than one. Omit to process every
+            declarative diagram in the file.
+
+    Returns:
+        Dict with keys: ok, file, diagrams_updated, warnings.
+    """
+    abs_file = str(Path(file).resolve())
+    with trace_span("mcp.layout_arch_diagram", {"file.path": abs_file}) as span:
+        report = layout_file(abs_file, diagram_id=diagram_id)
+        span.set_attribute("arch_layout.diagrams_updated", report.diagrams_updated)
+        span.set_attribute("arch_layout.warnings", len(report.warnings))
+        return {
+            "ok": True,
+            "file": report.file,
+            "diagrams_updated": report.diagrams_updated,
+            "warnings": list(report.warnings),
+        }
 
 
 def run_mcp_server() -> None:

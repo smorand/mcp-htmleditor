@@ -193,6 +193,46 @@ def _serve_file(file: str, port: int | None, poll: int | None, host: str, *, ope
         stop_http_server()
 
 
+@main.command("arch-checklist")
+def arch_checklist_cmd() -> None:
+    """Print the resolved arch-diagram QA checklist and where it lives.
+
+    Resolution order: HTMLEDITOR_ARCH_CHECKS_DIR, then
+    ~/.config/mcp-htmleditor/arch-checks/ (seeded once by `make install`, never
+    overwritten on reinstall), then the bundled repo copy. Edit the resolved
+    file directly to add or change a control: no code change, no reinstall.
+    """
+    from .arch_checks import checklist_path, read_checklist
+
+    click.echo(f"Fichier: {checklist_path()}\n")
+    content = read_checklist()
+    if not content:
+        click.echo("(checklist introuvable a cet emplacement)")
+        return
+    click.echo(content)
+
+
+@main.command("arch-layout")
+@click.argument("file", type=click.Path(exists=True, dir_okay=False))
+@click.option("--diagram-id", default=None, help="Ne recalculer que le diagramme portant ce data-diagram-id.")
+def arch_layout_cmd(file: str, diagram_id: str | None) -> None:
+    """Compute and write the layout of every declarative arch-diagram in FILE.
+
+    A diagram is "declarative" once it has at least one arch-row child; legacy
+    diagrams (data-x/data-y written by hand) are left untouched. See
+    skill/types/arch-diagram.md for the authored format.
+    """
+    from .arch_layout import layout_file
+
+    report = layout_file(file, diagram_id=diagram_id)
+    for warning in report.warnings:
+        click.echo(f"Attention: {warning}", err=True)
+    if report.diagrams_updated == 0:
+        click.echo('Aucun diagramme declaratif trouve (data-type="arch-diagram" avec un arch-row): rien a faire.')
+    else:
+        click.echo(f"Done. {report.diagrams_updated} diagramme(s) recalcule(s).")
+
+
 @main.command("export")
 @click.argument("format", type=click.Choice(["pptx", "docx"]))
 @click.argument("input_file", type=click.Path(exists=True, dir_okay=False))

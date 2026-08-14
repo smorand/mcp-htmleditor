@@ -31,6 +31,7 @@ DOCKER_TAG ?= latest
 BIN_DIR       ?= $(HOME)/.local/bin
 CONFIG_DIR    ?= $(HOME)/.config/mcp-htmleditor
 TEMPLATES_DIR ?= $(CONFIG_DIR)/templates
+ARCH_CHECKS_DIR ?= $(CONFIG_DIR)/arch-checks
 CACHE_DIR     ?= $(HOME)/.cache/mcp-htmleditor
 LOG_DIR       ?= $(CACHE_DIR)/logs
 PI_SKILLS_DIR ?= $(HOME)/.pi/agent/dynamic-skills/html-editor
@@ -170,6 +171,9 @@ ifeq ($(HAS_UV),yes)
 	@echo "==> Installing templates into $(TEMPLATES_DIR)"
 	@mkdir -p $(TEMPLATES_DIR)
 	@cp -R templates/. $(TEMPLATES_DIR)/
+	@echo "==> Seeding arch-diagram QA checklist into $(ARCH_CHECKS_DIR) (kept if already present: this file is meant to be hand-edited)"
+	@mkdir -p $(ARCH_CHECKS_DIR)
+	@test -f $(ARCH_CHECKS_DIR)/arch-diagram-checklist.md || cp skill/checks/arch-diagram-checklist.md $(ARCH_CHECKS_DIR)/
 	@echo "==> Creating log dir $(LOG_DIR)"
 	@mkdir -p $(LOG_DIR)
 	@$(MAKE) install-skill
@@ -276,6 +280,7 @@ info:
 	@echo "Install targets:"
 	@echo "  bin            $(BIN_DIR)"
 	@echo "  templates      $(TEMPLATES_DIR)"
+	@echo "  arch checks    $(ARCH_CHECKS_DIR)"
 	@echo "  logs           $(LOG_DIR)"
 	@echo "  pi skill       $(PI_SKILLS_DIR)"
 

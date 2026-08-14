@@ -3,7 +3,8 @@
 Serves the editor shell and proxies HTML content reads/writes to the current
 file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
 ``/content-frame``, ``/status`` (polling), ``/health`` (status + version),
-``/export/pptx`` and ``/export/docx``.
+``/export/pptx``, ``/export/docx`` and ``POST /arch-layout`` (recompute every
+declarative diagram in place, used by the browser after a structural edit).
 """
 
 from __future__ import annotations
@@ -132,6 +133,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
 
         if path == "/content":
             self._receive_content()
+        elif path == "/arch-layout":
+            self._run_arch_layout()
         else:
             self._not_found()
 
@@ -310,6 +313,40 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
 
         logger.debug("Saved %s (%d bytes)", target, len(html))
         self._send_json({"ok": True})
+
+    def _run_arch_layout(self) -> None:
+        """Recompute every declarative arch-diagram in the current file.
+
+        Called by the browser right after it saves a structural diagram edit
+        (add/remove node or edge, see editor.js's ``requestArchLayout``): the
+        browser cannot run the Python layout engine itself, so it POSTs here,
+        the server writes the recomputed positions to disk, and the existing
+        polling loop picks up the mtime change and reloads the iframe — the
+        same path an LLM agent's own ``arch-layout`` call already takes.
+        """
+        from .arch_layout import layout_file
+
+        state = get_state()
+        if not state.current_file:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        if length:
+            self.rfile.read(length)  # body is unused, drain it so the connection stays clean
+
+        target = Path(state.current_file)
+        with trace_span("mcp.layout_arch_diagram", {"file.path": str(target)}) as span:
+            try:
+                report = layout_file(target)
+            except OSError as exc:
+                logger.error("arch-layout failed for %s: %s", target, exc)
+                self._send_json({"error": str(exc)}, status=500)
+                return
+            span.set_attribute("arch_layout.diagrams_updated", report.diagrams_updated)
+            span.set_attribute("arch_layout.warnings", len(report.warnings))
+
+        self._send_json({"ok": True, "diagrams_updated": report.diagrams_updated, "warnings": list(report.warnings)})
 
     # ------------------------------------------------------------------
     # Low-level helpers

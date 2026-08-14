@@ -202,6 +202,41 @@
   .arch-tip-d { border-top:7px solid var(--ibm-blue-60); border-left:4.5px solid transparent; border-right:4.5px solid transparent; }
   .arch-tip-u { border-bottom:7px solid var(--ibm-blue-60); border-left:4.5px solid transparent; border-right:4.5px solid transparent; }
   .arch-edge-label { position:absolute; font-size:9.5px; color:var(--cds-text-secondary); white-space:nowrap; }
+  /* Lane (swimlane) grouping several arch-row: box derived automatically by the
+     declarative layout engine (mcp-htmleditor arch-layout) from the union of its
+     rows' node boxes, never guessed by hand. See skill/types/arch-diagram.md. */
+  [data-type="arch-lane"] {
+    position:absolute; box-sizing:border-box; pointer-events:none;
+    border:1.5px dashed var(--cds-border-strong-01); border-radius:8px;
+  }
+  [data-type="arch-lane"]::before {
+    content: attr(data-label);
+    position:absolute; top:-16px; left:6px;
+    font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    color: var(--cds-text-secondary);
+    background:#fff; padding:0 4px; border-radius:2px;
+  }
+  /* An arch-col's own box already is the slot rectangle (unlike a lane's derived
+     union box), so giving it a border/background directly makes it read as one
+     bordered card wrapping its stacked nodes. The corner label sits INSIDE the
+     box (not above it, unlike a lane): a col commonly starts at the diagram's own
+     top edge, and a slide has a hard overflow:hidden budget (skill/types/slides.md
+     § Hauteur utile) that would silently clip a label floated above row 0. */
+  [data-type="arch-col"] { position:absolute; box-sizing:border-box; }
+  [data-type="arch-col"][data-label]::before {
+    content: attr(data-label);
+    position:absolute; top:4px; left:8px;
+    font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    color: var(--cds-text-secondary); pointer-events:none;
+  }
+  /* Numbered step badge on an arch-edge (data-step="N"): a small filled circle at the
+     connector's true on-segment midpoint, distinct from the optional text label which
+     stays offset beside/below it. Background colour set inline per edge (data-color). */
+  .arch-edge-badge {
+    position:absolute; width:14px; height:14px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:8px; font-weight:700; line-height:1;
+  }
   .status-bar { height:24px; background:var(--ibm-gray-100); display:flex; align-items:center; padding:0 var(--cds-spacing-05); gap:var(--cds-spacing-05); flex-shrink:0; border-top:1px solid #393939; }
   .status-bar span { font-size:11px; color:#8d8d8d; }
   .status-bar .status-active { color:#42be65; }

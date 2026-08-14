@@ -650,6 +650,87 @@ def test_arch_nodes_become_autoshapes(section_deck: Path, tmp_path: Path) -> Non
     assert str(node.line.color.rgb) == "0F62FE"
 
 
+def test_arch_edge_badge_exports_as_a_numbered_circle(tmp_path: Path) -> None:
+    """data-step badges (arch-edge-badge) export as a filled circle with the number,
+    closing the PPTX fidelity gap tracked in the arch-diagram QA checklist."""
+    from mcp_htmleditor import arch_layout
+
+    html_path = tmp_path / "deck.html"
+    html_path.write_text(
+        """<!DOCTYPE html>
+<html data-doc-type="presentation"><body>
+<section data-type="slide" data-id="s1" data-title="Diagram">
+  <div data-type="arch-diagram" style="position:relative; height:200px;">
+    <div data-type="arch-row" data-row="0">
+      <div data-type="arch-node" data-id="a" data-label="A"></div>
+      <div data-type="arch-node" data-id="b" data-label="B"></div>
+    </div>
+    <div data-type="arch-edge" data-from="a" data-to="b" data-step="5" data-color="#2CA02C"></div>
+  </div>
+</section>
+</body></html>""",
+        encoding="utf-8",
+    )
+    arch_layout.layout_file(html_path)
+
+    out = tmp_path / "deck.pptx"
+    to_pptx(str(html_path), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    badges = [
+        s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE and s.auto_shape_type == MSO_SHAPE.OVAL
+    ]
+    assert any(s.has_text_frame and s.text_frame.text == "5" for s in badges)
+
+
+def test_arch_col_nested_nodes_export_at_the_right_place(tmp_path: Path) -> None:
+    """A node nested in an arch-col must be read against the col's own box, not the
+    outer diagram's: the col is itself position:absolute in the browser (containing
+    block for its children, see arch_layout.py's _to_local), so the exporter has to
+    switch container the same way or a nested node shrinks to roughly col-width^2/100
+    and lands in the wrong place (the exact bug _render_arch_children exists to avoid).
+    """
+    from mcp_htmleditor import arch_layout
+
+    html_path = tmp_path / "deck.html"
+    html_path.write_text(
+        """<!DOCTYPE html>
+<html data-doc-type="presentation"><body>
+<section data-type="slide" data-id="s1" data-title="Diagram">
+  <div data-type="arch-diagram" style="position:relative; height:200px;">
+    <div data-type="arch-row" data-row="0">
+      <div data-type="arch-node" data-id="wide" data-label="Wide"
+           style="border:2px solid #0f62fe;"></div>
+      <div data-type="arch-col">
+        <div data-type="arch-node" data-id="top" data-label="Top"
+             style="border:2px solid #198038;"></div>
+        <div data-type="arch-node" data-id="bottom" data-label="Bottom"
+             style="border:2px solid #da1e28;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+</body></html>""",
+        encoding="utf-8",
+    )
+    arch_layout.layout_file(html_path)
+
+    out = tmp_path / "deck.pptx"
+    to_pptx(str(html_path), str(out))
+
+    slide = Presentation(str(out)).slides[0]
+    shapes = {s.text_frame.text: s for s in slide.shapes if s.has_text_frame}
+    assert {"Wide", "Top", "Bottom"} <= shapes.keys()
+    top, bottom = shapes["Top"], shapes["Bottom"]
+    # Buggy (diagram-relative) reading would shrink both to a sliver near the
+    # diagram's own top-left; correctly converted, each keeps a normal, comparable
+    # width and they stack without overlapping.
+    assert top.width.inches > 1.0
+    assert bottom.width.inches > 1.0
+    assert abs(top.width.inches - bottom.width.inches) < 0.05
+    assert top.top + top.height <= bottom.top + Inches(0.02)
+
+
 def test_arch_edges_become_segments_tips_and_labels(section_deck: Path, tmp_path: Path) -> None:
     """CSS connectors become thin rectangles, arrow heads and labels."""
     out = tmp_path / "deck.pptx"

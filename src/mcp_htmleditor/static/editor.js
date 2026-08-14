@@ -27,6 +27,7 @@ let isDocument     = false;   // detected from data-doc-type
 let insertPosition = null;    // 'before' | 'after' when slide picker is open
 let blockPosition  = null;    // 'before' | 'after' when block picker is open
 let lastDocRange   = null;    // saved caret range in document mode
+let archConnectSource = null; // {node, doc} while picking an edge's target node
 
 const frame        = document.getElementById('content-frame');
 const overlay      = document.getElementById('update-overlay');
@@ -740,6 +741,159 @@ function insertLink(doc) {
 /* ============================================================
    Context menus (injected into iframe)
    ============================================================ */
+/* ============================================================
+   Declarative arch-diagram mouse editing (add/remove node, add edge)
+
+   These write the SAME markup the LLM authors (arch-row / arch-node /
+   arch-edge, see skill/types/arch-diagram.md): no position is ever computed
+   here client-side. Every structural change is followed by saveThenLayout(),
+   which persists the DOM then asks the server to run the Python layout
+   engine (POST /arch-layout) exactly as `mcp-htmleditor arch-layout` would,
+   so the browser never reimplements the row/col distribution or the edge
+   routing in JS.
+   ============================================================ */
+
+function isDeclarativeArchDiagram(diagram) {
+  return !!diagram.querySelector('[data-type="arch-row"]');
+}
+
+/** Assign a stable data-id to a node that does not have one yet (older
+    diagrams, or a node added before this feature existed). */
+function ensureNodeId(node, diagram) {
+  if (node.dataset.id) return node.dataset.id;
+  const used = new Set(
+    [...diagram.querySelectorAll('[data-type="arch-node"]')].map(n => n.dataset.id).filter(Boolean)
+  );
+  let n = 0;
+  let id = 'node-0';
+  while (used.has(id)) { n += 1; id = 'node-' + n; }
+  node.dataset.id = id;
+  return id;
+}
+
+/** Persist the DOM, then ask the server to recompute every declarative
+    diagram in the file (the browser never computes positions itself). */
+async function saveThenLayout() {
+  await saveContent();
+  try {
+    const res = await fetch('/arch-layout', { method: 'POST' });
+    const body = await res.json();
+    if (body.warnings && body.warnings.length) {
+      console.warn('arch-layout warnings:', body.warnings);
+    }
+  } catch (e) {
+    console.warn('arch-layout request failed:', e);
+  }
+}
+
+/** ＋ Ajouter nœud (declarative diagram): choose an existing row or a new one,
+    insert a plain arch-node, then recompute positions server-side. */
+function addArchNodeDeclarative(doc, diagram) {
+  const rows = [...diagram.querySelectorAll('[data-type="arch-row"]')];
+  const label = prompt('Libellé du nœud :', 'Nouveau nœud');
+  if (!label) return;
+
+  let targetRow;
+  if (rows.length === 0) {
+    targetRow = doc.createElement('div');
+    targetRow.dataset.type = 'arch-row';
+    targetRow.dataset.row = '0';
+    diagram.insertBefore(targetRow, diagram.firstChild);
+  } else if (rows.length === 1) {
+    targetRow = rows[0];
+  } else {
+    const indices = rows.map(r => r.dataset.row).join(', ');
+    const chosen = prompt(`Numéro de rangée existante (${indices}), ou un nouveau numéro :`, rows[rows.length - 1].dataset.row);
+    if (chosen === null) return;
+    targetRow = rows.find(r => r.dataset.row === chosen.trim());
+    if (!targetRow) {
+      targetRow = doc.createElement('div');
+      targetRow.dataset.type = 'arch-row';
+      targetRow.dataset.row = chosen.trim();
+      diagram.appendChild(targetRow);
+    }
+  }
+
+  const node = doc.createElement('div');
+  node.dataset.type = 'arch-node';
+  node.dataset.label = label;
+  node.dataset.shape = 'box';
+  ensureNodeId(node, diagram);
+  node.style.cssText = 'border:2px solid #333; background:#f5f5f5; color:#262626; border-radius:4px;';
+  node.textContent = label;
+  targetRow.appendChild(node);
+
+  saveThenLayout();
+}
+
+/** Supprimer: also drop every arch-edge that referenced this node (dangling
+    data-from/data-to would otherwise silently stop rendering a connector). */
+function removeArchNode(doc, diagram, node) {
+  const id = node.dataset.id;
+  if (id) {
+    diagram.querySelectorAll(`[data-type="arch-edge"][data-from="${id}"], [data-type="arch-edge"][data-to="${id}"]`)
+      .forEach(edge => {
+        const edgeId = edge.dataset.edgeId;
+        if (edgeId) diagram.querySelectorAll(`[data-edge-of="${edgeId}"]`).forEach(deco => deco.remove());
+        edge.remove();
+      });
+  }
+  node.remove();
+  saveThenLayout();
+}
+
+/** Enter "pick a target" mode after "➜ Créer une arête depuis ce nœud": the
+    next click on another arch-node of the SAME diagram creates the edge.
+    Escape or clicking the same node cancels. */
+function startArchConnect(doc, sourceNode) {
+  cancelArchConnect(doc);
+  archConnectSource = { node: sourceNode, doc };
+  sourceNode.style.outline = '3px solid #0f62fe';
+  doc.body.style.cursor = 'crosshair';
+
+  const onClick = e => {
+    const target = e.target.closest && e.target.closest('[data-type="arch-node"]');
+    if (!target) return;
+    e.preventDefault();
+    e.stopPropagation();
+    finishArchConnect(doc, target);
+  };
+  const onKey = e => { if (e.key === 'Escape') cancelArchConnect(doc); };
+
+  archConnectSource.onClick = onClick;
+  archConnectSource.onKey = onKey;
+  doc.addEventListener('click', onClick, { capture: true });
+  doc.addEventListener('keydown', onKey);
+}
+
+function cancelArchConnect(doc) {
+  if (!archConnectSource) return;
+  archConnectSource.node.style.outline = '';
+  doc.body.style.cursor = '';
+  doc.removeEventListener('click', archConnectSource.onClick, { capture: true });
+  doc.removeEventListener('keydown', archConnectSource.onKey);
+  archConnectSource = null;
+}
+
+function finishArchConnect(doc, targetNode) {
+  const source = archConnectSource.node;
+  if (targetNode === source) { cancelArchConnect(doc); return; }
+  const diagram = source.closest('[data-type="arch-diagram"]');
+  ensureNodeId(source, diagram);
+  ensureNodeId(targetNode, diagram);
+
+  const label = prompt('Libellé de l\'arête (optionnel) :', '') || '';
+  const edge = doc.createElement('div');
+  edge.dataset.type = 'arch-edge';
+  edge.dataset.from = source.dataset.id;
+  edge.dataset.to = targetNode.dataset.id;
+  if (label) edge.dataset.label = label;
+  diagram.appendChild(edge);
+
+  cancelArchConnect(doc);
+  saveThenLayout();
+}
+
 function injectContextMenus(doc) {
   doc.addEventListener('contextmenu', e => {
     let el = e.target;
@@ -777,8 +931,9 @@ function getContextMenuItems(dtype, el, doc) {
         { label: 'Supprimer', action: () => { el.remove(); scheduleSave(); }},
       ];
 
-    case 'arch-node':
-      return [
+    case 'arch-node': {
+      const diagram = el.closest('[data-type="arch-diagram"]');
+      const items = [
         { label: 'Renommer', action: () => {
           const name = prompt('Libellé :', el.textContent.trim());
           if (name !== null) { el.textContent = name; el.dataset.label = name; scheduleSave(); }
@@ -787,8 +942,22 @@ function getContextMenuItems(dtype, el, doc) {
           const shape = prompt('Forme (box/circle/diamond) :', el.dataset.shape || 'box');
           if (shape) { el.dataset.shape = shape; scheduleSave(); }
         }},
-        { label: 'Supprimer', action: () => { el.remove(); scheduleSave(); }},
       ];
+      if (diagram && isDeclarativeArchDiagram(diagram)) {
+        ensureNodeId(el, diagram);
+        items.push({ label: '➜ Créer une arête depuis ce nœud', action: () => {
+          startArchConnect(doc, el);
+        }});
+      }
+      items.push({ label: 'Supprimer', action: () => {
+        if (diagram && isDeclarativeArchDiagram(diagram)) {
+          removeArchNode(doc, diagram, el);
+        } else {
+          el.remove(); scheduleSave();
+        }
+      }});
+      return items;
+    }
 
     case 'annotation':
       return [
@@ -814,6 +983,13 @@ function getContextMenuItems(dtype, el, doc) {
       }}];
 
     case 'arch-diagram':
+      if (isDeclarativeArchDiagram(el)) {
+        return [{ label: '＋ Ajouter nœud (rangée existante ou nouvelle)', action: () => {
+          addArchNodeDeclarative(doc, el);
+        }}];
+      }
+      // Legacy diagram (no arch-row yet): keep the historical hand-positioned
+      // node, unrelated to the declarative engine (see skill/types/arch-diagram.md).
       return [{ label: '＋ Ajouter nœud', action: () => {
         const label = prompt('Libellé :', 'Nouveau nœud');
         if (!label) return;
@@ -1499,7 +1675,9 @@ function makeArchNodeDraggable(doc, node) {
     node.classList.add('_mcp_arch_grabbing');
     node.style.position = 'absolute';
 
+    let moved = false;
     const onMove = ev => {
+      moved = true;
       const x = clampPct(((ev.clientX - offX - rect.left) / rect.width) * 100);
       const y = clampPct(((ev.clientY - offY - rect.top)  / rect.height) * 100);
       applyArchNodePosition(node, x, y);
@@ -1510,6 +1688,10 @@ function makeArchNodeDraggable(doc, node) {
       node.classList.remove('_mcp_arch_grabbing');
       if (wasEditable === null) node.removeAttribute('contenteditable');
       else                      node.setAttribute('contenteditable', wasEditable);
+      // A node actually dragged by a human is locked: a future automatic
+      // recompute (mcp-htmleditor arch-layout / layout_arch_diagram) must
+      // never reposition it again. See arch_layout.py's _write_node_box.
+      if (moved) node.dataset.layout = 'manual';
       scheduleSave();
     };
     doc.addEventListener('pointermove', onMove);
