@@ -57,6 +57,10 @@ TEMPLATES: dict[str, tuple[str, str]] = {
         "bootstrap/document-ei-empty.html",
         "Document Euro-Information (bleu EI, Segoe UI)",
     ),
+    "mail": (
+        "bootstrap/mail-empty.html",
+        "Mail HTML Carbon leger (tables imbriquees, CSS inline, 640px)",
+    ),
 }
 
 

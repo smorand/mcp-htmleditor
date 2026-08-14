@@ -74,7 +74,7 @@ mcp-htmleditor --version      # or: curl localhost:7842/health
 ### Create from a template (recommended)
 
 ```bash
-mcp-htmleditor templates                          # list templates: ei, carbon, doc, doc-perso, doc-ei
+mcp-htmleditor templates                          # list templates: ei, carbon, doc, doc-perso, doc-ei, mail
 mcp-htmleditor new ei ma-presentation.html --serve # create + open editor
 ```
 
@@ -188,7 +188,8 @@ templates/
 │   ├── slides-empty.html          key: carbon    (IBM Carbon)
 │   ├── document-empty.html        key: doc       (Word-like document)
 │   ├── document-perso-empty.html  key: doc-perso (Perso charter, Arial)
-│   └── document-ei-empty.html     key: doc-ei    (Euro-Information, Segoe UI)
+│   ├── document-ei-empty.html     key: doc-ei    (Euro-Information, Segoe UI)
+│   └── mail-empty.html            key: mail      (HTML email, light Carbon charter)
 └── reference/                     rich examples to clone (read-only via server)
     ├── slides/
     │   ├── euro-information.html   EI: title + agenda + content, embedded logos (CSS source of the `ei` bootstrap)
@@ -199,7 +200,8 @@ templates/
     └── documents/
         ├── report-standard.html    generic standard report
         ├── perso.html              Perso charter: title/subtitle + h1-h5 + table + list
-        └── euro-information.html    EI document: blue header + logo, blue headings
+        ├── euro-information.html    EI document: blue header + logo, blue headings
+        └── mail-carbon-example.html rich HTML email example, light Carbon charter, inline CSS
 ```
 
 Add your own templates by dropping files into `~/.config/mcp-htmleditor/templates/`
