@@ -77,7 +77,13 @@ classe) puis dans les `style=""` inline.
 - La mise en page est un flux vertical de blocs, pas un moteur CSS: les hauteurs
   sont estimées à partir du texte, puis les blocs souples (grilles, schémas,
   tables) absorbent l'espace libre. Un contenu très dense est réduit
-  proportionnellement au lieu de déborder.
+  proportionnellement au lieu de déborder. Un conteneur `display:flex` en ligne
+  (pas `flex-direction:column`) avec 2 colonnes ou plus est reconnu
+  structurellement: chaque colonne garde sa largeur (`flex`/`flex-basis`/`width`
+  en % ou en px, sinon partage égal du reste) et reçoit son propre flux vertical
+  indépendant, avec son propre rétrécissement en cas de débordement. Un
+  conteneur flex sans aucun indice de largeur sur ses enfants reste traité comme
+  une simple pile verticale (pas de colonnes devinées à l'aveugle).
 - Les colonnes d'une `cds-grid` sont de largeur égale (le `grid-template-columns`
   personnalisé n'est pas lu).
 - Les dégradés sont ramenés à leur première couleur.
