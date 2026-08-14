@@ -615,8 +615,9 @@ def _side_exit_geometry(source: PctBox, target: PctBox, *, exit_right: bool) -> 
     other candidate route in this module.
     """
     channel_x = source.right + GUTTER_COL_PCT / 2 if exit_right else source.x - GUTTER_COL_PCT / 2
+    source_edge_x = source.right if exit_right else source.x
     h1 = LineSegment(
-        "h", min(source.right, channel_x), source.mid_y, abs(channel_x - source.right) or GUTTER_COL_PCT / 2
+        "h", min(source_edge_x, channel_x), source.mid_y, abs(channel_x - source_edge_x) or GUTTER_COL_PCT / 2
     )
     v = LineSegment("v", channel_x, min(source.mid_y, target.mid_y), abs(target.mid_y - source.mid_y))
     entering_from_right = channel_x >= target.mid_x

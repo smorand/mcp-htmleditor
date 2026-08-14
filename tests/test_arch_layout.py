@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from bs4 import BeautifulSoup, Tag
 
 from mcp_htmleditor import arch_layout
@@ -775,6 +776,28 @@ def test_side_exit_used_when_target_is_more_horizontal_than_vertical_offset(tmp_
     boxes = _node_boxes(path.read_text(encoding="utf-8"))
     all_boxes = list(boxes.values())
     assert arch_layout._detect_collisions(all_boxes) == []
+
+
+def test_side_exit_toward_the_left_uses_a_short_gutter_stub_not_the_full_box_width(
+    tmp_path: Path,
+) -> None:
+    """Regression: a left-side exit (target to the left of source) must produce a short
+    gutter stub (~GUTTER_COL_PCT / 2) for its first horizontal segment, exactly like the
+    right-side exit does, not stretch across the source node's entire width. Caught by the
+    arch-diagram QA sub-agent on the real client deck (memoire -> kafka, authent -> kafka on
+    slide-6): the exit-right branch's h1 length used source.right unconditionally instead of
+    source.x for this direction, drawing a line straight through the source's own label.
+    """
+    source = arch_layout.PctBox(x=59.5, y=60.6, width=20.6, height=11.6)
+    target = arch_layout.PctBox(x=0.0, y=78.2, width=100.0, height=4.2)
+
+    geometry = arch_layout._side_exit_geometry(source, target, exit_right=False)
+
+    first = geometry.segments[0]
+    assert first.axis == "h"
+    assert first.length == pytest.approx(arch_layout.GUTTER_COL_PCT / 2)
+    # The stub must sit in the gutter just left of source, never inside source's own box.
+    assert first.x + first.length <= source.x + 1e-6
 
 
 def test_side_exit_falls_back_to_the_elbow_when_the_channel_is_blocked(tmp_path: Path) -> None:
