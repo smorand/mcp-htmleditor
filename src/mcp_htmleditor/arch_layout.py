@@ -1060,11 +1060,27 @@ def _detect_collisions(boxes: list[PctBox]) -> list[tuple[int, int]]:
 def check_diagram(diagram: Tag) -> list[str]:
     """Geometric sanity check for one ``arch-diagram``: overlapping nodes.
 
-    Works on both declarative and legacy (hand authored ``data-x``/``data-y``)
-    diagrams alike, since it only reads each node's already written box. This
-    is the safety net for the format the skill still documents for very small
-    diagrams (2-3 nodes), where the layout engine above never runs.
+    Legacy (hand authored ``data-x``/``data-y``, no ``arch-row``) diagrams
+    only: this is the safety net for the format the skill still documents for
+    very small diagrams (2-3 nodes), where the layout engine above never runs
+    and nothing else verifies the hand written coordinates.
+
+    A declarative diagram (at least one ``arch-row``) is deliberately OUT of
+    scope and always returns ``[]``: ``_layout_diagram`` already guarantees
+    non-overlapping placement by construction (row/column/gutter math), and a
+    node nested inside an ``arch-col`` has its ``data-x``/``data-y`` written
+    *col-relative* (see ``_to_local``), not diagram-relative — comparing those
+    raw attributes across nodes from different columns as if they shared one
+    coordinate space produces false "overlap" positives (confirmed: hundreds
+    of them on every declarative diagram in a real deck). Resolving nested
+    boxes back to diagram-relative before comparing would fix that, but there
+    is no product path calling this function on a declarative diagram (only
+    its own tests did), so the correct minimum fix is to not pretend to
+    support a shape this function cannot safely check, rather than add dead
+    complexity no caller needs.
     """
+    if diagram.find(attrs={"data-type": "arch-row"}) is not None:
+        return []
     nodes = diagram.find_all(attrs={"data-type": "arch-node"})
     boxes: list[PctBox] = []
     labels: list[str] = []
