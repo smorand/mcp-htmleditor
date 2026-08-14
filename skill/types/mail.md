@@ -93,6 +93,15 @@ police IBM Plex qui n'est garantie sur aucun poste destinataire):
 | Fond hors carte | `#f4f5f7` | fond de la page mail (hors du bloc blanc) |
 | Police | `Helvetica, Arial, sans-serif` | garantie sur tous les postes, contrairement a IBM Plex |
 
+**Alignement par defaut: justifie sur le texte de corps.** Les paragraphes de
+contenu (intro, encadres de notification) portent `text-align:justify` en
+inline, convention de courrier professionnel qui donne un bloc de texte aux
+deux marges nettes plutot qu'un bord droit en dents de scie. Ne pas l'appliquer
+aux titres (`h1`/`h2`), aux listes a puces, ni aux textes courts d'une seule
+ligne (sous-titre d'en-tete, pied de page): le justifie n'a d'effet que sur un
+texte qui occupe plusieurs lignes, et peut y creer de grands espaces blancs
+quand une ligne n'a que peu de mots.
+
 ## Blocs disponibles (toolbar "+ Bloc")
 
 Les blocs generiques (`heading1`..`heading5`, `paragraph`, `table`, `list`)

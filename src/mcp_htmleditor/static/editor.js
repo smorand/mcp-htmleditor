@@ -425,6 +425,25 @@ function injectEditorStyles(doc) {
    ============================================================ */
 let _formatBar = null;
 
+/**
+ * Build a small crisp alignment icon: four horizontal bars (mimicking text
+ * lines of varying width) laid out left/center/right/justified. Replaces the
+ * previous emoji-square icons (⬛⬜⬜), which render as an illegible cluster
+ * of tiny blocks at toolbar-button size on most platforms.
+ *
+ * @param {'left'|'center'|'right'|'full'} align
+ */
+function alignIconSvg(align) {
+  const widths = [16, 11, 14, 9]; // uneven line lengths, like real text
+  const rows = widths.map((w, i) => {
+    const width = align === 'full' ? 16 : w;
+    const x = align === 'center' ? (16 - width) / 2 : align === 'right' ? 16 - width : 0;
+    const y = i * 3.6;
+    return `<rect x="${x}" y="${y}" width="${width}" height="1.8" rx="0.5" fill="currentColor"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 16 13.8" width="16" height="14" aria-hidden="true">${rows}</svg>`;
+}
+
 function createFormatBar(doc) {
   if (doc.getElementById('_mcp_format_bar')) return;
   const bar = doc.createElement('div');
@@ -439,9 +458,10 @@ function createFormatBar(doc) {
     { cmd: 'superscript',   icon: 'x²',          title: 'Exposant'           },
     { cmd: 'subscript',     icon: 'x₂',          title: 'Indice'             },
     { sep: true },
-    { cmd: 'justifyLeft',   icon: '⬛⬜⬜',      title: 'Aligner gauche'    },
-    { cmd: 'justifyCenter', icon: '⬜⬛⬜',      title: 'Centrer'            },
-    { cmd: 'justifyRight',  icon: '⬜⬜⬛',      title: 'Aligner droite'    },
+    { cmd: 'justifyLeft',   icon: alignIconSvg('left'),   title: 'Aligner à gauche'  },
+    { cmd: 'justifyCenter', icon: alignIconSvg('center'), title: 'Centrer'            },
+    { cmd: 'justifyRight',  icon: alignIconSvg('right'),  title: 'Aligner à droite'  },
+    { cmd: 'justifyFull',   icon: alignIconSvg('full'),   title: 'Justifié'          },
     { sep: true },
     { cmd: 'removeFormat',  icon: '✕',           title: 'Supprimer le style' },
   ];
@@ -553,7 +573,7 @@ function updateFormatBarState(doc) {
   const bar = doc.getElementById('_mcp_format_bar');
   if (!bar) return;
   const cmds = ['bold','italic','underline','strikeThrough','superscript','subscript',
-                 'justifyLeft','justifyCenter','justifyRight'];
+                 'justifyLeft','justifyCenter','justifyRight','justifyFull'];
   cmds.forEach(cmd => {
     const btn = bar.querySelector(`[data-cmd="${cmd}"]`);
     if (btn) btn.classList.toggle('active', doc.queryCommandState(cmd));
