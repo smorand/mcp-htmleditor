@@ -520,18 +520,23 @@ function showFormatBar(doc) {
 
   bar.style.display = 'flex';
 
-  // Position above the selection, within iframe viewport
-  const iframeRect = frame.getBoundingClientRect();
+  // The bar lives inside the iframe's own document (doc.body.appendChild),
+  // so its `position: fixed` is already relative to the IFRAME's viewport,
+  // not the outer page. `rect` (from range.getBoundingClientRect()) is also
+  // iframe-relative already: do not add the iframe's own offset within the
+  // outer page (iframeRect.top/left) on top of it, or the bar renders that
+  // far too low/right and overlaps the very text it should float above.
+  const iframeWin = doc.defaultView || window;
   const barW = bar.offsetWidth || 340;
   const barH = bar.offsetHeight || 32;
 
-  let top  = iframeRect.top + rect.top - barH - 8;
-  let left = iframeRect.left + rect.left + rect.width / 2 - barW / 2;
+  let top  = rect.top - barH - 8;
+  let left = rect.left + rect.width / 2 - barW / 2;
 
-  // Clamp within viewport
-  if (top < 4) top = iframeRect.top + rect.bottom + 8;
+  // Clamp within the iframe's own viewport
+  if (top < 4) top = rect.bottom + 8;
   if (left < 4) left = 4;
-  if (left + barW > window.innerWidth - 4) left = window.innerWidth - barW - 4;
+  if (left + barW > iframeWin.innerWidth - 4) left = iframeWin.innerWidth - barW - 4;
 
   bar.style.top  = top + 'px';
   bar.style.left = left + 'px';
@@ -604,11 +609,13 @@ function showInsertBar(doc, el) {
 
   bar.style.display = 'flex';
 
-  const iframeRect = frame.getBoundingClientRect();
-  const elRect     = el.getBoundingClientRect();  // in iframe coords
+  // Same iframe-relative fixed-positioning context as showFormatBar: do not
+  // add the iframe's own offset within the outer page on top of coordinates
+  // that are already relative to the iframe's viewport.
+  const elRect = el.getBoundingClientRect();  // in iframe coords
 
-  const top  = iframeRect.top  + elRect.top - (bar.offsetHeight || 32) - 6;
-  const left = iframeRect.left + elRect.right - (bar.offsetWidth  || 280);
+  const top  = elRect.top - (bar.offsetHeight || 32) - 6;
+  const left = elRect.right - (bar.offsetWidth  || 280);
 
   bar.style.top  = Math.max(4, top)  + 'px';
   bar.style.left = Math.max(4, left) + 'px';
