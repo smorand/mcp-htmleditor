@@ -27,6 +27,16 @@
     <button id="edit-mode-btn" type="button" aria-pressed="false" title="Activer/désactiver le mode édition">
       <span class="edit-dot"></span>Édition
     </button>
+    <!-- Undo/redo: structural mutations only (arch-node move, image insert,
+         table row/col, gantt task, slide, document block). Plain text edits
+         inside contenteditable keep using the browser's own native undo.
+         Only meaningful in edit mode: hidden otherwise via JS (updateUndoRedoVisibility). -->
+    <button id="undo-btn" type="button" title="Annuler (Ctrl/Cmd+Z)" disabled style="display:none">
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M7 2 2 6l5 4V8c3.3 0 6 1.6 6 5h1c0-4.4-3.4-7-7-7z"></path></svg>
+    </button>
+    <button id="redo-btn" type="button" title="Rétablir (Ctrl/Cmd+Shift+Z)" disabled style="display:none">
+      <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" style="transform:scaleX(-1);"><path d="M7 2 2 6l5 4V8c3.3 0 6 1.6 6 5h1c0-4.4-3.4-7-7-7z"></path></svg>
+    </button>
     <button id="present-btn" type="button" title="Mode présentation plein écran">
       <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M1 1h14v10H9v2h2v1H5v-1h2v-2H1zm1 1v8h12V2z"></path></svg>
     </button>

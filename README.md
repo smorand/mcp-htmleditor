@@ -109,6 +109,13 @@ node and add-edge via right-click (see `skill/types/arch-diagram.md` § Édition
 la souris): every structural change saves then calls the server's `arch-layout`
 engine, the browser never computes a position itself.
 
+Undo/redo (Ctrl+Z / Cmd+Z, Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y), active in edit mode:
+covers every structural mutation above (node move, node/edge/table/gantt-task
+add/remove, slide insert/delete, document block insert/reorder) with a 50-deep
+undo/redo stack. Plain text edits inside a text zone keep using the browser's own
+native undo, untouched by this feature — see `.agent_docs/html-conventions.md` §
+Undo / redo for the exact scope and the native-vs-structural interaction.
+
 ### MCP server (stdio)
 
 ```bash

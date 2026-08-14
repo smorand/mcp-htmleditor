@@ -172,3 +172,55 @@ Grammarly attributes). `_strip_editor_artifacts` removes all of them before writ
 a saved file never carries editor state. Add a new artifact to `_EDITOR_ARTIFACTS` in
 `http_server.py` at the same time as you add it to `editor.js`, otherwise it leaks into
 the file the next agent reads.
+
+## Undo / redo (structural mutations, `editor.js`)
+
+Ctrl+Z / Cmd+Z (undo) and Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y (redo) are active only in
+edit mode. Implementation: a pure in-memory JS stack of whole-document `outerHTML`
+snapshots (`undoStack`/`redoStack`, capped at `UNDO_MAX_DEPTH = 50`), pushed via
+`snapshotForUndo()` right BEFORE each structural mutation runs. No new DOM markers, no
+new `_EDITOR_ARTIFACTS` entry needed: the stacks never touch disk or the saved file.
+
+**Covered (has zero native undo without this feature):** arch-node drag reposition (one
+snapshot per drag gesture, not per pointermove), arch-node add/remove/rename/reshape,
+arch-edge create, image insert via drag-drop (`embedImageFile`'s `insertAdjacentHTML`
+branch — unlike the file-picker's `execCommand('insertHTML', ...)`, this does NOT push a
+native contenteditable undo step), table row/col add/remove/table delete, gantt task
+add/resize/rename/delete, slide insert/delete, document block insert/reorder (drag
+handle), annotation edit/delete.
+
+**Deliberately NOT covered, on purpose:** plain contenteditable text edits (typing,
+format-bar bold/italic/color/font-size, `insertTable`/`insertLink`/`insertHorizontalRule`
+when invoked with caret focus inside a `[data-editable~="text"]` zone — all of these are
+`execCommand`-based and already push a step onto the browser's OWN native undo stack) and
+native image resize/reposition when the image sits inside a `contenteditable` region
+(dragging the browser's own resize handles fires the `input` event, which is native
+undo territory the same as typing). `handleUndoRedoKeydown()` checks
+`document.activeElement.isContentEditable` and, if true, lets the keystroke fall through
+to the browser's native handler UNLESS `doc.queryCommandEnabled('undo'|'redo')` reports
+nothing left to undo/redo natively, in which case it falls back to the structural stack
+so Ctrl+Z is never a silent no-op. Interaction observed when a text edit and a structural
+op are interleaved (verified with a real Chromium E2E, `tests/test_undo_redo_e2e.py::
+test_undo_does_not_fire_inside_active_text_editing`): a keystroke while focus is inside
+an actively-edited text zone never touches the structural stack, so undoing a structural
+operation always requires focus to be OUTSIDE a live text edit at the moment of Ctrl+Z
+(clicking elsewhere in the iframe, or the caret having blurred). The two stacks do not
+merge or interleave; each stays scoped to its own kind of change.
+
+**Restore mechanism**: `restoreDomSnapshot()` calls `doc.open(); doc.write(html);
+doc.close();` on the iframe's document. Verified experimentally: Chromium fires the
+iframe's own `load` event on every `doc.write()`, exactly like a real navigation — so
+`onFrameLoad()` runs again and re-wires everything a fresh load already re-wires
+(editable zones, drag handles, arch-node drag, context menus): there is deliberately no
+second parallel rewiring function. The `restoringFromUndo` flag lets `onFrameLoad()`
+tell an undo/redo-triggered reload apart from a genuinely different document and skip
+`resetUndoStacks()` in that one case — get this flag wrong and `performUndo()`/
+`performRedo()` overwrite their own updated stacks with a wipe on every call (the actual
+bug hit and fixed while building this: redo silently did nothing, one push short every
+time). Persistence after a restore reuses `saveContent()` — the same `POST /content` path
+every other mutation already uses, no second save mechanism.
+
+Stacks reset (`resetUndoStacks()`) whenever the iframe loads a genuinely different
+document (initial load, external agent write, navigating to another file): a snapshot
+from a previous document does not correspond to anything restorable. Toggling edit mode
+off/on within the SAME loaded document deliberately does NOT reset the stacks.
