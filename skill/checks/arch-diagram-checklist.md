@@ -104,6 +104,54 @@ Après tout calcul de layout (`mcp-htmleditor arch-layout` ou l'outil MCP
       sinon, restructurer (deux `arch-row` séparées avec `GUTTER_ROW_PCT`, plus
       large) plutôt que d'empiler les deux nœuds dans un seul col.
 
+## Nœuds étroits avec icône + libellé (ex. « Utilisateur », acteur seul)
+
+- [ ] Un nœud à contenu centré (`align-items:center`) dont la seule sortie est
+      une arête d'un seul côté (typiquement un acteur/icône relié par une
+      flèche) laisse-t-il un vide visible entre le contenu visuel (icône,
+      texte) et le début du trait ? Si oui, aligner le contenu du côté de la
+      sortie (`align-items:flex-end` si l'arête part à droite, etc.) plutôt que
+      de centrer — la boîte garde sa taille, seul le contenu se rapproche du
+      point de sortie réel.
+
+## Libellés de connecteur trop longs pour l'espace disponible
+
+- [ ] Le libellé d'une arête (`data-label`, rendu en `.arch-edge-label`,
+      `white-space:nowrap`) dépasse-t-il visuellement les nœuds voisins parce
+      que le segment est court (ex. deux nœuds adjacents avec un simple coude
+      de raccord) ? Le moteur ne réduit ni ne wrappe jamais un libellé
+      automatiquement (`white-space:nowrap` fixe). Corriger en RACCOURCISSANT
+      le texte (préférer un mot court et clair, ex. « Async » plutôt que
+      « Tâches asynchrones ») plutôt qu'en changeant la police ou en
+      wrappant — un libellé qui tient sur un mot reste plus lisible qu'un
+      libellé sur deux lignes avec une police réduite.
+
+## Sortie d'arête par le côté plutôt que par le bas (connu, non corrigé)
+
+- [ ] Un nœud empilé dans un `arch-col` (pas le dernier de la pile) dont la
+      cible se trouve dans une rangée suivante ET horizontalement décalée:
+      le moteur (`_adjacent_row_geometry`) sort actuellement par le bas/haut du
+      nœud source, ce qui oblige le trait à longer le bord d'un nœud frère
+      juste en dessous avant de tourner vers la cible. Visuellement correct
+      (aucun croisement, `0 warning`) mais moins direct qu'une sortie par le
+      côté (droite/gauche) suivie d'une descente dans la gouttière de colonne.
+      **Limitation connue du moteur, pas encore corrigée** (choix de sortie
+      toujours bas/haut, jamais côté, quand `row_diff != 0`): à signaler si
+      rencontré, ne pas tenter de fix HTML à la main, ouvrir plutôt un ticket
+      moteur (`_route_edge` / `_adjacent_row_geometry`).
+
+## Diagramme + contenu de slide qui se chevauchent ou se coupent
+
+- [ ] Si la slide a un bloc de contenu APRÈS le diagramme (ex. notification
+      « Questions ouvertes »), ce bloc est-il coupé en bas par l'`overflow:hidden`
+      du conteneur `.slide-body` ? Cause typique: le wrapper `arch-diagram` a un
+      `min-height` fixe qui, combiné à `flex:1`, force le bloc suivant (sans
+      `flex-shrink:0` explicite) à être compressé sous sa hauteur naturelle par
+      le flex-shrink par défaut, débordant ensuite dans l'espace masqué par le
+      parent. Fix: ajouter `flex-shrink:0` sur le bloc de contenu qui ne doit
+      jamais rétrécir, et/ou réduire le `min-height` du diagramme de quelques
+      dizaines de px si la place manque réellement.
+
 ## Export PPTX (fidélité)
 
 - [ ] Un nœud imbriqué dans un `arch-col` s'exporte-t-il à la bonne position ?

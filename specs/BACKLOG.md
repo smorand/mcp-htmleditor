@@ -27,6 +27,12 @@ rédigés/ajustés par l'agent LLM directement dans le HTML, ce qui couvre l'usa
 Contexte technique: `specs/2026-08-07_16-31-00-mcp-htmleditor-retrospective.md` FR-008
 (renumérotation), architecture Gantt documentée dans `skill/types/gantt.md`.
 
+**Renforcement (2026-08-14):** Cas concret rencontré sur un vrai livrable client
+(`Agentic_Platform_Deck.html`, slide Gantt roadmap): l'utilisateur confirme vouloir le
+même niveau d'édition souris que les `arch-node`, plus une vérification explicite de la
+fidélité de l'export PPTX du Gantt (pas seulement l'édition navigateur). Priorité à
+remonter lors de la prochaine session de spec.
+
 ---
 
 ## BACKLOG-002: Édition de schéma d'architecture dans l'éditeur
