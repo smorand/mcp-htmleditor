@@ -48,6 +48,24 @@ def test_doc_ei_template_is_document() -> None:
     assert 'data-doc-template="ei"' in content
 
 
+def test_mail_template_is_document_with_mail_charter() -> None:
+    """The 'mail' template is a document with the mail charter marker."""
+    content = template_path("mail").read_text(encoding="utf-8")
+    assert 'data-doc-type="document"' in content
+    assert 'data-doc-template="mail"' in content
+
+
+def test_mail_template_is_mail_safe() -> None:
+    """The 'mail' template avoids constructs unsafe for email clients."""
+    content = template_path("mail").read_text(encoding="utf-8")
+    assert "<table" in content
+    assert "display:flex" not in content
+    assert "display: flex" not in content
+    assert "display:grid" not in content
+    assert "position:absolute" not in content
+    assert "<script" not in content
+
+
 def test_unknown_key_raises_keyerror() -> None:
     """An unknown template key raises KeyError."""
     with pytest.raises(KeyError):

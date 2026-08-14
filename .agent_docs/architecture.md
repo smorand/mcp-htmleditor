@@ -108,6 +108,18 @@ insertion (footer logo, `.logo-disc`, renumbering) and writes PNG captures. It s
 out of `make check` on purpose. Run it after touching the EI bootstrap,
 `slide-layouts.js` or `renumberSlides` / `resolveTemplateAssets`.
 
+**2026-08 — `mail` template added.** Third document-family charter (`data-doc-template="mail"`),
+alongside `perso`/`ei`. Deliberately does not follow the class-based charter pattern of
+`doc-perso`/`doc-ei`: HTML email clients do not reliably honor `<head><style>`, so every
+color/spacing that matters is inline `style=""` on the element itself, and layout is nested
+`<table>` (no flexbox/grid, no `position:absolute`). `charter_for("mail")` in
+`export/reference_docx.py` returns `None` (no reference.docx generated) since this template has
+no DOCX/PPTX export path by design; a mail is sent as-is. Generic blocks inserted via the
+`+ Bloc` picker land unstyled in a mail document (no class-based charter to inherit from) —
+documented as a known limitation in `skill/types/mail.md`, worked around by cloning an existing
+styled section instead of inserting a blank block. See `skill/types/mail.md` for the full
+mail-safe ruleset.
+
 ## LLM workflow
 
 ```

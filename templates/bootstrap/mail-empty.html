@@ -1,0 +1,68 @@
+<!--
+  Template: mail-empty (bootstrap)
+  Usage: Point de depart minimal pour un mail HTML charte Carbon leger
+  Contraintes mail-safe: voir skill/types/mail.md
+  Date: 2026-08
+-->
+<!DOCTYPE html>
+<html lang="fr" data-doc-type="document">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nouveau mail</title>
+<style>
+  /*
+    Confort d'edition navigateur UNIQUEMENT. Un mail HTML s'envoie tel quel,
+    sans dependre de ce bloc <style> (beaucoup de clients mail l'ignorent ou
+    le suppriment). Toute couleur, taille ou espacement qui compte pour le
+    rendu final DOIT etre en attribut style="" inline sur l'element lui-meme,
+    jamais seulement ici. Voir skill/types/mail.md.
+  */
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0; background: #f4f5f7; }
+</style>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f5f7; font-family:Helvetica,Arial,sans-serif; color:#1a1a1a;">
+
+<article data-type="document" data-doc-template="mail" data-layout="single-column">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f5f7;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:640px; max-width:640px; background-color:#ffffff; border-radius:8px; overflow:hidden;">
+
+<!-- En-tete -->
+<tr><td style="background-color:#161616; padding:28px 32px;">
+<h1 data-editable="text" style="margin:0; color:#ffffff; font-family:Helvetica,Arial,sans-serif; font-size:22px; font-weight:600;">Titre du mail</h1>
+<p data-editable="text" style="margin:6px 0 0; color:#c6c6c6; font-family:Helvetica,Arial,sans-serif; font-size:14px;">Sous-titre ou date</p>
+</td></tr>
+
+<!-- Intro -->
+<tr><td style="padding:24px 32px 8px;">
+<p data-editable="text" style="margin:0; font-family:Helvetica,Arial,sans-serif; font-size:15px; line-height:1.6; color:#1a1a1a;">
+Redigez votre introduction ici. Presentez en une ou deux phrases le contenu du mail.
+</p>
+</td></tr>
+
+<!-- Section de contenu -->
+<tr><td style="padding:20px 32px 4px;">
+<h2 data-editable="text" style="margin:0 0 12px; font-family:Helvetica,Arial,sans-serif; font-size:18px; color:#0f62fe; border-bottom:2px solid #0f62fe; padding-bottom:6px;">Titre de section</h2>
+<ul data-editable="text" style="margin:0; padding-left:20px; font-family:Helvetica,Arial,sans-serif; font-size:14px; line-height:1.7; color:#1a1a1a;">
+<li>Premier point.</li>
+<li>Deuxieme point.</li>
+<li>Troisieme point.</li>
+</ul>
+</td></tr>
+
+<!-- Pied de page -->
+<tr><td style="padding:20px 32px 32px; color:#8a8f98; font-family:Helvetica,Arial,sans-serif; font-size:12px; border-top:1px solid #e5e7eb;">
+<p data-editable="text" style="margin:0;">Texte de pied de page.</p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+
+</article>
+
+</body>
+</html>

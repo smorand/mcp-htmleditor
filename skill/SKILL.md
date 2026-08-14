@@ -25,6 +25,7 @@ mcp-htmleditor new carbon ma-pres.html   --serve  # IBM Carbon (slides)
 mcp-htmleditor new doc    mon-rapport.html        # Document standard
 mcp-htmleditor new doc-perso mon-doc.html --serve # Document charte Perso
 mcp-htmleditor new doc-ei    note-ei.html --serve # Document Euro-Information
+mcp-htmleditor new mail      mon-mail.html --serve # Mail HTML Carbon leger
 ```
 
 ### Où sont stockés les templates
@@ -36,7 +37,8 @@ templates/
 │   ├── slides-empty.html          ← key: carbon    (IBM Carbon)
 │   ├── document-empty.html        ← key: doc       (document standard)
 │   ├── document-perso-empty.html  ← key: doc-perso (charte Perso, Arial)
-│   └── document-ei-empty.html     ← key: doc-ei    (Euro-Information, Segoe UI)
+│   ├── document-ei-empty.html     ← key: doc-ei    (Euro-Information, Segoe UI)
+│   └── mail-empty.html            ← key: mail      (mail HTML Carbon leger)
 └── reference/                    ← exemples complets (à consulter/cloner)
     ├── slides/
     │   ├── euro-information.html  ← EI: titre + agenda + contenu, logos embarqués
@@ -49,7 +51,8 @@ templates/
         ├── perso.html             ← charte Perso: titre/sous-titre + h1-h5 + tableau + liste
         ├── euro-information.html   ← document EI: en-tête bleu + logo, headings bleus
         ├── example-perso-complete.html ← exemple riche Perso (3 pages, figure PNG, sup/sub)
-        └── example-ei-complete.html    ← exemple riche EI (3 pages, figure PNG, sup/sub)
+        ├── example-ei-complete.html    ← exemple riche EI (3 pages, figure PNG, sup/sub)
+        └── mail-carbon-example.html    ← exemple riche mail Carbon leger (tables imbriquées, CSS inline)
 ```
 
 Les fichiers `bootstrap/` sont le point de départ minimal. Les fichiers `reference/`
@@ -71,6 +74,9 @@ contenant `templates/` est ignorée).
   colorés (titre 22pt gras souligné centré, h1 18pt, h2 bleu, etc.).
 - **Document EI** (`doc-ei`): document Euro-Information, bleu EI + orange, Segoe UI,
   en-tête avec filet bleu et logo EI embarqué.
+- **Mail** (`mail`): mail HTML charte Carbon léger, tables imbriquées, CSS inline sur
+  chaque élément qui compte (pas de `<style>` fiable en mail), largeur fixe 640px,
+  pas de flexbox/grid. Aucun export dédié: le fichier s'envoie tel quel.
 
 En mode présentation, le serveur adapte le picker « Insérer slide » (5 layouts:
 title, agenda, section, content, diagram). En mode document, la toolbar affiche un
@@ -112,12 +118,13 @@ mcp-htmleditor templates
 
 # Créer un fichier à partir d'un template (le moyen recommandé de démarrer)
 mcp-htmleditor new <template> mon-fichier.html
-#   <template> = ei | carbon | doc | doc-perso | doc-ei
+#   <template> = ei | carbon | doc | doc-perso | doc-ei | mail
 #   ei        → Euro-Information slides (Crédit Mutuel / CIC)
 #   carbon    → IBM Carbon slides
 #   doc       → document Word-like standard
 #   doc-perso → document charte Perso (Arial, headings colorés)
 #   doc-ei    → document Euro-Information (bleu EI, Segoe UI)
+#   mail      → mail HTML Carbon léger (tables imbriquées, CSS inline)
 # Option --serve pour ouvrir l'éditeur immédiatement:
 mcp-htmleditor new ei ma-presentation.html --serve
 
@@ -199,6 +206,7 @@ par présentation si un vrai affichage simultané est nécessaire).
 | `skill/types/annotated-image.md` | Règles pour les images annotées |
 | `skill/types/tables.md` | Règles pour les tableaux |
 | `skill/types/document.md` | Règles pour le mode document |
+| `skill/types/mail.md` | Règles pour le mode mail HTML (tables, CSS inline, charte Carbon léger) |
 | `templates/bootstrap/slides-empty.html` | Template minimal présentation |
 | `templates/bootstrap/document-empty.html` | Template minimal document |
 | `templates/reference/slides/ibm-carbon.html` | **Template de référence IBM Carbon** (9 slides complètes, tous composants) |
@@ -211,3 +219,4 @@ par présentation si un vrai affichage simultané est nécessaire).
 | `templates/reference/documents/euro-information.html` | **Template document Euro-Information** (en-tête bleu + logo, headings bleus, Segoe UI) |
 | `templates/reference/documents/example-perso-complete.html` | Exemple complet charte Perso: 3 pages, h1-h5, listes, tableau avec `colgroup`, figure PNG base64, sup/sub |
 | `templates/reference/documents/example-ei-complete.html` | Exemple complet charte EI: 3 pages, en-tête EI, h1-h5, tableau, figure PNG base64, sup/sub |
+| `templates/reference/documents/mail-carbon-example.html` | **Exemple riche mail Carbon léger** (en-tête, intro, sections, encadré notification, pied de page, tout en CSS inline) |
