@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<!--
+  Medical Slides — Template bootstrap vide (charte "medical")
+  Public: presentation medicale (congres, staff, enseignement), pneumologie
+  interventionnelle. Slides = images + commentaire, texte en colonnes, cas clinique.
+  Usage: copier ce fichier, renseigner data-title sur chaque section,
+         ajouter les slides dans .slide-frame, mettre a jour TOTAL et slideNames.
+  Catalogue de composants: templates/reference/slides/medical.html
+  Exemple complet: templates/reference/slides/example-medical-complete.html
+  Regles d'ecriture (citations, anonymisation, budget de hauteur): skill/types/medical.md
+  SOURCE UNIQUE DU CSS de la charte: ce fichier. Apres modification du bloc de
+  style, lancer `make sync-medical-css` pour le propager aux fichiers reference/.
+-->
+<html lang="fr" data-doc-type="presentation" data-doc-template="medical">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Présentation médicale</title>
+<style>
+  :root {
+    /* Charte medical: teal + orange (filet de titre), panneau gris clair,
+       encre quasi noire. Bleu de reference pour les citations bibliographiques. */
+    --med-teal:#159984; --med-teal-dark:#0F6F60; --med-orange:#EE5A02;
+    --med-panel:#E9EDEE; --med-panel-2:#F5F7F8; --med-hair:#D7DEE2;
+    --med-ink:#252525; --med-body:#3A3A3A; --med-muted:#5D5D5D;
+    --med-ref:#3D85C6; --med-red:#C81E3A; --med-navy:#0F2E4C;
+    /* Surface sombre: imagerie (TDM, EBUS, endoscopie, histologie). */
+    --med-dark:#0B0E11; --med-dark-panel:#14181D; --med-dark-hair:#2A323B;
+    --med-dark-text:#E8EDF2; --med-dark-muted:#9AA7B4;
+    --med-cyan:#4FC3D9; --med-amber:#F2A33C;
+    --med-font:'Trebuchet MS','Helvetica Neue',Helvetica,Arial,sans-serif;
+    --med-font-body:Arial,Helvetica,sans-serif;
+    --med-pad:56px;
+  }
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    font-family:var(--med-font-body); background:#dfe4e6; color:var(--med-ink);
+    height:100vh; overflow:hidden; display:flex; flex-direction:column;
+  }
+
+  /* ── Shell d'edition (hors slide, jamais exporte) ─────────────────────── */
+  .shell-header {
+    height:44px; background:var(--med-navy); display:flex; align-items:center;
+    padding:0 16px; gap:14px; flex-shrink:0;
+  }
+  .shell-logo { display:flex; align-items:center; gap:8px; color:#fff; font-size:13px; }
+  .shell-logo .product-name { font-weight:700; color:#7FD8C8; letter-spacing:.02em; }
+  .shell-divider { width:1px; height:18px; background:#2D4A66; }
+  .shell-title { color:#BDD0DF; font-size:13px; }
+  .toolbar {
+    height:44px; background:var(--med-panel); border-bottom:1px solid var(--med-hair);
+    display:flex; align-items:center; padding:0 16px; gap:14px; flex-shrink:0;
+  }
+  .cds-select-label { font-size:12px; color:var(--med-muted); white-space:nowrap; }
+  .cds-select-wrapper { position:relative; display:inline-flex; align-items:center; }
+  .cds-select {
+    appearance:none; -webkit-appearance:none; height:30px; min-width:250px; padding:0 32px 0 10px;
+    background:#fff; border:1px solid #9BA7AD; border-bottom-color:var(--med-ink);
+    color:var(--med-ink); font-family:var(--med-font-body); font-size:13px; cursor:pointer; outline:none;
+  }
+  .cds-select:focus { border-color:var(--med-teal); box-shadow:inset 0 0 0 1px var(--med-teal); }
+  .cds-select-icon { position:absolute; right:10px; pointer-events:none; color:var(--med-ink); }
+  .cds-btn-icon {
+    display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px;
+    background:transparent; border:1px solid transparent; cursor:pointer;
+    color:var(--med-ink); outline:none; flex-shrink:0;
+  }
+  .cds-btn-icon:hover { background:#dbe2e5; }
+  .cds-btn-icon:disabled { opacity:.3; cursor:not-allowed; }
+  .cds-btn-icon svg { width:16px; height:16px; fill:currentColor; }
+  .toolbar-sep { width:1px; height:22px; background:var(--med-hair); }
+  .cds-tag {
+    display:inline-flex; align-items:center; height:22px; padding:0 10px; margin-left:auto;
+    background:#D6EFE9; color:var(--med-teal-dark); font-size:12px; font-weight:700;
+    border-radius:100px; white-space:nowrap;
+  }
+  .stage { flex:1; display:flex; align-items:stretch; overflow:hidden; background:#dfe4e6; }
+  .nav-arrow {
+    display:flex; align-items:center; justify-content:center; width:44px; background:var(--med-panel);
+    border:none; cursor:pointer; color:var(--med-ink); flex-shrink:0; outline:none;
+  }
+  .nav-arrow:hover:not(:disabled) { background:#d3dade; }
+  .nav-arrow:disabled { opacity:.25; cursor:not-allowed; }
+  .nav-arrow svg { width:20px; height:20px; fill:currentColor; }
+  .slide-frame { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; overflow:hidden; }
+  .status-bar {
+    height:24px; background:var(--med-navy); display:flex; align-items:center;
+    padding:0 16px; gap:14px; flex-shrink:0;
+  }
+  .status-bar span { font-size:11px; color:#8FA7BB; }
+  .status-bar .status-active { color:#42BE65; }
+
+  /* ── Canevas de slide: 960x540 fixe, comme une vraie diapositive ──────── */
+  .slide {
+    display:none; position:relative; width:100%; max-width:960px; aspect-ratio:16/9;
+    background:#fff; color:var(--med-ink); box-shadow:0 4px 16px rgba(0,0,0,.14);
+    flex-direction:column; overflow:hidden; animation:fadein 180ms ease;
+  }
+  .slide.active { display:flex; }
+  @keyframes fadein { from { opacity:0; translate:0 6px; } to { opacity:1; translate:0 0; } }
+
+  /* Surface sombre: toute slide dont la preuve principale est une image
+     medicale (TDM, EBUS, endoscopie, histologie). Voir skill/types/medical.md. */
+  .slide.dark { background:var(--med-dark); color:var(--med-dark-text); }
+  .slide.dark .med-band { background:var(--med-dark-panel); }
+  .slide.dark .slide-h1 { color:var(--med-dark-text); }
+  .slide.dark .slide-eyebrow { color:var(--med-dark-muted); }
+  .slide.dark .med-list { color:var(--med-dark-text); }
+  .slide.dark .med-caption { color:var(--med-dark-muted); }
+  .slide.dark .med-list strong, .slide.dark .med-caption strong { color:var(--med-dark-text); }
+  .slide.dark .med-source, .slide.dark .med-source .src-ref { color:var(--med-dark-muted); }
+  .slide.dark .med-source .src-title { color:var(--med-cyan); }
+  .slide.dark .slide-foot-page { color:var(--med-dark-muted); }
+  .slide.dark .med-figure img { border-color:var(--med-dark-hair); }
+  .slide.dark .med-comment { background:var(--med-dark-panel); border-color:var(--med-dark-hair); color:var(--med-dark-text); }
+  .slide.dark .med-comment-head { color:var(--med-cyan); }
+  .slide.dark .med-col-head { color:var(--med-cyan); border-bottom-color:var(--med-dark-hair); }
+  .slide.dark .med-delta { color:var(--med-dark-text); }
+
+  /* ── Bandeau haut + titre + filet teal/orange (signature de la charte) ── */
+  .med-band { height:40px; background:var(--med-panel); flex-shrink:0; }
+  .med-head { padding:16px var(--med-pad) 0; flex-shrink:0; }
+  .slide-eyebrow {
+    font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--med-muted); margin-bottom:6px;
+  }
+  .slide-h1 { font-family:var(--med-font); font-size:30px; font-weight:700; line-height:1.18; color:var(--med-ink); }
+  .slide-h1 span { color:var(--med-teal-dark); }
+  .slide-subtitle { margin-top:8px; font-size:15px; color:var(--med-muted); line-height:1.45; max-width:720px; }
+  /* Filet: segment teal puis segment orange, jamais un seul trait. */
+  .med-rule { display:flex; gap:4px; margin-top:10px; }
+  .med-rule i { display:block; width:44px; height:5px; background:var(--med-teal); }
+  .med-rule b { display:block; width:34px; height:5px; background:var(--med-orange); }
+
+  /* ── Corps ────────────────────────────────────────────────────────────── */
+  .slide-body { padding:14px var(--med-pad) 0; flex:1; min-height:0; font-size:18px; }
+  /* Variante dense: paddings resserres quand la slide frole les 540px utiles. */
+  .slide.dense .med-head { padding-top:10px; }
+  .slide.dense .slide-body { padding-top:8px; }
+  .slide.dense .med-foot { min-height:38px; }
+
+  /* Listes a puces: 4 puces maximum, 2 lignes par puce (skill/types/medical.md).
+     La couleur est portee par la liste, pas par les <li>: les variantes de
+     surface (`.slide.dark .med-list`) doivent pouvoir la reprendre par heritage,
+     y compris a l'export PPTX qui n'indexe pas les selecteurs a combinateur. */
+  ul.med-list { list-style:none; color:var(--med-body); }
+  ul.med-list > li {
+    position:relative; padding-left:22px; margin-bottom:10px;
+    font-size:18px; line-height:1.4;
+  }
+  ul.med-list > li::before {
+    content:''; position:absolute; left:4px; top:8px; width:7px; height:7px;
+    border-radius:50%; background:var(--med-teal);
+  }
+  ul.med-list > li strong { color:var(--med-ink); font-weight:700; }
+  ul.med-list ul.med-sub { list-style:none; margin-top:6px; }
+  ul.med-list ul.med-sub > li {
+    position:relative; padding-left:18px; margin-bottom:4px; font-size:15px; color:var(--med-muted);
+  }
+  ul.med-list ul.med-sub > li::before {
+    content:''; position:absolute; left:2px; top:8px; width:8px; height:1.5px; background:var(--med-orange);
+  }
+  .med-lead { font-size:19px; line-height:1.4; color:var(--med-ink); margin-bottom:10px; }
+  .med-lead strong { color:var(--med-teal-dark); }
+
+  /* ── Figures et micro-legendes ────────────────────────────────────────── */
+  .med-figure { display:flex; flex-direction:column; gap:5px; }
+  .med-figure img {
+    display:block; width:100%; height:auto; border:1px solid var(--med-hair); background:#000;
+  }
+  .med-caption { font-size:12px; line-height:1.35; color:var(--med-muted); }
+  .med-caption strong { color:var(--med-ink); }
+  /* Plafonnement de hauteur d'image: une figure a `height:auto`, donc une seule
+     vignette large mange tout le budget de 540px. Choisir une taille, jamais
+     laisser la hauteur libre dans une rangee. */
+  .med-figure.h-sm img { height:110px; object-fit:cover; }
+  .med-figure.h-md img { height:150px; object-fit:cover; }
+  .med-figure.h-lg img { height:200px; object-fit:cover; }
+  .med-figure.h-xl img { height:250px; object-fit:cover; }
+  /* Recadrage bas d'une image plafonnee: deux vues du meme organe ne doivent pas
+     montrer exactement les memes pixels dans une comparaison avant/apres. */
+  .med-figure.crop-low img { object-position:center 78%; }
+  /* Bande d'images alignees (2 a 4 vignettes). Chaque enfant porte sa largeur
+     (w-50 / w-33 / w-25): l'export PPTX ne reconnait une rangee de colonnes que
+     si au moins un enfant declare une largeur explicite, un `flex:1` partout
+     retombe en empilement vertical. Voir skill/types/medical.md § Largeurs. */
+  .med-strip { display:flex; gap:12px; align-items:flex-start; }
+  /* Grille d'images: un .med-grid empile des .med-strip (jamais display:grid,
+     que l'export ne sait pas mesurer). 4 images maximum, au-dela scinder. */
+  .med-grid { display:flex; flex-direction:column; gap:12px; }
+  /* Espacement vertical entre deux blocs du corps (aucun bloc ne porte de marge
+     propre, hors .med-callout): utiliser ces classes, pas un style inline. */
+  .mt-8 { margin-top:8px; }
+  .mt-12 { margin-top:12px; }
+  .mt-16 { margin-top:16px; }
+  /* Largeurs de colonne partagees par tous les layouts en rangee. */
+  .w-25 { flex:0 0 22.5%; }
+  .w-30 { flex:0 0 29%; }
+  .w-33 { flex:0 0 31.3%; }
+  .w-40 { flex:0 0 37.5%; }
+  .w-50 { flex:0 0 48%; }
+  .w-60 { flex:0 0 59%; }
+  .w-70 { flex:0 0 68%; }
+  /* Badge de reperage d'une vignette (A/B/C/D), appele par la legende. */
+  .med-badge {
+    display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px;
+    padding:0 5px; margin-right:6px; background:var(--med-amber); color:#1A1206;
+    font-size:11px; font-weight:700; border-radius:2px;
+  }
+
+  /* ── Image + commentaire (le layout de travail) ───────────────────────── */
+  .med-split { display:flex; gap:20px; align-items:flex-start; }
+  .med-comment {
+    background:var(--med-panel-2); border:1px solid var(--med-hair);
+    border-left:5px solid var(--med-teal); padding:12px 14px;
+  }
+  .med-comment-head {
+    font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--med-teal-dark); margin-bottom:8px;
+  }
+  .med-comment { color:var(--med-body); }
+  .med-comment ul.med-list > li { font-size:15px; margin-bottom:8px; }
+  .med-comment p { font-size:15px; line-height:1.4; }
+
+  /* ── Comparaison avant / apres ────────────────────────────────────────── */
+  .med-compare { display:flex; gap:16px; align-items:stretch; }
+  .med-compare > div { display:flex; flex-direction:column; gap:6px; }
+  .med-chip {
+    display:inline-block; align-self:flex-start; padding:2px 9px; font-size:11px; font-weight:700;
+    letter-spacing:.05em; text-transform:uppercase; background:var(--med-panel); color:var(--med-muted);
+  }
+  .med-chip.after { background:#D6EFE9; color:var(--med-teal-dark); }
+  .slide.dark .med-chip { background:var(--med-dark-panel); color:var(--med-dark-muted); }
+  .slide.dark .med-chip.after { background:#123B44; color:var(--med-cyan); }
+  .med-delta {
+    margin-top:10px; text-align:center; font-size:17px; font-weight:700; color:var(--med-ink);
+  }
+  .slide.dark .med-delta { color:var(--med-dark-text); }
+
+  /* ── Colonnes de texte (2 ou 3) ───────────────────────────────────────── */
+  .med-cols { display:flex; gap:24px; align-items:stretch; }
+  .med-col-head {
+    font-size:13px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--med-navy); padding-bottom:6px; border-bottom:2px solid var(--med-hair); margin-bottom:10px;
+  }
+  .med-col-head.teal { color:var(--med-teal-dark); border-bottom-color:var(--med-teal); }
+  .med-col-head.orange { color:#B34503; border-bottom-color:var(--med-orange); }
+  .med-col { color:var(--med-body); }
+  .med-col ul.med-list > li { font-size:15px; margin-bottom:8px; }
+  .med-col p { font-size:15px; line-height:1.45; }
+
+  /* ── Encadres: information, alerte, message cle ───────────────────────── */
+  .med-callout {
+    display:flex; gap:10px; padding:10px 14px; margin-top:10px;
+    background:#EAF3FA; border-left:5px solid var(--med-ref);
+  }
+  .med-callout .callout-title { font-size:14px; font-weight:700; color:#1B5E8C; }
+  .med-callout .callout-body { font-size:14px; line-height:1.4; color:var(--med-body); margin-top:2px; }
+  .med-callout.warn { background:#FDECEF; border-left-color:var(--med-red); }
+  .med-callout.warn .callout-title { color:var(--med-red); }
+  .med-callout.key { background:#E6F5F1; border-left-color:var(--med-teal); }
+  .med-callout.key .callout-title { color:var(--med-teal-dark); }
+  .slide.dark .med-callout { background:var(--med-dark-panel); border-left-color:var(--med-cyan); }
+  .slide.dark .med-callout .callout-title { color:var(--med-cyan); }
+  .slide.dark .med-callout .callout-body { color:var(--med-dark-text); }
+
+  /* Message cle: une phrase, jamais un titre de sujet. */
+  .med-key {
+    display:flex; flex-direction:column; justify-content:center; height:100%;
+    padding-left:18px; border-left:6px solid var(--med-teal);
+  }
+  .med-key.warn { border-left-color:var(--med-red); }
+  /* Message cle suivi d'une rangee de chiffres: la hauteur pleine du .med-key
+     ne laisserait aucune place a la rangee, qui deborderait du cadre. */
+  .med-key.with-stats { height:auto; justify-content:flex-start; }
+  .med-key-text { font-family:var(--med-font); font-size:33px; font-weight:700; line-height:1.25; color:var(--med-ink); }
+  .med-key-sub { margin-top:12px; font-size:16px; color:var(--med-muted); }
+  .slide.dark .med-key-text { color:var(--med-dark-text); }
+
+  /* Chiffres cles */
+  .med-stats { display:flex; gap:16px; }
+  .med-stat { background:var(--med-panel-2); border-top:4px solid var(--med-teal); padding:10px 14px; }
+  .med-stat-value { font-family:var(--med-font); font-size:30px; font-weight:700; color:var(--med-teal-dark); line-height:1.1; }
+  .med-stat-label { font-size:12.5px; color:var(--med-muted); margin-top:4px; line-height:1.35; }
+
+  /* ── Plan / sommaire ──────────────────────────────────────────────────── */
+  .med-agenda { width:100%; border-collapse:collapse; }
+  .med-agenda td { padding:11px 8px; border-bottom:1px solid var(--med-hair); font-size:18px; color:var(--med-ink); }
+  .med-agenda td.num {
+    width:52px; font-family:var(--med-font); font-weight:700; font-size:24px; color:var(--med-orange);
+  }
+  .med-agenda td .agenda-sub { display:block; font-size:13px; color:var(--med-muted); margin-top:2px; }
+  .med-agenda tr.done td, .med-agenda tr.done td.num { color:#9AA7AD; }
+
+  /* ── Tableau ──────────────────────────────────────────────────────────── */
+  .med-table { width:100%; border-collapse:collapse; }
+  .med-table thead th {
+    background:var(--med-navy); color:#fff; font-size:12px; font-weight:700; text-align:left;
+    padding:7px 10px; letter-spacing:.04em; text-transform:uppercase;
+  }
+  .med-table tbody td {
+    font-size:14px; padding:7px 10px; border-bottom:1px solid var(--med-hair);
+    color:var(--med-body); vertical-align:top;
+  }
+  .med-table tbody tr:nth-child(even) td { background:var(--med-panel-2); }
+  .med-table tbody td strong { color:var(--med-ink); }
+  .med-table .abn { color:var(--med-red); font-weight:700; }
+  .med-table.compact tbody td { padding:5px 10px; font-size:13px; }
+
+  /* ── Cas clinique ─────────────────────────────────────────────────────── */
+  .med-case-chip {
+    position:absolute; top:9px; right:var(--med-pad); z-index:2;
+    padding:3px 10px; background:var(--med-panel); color:var(--med-navy);
+    font-size:12px; font-weight:700; letter-spacing:.03em;
+  }
+  .slide.dark .med-case-chip { background:var(--med-dark-panel); color:var(--med-cyan); }
+  .med-timeline { display:flex; align-items:center; justify-content:space-between; gap:0; margin-top:12px; }
+  .med-timeline .tl-step { text-align:center; font-size:12.5px; color:var(--med-muted); }
+  .med-timeline .tl-step b { display:block; font-size:14px; color:var(--med-teal-dark); }
+  /* Etapes de procedure numerotees */
+  .med-steps { display:flex; gap:12px; }
+  .med-step { background:var(--med-panel-2); border:1px solid var(--med-hair); padding:10px 12px; }
+  .med-step .step-num {
+    display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px;
+    background:var(--med-teal); color:#fff; font-size:12px; font-weight:700; border-radius:50%; margin-bottom:6px;
+  }
+  .med-step .step-title { font-size:15px; font-weight:700; color:var(--med-ink); margin-bottom:3px; }
+  .med-step p { font-size:13.5px; line-height:1.4; color:var(--med-muted); }
+
+  /* ── Messages a retenir ───────────────────────────────────────────────── */
+  .med-takehome { display:flex; flex-direction:column; gap:10px; }
+  .med-th-row {
+    background:var(--med-panel-2); border-left:6px solid var(--med-teal);
+    padding:11px 14px; font-size:17px; font-weight:700; line-height:1.35; color:var(--med-ink);
+  }
+  .med-th-row sup { font-size:11px; color:var(--med-ref); font-weight:700; }
+
+  /* ── Bibliographie ────────────────────────────────────────────────────── */
+  .med-refs { counter-reset:ref; }
+  .med-refs li {
+    list-style:none; counter-increment:ref; position:relative; padding-left:26px;
+    margin-bottom:7px; font-size:13px; line-height:1.4; color:var(--med-body);
+  }
+  .med-refs li::before {
+    content:counter(ref) '.'; position:absolute; left:0; font-weight:700; color:var(--med-ref);
+  }
+  .med-refs li em { font-style:normal; color:var(--med-muted); }
+
+  /* ── Pied de slide: sources a gauche, numero a droite ─────────────────── */
+  .med-foot {
+    display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+    min-height:46px; padding:6px var(--med-pad) 8px; flex-shrink:0;
+  }
+  .med-sources { flex:1; min-width:0; }
+  /* Toute slide portant des pixels de tiers doit avoir une ligne de source
+     non vide (skill/types/medical.md § Citer ses sources). */
+  .med-source { font-size:10px; line-height:1.35; color:var(--med-muted); margin-bottom:2px; }
+  .med-source .src-title { color:var(--med-ref); font-weight:700; }
+  .med-source .src-ref { color:var(--med-muted); }
+  .slide-foot-page { font-size:12px; font-weight:700; color:#8A9299; flex-shrink:0; }
+
+  /* ── Couverture ───────────────────────────────────────────────────────── */
+  .slide[data-slide-type="title"] { background:#fff; }
+  .med-cover { flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 var(--med-pad); }
+  .med-cover-event {
+    font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--med-teal-dark); margin-bottom:14px;
+  }
+  .med-cover-title {
+    font-family:var(--med-font); font-size:42px; font-weight:700; line-height:1.14;
+    color:var(--med-ink); max-width:800px;
+  }
+  .med-cover-title span { color:var(--med-teal-dark); }
+  .med-cover-sub { margin-top:12px; font-size:19px; color:var(--med-muted); max-width:760px; line-height:1.4; }
+  .med-author { margin-top:26px; font-size:16px; line-height:1.5; color:var(--med-body); }
+  .med-author .author-name { font-size:19px; font-weight:700; color:var(--med-ink); }
+  .med-author .author-role { color:var(--med-teal-dark); font-weight:700; }
+  .med-author .author-org, .med-author .author-mail { color:var(--med-muted); font-size:15px; }
+  .med-cover-foot {
+    display:flex; align-items:flex-end; justify-content:space-between;
+    padding:0 var(--med-pad) 20px; gap:20px; flex-shrink:0;
+  }
+  .med-cover-date { font-size:14px; color:var(--med-muted); }
+  .med-logos { display:flex; align-items:flex-end; gap:18px; }
+  .med-logos img { display:block; height:38px; width:auto; }
+
+  /* ── Coupure de section: panneau gris pleine surface ──────────────────── */
+  .slide[data-slide-type="section"] { background:var(--med-panel); }
+  .med-section { flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 var(--med-pad); }
+  .med-section .med-rule { margin-bottom:14px; }
+  .med-section-title { font-family:var(--med-font); font-size:44px; font-weight:700; line-height:1.14; color:var(--med-ink); }
+  .med-section-sub { margin-top:12px; font-size:17px; color:var(--med-muted); max-width:700px; line-height:1.4; }
+  .med-section-figs { display:flex; gap:18px; margin-top:22px; }
+
+  /* ── Remerciements / questions ────────────────────────────────────────── */
+  .slide[data-slide-type="thanks"] { background:var(--med-navy); color:#fff; }
+  .med-thanks { flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 var(--med-pad); }
+  /* Filet sur fond bleu nuit: le segment teal passe en teal clair. La classe
+     `light` est lue aussi par l'export PPTX (_render_med_rule). */
+  .med-thanks .med-rule { margin-bottom:14px; }
+  .med-rule.light i { background:#7FD8C8; }
+  .med-thanks-title { font-family:var(--med-font); font-size:42px; font-weight:700; color:#fff; line-height:1.15; }
+  .med-thanks-sub { margin-top:10px; font-size:26px; color:#9BC1E4; }
+  .med-contact { margin-top:22px; font-size:15px; line-height:1.55; color:#D3E2EE; }
+  .med-contact strong { color:#fff; }
+  .med-ack { padding:0 var(--med-pad) 22px; font-size:12px; color:#8FA7BB; line-height:1.4; }
+
+  /* ── Mode presentation (plein ecran): masquer le shell, zoomer la slide ─ */
+  :fullscreen .shell-header,
+  :fullscreen .toolbar,
+  :fullscreen .nav-arrow,
+  :fullscreen .status-bar { display:none !important; }
+  :fullscreen .stage { background:#000; }
+  :fullscreen .slide-frame { padding:0; }
+  /* Zoom uniforme (comme PowerPoint): la slide garde sa taille de conception
+     et est agrandie via scale, sinon les polices en px restent minuscules.
+     --fs-scale est calcule par updateFullscreenScale(). */
+  :fullscreen .slide { box-shadow:none; scale:var(--fs-scale,1); transform-origin:center center; }
+  :fullscreen body { background:#000; }
+</style>
+</head>
+<body>
+
+<header class="shell-header">
+  <div class="shell-logo">
+    <svg width="20" height="20" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <rect width="32" height="32" rx="4" fill="#159984"></rect>
+      <path d="M8 21c2.5 0 3-3 4-3s1.5 5 4 5 2.5-8 4-8 2 4 4 4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"></path>
+    </svg>
+    <span class="product-name">Medical</span>
+  </div>
+  <div class="shell-divider"></div>
+  <span class="shell-title">Présentation médicale</span>
+</header>
+
+<div class="toolbar">
+  <button class="cds-btn-icon" id="btn-prev" onclick="navigate(-1)" title="Précédent (←)" disabled>
+    <svg viewBox="0 0 16 16"><path d="M10.5 15.5 3 8l7.5-7.5 1.4 1.4L5.8 8l6.1 6.1z"></path></svg>
+  </button>
+  <button class="cds-btn-icon" id="btn-next" onclick="navigate(1)" title="Suivant (→)">
+    <svg viewBox="0 0 16 16"><path d="M5.5.5 13 8l-7.5 7.5-1.4-1.4L10.2 8 4.1 1.9z"></path></svg>
+  </button>
+  <div class="toolbar-sep"></div>
+  <span class="cds-select-label">Diapositive :</span>
+  <div class="cds-select-wrapper">
+    <select class="cds-select" id="slide-select" onchange="goToSlide(this.value)"></select>
+    <svg class="cds-select-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 11L3 6h10z"></path></svg>
+  </div>
+  <span class="cds-tag" id="progress-tag">1 / 1</span>
+  <div style="margin-left:auto;"></div>
+  <button class="cds-btn-icon" id="btn-present" onclick="enterPresentation()" title="Présenter (F)">
+    <svg viewBox="0 0 16 16"><path d="M1 1h14v10H9v2h2v1H5v-1h2v-2H1zm1 1v8h12V2z"></path></svg>
+  </button>
+</div>
+
+<div class="stage">
+  <button class="nav-arrow" id="nav-prev" onclick="navigate(-1)" disabled title="Précédent">
+    <svg viewBox="0 0 24 24"><path d="M15.5 20 8 12l7.5-8 1.5 1.4L11 12l6 6.6z"></path></svg>
+  </button>
+
+  <div class="slide-frame">
+
+    <!-- SLIDE 1 — Couverture. Dupliquer un bloc <article> pour chaque slide et
+         mettre a jour TOTAL + slideNames dans le <script> en bas. -->
+    <article class="slide active" id="slide-0" data-type="slide" data-id="slide-0"
+             data-slide-type="title" data-title="Titre de la présentation">
+      <div class="med-band"></div>
+      <div class="med-cover">
+        <div class="med-cover-event" data-editable="text">Congrès · Session · Ville</div>
+        <div class="med-cover-title" data-editable="text">Titre de la <span>présentation</span></div>
+        <div class="med-rule"><i></i><b></b></div>
+        <div class="med-cover-sub" data-editable="text">Sous-titre: question clinique traitée en une phrase.</div>
+        <div class="med-author" data-editable="text">
+          <div class="author-name">Dr Prénom Nom, MD</div>
+          <div class="author-role">Fonction · Unité</div>
+          <div class="author-org">Établissement, Ville · Affiliation académique</div>
+          <div class="author-mail">prenom.nom@exemple.org</div>
+        </div>
+      </div>
+      <div class="med-cover-foot">
+        <span class="med-cover-date" data-editable="text">Jour Mois Année</span>
+        <div class="med-logos"><!-- <img src="data:image/png;base64,…" alt="Logo"> --></div>
+      </div>
+    </article>
+
+  </div>
+
+  <button class="nav-arrow" id="nav-next" onclick="navigate(1)" title="Suivant">
+    <svg viewBox="0 0 24 24"><path d="M8.5 4 16 12l-7.5 8-1.5-1.4L13 12 7 5.4z"></path></svg>
+  </button>
+</div>
+
+<div class="status-bar">
+  <span class="status-active">●</span>
+  <span id="status-slide">Slide 1 / 1</span>
+  <span style="margin-left:auto;">Navigation : ← → ou menu déroulant · F plein écran</span>
+</div>
+
+<script>
+  // ── À METTRE À JOUR à chaque ajout/suppression de slide ──────
+  const TOTAL = 1;
+  const slideNames = [
+    "Titre de la présentation",
+  ];
+  // ─────────────────────────────────────────────────────────────
+
+  let current = 0;
+  const sel = document.getElementById('slide-select');
+
+  // Regénère les options du dropdown (vide d'abord pour éviter les doublons)
+  function buildOptions() {
+    sel.innerHTML = '';
+    slideNames.forEach((name, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = String(i + 1).padStart(2, '0') + ' — ' + name;
+      sel.appendChild(opt);
+    });
+  }
+
+  function render() {
+    document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById('slide-' + current);
+    if (el) el.classList.add('active');
+    sel.value = current;
+    document.getElementById('progress-tag').textContent = (current + 1) + ' / ' + TOTAL;
+    document.getElementById('status-slide').textContent =
+      'Slide ' + (current + 1) + ' / ' + TOTAL + ' — ' + slideNames[current];
+    document.getElementById('btn-prev').disabled = current === 0;
+    document.getElementById('nav-prev').disabled = current === 0;
+    document.getElementById('btn-next').disabled = current === TOTAL - 1;
+    document.getElementById('nav-next').disabled = current === TOTAL - 1;
+    updateFullscreenScale();
+  }
+
+  // Plein écran = zoom uniforme, pas un étirement: la slide garde sa taille de
+  // conception et --fs-scale (scale CSS) l'agrandit comme PowerPoint.
+  function updateFullscreenScale() {
+    const slide = document.querySelector('.slide.active');
+    const root = document.documentElement;
+    if (!document.fullscreenElement || !slide) {
+      root.style.removeProperty('--fs-scale');
+      return;
+    }
+    root.style.setProperty('--fs-scale', '1'); // mesurer la taille naturelle avant de recalculer
+    const rect = slide.getBoundingClientRect();
+    const scale = Math.min(window.innerWidth / rect.width, window.innerHeight / rect.height);
+    root.style.setProperty('--fs-scale', String(scale));
+  }
+
+  document.addEventListener('fullscreenchange', updateFullscreenScale);
+  window.addEventListener('resize', updateFullscreenScale);
+
+  function navigate(dir) {
+    const next = current + dir;
+    if (next >= 0 && next < TOTAL) { current = next; render(); }
+  }
+
+  function goToSlide(idx) { current = parseInt(idx, 10); render(); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); navigate(1); }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  navigate(-1);
+    if (e.key === 'Home') goToSlide(0);
+    if (e.key === 'End')  goToSlide(TOTAL - 1);
+    if (e.key === 'f' || e.key === 'F') enterPresentation();
+    if (e.key === 'Escape') exitPresentation();
+  });
+
+  function enterPresentation() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }
+
+  function exitPresentation() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen && document.exitFullscreen();
+    }
+  }
+
+  buildOptions();
+  render();
+</script>
+</body>
+</html>

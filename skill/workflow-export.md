@@ -47,10 +47,17 @@ Format: 16:9, 13,333 x 7,5 pouces, c'est-à-dire le canvas de référence des
 templates (960 x 540 px CSS). Un pixel CSS vaut donc exactement un point, et une
 taille `font-size: 28px` devient 28 pt.
 
-La charte est détectée sur le document (tokens `--ei-*` → Euro-Information,
-`--ibm-*` / `--cds-*` → IBM Carbon, sinon charte générique) et les couleurs et
-tailles sont relues dans la feuille de style du document (règles à une seule
-classe) puis dans les `style=""` inline.
+La charte est détectée sur le document (tokens `--med-*` → médicale,
+`--ei-*` → Euro-Information, `--ibm-*` / `--cds-*` → IBM Carbon, sinon charte
+générique) et les couleurs et tailles sont relues dans la feuille de style du
+document puis dans les `style=""` inline. Trois formes de règles CSS sont
+indexées: `.classe`, `.classe.variante` (appliquée seulement si l'élément porte
+les deux classes) et `.slide.dark .classe` (appliquée seulement si la slide en
+cours porte le scope, ce qui fait passer les slides d'imagerie de la charte
+médicale en surface sombre). Les sélecteurs à combinateur (`>`), d'attribut
+(`[data-slide-type=…]`) ou qualifiés par une balise (`ul.med-list li`) ne sont
+pas relus: la charte médicale compense par son propre chrome et par une échelle
+typographique dédiée (`_MEDICAL_STYLES`, `_THEME_TAG_STYLES`).
 
 ### Converti fidèlement
 
@@ -58,6 +65,9 @@ classe) puis dans les `style=""` inline.
 |---|---|
 | `data-slide-type` EI `content` / `agenda` / `diagram` | cadre bleu, zone blanche arrondie, anneau de logo, pied de page |
 | `data-slide-type` EI `section` | fond bleu plein + bandeau, titre centré |
+| Charte médicale, toute slide | bandeau gris haut, bloc de titre, filet teal puis orange, bande de sources bibliographiques en bas à gauche, numéro de page seul à droite |
+| Charte médicale `title` / `section` / `thanks` | mise en page pleine surface: date et logos de couverture, panneau gris de coupure, fond bleu nuit de clôture (`.med-rule.light` passe le filet en teal clair) |
+| Charte médicale `image` / `grid` / `compare` (`class="slide dark"`) | fond `#0B0E11`, panneaux `#14181D`, textes clairs, légendes et sources en gris clair |
 | `data-slide-type` EI `title` | image de couverture (recadrée comme `object-fit: cover`), titre, sous-titre, logos alignés |
 | Slides Carbon | fond, filet bleu sous l'en-tête, pied de page gris, séparateurs centrés |
 | Titres, eyebrow, sous-titres, tuiles, encadrés | zones de texte à l'échelle typographique de la charte, police et couleurs comprises |

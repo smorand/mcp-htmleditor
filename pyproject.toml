@@ -124,6 +124,8 @@ ignore = [
 "tools/**" = [
     "PLC0415", # playwright is an optional, tool-only dependency
     "PLR2004",
+    "S311",    # the placeholder generator draws decorative speckle, not secrets
+    "S108",    # its default output is a scratch directory, overridable by argv
     "T201",    # maintenance scripts print their report
     "S603",    # they drive local, hardcoded commands
     "S607",

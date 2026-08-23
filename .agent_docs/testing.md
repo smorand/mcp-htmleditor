@@ -98,3 +98,24 @@ git worktree remove /tmp/ht-baseline --force
 
 For DOCX, compare the `<w:t>` runs and the `w:pStyle` sequence of `word/document.xml`
 between the two exports.
+
+### 2026-08-21, medical charter tests
+
+`tests/test_medical_template.py` covers the three failure modes of the charter:
+
+* the CSS is duplicated in the two reference decks, so their `<style>` block is compared
+  byte for byte with the bootstrap (fix with `make sync-medical-css`). Anchor the regex at
+  line start (`^<style>\n.*?^</style>`): a header comment mentioning the tag otherwise
+  starts the match and the captured "CSS" swallows `<html>`/`<head>`, which killed the
+  `:root` tokens once, silently, with a green test;
+* the insertable layouts live in JavaScript, out of pytest's reach, so
+  `LAYOUT_SETS.medical` is checked textually (16 keys, required `data-*`, page marker on
+  every layout that has a footer band, medical detection before EI in `detectTemplate`);
+* the exporter has its own chrome and theme, so both decks are exported for real and the
+  result is inspected (one PPTX slide per HTML slide, zero warning, pictures, native
+  tables, a bare page number), plus a unit check that a dark slide resolves its inverted
+  palette through `StyleResolver.active_scope`.
+
+Deck coherence (sequential ids, `TOTAL`, `slideNames` == `data-title`, a `.med-source` on
+every slide that shows an image, no CSS grid row) is asserted on both decks too: those are
+authoring invariants an agent breaks by editing HTML by hand.

@@ -18,6 +18,7 @@ make install     # uv tool install + templates + log dir + Pi skill
 make run ARGS='export pptx in.html out.pptx'
 make docker-build / run-up / run-down
 make bootstrap-ei  # regenerate the EI bootstrap from the EI reference
+make sync-medical-css  # propagate the medical charter CSS to the reference decks
 make help        # every target
 ```
 
@@ -25,8 +26,9 @@ CLI (same after `make install`):
 
 ```bash
 mcp-htmleditor --version
-mcp-htmleditor templates                   # ei, carbon, doc, doc-perso, doc-ei, mail, website
+mcp-htmleditor templates                   # ei, carbon, medical, doc, doc-perso, doc-ei, mail, website
 mcp-htmleditor new ei pres.html --serve
+mcp-htmleditor new medical talk.html --serve
 mcp-htmleditor serve file.html [-v|-q] [--host] [--port] [--poll] [--no-browser]
 mcp-htmleditor mcp                         # MCP server (stdio)
 mcp-htmleditor export pptx in.html out.pptx
@@ -50,7 +52,16 @@ mcp-htmleditor skill                       # full skill content
 - `data-doc-type` on `<html>` drives the mode, `data-type="slide"` needs `data-id` and
   `data-title`, document headings are semantic `<h1>` to `<h5>`.
 - Templates are read only through the server; `templates/bootstrap/slides-ei-empty.html`
-  is generated, edit the EI reference then `make bootstrap-ei`.
+  is generated, edit the EI reference then `make bootstrap-ei`. For the `medical` charter
+  it is the reverse: the bootstrap `<style>` is the source, edit it then
+  `make sync-medical-css` to propagate the copy into the two reference decks.
+- A `medical` deck cites every third party image (non empty `.med-source` in the footer
+  band) and anonymizes every patient image (no name, initials, MRN, care date, full date
+  of birth; DICOM header **and** burned in pixels cleaned): see `skill/types/medical.md`.
+  Its flex rows (`.med-strip`, `.med-split`, `.med-cols`, `.med-compare`, `.med-steps`,
+  `.med-stats`, `.med-timeline`, `.med-section-figs`) need an explicit width class
+  (`w-25` to `w-70`) on every child, otherwise the PPTX export flattens the row into a
+  vertical stack.
 - After editing anything under `templates/`, run `make install` or export
   `HTMLEDITOR_TEMPLATES_DIR=$PWD/templates`, otherwise the installed copy wins.
 - Every slide template (current and future) must ship fullscreen support (`:fullscreen`
