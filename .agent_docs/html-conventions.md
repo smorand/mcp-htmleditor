@@ -20,8 +20,9 @@ export or the editor silently degrades.
 * EI slide footer markup is `.slide-foot-logo > .logo-disc > img`. The template only
   sizes `.slide-foot-logo .logo-disc img` (16px), so a missing `.logo-disc` lets the
   chevrons render at 41x37 and spill over the blue ring.
-* Slide counters: eyebrow `Catégorie · Slide 0N / TT` in both charters, plus
-  `.slide-footer-right` ("Slide N / TT", Carbon) or `.slide-foot-page` ("N", EI).
+* Slide counters: eyebrow `Catégorie · Slide 0N / TT` in every charter, plus
+  `.slide-footer-right` ("Slide N / TT", Carbon) or `.slide-foot-page` ("N", EI and
+  medical).
   `renumberSlides()` in `editor.js` rewrites exactly those three, anything else goes stale.
 * `<html data-asset-chevrons="data:image/png;base64,...">` in the EI bootstrap is the
   fallback source for `{{CHEVRONS}}` in inserted slides (`resolveTemplateAssets`), needed
@@ -29,6 +30,25 @@ export or the editor silently degrades.
   available for `data-asset-cover`, `-cm`, `-cic`, `-ei`.
 * Slide layouts may use `{{N}}` / `{{TT}}`: they are not substituted at insertion, the
   eyebrow regex in `renumberSlides()` resolves them on the following pass.
+
+### 2026-08-21, medical charter, two invariants worth knowing
+
+* **Explicit width class on every child of a flex row.** The `medical` charter states its
+  side by side layouts with `w-25` to `w-70` (`flex:0 0 X%`) on each child of
+  `.med-strip`, `.med-split`, `.med-cols`, `.med-compare`, `.med-steps`, `.med-stats`,
+  `.med-timeline`, `.med-section-figs`. This is not cosmetic: `to_pptx.py` only splits a
+  `display:flex` row into independent column regions when at least one child declares a
+  width, so a bare `flex:1` everywhere exports as a vertical stack (and gets cropped).
+  Same reason `.med-grid` is a vertical flex container of `.med-strip` rows, never a
+  `display:grid` (the exporter does not read `grid-template-columns`). Authoring rules:
+  `skill/types/medical.md`.
+* **CSS source direction is the opposite of EI.** For `ei`, the reference deck is the
+  source and `make bootstrap-ei` generates the bootstrap. For `medical`,
+  `templates/bootstrap/slides-medical-empty.html` is the source and
+  `make sync-medical-css` copies its `<style>` block into
+  `reference/slides/medical.html` and `reference/slides/example-medical-complete.html`
+  (both must stay standalone files). Editing a reference `<style>` by hand diverges
+  silently until the sync check runs.
 
 ## Fullscreen presentation mode (mandatory on every slide template)
 

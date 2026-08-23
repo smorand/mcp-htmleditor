@@ -295,6 +295,10 @@ body:has(#content-frame:fullscreen) #update-overlay {
   padding: 24px;
   max-width: 720px;
   width: 90%;
+  /* The medical charter ships 15 layouts: without a scroll cap the panel grows
+     past the viewport and the cancel button becomes unreachable. */
+  max-height: 86vh;
+  overflow-y: auto;
 }
 #slide-picker .picker-title,
 #block-picker .picker-title {

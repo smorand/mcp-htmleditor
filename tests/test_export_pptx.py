@@ -1014,10 +1014,42 @@ def test_style_resolver_indexes_classes_without_leaking_compounds() -> None:
 
     assert resolver.class_props["notif"]["background"] == "#EDF5FF"
     assert "error" not in resolver.class_props
-    assert resolver.class_props["name"]["color"] == "#003A8D"
+    # ``.card .name`` is a scoped rule: indexed on its target class, applied
+    # only when the ``card`` scope is active (see StyleResolver.active_scope).
+    assert "name" not in resolver.class_props
+    assert resolver.scoped_props["name"] == [
+        (frozenset({"card"}), frozenset({"name"}), {"color": "#003A8D", "font-weight": "700"})
+    ]
     node = soup.find("div")
     assert node is not None
-    assert resolver.color(node, ("background",)) == "EDF5FF"
+    # ``.notif.error`` is a compound target: it applies here (both classes are
+    # on the element) but never to a plain ``.notif``.
+    assert resolver.color(node, ("background",)) == "FFF1F1"
+    plain = BeautifulSoup('<div class="notif">x</div>', "html.parser").div
+    assert plain is not None
+    assert resolver.color(plain, ("background",)) == "EDF5FF"
+
+
+def test_style_resolver_applies_scoped_rules_only_in_scope() -> None:
+    """A ``.slide.dark .x`` rule reaches ``.x`` only on a slide carrying ``dark``."""
+    soup = BeautifulSoup(
+        "<html><head><style>"
+        ".cap { color: #5D5D5D; }\n"
+        ".slide.dark .cap { color: #9AA7B4; }\n"
+        "</style></head>"
+        '<body><p class="cap">x</p></body></html>',
+        "html.parser",
+    )
+    resolver = StyleResolver.from_soup(soup)
+    node = soup.find("p")
+    assert node is not None
+
+    assert resolver.color(node, ("color",)) == "5D5D5D"
+    resolver.active_scope = frozenset({"slide", "dark"})
+    assert resolver.color(node, ("color",)) == "9AA7B4"
+    # A partial scope (``slide`` alone) must not enable the variant.
+    resolver.active_scope = frozenset({"slide"})
+    assert resolver.color(node, ("color",)) == "5D5D5D"
 
 
 def test_style_resolver_applies_inline_overrides() -> None:

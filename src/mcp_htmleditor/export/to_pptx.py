@@ -455,10 +455,15 @@ class _SlideBuilder:
     def build(self) -> None:
         """Draw the chrome then flow the content of the slide."""
         kind = self._slide_kind()
+        # Slide level CSS variants (``.slide.dark`` ...) only apply to this
+        # slide: publish its classes as the active scope of the resolver.
+        self.res.active_scope = frozenset(classes(self.article))
         if self.theme.key == "ei":
             regions = self._chrome_ei(kind)
         elif self.theme.key == "carbon":
             regions = self._chrome_carbon()
+        elif self.theme.key == "medical":
+            regions = self._chrome_medical(kind)
         else:
             regions = self._chrome_generic()
         for region in regions:
@@ -646,6 +651,131 @@ class _SlideBuilder:
         if isinstance(right, Tag):
             self._render_text(Box(pad + half, top + 0.09, half, 0.22), right, anchor="middle")
 
+    def _chrome_medical(self, kind: str) -> list[_Region]:
+        """Draw the medical charter and return the content regions.
+
+        Chrome of the charter: a grey top band, the title block with its
+        teal/orange rule, then a bottom band holding the bibliographic source
+        lines on the left and the bare page number on the right. Cover,
+        section separator and closing slides replace the band/title block by
+        their own full surface layout.
+        """
+        canvas = Box.slide()
+        pad = 56.0 * PX_IN
+        content_w = SLIDE_W_IN - 2 * pad
+        dark = has_class(self.article, "dark")
+        # The kind wins over the ``.slide { background:#fff }`` base rule: the
+        # charter states the section and closing backgrounds with attribute
+        # selectors (``.slide[data-slide-type="section"]``), which the class
+        # based resolver cannot index. An inline background still wins over all.
+        inline = parse_color(
+            style_props(self.article).get("background") or style_props(self.article).get("background-color"),
+            self.res.css_vars,
+        )
+        kind_bg = {"section": self.theme.surface, "thanks": "0F2E4C"}.get(kind) or ("0B0E11" if dark else None)
+        self._rect(canvas, fill=inline or kind_bg or self._element_color(self.article) or "FFFFFF")
+
+        band = self.article.find(class_="med-band")
+        if isinstance(band, Tag):
+            fill = self._element_color(band) or ("14181D" if dark else self.theme.surface)
+            self._rect(canvas.slice_top(40.0 * PX_IN), fill=fill)
+            self._consume(band)
+
+        chip = self.article.find(class_="med-case-chip")
+        if isinstance(chip, Tag):
+            self._render_text(Box(SLIDE_W_IN - pad - 4.0, 9.0 * PX_IN, 4.0, 0.24), chip, anchor="middle")
+            self._consume(chip)
+
+        if kind == "title":
+            return self._chrome_medical_cover(pad, content_w)
+        if kind in {"section", "thanks"}:
+            return self._chrome_medical_full(kind, pad, content_w)
+
+        foot_top = self._render_medical_foot(pad, content_w)
+        regions: list[_Region] = []
+        cursor = 56.0 * PX_IN
+        head = self.article.find(class_="med-head")
+        if isinstance(head, Tag):
+            children = self._children(head)
+            height = sum(b.height for b in self._collect_all(children, content_w))
+            regions.append(_Region(Box(pad, cursor, content_w, height), children))
+            cursor += height + 12.0 * PX_IN
+            self._consume(head, deep=False)
+
+        body = self.article.find(class_="slide-body")
+        host = body if isinstance(body, Tag) else self.article
+        if isinstance(body, Tag):
+            self._consume(body, deep=False)
+        regions.append(_Region(Box(pad, cursor, content_w, max(foot_top - cursor - 0.05, 0.5)), self._children(host)))
+        return regions
+
+    def _chrome_medical_cover(self, pad: float, content_w: float) -> list[_Region]:
+        """Render the medical cover: centered title block, date and logos row."""
+        bottom = SLIDE_H_IN
+        foot = self.article.find(class_="med-cover-foot")
+        if isinstance(foot, Tag):
+            bottom = SLIDE_H_IN - 56.0 * PX_IN
+            date = foot.find(class_="med-cover-date")
+            if isinstance(date, Tag):
+                self._render_text(Box(pad, SLIDE_H_IN - 42.0 * PX_IN, 4.0, 0.24), date, anchor="middle")
+            right_edge = SLIDE_W_IN - pad
+            images = [img for img in foot.find_all("img") if isinstance(img, Tag)]
+            for img in reversed(images):
+                height = 38.0 * PX_IN
+                box = Box(right_edge - 1.4, SLIDE_H_IN - 20.0 * PX_IN - height, 1.4, height)
+                placed = self._add_picture(box, str(img.get("src") or ""), mode="fit-height")
+                if placed:
+                    width = inches(placed.width)
+                    placed.left = Inches(right_edge - width)
+                    right_edge -= width + 18.0 * PX_IN
+            self._consume(foot)
+        cover = self.article.find(class_="med-cover")
+        host = cover if isinstance(cover, Tag) else self.article
+        if isinstance(cover, Tag):
+            self._consume(cover, deep=False)
+        top = 40.0 * PX_IN
+        return [_Region(Box(pad, top, content_w, max(bottom - top, 1.0)), self._children(host), anchor="middle")]
+
+    def _chrome_medical_full(self, kind: str, pad: float, content_w: float) -> list[_Region]:
+        """Render a full surface medical slide: section separator or closing."""
+        container = self.article.find(class_="med-section" if kind == "section" else "med-thanks")
+        host = container if isinstance(container, Tag) else self.article
+        if isinstance(container, Tag):
+            self._consume(container, deep=False)
+        bottom = SLIDE_H_IN - 24.0 * PX_IN
+        ack = self.article.find(class_="med-ack")
+        if isinstance(ack, Tag):
+            self._render_text(Box(pad, SLIDE_H_IN - 58.0 * PX_IN, content_w, 0.45), ack)
+            self._consume(ack)
+            bottom = SLIDE_H_IN - 62.0 * PX_IN
+        top = 44.0 * PX_IN
+        return [_Region(Box(pad, top, content_w, max(bottom - top, 1.0)), self._children(host), anchor="middle")]
+
+    def _render_medical_foot(self, pad: float, content_w: float) -> float:
+        """Render the source lines and the page number; return the band's top.
+
+        The band grows with the number of citations (a slide legitimately
+        carries up to four), so the body region is measured against the real
+        top of the band rather than a fixed footer height.
+        """
+        foot = self.article.find(class_="med-foot")
+        if not isinstance(foot, Tag):
+            return SLIDE_H_IN - 12.0 * PX_IN
+        sources = foot.find(class_="med-sources")
+        sources_w = content_w - 0.6
+        height = 0.0
+        if isinstance(sources, Tag):
+            height = sum(b.height for b in self._collect_all(self._children(sources), sources_w))
+        band_h = max(height + 14.0 * PX_IN, 34.0 * PX_IN)
+        top = SLIDE_H_IN - band_h
+        if isinstance(sources, Tag) and height:
+            self._flow(_Region(Box(pad, top + 6.0 * PX_IN, sources_w, height), self._children(sources)))
+        page = foot.find(class_="slide-foot-page")
+        if isinstance(page, Tag):
+            self._render_text(Box(SLIDE_W_IN - pad - 0.9, SLIDE_H_IN - 26.0 * PX_IN, 0.9, 0.22), page, anchor="middle")
+        self._consume(foot)
+        return top
+
     def _chrome_generic(self) -> list[_Region]:
         """Fallback layout for documents without a known charter."""
         canvas = Box.slide()
@@ -743,6 +873,8 @@ class _SlideBuilder:
             return [self._grid_block(element, width)]
         if has_class(element, "cw-bar"):
             return [_Block("hbar", element, 32.0 * PX_IN + 0.08)]
+        if has_class(element, "med-rule"):
+            return [_Block("med-rule", element, 16.0 * PX_IN)]
         if has_class(element, "slide-title-rule", "accent-line"):
             return [_Block("rule", element, 33.0 * PX_IN)]
         if element.name == "img":
@@ -1031,6 +1163,8 @@ class _SlideBuilder:
             self._render_text(box, block.element, style=block.style)
         elif block.kind == "rule":
             self._render_rule(box, block.element)
+        elif block.kind == "med-rule":
+            self._render_med_rule(box, block.element)
         elif block.kind == "panel":
             self._render_panel(box, block.element)
         elif block.kind == "hbar":
@@ -1089,6 +1223,31 @@ class _SlideBuilder:
         color = color_of(props, FILL_KEYS, self.res)
         rule = Box(box.left, box.top + 12.0 * PX_IN, min(width, box.width), height)
         self._rect(rule, fill=color or self.theme.accent)
+
+    def _render_med_rule(self, box: Box, element: Tag) -> None:
+        """Render the two segment teal/orange rule of the medical charter.
+
+        Geometry is fixed here rather than read from the CSS: the charter
+        states it with tag selectors (``.med-rule i``) that the class based
+        resolver does not index, and the rule is a charter signature, not a
+        per slide decision.
+        """
+        segments = self._children(element)
+        widths = (44.0, 34.0)
+        # `.med-rule.light` is the variant used on the navy closing slide, where
+        # the charter teal would be too dark to read (the CSS states it on the
+        # `i` child, a tag selector the resolver does not index).
+        teal = "7FD8C8" if has_class(element, "light") else self.theme.primary_alt
+        colors = (teal, self.theme.accent)
+        cursor = box.left
+        top = box.top + 5.0 * PX_IN
+        for index, segment in enumerate(segments[:2] or []):
+            props = self.res.props(segment)
+            width = parse_length(props.get("width"), box.width) or widths[index] * PX_IN
+            height = parse_length(props.get("height"), 0.0) or 5.0 * PX_IN
+            fill = color_of(props, FILL_KEYS, self.res) or colors[index]
+            self._rect(Box(cursor, top, width, height), fill=fill)
+            cursor += width + 4.0 * PX_IN
 
     def _render_panel(self, box: Box, element: Tag) -> None:
         """Render a callout or card: tinted panel, accent bar, then its text."""
@@ -1852,18 +2011,35 @@ class _SlideBuilder:
                 paras.extend(item_paras)
             return paras
         if self._has_block_children(element):
-            paras = []
+            blocks: list[_Para] = []
+            inline: list[tuple[str, TextStyle]] = []
+
+            def flush() -> None:
+                """Emit the pending inline runs as one paragraph."""
+                if any(text.strip() for text, _ in inline):
+                    blocks.append(_Para(base, list(inline), level))
+                inline.clear()
+
             for child in element.children:
                 if isinstance(child, NavigableString):
-                    text = re.sub(r"\s+", " ", str(child)).strip()
-                    if text:
-                        paras.append(_Para(base, [(text, base)], level))
+                    # Inline text around a nested block (``<li>text<ul>…</ul></li>``)
+                    # keeps flowing in the *same* paragraph as the neighbouring
+                    # inline tags: one paragraph per text node would break a
+                    # bullet in two right after its bold lead-in.
+                    text = re.sub(r"\s+", " ", str(child))
+                    if text.strip():
+                        inline.append((text, base))
                 elif isinstance(child, Tag) and child.name not in SKIP_TAGS:
+                    if not self._is_block_child(child):
+                        inline.extend(self._runs(child, self._inline_style(child, base)))
+                        continue
+                    flush()
                     style = self.res.style(child, base)
                     if child.name in INLINE_BLOCK_TAGS:
                         style = self._inline_style(child, base)
-                    paras.extend(self._paragraphs(child, style, level))
-            return paras
+                    blocks.extend(self._paragraphs(child, style, level))
+            flush()
+            return blocks
         runs = self._runs(element, base)
         return [_Para(base, runs, level)] if runs else []
 

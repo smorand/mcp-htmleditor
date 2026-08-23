@@ -3,7 +3,7 @@
 
 .PHONY: sync run run-dev test test-cov lint lint-fix format format-check typecheck \
         security check build install install-skill uninstall docker-build docker-push \
-        docker run-up run-down bootstrap-ei clean clean-all info help
+        docker run-up run-down bootstrap-ei sync-medical-css clean clean-all info help
 
 PROJECT_NAME=$(shell grep -m1 '^name' pyproject.toml 2>/dev/null | sed 's/.*= *"\([^"]*\)".*/\1/')
 PACKAGE := mcp_htmleditor
@@ -241,6 +241,10 @@ run-down:
 bootstrap-ei:
 	@uv run python tools/gen_ei_bootstrap.py
 
+## sync-medical-css: Copy the medical charter CSS from its bootstrap to the reference decks
+sync-medical-css:
+	@uv run python tools/sync_medical_css.py
+
 # ============================================================================
 # CLEANUP
 # ============================================================================
@@ -324,6 +328,7 @@ help:
 	@echo ""
 	@echo "Project specific:"
 	@echo "  bootstrap-ei     - Regenerate the EI bootstrap from the EI reference"
+	@echo "  sync-medical-css - Propagate the medical charter CSS to the reference decks"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  clean            - Remove caches and build artifacts"

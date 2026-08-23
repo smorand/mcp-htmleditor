@@ -22,6 +22,7 @@ Il n'y a pas d'option `--template` sur `serve`: on crée d'abord, on édite ensu
 mcp-htmleditor templates                          # liste les templates
 mcp-htmleditor new ei     ma-pres.html   --serve  # Euro-Information (slides)
 mcp-htmleditor new carbon ma-pres.html   --serve  # IBM Carbon (slides)
+mcp-htmleditor new medical pres-med.html --serve  # Presentation medicale (teal/orange)
 mcp-htmleditor new doc    mon-rapport.html        # Document standard
 mcp-htmleditor new doc-perso mon-doc.html --serve # Document charte Perso
 mcp-htmleditor new doc-ei    note-ei.html --serve # Document Euro-Information
@@ -36,6 +37,7 @@ templates/
 ├── bootstrap/                     ← points de départ (copiés par `new`)
 │   ├── slides-ei-empty.html       ← key: ei        (Euro-Information)
 │   ├── slides-empty.html          ← key: carbon    (IBM Carbon)
+│   ├── slides-medical-empty.html  ← key: medical   (présentation médicale, source du CSS de la charte)
 │   ├── document-empty.html        ← key: doc       (document standard)
 │   ├── document-perso-empty.html  ← key: doc-perso (charte Perso, Arial)
 │   ├── document-ei-empty.html     ← key: doc-ei    (Euro-Information, Segoe UI)
@@ -46,6 +48,8 @@ templates/
     │   ├── euro-information.html  ← EI: titre + agenda + contenu, logos embarqués
     │   ├── example-ei-complete.html ← EI: 9 slides, gantt, schéma, tableau, image annotée
     │   ├── ibm-carbon.html        ← IBM Carbon: 9 slides, tous les composants
+    │   ├── medical.html           ← medical: catalogue, une slide par data-slide-type (16)
+    │   ├── example-medical-complete.html ← medical: exemple riche de bout en bout
     │   ├── presentation-standard.html
     │   └── roadmap-one-pager.html
     ├── documents/
@@ -73,6 +77,11 @@ contenant `templates/` est ignorée).
 - **Euro-Information** (`ei`): présentations EI. Bleu `#003A8D`, orange `#FBAE40`,
   police Segoe UI, logos Crédit Mutuel / CIC / Euro Information embarqués en base64.
 - **IBM Carbon** (`carbon`): présentations génériques. Tokens Carbon.
+- **Médical** (`medical`): présentations médicales (congrès, staff, enseignement),
+  pneumologie interventionnelle. Teal `#159984` + orange `#EE5A02`, Trebuchet MS / Arial,
+  bandeau gris et filet deux segments sous le titre, bande de sources bibliographiques en
+  pied, surface sombre pour les slides d'imagerie. 16 layouts insérables. Citations et
+  anonymisation obligatoires: `skill/types/medical.md`.
 - **Document** (`doc`): documents Word-like standard (export DOCX optimal).
 - **Document Perso** (`doc-perso`): charte Perso, police Arial, headings h1-h5
   colorés (titre 22pt gras souligné centré, h1 18pt, h2 bleu, etc.).
@@ -87,8 +96,10 @@ contenant `templates/` est ignorée).
   édition), cartes, footer. Réutilise le mode édition document (blocs déplaçables/
   insérables) sans afficher de bouton d'export. Voir `skill/types/website.md`.
 
-En mode présentation, le serveur adapte le picker « Insérer slide » (5 layouts:
-title, agenda, section, content, diagram). En mode document, la toolbar affiche un
+En mode présentation, le serveur adapte le picker « Insérer slide » à la charte détectée:
+5 layouts pour `carbon` et `ei` (title, agenda, section, content, diagram), **16 pour
+`medical`** (title, disclosure, agenda, section, content, image, grid, compare, columns,
+case, steps, table, keymessage, takehome, references, thanks). En mode document, la toolbar affiche un
 bouton « ＋ Bloc » qui ouvre un picker de blocs (titre, sous-titre, h1-h5,
 paragraphe, tableau, liste). Règles détaillées: `skill/types/slides.md` et
 `skill/types/document.md`.
@@ -127,9 +138,10 @@ mcp-htmleditor templates
 
 # Créer un fichier à partir d'un template (le moyen recommandé de démarrer)
 mcp-htmleditor new <template> mon-fichier.html
-#   <template> = ei | carbon | doc | doc-perso | doc-ei | mail | website
+#   <template> = ei | carbon | medical | doc | doc-perso | doc-ei | mail | website
 #   ei        → Euro-Information slides (Crédit Mutuel / CIC)
 #   carbon    → IBM Carbon slides
+#   medical   → présentation médicale (teal/orange, sources, imagerie sur fond sombre)
 #   doc       → document Word-like standard
 #   doc-perso → document charte Perso (Arial, headings colorés)
 #   doc-ei    → document Euro-Information (bleu EI, Segoe UI)
@@ -210,7 +222,8 @@ par présentation si un vrai affichage simultané est nécessaire).
 | `skill/workflow-create.md` | Créer et modifier un fichier HTML (from scratch ou template) |
 | `skill/workflow-export.md` | Exporter en PPTX ou DOCX, limitations, post-processing |
 | `skill/workflow-templates.md` | Créer un template depuis un PPTX/DOCX existant |
-| `skill/types/slides.md` | Règles détaillées pour les slides |
+| `skill/types/slides.md` | Règles détaillées pour les slides (chartes IBM Carbon et Euro-Information) |
+| `skill/types/medical.md` | Règles de la charte `medical`: 15 types de slide, largeurs `w-*`, citations, anonymisation, budget de hauteur, export |
 | `skill/types/gantt.md` | Règles pour les diagrammes Gantt |
 | `skill/types/arch-diagram.md` | Règles pour les schémas d'architecture |
 | `skill/types/annotated-image.md` | Règles pour les images annotées |
@@ -223,6 +236,8 @@ par présentation si un vrai affichage simultané est nécessaire).
 | `templates/reference/slides/ibm-carbon.html` | **Template de référence IBM Carbon** (9 slides complètes, tous composants) |
 | `templates/reference/slides/euro-information.html` | **Template de référence Euro-Information** (3 slides: titre, agenda, contenu; logos CM/CIC/EI embarqués; source du CSS du bootstrap `ei`) |
 | `templates/reference/slides/example-ei-complete.html` | **Exemple complet Euro-Information** (9 slides: couverture, agenda, section, tuiles, schéma d'architecture ancré, Gantt aligné, tableau, image annotée, clôture) |
+| `templates/reference/slides/medical.html` | **Catalogue de composants de la charte `medical`** (une slide par `data-slide-type`, 16 au total; copie exacte du CSS du bootstrap, propagée par `make sync-medical-css`) |
+| `templates/reference/slides/example-medical-complete.html` | **Exemple complet charte `medical`** (déroulé d'un exposé: couverture, liens d'intérêt, plan, sections, imagerie sur fond sombre, cas clinique, tableau, messages à retenir, bibliographie) |
 | `templates/reference/slides/presentation-standard.html` | Template 4 slides standard |
 | `templates/reference/slides/roadmap-one-pager.html` | Template roadmap one-pager |
 | `templates/reference/documents/report-standard.html` | Template rapport standard générique |

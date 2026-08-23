@@ -31,6 +31,7 @@ _SUBDOCS = [
     "workflow-templates.md",
     "workflow-arch-qa.md",
     "types/slides.md",
+    "types/medical.md",
     "types/document.md",
     "types/mail.md",
     "types/website.md",

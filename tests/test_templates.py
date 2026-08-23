@@ -28,6 +28,14 @@ def test_carbon_template_is_presentation() -> None:
     assert 'data-doc-type="presentation"' in content
 
 
+def test_medical_template_is_a_medical_presentation() -> None:
+    """The 'medical' template is a presentation carrying the medical charter."""
+    content = template_path("medical").read_text(encoding="utf-8")
+    assert 'data-doc-type="presentation"' in content
+    assert 'data-doc-template="medical"' in content
+    assert "--med-teal" in content
+
+
 def test_doc_template_is_document() -> None:
     """The 'doc' template is a document."""
     content = template_path("doc").read_text(encoding="utf-8")

@@ -45,6 +45,10 @@ TEMPLATES: dict[str, tuple[str, str]] = {
         "bootstrap/slides-empty.html",
         "IBM Carbon presentation, 1 empty slide",
     ),
+    "medical": (
+        "bootstrap/slides-medical-empty.html",
+        "Presentation medicale (congres/staff): teal+orange, images commentees, citations",
+    ),
     "doc": (
         "bootstrap/document-empty.html",
         "Word-like document (single column)",
@@ -75,7 +79,7 @@ def template_path(key: str) -> Path:
     first match.
 
     Args:
-        key: Template key (e.g. 'ei', 'carbon', 'doc', 'doc-perso', 'doc-ei').
+        key: Template key (e.g. 'ei', 'carbon', 'medical', 'doc', 'doc-perso').
 
     Returns:
         Absolute path to the bootstrap HTML file.

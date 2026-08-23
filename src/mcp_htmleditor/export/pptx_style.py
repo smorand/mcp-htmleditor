@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from bs4 import BeautifulSoup, Tag
 from pptx.util import Emu, Inches
@@ -343,6 +343,21 @@ THEME_CARBON = Theme(
     table_header_fg="FFFFFF",
 )
 
+THEME_MEDICAL = Theme(
+    key="medical",
+    font="Trebuchet MS",
+    mono_font="Courier New",
+    primary="0F6F60",
+    primary_alt="159984",
+    accent="EE5A02",
+    text="252525",
+    secondary="5D5D5D",
+    surface="E9EDEE",
+    border="D7DEE2",
+    table_header_bg="0F2E4C",
+    table_header_fg="FFFFFF",
+)
+
 THEME_GENERIC = Theme(
     key="generic",
     font="Arial",
@@ -362,6 +377,8 @@ THEME_GENERIC = Theme(
 def detect_theme(soup: BeautifulSoup) -> Theme:
     """Pick the charter of a document from its CSS tokens and markup."""
     css = stylesheet_text(soup)
+    if "--med-teal" in css or soup.find(class_="med-rule") is not None:
+        return THEME_MEDICAL
     if "--ei-blue" in css or soup.find(class_="slide-inner") is not None:
         return THEME_EI
     if "--ibm-blue" in css or "--cds-" in css or soup.find(class_="slide-header") is not None:
@@ -452,9 +469,71 @@ _TAG_STYLES: dict[str, TextStyle] = {
     "figcaption": TextStyle(size=10, italic=True, color="secondary"),
 }
 
+_MEDICAL_STYLES: dict[str, TextStyle] = {
+    "slide-eyebrow": TextStyle(size=11, bold=True, color="secondary", upper=True, space_after=3),
+    "slide-h1": TextStyle(size=26, bold=True, color="text", space_after=4, line_spacing=1.15),
+    "slide-subtitle": TextStyle(size=14, color="secondary", space_after=4),
+    "med-lead": TextStyle(size=17, color="text", space_after=6),
+    "med-cover-event": TextStyle(size=11.5, bold=True, color="primary", upper=True, space_after=8),
+    "med-cover-title": TextStyle(size=36, bold=True, color="text", line_spacing=1.25, space_after=12),
+    "med-cover-sub": TextStyle(size=17, color="secondary", space_after=18),
+    "author-name": TextStyle(size=17, bold=True, color="text", space_after=1),
+    "author-role": TextStyle(size=14, bold=True, color="primary", space_after=1),
+    "author-org": TextStyle(size=13, color="secondary", space_after=1),
+    "author-mail": TextStyle(size=13, color="secondary", space_after=10),
+    "med-cover-date": TextStyle(size=13, color="secondary"),
+    "med-section-title": TextStyle(size=38, bold=True, color="text", line_spacing=1.25, space_after=16),
+    "med-section-sub": TextStyle(size=15, color="secondary", space_after=12, line_spacing=1.35),
+    "med-key-text": TextStyle(size=29, bold=True, color="text", line_spacing=1.25, space_after=6),
+    "med-key-sub": TextStyle(size=15, color="secondary"),
+    "med-th-row": TextStyle(size=15.5, bold=True, color="text", line_spacing=1.35),
+    "med-caption": TextStyle(size=11, color="secondary", space_after=1),
+    "med-source": TextStyle(size=9, color="secondary", space_after=1),
+    "src-title": TextStyle(size=9, bold=True, color="3D85C6", space_after=1),
+    "slide-foot-page": TextStyle(size=11, bold=True, color="8A9299", align="right"),
+    "med-comment-head": TextStyle(size=11, bold=True, color="primary", upper=True, space_after=5),
+    "med-col-head": TextStyle(size=12.5, bold=True, color="0F2E4C", upper=True, space_after=6),
+    "callout-title": TextStyle(size=13, bold=True, color="1B5E8C", space_after=2),
+    "callout-body": TextStyle(size=13, color="text"),
+    "med-chip": TextStyle(size=10.5, bold=True, color="secondary", upper=True, space_after=2),
+    "med-delta": TextStyle(size=16, bold=True, color="text", align="center"),
+    "med-stat-value": TextStyle(size=26, bold=True, color="primary", space_after=2),
+    "med-stat-label": TextStyle(size=12, color="secondary"),
+    "step-num": TextStyle(size=11, bold=True, color="FFFFFF", align="center", space_after=2),
+    "step-title": TextStyle(size=14, bold=True, color="text", space_after=2),
+    "med-case-chip": TextStyle(size=11.5, bold=True, color="0F2E4C", align="right"),
+    "med-thanks-title": TextStyle(size=36, bold=True, color="FFFFFF", space_after=4),
+    "med-thanks-sub": TextStyle(size=22, color="9BC1E4", space_after=6),
+    "med-contact": TextStyle(size=13, color="D3E2EE"),
+    "med-ack": TextStyle(size=11, color="8FA7BB"),
+    "num": TextStyle(size=20, bold=True, color="accent"),
+    "agenda-sub": TextStyle(size=12, color="secondary"),
+    "tl-step": TextStyle(size=12, color="secondary", align="center"),
+}
+
+_THEME_TAG_STYLES: dict[str, dict[str, TextStyle]] = {
+    # The medical charter runs on a bigger type scale than the software ones
+    # (18px bullets, 15px paragraphs) and states it through descendant
+    # selectors (``ul.med-list > li``) that :func:`_selector_classes` cannot
+    # index. Without these per theme tag defaults, a plain ``<li>`` would
+    # export at the generic 12pt and the deck would look nothing like the
+    # rendered slide.
+    "medical": {
+        "li": TextStyle(size=17, color="3A3A3A", space_after=3, line_spacing=1.4),
+        "p": TextStyle(size=15, color="3A3A3A", line_spacing=1.4),
+        "td": TextStyle(size=14, color="3A3A3A", space_after=0),
+        "th": TextStyle(size=12, bold=True, color="table_header_fg", upper=True, space_after=0),
+        "figcaption": TextStyle(size=11, color="secondary"),
+        "h2": TextStyle(size=20, bold=True, color="text", space_after=4),
+        "h3": TextStyle(size=15, bold=True, color="text", space_after=3),
+    },
+}
+"""Per theme overrides of :data:`_TAG_STYLES`, consulted before the defaults."""
+
 _CLASS_STYLES: dict[str, dict[str, TextStyle]] = {
     "ei": _EI_STYLES,
     "carbon": _CARBON_STYLES,
+    "medical": _MEDICAL_STYLES,
     "generic": {},
 }
 
@@ -465,22 +544,42 @@ _SELECTOR_REJECT = re.compile(r"[\[\]:>+~*@]")
 _RULE_RE = re.compile(r"([^{}]+)\{([^{}]*)\}")
 
 
-def _selector_classes(selector: str) -> list[str]:
-    """Return the class targeted by the last compound of a CSS selector.
+def _selector_target(selector: str) -> tuple[frozenset[str], frozenset[str]] | None:
+    """Return ``(scope classes, target classes)`` of a CSS selector, or ``None``.
 
-    Ancestor constraints are dropped on purpose: ``.card .name`` is indexed as
-    ``name``. The exporter only needs colors and typography, and slide
-    documents are small and internally consistent, so this approximation is
-    much cheaper than a real cascade. Ignored selectors: pseudo classes,
-    attribute filters, combinators, at-rules, and multi-class compounds such as
-    ``.notification.error`` whose declarations must not leak onto either class.
+    Three shapes are indexed:
+
+    * ``.name`` — an unscoped rule on a single class;
+    * ``.name.variant`` — a compound target: applied only to an element
+      carrying *every* class of the compound, so ``.cds-notification.error``
+      never paints a plain ``.cds-notification``;
+    * ``.a .b .name`` / ``.a.b .name`` — a descendant rule, whose ancestor
+      compounds become its scope. The caller applies it only when that scope is
+      active (see :attr:`StyleResolver.active_scope`), which is how a slide
+      level variant such as ``.slide.dark .med-caption`` reaches the right
+      elements instead of leaking onto every ``.med-caption`` of the deck.
+
+    Ignored: pseudo classes, attribute filters, child/sibling combinators,
+    at-rules and tag qualified compounds (``ul.med-list li``).
     """
     text = selector.strip()
     if not text or _SELECTOR_REJECT.search(text):
-        return []
-    last = text.split()[-1]
-    parts = [part for part in last.split(".")[1:] if part]
-    return parts if len(parts) == 1 else []
+        return None
+    compounds = text.split()
+    if not compounds[-1].startswith("."):
+        return None
+    target = {part for part in compounds[-1].split(".")[1:] if part}
+    if not target:
+        return None
+    scope: set[str] = set()
+    for compound in compounds[:-1]:
+        if not compound.startswith("."):
+            return None  # tag qualified ancestor (``ul.med-list li``): not indexed
+        names = [part for part in compound.split(".")[1:] if part]
+        if not names:
+            return None
+        scope.update(names)
+    return frozenset(scope), frozenset(target)
 
 
 @dataclass
@@ -494,25 +593,55 @@ class StyleResolver:
     theme: Theme
     css_vars: dict[str, str]
     class_props: dict[str, dict[str, str]]
+    scoped_props: dict[str, list[tuple[frozenset[str], frozenset[str], dict[str, str]]]] = field(default_factory=dict)
+    """Conditional rules by target class: ``(scope, required classes, props)``.
+
+    A rule lands here when it needs more than the target class alone: an
+    ancestor scope (``.slide.dark .med-caption``) or several classes on the
+    element itself (``.cds-notification.error``).
+    """
+
+    active_scope: frozenset[str] = frozenset()
+    """Classes of the slide currently exported (``slide dark`` and friends).
+
+    Set by the slide builder before it draws a slide; scoped rules whose scope
+    is a subset of it are merged on top of the unscoped ones.
+    """
 
     @classmethod
     def from_soup(cls, soup: BeautifulSoup) -> StyleResolver:
         """Build a resolver from the ``<style>`` blocks of a document."""
         class_props: dict[str, dict[str, str]] = {}
+        scoped_props: dict[str, list[tuple[frozenset[str], frozenset[str], dict[str, str]]]] = {}
         for selectors, body in _RULE_RE.findall(stylesheet_text(soup)):
             props = parse_declarations(body)
             if not props:
                 continue
             for selector in selectors.split(","):
-                for name in _selector_classes(selector):
-                    class_props.setdefault(name, {}).update(props)
-        return cls(detect_theme(soup), collect_css_vars(soup), class_props)
+                target = _selector_target(selector)
+                if target is None:
+                    continue
+                scope, required = target
+                if not scope and len(required) == 1:
+                    class_props.setdefault(next(iter(required)), {}).update(props)
+                    continue
+                for name in required:
+                    scoped_props.setdefault(name, []).append((scope, required, props))
+        return cls(detect_theme(soup), collect_css_vars(soup), class_props, scoped_props)
 
     def props(self, element: Tag) -> dict[str, str]:
         """Return the declarations that apply to an element."""
         merged: dict[str, str] = {}
+        own = frozenset(classes(element))
         for name in classes(element):
             merged.update(self.class_props.get(name, {}))
+        seen: set[int] = set()
+        for name in classes(element):
+            for scope, required, props in self.scoped_props.get(name, ()):
+                if id(props) in seen or not (required <= own and scope <= self.active_scope):
+                    continue
+                seen.add(id(props))
+                merged.update(props)
         merged.update(style_props(element))
         return merged
 
@@ -532,8 +661,16 @@ class StyleResolver:
             if name in table:
                 style = table[name]
                 break
-        if style is None and element.name in _TAG_STYLES:
-            style = _TAG_STYLES[element.name]
+        if style is None:
+            tags = _THEME_TAG_STYLES.get(self.theme.key, {})
+            style = tags.get(element.name) or _TAG_STYLES.get(element.name)
+            if style is not None and tags and inherited is not None and "color" not in self.props(element):
+                # Charters with their own tag scale (medical) state text colours
+                # on the container (``.med-list``, ``.med-comment``) and let CSS
+                # inheritance do the rest, including on a dark surface. Honour
+                # that inheritance instead of pinning the tag default, which
+                # would print near black text on a near black panel.
+                style = replace(style, color=inherited.color)
         if style is None:
             style = inherited if inherited is not None else TextStyle()
         return self.apply(style, self.props(element))

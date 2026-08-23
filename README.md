@@ -74,8 +74,9 @@ mcp-htmleditor --version      # or: curl localhost:7842/health
 ### Create from a template (recommended)
 
 ```bash
-mcp-htmleditor templates                          # list templates: ei, carbon, doc, doc-perso, doc-ei, mail, website
+mcp-htmleditor templates                          # list templates: ei, carbon, medical, doc, doc-perso, doc-ei, mail, website
 mcp-htmleditor new ei ma-presentation.html --serve # create + open editor
+mcp-htmleditor new medical talk.html --serve       # medical deck (congress, staff, teaching)
 ```
 
 ### Visual editor
@@ -98,7 +99,8 @@ Global options come before the subcommand: `-v` / `--verbose` raises the log lev
 Edit mode toggle (top-right "Édition"): in-place rich-text editing, format toolbar
 on selection (bold/italic/underline/strike, superscript/subscript, align, size,
 color), insert image (local file picker or drag-drop, embedded as base64), insert
-table, slide insert/delete (presentation mode) with a template-aware picker, and
+table, slide insert/delete (presentation mode) with a template-aware picker (5 layouts for
+the `carbon` and `ei` charters, 16 for `medical`), and
 document block insert before/after (document mode) via "＋ Bloc avant / Bloc après"
 pickers (title, subtitle, h1-h5, paragraph, table, list). Drag-and-drop editing:
 reorder top-level document blocks with a left-side grip handle (DOM order = visual
@@ -160,7 +162,7 @@ the union of the rows they declare. Diagrams with no `arch-row` (legacy, hand au
 The PPTX export writes one 16:9 slide (13.333 x 7.5 in) per element carrying
 `data-type="slide"`, with a fallback on `article.slide` for older templates. The
 navigation shell, `<script>` and `<style>` are never exported. It detects the
-charter of the document (Euro-Information, IBM Carbon, generic), draws the slide
+charter of the document (Euro-Information, IBM Carbon, medical, generic), draws the slide
 chrome (frames, footers, logo ring, header rule), then flows the content: text at
 the typographic scale of the template, tile grids, callouts, native tables with
 `colspan` / `rowspan` merges, real Gantt bars, diagram nodes as autoshapes with
@@ -227,6 +229,7 @@ templates/
 ├── bootstrap/                     starters copied by `new`
 │   ├── slides-ei-empty.html       key: ei        (Euro-Information)
 │   ├── slides-empty.html          key: carbon    (IBM Carbon)
+│   ├── slides-medical-empty.html  key: medical   (medical deck, single source of the charter CSS)
 │   ├── document-empty.html        key: doc       (Word-like document)
 │   ├── document-perso-empty.html  key: doc-perso (Perso charter, Arial)
 │   ├── document-ei-empty.html     key: doc-ei    (Euro-Information, Segoe UI)
@@ -237,6 +240,8 @@ templates/
     │   ├── euro-information.html   EI: title + agenda + content, embedded logos (CSS source of the `ei` bootstrap)
     │   ├── example-ei-complete.html EI: 9 slides, gantt, arch diagram, table, annotated image
     │   ├── ibm-carbon.html         IBM Carbon: 9 slides, all components
+    │   ├── medical.html            medical charter catalogue, one slide per `data-slide-type` (16)
+    │   ├── example-medical-complete.html medical: full talk, dark imaging slides, clinical case, bibliography
     │   ├── presentation-standard.html
     │   └── roadmap-one-pager.html
     ├── documents/
@@ -257,6 +262,17 @@ which keeps the reference as the single source of the EI charter CSS, trims the 
 the title slide, and copies the EI chevrons data URI onto `<html data-asset-chevrons>` so a
 slide inserted into a brand new file still gets its footer logo. Edit the reference, then
 run `make bootstrap-ei`; never patch the bootstrap directly.
+
+The `medical` charter works the other way round: `bootstrap/slides-medical-empty.html` is the
+single source of its CSS, and the two reference decks (`reference/slides/medical.html`,
+`reference/slides/example-medical-complete.html`) embed an exact copy so they open on their
+own. Edit the bootstrap `<style>`, then run `make sync-medical-css`. That charter targets
+medical presentations (congress, staff meeting, teaching, interventional pulmonology): teal
+`#159984` plus orange `#EE5A02`, Trebuchet MS / Arial, grey top band and two segment rule
+under the title, bibliographic source band in the footer, dark surface for imaging slides,
+and 16 insertable slide layouts (the other slide charters expose 5). Every third party image
+must carry a source line and every patient image must be anonymized: see
+`skill/types/medical.md`.
 
 ## HTML data-types
 
@@ -337,7 +353,7 @@ src/mcp_htmleditor/
 └── static/
     ├── editor.html      iframe shell + toolbar
     ├── editor.js        polling, rich-text, slide insert, doc-block insert, image embed, drag-reorder blocks + move arch-nodes
-    ├── slide-layouts.js per-template slide layouts (carbon / ei)
+    ├── slide-layouts.js per-template slide layouts (carbon / ei / medical)
     ├── doc-blocks.js    document block definitions (title, subtitle, h1-h5, paragraph, table, list)
     └── editor.css       toolbar, overlay, picker styles
 templates/          versioned templates (bootstrap + reference)
@@ -345,6 +361,8 @@ tests/              pytest suite (see .agent_docs/testing.md)
 tools/              maintenance scripts
                     gen_ei_bootstrap.py  regenerate the EI bootstrap from the EI reference
                     check_ei_insert.py   browser check of EI slide insertion (logo + numbering)
+                    sync_medical_css.py  propagate the medical charter CSS to the reference decks
+                    gen_medical_placeholders.py  synthetic placeholder images for the medical decks
 skill/              skill docs (served by `mcp-htmleditor skill`)
 dynamic-skills/     dynamic Pi skill + routing doc (installed to ~/.pi/agent/dynamic-skills)
 .agent_docs/        detailed docs for AI agents (python, makefile, architecture, ...)
