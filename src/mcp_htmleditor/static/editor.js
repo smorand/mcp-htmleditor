@@ -196,6 +196,7 @@ function onFrameLoad() {
     isWebsite      = docType === 'website';
     updateSlideActionsVisibility();
     updateDocActionsVisibility();
+    syncBrowserTabTitle(doc);
     if (editMode) injectEditMode(doc);
     injectContextMenus(doc);
     // A freshly loaded document (initial load, external agent write, or the
@@ -216,6 +217,24 @@ function onFrameLoad() {
   } catch (e) {
     console.warn('Could not access iframe content:', e);
   }
+}
+
+/**
+ * Reflect the edited document's own <title> in the browser tab, instead of
+ * the shell's hardcoded "HTML Editor" or the file name on disk. Falls back
+ * to the current file name when the document has no <title> (or an empty
+ * one), so the tab is never blank. Runs on every iframe load, so switching
+ * files (open_file) or an external agent rewrite keeps the tab in sync, and
+ * two files served on two different ports keep two distinct tab titles.
+ */
+function syncBrowserTabTitle(doc) {
+  const docTitle = (doc.title || '').trim();
+  if (docTitle) {
+    document.title = docTitle;
+    return;
+  }
+  const filename = (document.getElementById('toolbar-filename').textContent || '').trim();
+  document.title = filename || 'HTML Editor';
 }
 
 /* ============================================================
