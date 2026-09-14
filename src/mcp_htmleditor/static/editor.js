@@ -210,10 +210,12 @@ function onFrameLoad() {
     // as if a fresh unrelated document had been loaded.
     if (restoringFromUndo) {
       doc.addEventListener('keydown', handleUndoRedoKeydown);
+      doc.addEventListener('keydown', blockNavKeysInEditMode, true);
       return;
     }
     resetUndoStacks();
     doc.addEventListener('keydown', handleUndoRedoKeydown);
+    doc.addEventListener('keydown', blockNavKeysInEditMode, true);
   } catch (e) {
     console.warn('Could not access iframe content:', e);
   }
@@ -537,6 +539,21 @@ function resetUndoStacks() {
 /* ============================================================
    Edit mode toggle
    ============================================================ */
+/**
+ * Capture-phase keydown guard injected on the iframe's document.
+ * Blocks slide-navigation shortcuts (Space, arrows, Home, End, F) when the
+ * user is actively editing inside a contenteditable element so keystrokes
+ * reach the text instead of jumping slides. Works for all presentation files,
+ * including those created before the template-side guard was added.
+ */
+function blockNavKeysInEditMode(e) {
+  if (!editMode) return;
+  const ae = e.target;
+  if (!ae || !ae.isContentEditable) return;
+  const navKeys = new Set([' ', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'f', 'F']);
+  if (navKeys.has(e.key)) e.stopPropagation();
+}
+
 function applyEditMode() {
   try {
     const doc = frame.contentDocument;

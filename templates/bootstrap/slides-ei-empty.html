@@ -363,6 +363,8 @@
   function goToSlide(idx) { current = parseInt(idx, 10); render(); }
 
   document.addEventListener('keydown', e => {
+    const ae = document.activeElement;
+    if (ae && (ae.isContentEditable || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return;
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); navigate(1); }
     if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  navigate(-1);
     if (e.key === 'Home') goToSlide(0);
