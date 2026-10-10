@@ -193,6 +193,11 @@ a saved file never carries editor state. Add a new artifact to `_EDITOR_ARTIFACT
 `http_server.py` at the same time as you add it to `editor.js`, otherwise it leaks into
 the file the next agent reads.
 
+2026-10-10 (SPEC-0004): the client side save (`saveContent` in `editor.js`) strips these
+artifacts on a detached clone of the document and never mutates the live DOM. Removing
+`contenteditable` from the focused zone moves focus to `<body>` and drops the keystrokes
+typed after the save. A new client artifact must be stripped on the clone too.
+
 ## Undo / redo (structural mutations, `editor.js`)
 
 Ctrl+Z / Cmd+Z (undo) and Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y (redo) are active only in

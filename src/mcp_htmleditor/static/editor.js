@@ -1400,37 +1400,19 @@ async function saveContent() {
     const doc = frame.contentDocument;
     if (!doc) return;
 
-    // Temporarily strip editor artifacts before serialising
-    const editables = [...doc.querySelectorAll('[contenteditable]')];
-    const backup = editables.map(el => ({
-      el, ce: el.contentEditable,
-      outline: el.style.outline, cursor: el.style.cursor,
-    }));
-    editables.forEach(el => {
+    // Strip editor artifacts on a detached clone, never on the live DOM:
+    // removing contenteditable from the focused zone would move focus to
+    // <body> and drop the keystrokes typed after the save (SPEC-0004).
+    const clone = doc.documentElement.cloneNode(true);
+    clone.querySelectorAll('[contenteditable]').forEach(el => {
       el.removeAttribute('contenteditable');
       el.style.outline = ''; el.style.cursor = '';
     });
+    clone.querySelectorAll('#_mcp_format_bar, #_mcp_insert_bar').forEach(bar => { bar.style.display = 'none'; });
+    clone.querySelectorAll('._mcp_drag_handle, ._mcp_drop_indicator').forEach(node => node.remove());
+    clone.querySelectorAll('._mcp_drag_host').forEach(host => host.classList.remove('_mcp_drag_host'));
 
-    // Hide bars while serializing
-    const fb = doc.getElementById('_mcp_format_bar');
-    const ib = doc.getElementById('_mcp_insert_bar');
-    const fbDisplay = fb?.style.display; const ibDisplay = ib?.style.display;
-    if (fb) fb.style.display = 'none';
-    if (ib) ib.style.display = 'none';
-
-    // Detach drag artifacts (handles + drop indicator) so they never reach disk.
-    // They are re-injected right after serialization, keeping the live DOM intact.
-    const detachedDrag = detachDragArtifacts(doc);
-
-    const html = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
-
-    // Restore
-    backup.forEach(({ el, ce, outline, cursor }) => {
-      el.contentEditable = ce; el.style.outline = outline; el.style.cursor = cursor;
-    });
-    if (fb) fb.style.display = fbDisplay;
-    if (ib) ib.style.display = ibDisplay;
-    reattachDragArtifacts(detachedDrag);
+    const html = '<!DOCTYPE html>\n' + clone.outerHTML;
 
     selfSaving = true;
     await fetch('/content', {
