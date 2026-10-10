@@ -22,7 +22,7 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 | `tracing.py` | `configure_tracing()`, `trace_span()`, `JsonlSpanExporter` |
 | `version.py` | `__version__`, written at build time from the git tag |
 | `state.py` | `EditorState` singleton (current file, port, pid, poll interval, update flag) plus `.mcp_state.json` persistence next to the edited file |
-| `http_server.py` | `ThreadingHTTPServer`. Routes: `/`, `/static/*`, `/content` (GET raw, POST save), `/content-frame`, `/status` (polling), `/health` (status + version). Binds `HTMLEDITOR_HOST` (localhost by default, `0.0.0.0` in a container) |
+| `http_server.py` | `ThreadingHTTPServer`. Routes: `/`, `/static/*`, `/content` (GET raw, POST save), `/content-frame`, `/status` (polling), `/health` (status + version), `/export/pptx`, `/export/docx`, `POST /arch-layout`. Binds `HTMLEDITOR_HOST` (localhost by default, `0.0.0.0` in a container). Request gate (2026-10-10, SPEC-0005): every route but `/health` answers 403 unless the `Host` name is `localhost`, `127.0.0.1`, `[::1]` or the bind host (port ignored), and any `Origin` is exactly `http://<Host>`; no CORS headers are ever sent |
 | `mcp_server.py` | FastMCP, 6 tools, each traced as `mcp.<tool>` |
 | `cli.py` | click group with `-v/-q` and `--version`; subcommands `templates`, `new`, `serve`, `skill`, `mcp`, `export`. Subcommand imports are lazy on purpose to keep startup fast |
 | `templates.py` | Template registry (key to bootstrap file) and search path resolution |

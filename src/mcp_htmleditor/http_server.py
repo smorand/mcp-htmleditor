@@ -19,7 +19,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
@@ -80,18 +80,35 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         pass
 
     # ------------------------------------------------------------------
-    # CORS helper
+    # Request gate (SPEC-0005): own origin, loopback host names only
     # ------------------------------------------------------------------
 
-    def _send_cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+    def _refuse_untrusted_request(self) -> bool:
+        """Answer 403 and return True when the request comes from elsewhere.
+
+        Any page open in the user's browser can reach a loopback server, and
+        any DNS name can be rebound to 127.0.0.1: only requests addressed
+        through a trusted host name and, when they carry an Origin, coming
+        from that same origin are allowed through.
+        """
+        host = self.headers.get("Host", "")
+        host_name, host_port = _split_host(host)
+        if host_name not in _trusted_host_names(getattr(self.server, "bind_host", "")):
+            self._refuse("forbidden host", host)
+            return True
+        origin = self.headers.get("Origin")
+        if origin is not None and not _is_same_origin(origin, host_name, host_port):
+            self._refuse("forbidden origin", origin)
+            return True
+        return False
+
+    def _refuse(self, reason: str, value: str) -> None:
+        logger.warning("Refused %s %s: %s %r", self.command, urlparse(self.path).path, reason, value)
+        self._send_json({"error": reason}, status=403)
 
     def do_OPTIONS(self) -> None:
-        """Handle pre-flight CORS requests."""
+        """Handle pre-flight CORS requests (no CORS headers are granted)."""
         self.send_response(204)
-        self._send_cors_headers()
         self.end_headers()
 
     # ------------------------------------------------------------------
@@ -103,6 +120,12 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
+        if path == "/health":
+            self._send_json(health_payload())
+            return
+        if self._refuse_untrusted_request():
+            return
+
         if path in {"/", ""}:
             self._serve_editor_html()
         elif path.startswith("/static/"):
@@ -113,8 +136,6 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._serve_content_frame()
         elif path == "/status":
             self._serve_status()
-        elif path == "/health":
-            self._send_json(health_payload())
         elif path == "/export/pptx":
             self._export_pptx()
         elif path == "/export/docx":
@@ -131,6 +152,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         parsed = urlparse(self.path)
         path = parsed.path
 
+        if self._refuse_untrusted_request():
+            return
         if path == "/content":
             self._receive_content()
         elif path == "/arch-layout":
@@ -214,7 +237,6 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             )
             self.send_header("Content-Disposition", f'attachment; filename="{stem}.pptx"')
             self.send_header("Content-Length", str(len(data)))
-            self._send_cors_headers()
             self.end_headers()
             self.wfile.write(data)
         except Exception as exc:
@@ -243,7 +265,6 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             self.send_header("Content-Disposition", f'attachment; filename="{stem}.docx"')
             self.send_header("Content-Length", str(len(data)))
-            self._send_cors_headers()
             self.end_headers()
             self.wfile.write(data)
         except Exception as exc:
@@ -362,7 +383,6 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
         self._send_no_store_headers()
-        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(data)
 
@@ -371,7 +391,6 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
         self._send_no_store_headers()
-        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(data)
 
@@ -393,7 +412,6 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
-        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(data)
 
@@ -542,6 +560,46 @@ def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
 # Server lifecycle
 # ---------------------------------------------------------------------------
 
+LOOPBACK_HOST_NAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+# Wildcard bind addresses: compared against the bind host, never bound here.
+_WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})  # noqa: S104  # nosec B104
+
+
+class _EditorServer(ThreadingHTTPServer):
+    """HTTP server that remembers the host it was asked to bind (SPEC-0005 host gate)."""
+
+    def __init__(self, bind_host: str, port: int) -> None:
+        super().__init__((bind_host, port), _EditorHandler)
+        self.bind_host = bind_host
+
+
+def _split_host(host: str) -> tuple[str, int | None]:
+    """Return the lower cased name and the port of a ``Host`` header, ``("", None)`` if unparsable."""
+    try:
+        parts = urlsplit(f"//{host}")
+        return (parts.hostname or "", parts.port)
+    except ValueError:
+        return ("", None)
+
+
+def _trusted_host_names(bind_host: str) -> frozenset[str]:
+    """Loopback names, plus the bind host when it names one interface (not a wildcard)."""
+    extra = bind_host.strip("[]").lower()
+    if not extra or extra in _WILDCARD_HOSTS:
+        return LOOPBACK_HOST_NAMES
+    return LOOPBACK_HOST_NAMES | {extra}
+
+
+def _is_same_origin(origin: str, host_name: str, host_port: int | None) -> bool:
+    """True when ``origin`` is exactly ``http://`` plus the host the request was sent to."""
+    try:
+        parts = urlsplit(origin)
+        origin_port = parts.port
+    except ValueError:
+        return False
+    return parts.scheme == "http" and (parts.hostname or "") == host_name and (origin_port or 80) == (host_port or 80)
+
+
 _server_instance: ThreadingHTTPServer | None = None
 _server_thread: threading.Thread | None = None
 _server_lock = threading.Lock()
@@ -636,7 +694,7 @@ def start_http_server(
         state.save()
 
         try:
-            server = ThreadingHTTPServer((bind_host, resolved_port), _EditorHandler)
+            server = _EditorServer(bind_host, resolved_port)
         except OSError as exc:
             hint = (
                 "pass no --port to auto-pick a free one in "
