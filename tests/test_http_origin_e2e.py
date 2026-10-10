@@ -28,6 +28,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page
 
+from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
 
 MARKER = "ORIGINAL-MARKER"
@@ -335,3 +336,67 @@ def test_healthcheck_request_still_answered(served: Served) -> None:
     """BT-022."""
     with urllib.request.urlopen(f"http://127.0.0.1:{served.port}/health", timeout=5) as response:
         assert response.status == 200
+
+
+# --- US-0003: JSON only saves, refused preflight, editor non regression ------
+
+
+def test_non_json_save_refused_even_same_origin(served: Served) -> None:
+    """BT-014."""
+    before = served.path.read_bytes()
+    reply = _request(served, "POST", "/content", {"Content-Type": "text/plain"}, "<p>X</p>")
+    assert reply.status == 415
+    assert json.loads(reply.body) == {"error": "unsupported content type"}
+    assert served.path.read_bytes() == before
+
+    accepted = _request(
+        served,
+        "POST",
+        "/content",
+        {"Content-Type": "application/json; charset=utf-8"},
+        json.dumps({"html": "<!DOCTYPE html><html><body><p>X</p></body></html>"}),
+    )
+    assert accepted.status == 200
+    assert "<p>X</p>" in served.path.read_text(encoding="utf-8")
+
+
+def test_preflight_refused(served: Served) -> None:
+    """BT-015."""
+    reply = _request(
+        served,
+        "OPTIONS",
+        "/content",
+        {"Origin": EVIL_ORIGIN, "Access-Control-Request-Method": "POST"},
+    )
+    assert reply.status == 405
+    assert reply.headers.get("allow") == "GET, POST"
+    assert reply.body == ""
+    _assert_no_cors(reply)
+
+
+@pytest.fixture
+def served_deck(tmp_path: Path, reset_state: None) -> Iterator[Served]:
+    deck = templates_module.template_path("carbon").read_text(encoding="utf-8")
+    deck = deck.replace("de la présentation</h1>", f"de la présentation {MARKER}</h1>", 1)
+    yield from _serve(tmp_path, deck)
+
+
+@needs_chromium
+def test_browser_editor_still_saves_polls_exports(page: Page, served_deck: Served) -> None:
+    """BT-020."""
+    page.goto(f"http://{served_deck.host}/")
+    page.wait_for_function(
+        "() => { const d = document.getElementById('content-frame').contentDocument;"
+        " return d && d.querySelector('[data-editable~=\"text\"]'); }"
+    )
+    page.click("#edit-mode-btn")
+    page.wait_for_timeout(150)
+    page.frame_locator("#content-frame").locator('[data-editable~="text"]').first.click()
+    page.keyboard.press("End")
+    page.keyboard.type("AAA")
+    page.wait_for_timeout(1500)
+
+    assert "AAA" in served_deck.path.read_text(encoding="utf-8")
+    color = page.evaluate("() => getComputedStyle(document.getElementById('toolbar-status')).color")
+    assert color == "rgb(66, 190, 101)"
+    assert page.evaluate("() => fetch('/export/pptx').then(r => r.status)") == 200

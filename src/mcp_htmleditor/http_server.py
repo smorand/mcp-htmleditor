@@ -102,13 +102,15 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             return True
         return False
 
-    def _refuse(self, reason: str, value: str) -> None:
+    def _refuse(self, reason: str, value: str, status: int = 403) -> None:
         logger.warning("Refused %s %s: %s %r", self.command, urlparse(self.path).path, reason, value)
-        self._send_json({"error": reason}, status=403)
+        self._send_json({"error": reason}, status=status)
 
     def do_OPTIONS(self) -> None:
-        """Handle pre-flight CORS requests (no CORS headers are granted)."""
-        self.send_response(204)
+        """Refuse CORS preflights: no cross origin access is ever granted (SPEC-0005/BR-005)."""
+        self.send_response(405)
+        self.send_header("Allow", "GET, POST")
+        self.send_header("Content-Length", "0")
         self.end_headers()
 
     # ------------------------------------------------------------------
@@ -295,17 +297,18 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length)
 
+        # JSON only: a text/plain or form body is what a foreign page can send
+        # without a CORS preflight (SPEC-0005/BR-004).
         content_type = self.headers.get("Content-Type", "")
-
-        if "application/json" in content_type:
-            try:
-                data: dict[str, Any] = json.loads(body)
-                html: str = data.get("html", "")
-            except (json.JSONDecodeError, KeyError):
-                self._send_json({"error": "Invalid JSON body"}, status=400)
-                return
-        else:
-            html = body.decode("utf-8")
+        if content_type.split(";", 1)[0].strip().lower() != "application/json":
+            self._refuse("unsupported content type", content_type, status=415)
+            return
+        try:
+            data: dict[str, Any] = json.loads(body)
+            html: str = data.get("html", "")
+        except (json.JSONDecodeError, KeyError):
+            self._send_json({"error": "Invalid JSON body"}, status=400)
+            return
 
         # The editor sends the full document (DOCTYPE + html); strip ephemeral
         # editor artifacts before writing so the file stays clean for LLM agents.

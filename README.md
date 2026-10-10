@@ -314,6 +314,23 @@ Every variable is read through the `Settings` class (pydantic-settings,
 A malformed `HTMLEDITOR_PORT` or `HTMLEDITOR_POLL_INTERVAL` falls back to its default
 instead of aborting; a blank path variable means "unset", not the current directory.
 
+## Security model
+
+The preview server is for one local user. It has no authentication, so it only answers requests
+it can trust as coming from its own editor page:
+
+- the `Host` name must be `localhost`, `127.0.0.1`, `[::1]` or the host given with `--host` /
+  `HTMLEDITOR_HOST` (never `0.0.0.0`); any port is accepted, so a published container port such
+  as `-p 7999:7842` works;
+- a request carrying an `Origin` header must come from that same `http://<host>:<port>`;
+- no CORS header is ever sent, preflight `OPTIONS` answers `405`, and saves must be
+  `Content-Type: application/json`.
+
+Anything else answers `403 {"error": "forbidden host"}`, `403 {"error": "forbidden origin"}` or
+`415 {"error": "unsupported content type"}`, and is logged as a warning. `GET /health` stays open
+for health checks. Limitation: in a container bound to `0.0.0.0`, a client on the network that sets
+`Host: localhost` is not stopped; do not publish the port beyond the machine (tracked as BL-0019).
+
 ## Logs and tracing
 
 | File | Content |

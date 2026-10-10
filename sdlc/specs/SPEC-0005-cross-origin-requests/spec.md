@@ -5,7 +5,7 @@
 > Nature: BUG
 > Depth: M
 > Depth evidence: 1 module (preview HTTP server) plus container configuration; 9 HTTP routes in the sweep, 7 vulnerable; 8 requirements; public HTTP contract changes (403 and 415 answers, CORS headers removed); no data model change
-> Status: designed
+> Status: implemented
 > Verdict: no authority
 > Defect class: absent
 > Severity: High
