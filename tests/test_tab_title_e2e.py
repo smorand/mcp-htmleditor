@@ -50,8 +50,8 @@ def _write_doc(path: Path, title: str, heading: str) -> Path:
     path.write_text(
         "<!DOCTYPE html>\n"
         '<html lang="fr" data-doc-type="document">\n'
-        "<head><meta charset=\"UTF-8\"><title>" + title + "</title></head>\n"
-        "<body><article data-type=\"document\">"
+        '<head><meta charset="UTF-8"><title>' + title + "</title></head>\n"
+        '<body><article data-type="document">'
         '<h1 data-editable="text">' + heading + "</h1></article></body>\n"
         "</html>\n",
         encoding="utf-8",
@@ -129,8 +129,8 @@ def test_tab_title_falls_back_to_filename_when_document_has_no_title(page: Page,
     edited document has no <title> at all."""
     doc = tmp_path / "sans-titre.html"
     doc.write_text(
-        "<!DOCTYPE html>\n<html data-doc-type=\"document\"><head><meta charset=\"UTF-8\"></head>"
-        "<body><article data-type=\"document\"><p data-editable=\"text\">Sans titre</p></article></body></html>\n",
+        '<!DOCTYPE html>\n<html data-doc-type="document"><head><meta charset="UTF-8"></head>'
+        '<body><article data-type="document"><p data-editable="text">Sans titre</p></article></body></html>\n',
         encoding="utf-8",
     )
     _port, base_url = _serve(doc)
