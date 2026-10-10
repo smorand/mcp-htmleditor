@@ -103,11 +103,15 @@ Casing: header names as sent on the wire (`Origin`, `Host`), JSON keys lowercase
 - **Exact names:** status `403`, `Content-Type: application/json`, body `{"error": "forbidden origin"}`.
 
 #### BR-002 [EARS-O]: Foreign host names refused
-> IF a request to a protected route carries a `Host` header whose name is not `localhost`, `127.0.0.1`, `[::1]` or the configured `HTMLEDITOR_HOST`, or whose port is not the bound port, THEN THE preview server SHALL answer `403` with body `{"error": "forbidden host"}` and SHALL NOT run the route.
+> IF a request to a protected route carries a `Host` header whose name is not `localhost`, `127.0.0.1`, `[::1]` or the configured `HTMLEDITOR_HOST` THEN THE preview server SHALL answer `403` with body `{"error": "forbidden host"}` and SHALL NOT run the route.
 
 - **Source:** decided here: user answer "go" to question 2.
 - **Business Rules:** `HTMLEDITOR_HOST` counts only when it is not `0.0.0.0` and not `::`. A missing
-  `Host` header is refused. BR-002 is evaluated before BR-001.
+  `Host` header is refused. The port part of `Host` is not checked: any port, or none, is
+  accepted, so a published container port (`-p 7999:7842`) keeps working. BR-002 is evaluated
+  before BR-001.
+- **Amended:** 2026-10-10, port clause removed (user answer "go" to design issue
+  `design-issues.md` 2026-10-10).
 - **Exact names:** status `403`, body `{"error": "forbidden host"}`, setting `HTMLEDITOR_HOST`.
 
 #### BR-003 [EARS-UB]: No cross origin read permission
@@ -155,10 +159,11 @@ Casing: header names as sent on the wire (`Origin`, `Host`), JSON keys lowercase
 | no `Origin`, `Host: 127.0.0.1:<port>` (curl, CLI) | served | BR-001, BR-002 |
 | `Host: LOCALHOST:<port>` | served (host name case insensitive) | BR-002 |
 | `Host: attacker.example:<port>` | 403 forbidden host | BR-002 |
-| `Host: 127.0.0.1` with no port, server on 7842 | 403 forbidden host | BR-002 |
+| `Host: 127.0.0.1` with no port, server on 7842 | served (port not checked) | BR-002 |
+| `Host: 127.0.0.1:Q`, Q not the bound port | served (port not checked) | BR-002 |
 | `Content-Type: application/json; charset=utf-8` on save | accepted | BR-004 |
 | `GET /health` with `Origin: https://evil.example` | 200, current body | BR-006 |
-| container: `HTMLEDITOR_HOST=0.0.0.0`, browser on host opens `http://localhost:7999/` | served (`Host: localhost:7999` is a loopback name; port check uses the port in the URL the user typed) | BR-002, BL-0019 |
+| container: `HTMLEDITOR_HOST=0.0.0.0`, browser on host opens `http://localhost:7999/` | served (`Host: localhost:7999` is a loopback name; the port is not checked) | BR-002, BL-0019 |
 
 ## 4. Tests
 
@@ -234,10 +239,10 @@ explicit headers, except BT-005 (browser).
 - When `GET /content` with `Host: 127.0.0.1:P` and, in turn, `Origin: http://localhost:P`, `Origin: http://127.0.0.1:Q`, `Origin: null`
 - Then each answers `403 {"error": "forbidden origin"}`
 
-#### BT-012: Wrong port or missing port in Host refused
+#### BT-012: Host port is not checked
 - **Validates:** BR-002
-- When `GET /content` with `Host: 127.0.0.1:Q` (Q not P), then `Host: 127.0.0.1`
-- Then each answers `403 {"error": "forbidden host"}`
+- When `GET /content` with `Host: 127.0.0.1:Q` (Q not P), then `Host: 127.0.0.1`, then `Host: localhost:7999`, each with no `Origin`
+- Then each answers `200` and the body contains `ORIGINAL-SECRET`
 
 #### BT-013: No CORS headers on any response
 - **Validates:** BR-003
@@ -318,7 +323,7 @@ explicit headers, except BT-005 (browser).
 | 1 | No technical decision | PASS: root cause lines only; no mechanism chosen |
 | 2 | No buried requirement | PASS: 405 preflight, logging, health each have their own BR |
 | 3 | Names spelled | PASS: statuses, JSON bodies, headers, `HTMLEDITOR_HOST`, routes, logger name |
-| 4 | No forced choice | PASS: missing Origin, missing Host, null, case, port, charset, check order stated |
+| 4 | No forced choice | PASS: missing Origin, missing Host, null, case, port (not checked, amended 2026-10-10), charset, check order stated |
 | 5 | Tests specified | PASS: BT-001 to BT-007, BT-010 to BT-017, BT-020 to BT-022 with exact values; 4.4 lists every HTTP test file |
 | 6 | Reproduction end to end | PASS: BT-001 drives a real cross origin page, asserts the file on disk |
 | 7ante | Security classification | PASS: `Security: internal finding` |
