@@ -129,7 +129,7 @@ to a picture or measures layout for the agent.
 > WHEN a user passes `--report` THE Editor SHALL also print the layout problems of the rendered slide, then a final line, and exit with status 1 when at least one problem is found.
 
 - **Business rules:** a problem line is `<kind> <slide>: <message>`. Kinds and messages:
-  - `overflow`: the scroll height of the slide element, rounded to the nearest pixel, is greater than 540: `content is 612px tall, the slide is 540px` (that rounded value).
+  - `overflow`: the content height of the slide, rounded to the nearest pixel, is greater than 540: `content is 612px tall, the slide is 540px` (that rounded value). The content height is the largest of the scroll height of the slide element and, for every rendered descendant of the slide (not `display:none`) whose computed `overflow-y` is `hidden`, `clip` or `auto`, the unrounded distance from the top of the slide to the top of that descendant (difference of their bounding box tops) plus its scroll height; the value is rounded once, at the end; this makes content cut off by a slide body count, not only content cut off by the slide itself.
   - `clipped`: a rendered element (not `display:none`, not of zero size) inside the slide, which is not a descendant of an element already reported, has a box beyond the frame by more than 1 pixel on the left, right or top, or on the bottom when the slide does not already report `overflow`; at most one line per element: `<selector> is outside the slide frame`, the selector being the lower case tag name followed by `.` and each class in attribute order joined by `.` (the tag alone when there is no class), for example `span.slide-foot-page`.
   - `font`: for a font family list used by text of the slide, none of its non generic families is installed on this machine (`sans-serif`, `serif`, `monospace`, `system-ui` are ignored): `"NoSuchFont" is not available, fallback used`, naming the first non generic family; one line per name per slide.
   - `script`: an uncaught script error, written `<name>: <message>` (for example `Error: boom`); an error raised while the page loads is reported once per run with the slide `-`; an error raised while a slide is displayed is reported with that slide's id.
@@ -294,6 +294,8 @@ Coverage: happy 6, failure 15, edge 6, side effect 2 (29 tests). Happy to failur
 - **Given** DECK-EI where the body of `slide-4` holds a block with the style `height:700px`
 - **When** the user runs `render DECK-EI --report-only`
 - **Then** the output holds one line `overflow slide-4: content is <N>px tall, the slide is 540px` where `<N>` is an integer of at least 700, then `report: 1 problem`; no `clipped` line appears; the exit status is 1
+- **And** the block of `height:700px` placed instead as a direct child of the slide element, after the inner frame, not absolutely positioned, gives the same line with `<N>` at least 700
+- **And** `slide-4` whose body content is replaced by `<div style="height:300px"></div>` gives no `overflow` line
 - **And** the file DECK-EI is byte for byte unchanged
 - **Priority:** Critical
 
@@ -431,6 +433,7 @@ None.
 |---|---|---|---|
 | 1 | 9 | 3 | NOT-IMPLEMENTABLE |
 | 2 | 4 | 3 | final line IMPLEMENTABLE although F findings were listed; all amended, no round 3 (cap) |
+| 3 | 4 | 0 | IMPLEMENTABLE after amendment 2026-11-03 (FR-NEW-003 `overflow` content height, from design ISSUE-001) |
 
 **Amendments applied:** all F findings of rounds 1 and 2. **Concern:** the round 2 verdict line contradicted its own F list; the amendments were not re audited.
 **No implementation detail outside Section 14:** PASS
