@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: S
 > Depth evidence: one observable behavior (a freshness check), one area (build tooling), no public contract change, no persisted data change
-> Status: draft
+> Status: specified
 > Generated on: 2026-11-03
 > Project: existing
 > From backlog: n/a
