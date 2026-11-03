@@ -111,15 +111,23 @@ _PATH_FIELDS = (
 def get_status() -> dict[str, Any]:
     state = get_state()
     with trace_span("mcp.get_status", {"server.running": is_server_running()}):
-        return {"file": state.current_file, "port": state.port, "pid": state.server_pid,
-                "update_in_progress": state.update_in_progress, "mtime": state.get_mtime(),
-                "running": is_server_running()}
+        return {
+            "file": state.current_file,
+            "port": state.port,
+            "pid": state.server_pid,
+            "update_in_progress": state.update_in_progress,
+            "mtime": state.get_mtime(),
+            "running": is_server_running(),
+        }
 ```
 - Status payload (`src/mcp_htmleditor/http_server.py`, `_serve_status`), literal:
 ```python
 payload: dict[str, Any] = {
-    "mtime": state.get_mtime(), "update_in_progress": state.update_in_progress,
-    "filename": state.current_file, "poll_interval": state.poll_interval, "port": state.port,
+    "mtime": state.get_mtime(),
+    "update_in_progress": state.update_in_progress,
+    "filename": state.current_file,
+    "poll_interval": state.poll_interval,
+    "port": state.port,
 }
 self._send_json(payload)
 ```

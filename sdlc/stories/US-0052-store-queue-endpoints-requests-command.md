@@ -62,22 +62,46 @@ Rules of `queue` in order: `is_blank(instruction)` gives `Write a request first`
 ```python
 # request_store.py (new)
 @dataclass(frozen=True, slots=True)
-class Request: id: str; slide: str | None; title: str; queued: str; instruction: str; status: str; reason: str | None
+class Request:
+    id: str
+    slide: str | None
+    title: str
+    queued: str
+    instruction: str
+    status: str
+    reason: str | None
+
+
 @dataclass(frozen=True, slots=True)
-class Suggestion: id: str; slide: str | None; title: str; why: str; change: str; applied: bool
+class Suggestion:
+    id: str
+    slide: str | None
+    title: str
+    why: str
+    change: str
+    applied: bool
+
+
 @dataclass(slots=True)
-class Record: next_id: int = 1; revision: int = 0; requests: list[Request] = field(default_factory=list); review: list[Suggestion] | None = None
+class Record:
+    next_id: int = 1
+    revision: int = 0
+    requests: list[Request] = field(default_factory=list)
+    review: list[Suggestion] | None = None
+
 
 class RequestStore:
     def __init__(self, state_dir: Path) -> None: ...
-    def record_dir(self, file: Path) -> Path: ...    # <state_dir>/files/<key>/requests
-    def read(self, file: Path) -> Record: ...        # lock free, empty Record when absent
-    def update[T](self, file: Path, operation: str, change: Callable[[Record], T]) -> T: ...
+    def record_dir(self, file: Path) -> Path: ...  # <state_dir>/files/<key>/requests
+    def read(self, file: Path) -> Record: ...  # lock free, empty Record when absent
+    def update[T](self, file: Path, operation: str, change: Callable[[Record], T]) -> T:
+        ...
         # mkdir(mode=0o700, parents=True, exist_ok=True); flock EX on record.lock; read; change(record);
         # if the serialized form changed: revision += 1 and atomic_write(record.json, bytes) (fileio, no reason);
         # JSON written with ensure_ascii=False, UTF 8; span "requests.update" (record path and operation name, never the text);
         # any exception from change() writes nothing
-    def revision(self, file: Path) -> int: ...       # 0 when absent or unreadable (logs a warning), used by /status
+
+    def revision(self, file: Path) -> int: ...  # 0 when absent or unreadable (logs a warning), used by /status
 ```
 
 ```python

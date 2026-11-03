@@ -43,7 +43,7 @@ one empty line; `--type foo` writes the unknown topic message on stderr, exit 2,
 @dataclass(frozen=True, slots=True)
 class Topic:
     name: str
-    description: str    # exact text of the index table below
+    description: str  # exact text of the index table below
 ```
 No persistent data.
 

@@ -110,20 +110,44 @@ Rejected (DEC-002): rename is atomic but two writers can both pass the compare b
 ```python
 # request_store.py
 @dataclass(frozen=True, slots=True)
-class Request: id: str; slide: str | None; title: str; queued: str; instruction: str; status: str; reason: str | None
+class Request:
+    id: str
+    slide: str | None
+    title: str
+    queued: str
+    instruction: str
+    status: str
+    reason: str | None
+
+
 @dataclass(frozen=True, slots=True)
-class Suggestion: id: str; slide: str | None; title: str; why: str; change: str; applied: bool
+class Suggestion:
+    id: str
+    slide: str | None
+    title: str
+    why: str
+    change: str
+    applied: bool
+
+
 @dataclass(slots=True)
-class Record: next_id: int = 1; revision: int = 0; requests: list[Request] = field(default_factory=list); review: list[Suggestion] | None = None
+class Record:
+    next_id: int = 1
+    revision: int = 0
+    requests: list[Request] = field(default_factory=list)
+    review: list[Suggestion] | None = None
+
 
 class RequestStore:
     def __init__(self, state_dir: Path) -> None: ...
-    def record_dir(self, file: Path) -> Path: ...                       # <state_dir>/files/<key>/requests
-    def read(self, file: Path) -> Record: ...                          # lock free, empty Record when absent
-    def update[T](self, file: Path, operation: str, change: Callable[[Record], T]) -> T: ...
+    def record_dir(self, file: Path) -> Path: ...  # <state_dir>/files/<key>/requests
+    def read(self, file: Path) -> Record: ...  # lock free, empty Record when absent
+    def update[T](self, file: Path, operation: str, change: Callable[[Record], T]) -> T:
+        ...
         # mkdir parents, flock EX on record.lock, read, change(record), if serialized form changed:
         # revision += 1, atomic_write(record.json), traced "requests.update"; any exception from change() => nothing written
-    def revision(self, file: Path) -> int: ...                         # 0 when absent or unreadable (logs a warning), used by /status
+
+    def revision(self, file: Path) -> int: ...  # 0 when absent or unreadable (logs a warning), used by /status
 ```
 
 ```python
@@ -162,11 +186,13 @@ Rules, in the order the spec fixes them:
 ```python
 # mcp_server.py (tools, each: trace_span("mcp.<name>", {"file.path": abs}); except RequestError as exc: raise ToolError(exc.message) from exc)
 @mcp.tool()
-def list_requests(file: str) -> dict[str, Any]: ...        # {"file": abs, "requests": [request_to_dict, ...]}
+def list_requests(file: str) -> dict[str, Any]: ...  # {"file": abs, "requests": [request_to_dict, ...]}
 @mcp.tool()
-def complete_request(file: str, id: str, status: str, reason: str | None = None) -> dict[str, Any]: ...   # {"ok": True, "id", "status"}
+def complete_request(
+    file: str, id: str, status: str, reason: str | None = None
+) -> dict[str, Any]: ...  # {"ok": True, "id", "status"}
 @mcp.tool()
-def write_review(file: str, suggestions: list[Any]) -> dict[str, Any]: ...   # {"ok": True, "count": n}
+def write_review(file: str, suggestions: list[Any]) -> dict[str, Any]: ...  # {"ok": True, "count": n}
 ```
 
 `status` is `str`, not `Literal`, and `suggestions` is `list[Any]`, so the product messages win over a schema validation error (DEC-006). The `file` of `list_requests` is `str(Path(file).resolve())`.

@@ -39,17 +39,18 @@ the bytes counted equal `len(CliRunner.invoke(skill --type gantt).stdout_bytes)`
 ### Data model
 ```python
 @dataclass(frozen=True, slots=True)
-class AuditItem:           # skill_audit.py
-    name: str              # "core" or the topic name
+class AuditItem:  # skill_audit.py
+    name: str  # "core" or the topic name
     size_bytes: int | None
-    tokens: int | None     # ceil(size_bytes / 4)
-    budget: int            # 7000 or 8000
-    status: str            # "OK" | "OVER" | "MISSING"
+    tokens: int | None  # ceil(size_bytes / 4)
+    budget: int  # 7000 or 8000
+    status: str  # "OK" | "OVER" | "MISSING"
+
 
 @dataclass(frozen=True, slots=True)
 class AuditReport:
     items: tuple[AuditItem, ...]
-    problems: tuple[str, ...]      # text after "PROBLEM "
+    problems: tuple[str, ...]  # text after "PROBLEM "
     # verdict "OK" when no problem else "FAIL"; exit status 0 / 1
 ```
 

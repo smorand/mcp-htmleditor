@@ -129,22 +129,24 @@ No persistent data. Value objects (frozen, `slots=True`):
 
 ```python
 @dataclass(frozen=True, slots=True)
-class Topic:            # skill_content.py
+class Topic:  # skill_content.py
     name: str
-    description: str    # exact text of the spec's index table
+    description: str  # exact text of the spec's index table
+
 
 @dataclass(frozen=True, slots=True)
-class AuditItem:        # skill_audit.py
-    name: str           # "core" or the topic name
+class AuditItem:  # skill_audit.py
+    name: str  # "core" or the topic name
     size_bytes: int | None
     tokens: int | None  # ceil(size_bytes / 4)
-    budget: int         # 7000 or 8000
-    status: str         # "OK" | "OVER" | "MISSING"
+    budget: int  # 7000 or 8000
+    status: str  # "OK" | "OVER" | "MISSING"
+
 
 @dataclass(frozen=True, slots=True)
 class AuditReport:
     items: tuple[AuditItem, ...]
-    problems: tuple[str, ...]      # text after "PROBLEM "
+    problems: tuple[str, ...]  # text after "PROBLEM "
     # verdict "OK" when no problem else "FAIL"; exit status 0 / 1
 ```
 
@@ -173,6 +175,7 @@ for the skill text" (3.2) stays true because they are documented as such and not
 @click.option("--type", "topic", default=None, help="Print one topic instead of the core.")
 @click.option("--all", "show_all", is_flag=True, help="Print the core then every topic.")
 def skill_cmd(topic: str | None, show_all: bool) -> None: ...
+
 
 @main.command("skill-audit")
 @click.option("--json", "as_json", is_flag=True, help="Machine readable report.")
