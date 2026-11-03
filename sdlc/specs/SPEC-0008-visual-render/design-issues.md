@@ -36,3 +36,5 @@ offset from the slide top plus its scroll height; `overflow` is reported when th
 pixel, is greater than 540, and the message shows that value". For the measured case this gives the body offset plus 1010,
 which is more than 1010 and so at least 700. The `clipped` rule keeps its text ("when the slide does not already report `overflow`").
 Default if no answer: none; the design waits for the amended text.
+
+Resolved 2026-11-03 by the amendment of FR-NEW-003 (spec commit on main).

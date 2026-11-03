@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: L
 > Depth evidence: a browser rendering capability, 2 surfaces (command line, agent tool), new install step, more than 10 requirements
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-03
 > Project: existing
 > From backlog: n/a

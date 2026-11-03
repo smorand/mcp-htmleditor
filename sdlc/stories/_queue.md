@@ -59,3 +59,11 @@
 | US-0057 | SPEC-0010 | write and read the ai review (tool and command) | US-0053 | 2 | todo | | |
 | US-0058 | SPEC-0010 | show the ai suggestions and apply one | US-0056, US-0057 | 2 | todo | | |
 | US-0059 | SPEC-0010 | documentation and no file next to the user's file | US-0058 | 2 | todo | | |
+| US-0060 | SPEC-0008 | optional render extra, install-browser and fixtures | US-0059 | 2 | todo | | |
+| US-0061 | SPEC-0008 | render the first slide to a picture | US-0060, US-0035, US-0038 | 2 | todo | | |
+| US-0062 | SPEC-0008 | choose a slide and a scale | US-0061 | 2 | todo | | |
+| US-0063 | SPEC-0008 | layout report for one slide | US-0062 | 2 | todo | | |
+| US-0064 | SPEC-0008 | report only across the deck | US-0063 | 2 | todo | | |
+| US-0065 | SPEC-0008 | font, script and image problems | US-0064 | 2 | todo | | |
+| US-0066 | SPEC-0008 | json output and the render tool | US-0065, US-0024, US-0025, US-0037, US-0047 | 2 | todo | | |
+| US-0067 | SPEC-0008 | large decks and documentation | US-0066 | 2 | todo | | |
