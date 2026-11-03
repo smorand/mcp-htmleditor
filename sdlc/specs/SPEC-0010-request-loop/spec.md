@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: M
 > Depth evidence: 3 areas (editor panel, agent tools, stored requests), one new persisted concept (request), about 9 requirements
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-03
 > Project: existing
 > From backlog: n/a

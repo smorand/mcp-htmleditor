@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: L
 > Depth evidence: 4 areas touched (skill text, command line, agent tool surface, installed routing skill), a new audit command, more than 10 anticipated requirements
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-03
 > Project: existing
 > From backlog: n/a

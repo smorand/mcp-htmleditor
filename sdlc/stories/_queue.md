@@ -3,3 +3,59 @@
 | US-0001 | SPEC-0004 | autosave serializes a clone and never moves focus | main | 2 | landed | story/US-0001-autosave-serializes-a-clone | 50969dedefa9c2b0ef43acdc43669d60d02eb27b |
 | US-0002 | SPEC-0005 | refuse foreign origins and host names, drop cors | main | 2 | landed | story/US-0002-refuse-foreign-origins-and-hosts | da1681aa86218fc2f8d94b115ea7a25a37900bb7 |
 | US-0003 | SPEC-0005 | json only saves, refused preflight, editor non regression | US-0002 | 2 | landed | story/US-0003-json-only-saves-and-refused-preflight | cbf109a283ff53c5b8bc4250fb1bb9d44608250b |
+| US-0004 | SPEC-0011 | `--check` mode for both generators | main | 2 | todo | | |
+| US-0005 | SPEC-0011 | `make check-generated` in the quality gate and docs | US-0004 | 2 | todo | | |
+| US-0006 | SPEC-0012 | record golden slide xml hashes and detector table | US-0005 | 2 | todo | | |
+| US-0007 | SPEC-0012 | charter registry, templates and detectors read it | US-0006 | 2 | todo | | |
+| US-0008 | SPEC-0012 | pptx_model.py with types, constants, base class | US-0007 | 2 | todo | | |
+| US-0009 | SPEC-0012 | extract text and primitives mixin | US-0008 | 2 | todo | | |
+| US-0010 | SPEC-0012 | extract images and arch mixins | US-0009 | 2 | todo | | |
+| US-0011 | SPEC-0012 | extract gantt and blocks mixins | US-0010 | 2 | todo | | |
+| US-0012 | SPEC-0012 | extract flow and chrome mixins | US-0011 | 2 | todo | | |
+| US-0013 | SPEC-0012 | extract node and block drag script | US-0012 | 2 | todo | | |
+| US-0014 | SPEC-0012 | extract blocks and slides scripts | US-0013 | 2 | todo | | |
+| US-0015 | SPEC-0012 | extract save and menus scripts | US-0014 | 2 | todo | | |
+| US-0016 | SPEC-0012 | extract format and edit scripts | US-0015 | 2 | todo | | |
+| US-0017 | SPEC-0012 | extract undo script, order and serving tests | US-0016 | 2 | todo | | |
+| US-0018 | SPEC-0012 | fix skill documents naming moved methods | US-0012 | 2 | todo | | |
+| US-0019 | SPEC-0012 | update readme, agents and agent docs | US-0017, US-0018 | 2 | todo | | |
+| US-0020 | SPEC-0012 | size caps, remaining mentions, full gate | US-0019 | 2 | todo | | |
+| US-0021 | SPEC-0006 | topic engine and `skill --type/--all` | US-0020 | 2 | todo | | |
+| US-0022 | SPEC-0006 | `get_skill` tool and checklist fallback | US-0021 | 2 | todo | | |
+| US-0023 | SPEC-0006 | `skill-audit` sizes, budgets, missing items, json | US-0022 | 2 | todo | | |
+| US-0024 | SPEC-0006 | audit tool list check and stale statement check | US-0023 | 2 | todo | | |
+| US-0025 | SPEC-0006 | core text, routing skill, shipped content gates | US-0024 | 2 | todo | | |
+| US-0026 | SPEC-0006 | topics slides-carbon and slides-ei | US-0025 | 2 | todo | | |
+| US-0027 | SPEC-0006 | topics medical and medical-sources | US-0025 | 2 | todo | | |
+| US-0028 | SPEC-0006 | topics create and export | US-0025 | 2 | todo | | |
+| US-0029 | SPEC-0006 | topics document and mail | US-0025 | 2 | todo | | |
+| US-0030 | SPEC-0006 | topics website and tables | US-0025 | 2 | todo | | |
+| US-0031 | SPEC-0006 | topics gantt and annotated-image | US-0025 | 2 | todo | | |
+| US-0032 | SPEC-0006 | topics arch-diagram and templates | US-0025 | 2 | todo | | |
+| US-0033 | SPEC-0006 | topic arch-qa and the cut shipped checklist | US-0025 | 2 | todo | | |
+| US-0034 | SPEC-0006 | clean real audit, all 15 topics enforced, documentation | US-0026, US-0027, US-0028, US-0029, US-0030, US-0031, US-0032, US-0033 | 2 | todo | | |
+| US-0035 | SPEC-0007 | `outline` on the command line | US-0034 | 2 | todo | | |
+| US-0036 | SPEC-0007 | `get-slide` on the command line and the scanner | US-0035 | 2 | todo | | |
+| US-0037 | SPEC-0007 | `outline` and `get_slide` tools | US-0036, US-0025 | 2 | todo | | |
+| US-0038 | SPEC-0007 | `patch` with `set_text`, atomic write, path guard | US-0036 | 2 | todo | | |
+| US-0039 | SPEC-0007 | `delete_slide`, renumbering, dry run | US-0038 | 2 | todo | | |
+| US-0040 | SPEC-0007 | `insert_slide`, `move_slide`, `replace_slide` | US-0039 | 2 | todo | | |
+| US-0041 | SPEC-0007 | `patch` tool and editor flag | US-0040, US-0025 | 2 | todo | | |
+| US-0042 | SPEC-0007 | `lint` command and structure rules | US-0038 | 2 | todo | | |
+| US-0043 | SPEC-0007 | charter rules l007 to l011 | US-0042 | 2 | todo | | |
+| US-0044 | SPEC-0007 | lint problems in `outline` and `patch` | US-0040, US-0043 | 2 | todo | | |
+| US-0045 | SPEC-0007 | template, new and export services on the command line | US-0034 | 2 | todo | | |
+| US-0046 | SPEC-0007 | `lint`, `list_templates`, `new_file`, `export` tools | US-0043, US-0045, US-0041, US-0025 | 2 | todo | | |
+| US-0047 | SPEC-0009 | state per file in the state directory, expiring update flag | US-0046 | 3 | todo | | |
+| US-0048 | SPEC-0009 | atomic, guarded, conflict aware browser save (server side) | US-0047, US-0038 | 2 | todo | | |
+| US-0049 | SPEC-0009 | conflict choice, save failures and server loss in the editor | US-0048, US-0017 | 2 | todo | | |
+| US-0050 | SPEC-0009 | history snapshots, `history` and `restore` commands | US-0048, US-0049 | 2 | todo | | |
+| US-0051 | SPEC-0009 | `history` and `restore` tools, patch snapshots, docs and deployment | US-0050, US-0025, US-0041 | 2 | todo | | |
+| US-0052 | SPEC-0010 | store, queue endpoints and the requests command | US-0051 | 2 | todo | | |
+| US-0053 | SPEC-0010 | agent lists and completes requests (tools) | US-0052 | 2 | todo | | |
+| US-0054 | SPEC-0010 | complete from the command line and the apply workflow | US-0053, US-0025, US-0028 | 2 | todo | | |
+| US-0055 | SPEC-0010 | ask ai panel and the requests side list | US-0053, US-0017 | 2 | todo | | |
+| US-0056 | SPEC-0010 | live refresh of the side list | US-0055 | 2 | todo | | |
+| US-0057 | SPEC-0010 | write and read the ai review (tool and command) | US-0053 | 2 | todo | | |
+| US-0058 | SPEC-0010 | show the ai suggestions and apply one | US-0056, US-0057 | 2 | todo | | |
+| US-0059 | SPEC-0010 | documentation and no file next to the user's file | US-0058 | 2 | todo | | |

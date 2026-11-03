@@ -4,7 +4,7 @@
 > Nature: DEBT
 > Depth: M
 > Depth evidence: 4 modules plus one script touched, about 70 non source occurrences, no public contract change
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-03
 > Behavior change: none
 > From backlog: n/a
@@ -200,3 +200,88 @@ The existing test suite passes **unmodified**:
 | 2 | 3 | 3 | NOT-IMPLEMENTABLE (amended after; cap of two rounds reached) |
 
 **Amendments applied:** all F findings of rounds 1 and 2. Concern (user waiver, 2026-11-03): the two round cap was reached with F findings amended but not re audited.
+
+## Design additions (2026-11-03)
+
+**Validation result:** designed, no spec issue. Checked: DEC-001..003 each name their DR (and DEC-003 DT-002); DR-001..010 are all implemented by a DEC or are mechanical (DR-002, 003, 005, 007, 008, 009, 010); the success criterion (`make test`, 278 tests unmodified) is in 8.1. Code claims re-read: `templates.py:39` (`TEMPLATES`), `pptx_style.py:377-386` (`detect_theme`), `reference_docx.py:299` (`charter_for`), `slide-layouts.js:12-18` (`detectTemplate`), `editor.html:81-83` (3 tags), `pyproject.toml:104` (ignores on `to_pptx.py`), `to_pptx.py` 2283 lines, `editor.js` 1998 lines. One ordering defect in Section 9 step 5 is resolved by DEC-004 (not a blocker).
+
+### Decisions
+
+- **DEC-004:** each export story adds, in the same commit, the per file lint ignores of the modules it creates (`PLR0911`, `PLR0912`, `ARG002`, `PLR2004`, comment kept), instead of step 5 doing it at the end. **Obliged by:** DR-010 and the rule that every step leaves `make check` green: a new `pptx_*.py` without the ignores fails `make lint`. **Alternatives:** a glob entry `export/pptx_*.py` in the first story (rejected: would also cover the pre existing `pptx_style.py` and `pptx_components.py`, which have narrower ignores). **Evidence:** `pyproject.toml:104`.
+- **DEC-005:** `pptx_model.py` is created first (types, constants, `_BuilderBase` with stubs) and each mixin story appends the stubs it needs. **Obliged by:** DR-004, DR-009 (strict mypy without `type: ignore`). Mixins come before `_BuilderBase` in the `_SlideBuilder` bases so real methods win over stubs.
+- **DEC-006:** size cap test DT-011 and the final doc fixes live in the closing story, because the caps (`to_pptx.py` at most 600 lines, `editor.js` at most 500) only hold once every split story has landed. **Obliged by:** DR-004, DR-006 and "main green after each step".
+- **DEC-007:** during the editor split the code not yet moved stays in `editor.js` (loaded last), each story inserts its new script tag before `editor.js` in the final relative order; DT-012 (full order) is only asserted in the last JS story. **Obliged by:** DR-006.
+
+### File structure impact
+
+| Path | Action | Caused by | Story |
+|---|---|---|---|
+| `tests/test_export_golden.py` | create | DR-007 | STORY-A |
+| `tests/testdata/pptx_slide_hashes.json` | create | DR-007 | STORY-A |
+| `tests/test_charter_detection.py` | create | DR-001, DR-003 | STORY-A |
+| `tests/testdata/detector_table.json` | create | DR-001, DR-003 | STORY-A |
+| `src/mcp_htmleditor/export/charters.py` | create | DR-001 | STORY-B |
+| `src/mcp_htmleditor/templates.py` | edit | DR-002 | STORY-B |
+| `src/mcp_htmleditor/export/pptx_style.py` | edit | DR-003 | STORY-B |
+| `src/mcp_htmleditor/export/reference_docx.py` | edit | DR-003 | STORY-B |
+| `tests/test_charters.py` | create (DT-010) | DR-001, DR-002 | STORY-B |
+| `src/mcp_htmleditor/export/pptx_model.py` | create, then append stubs | DR-009, DR-004 | STORY-C..G |
+| `src/mcp_htmleditor/export/to_pptx.py` | edit (shrinks each story) | DR-004, DR-005 | STORY-C..G |
+| `pyproject.toml` | edit (ignores per new module) | DR-010 | STORY-C..G |
+| `tests/test_pptx_names.py` | create (DT-003) | DR-005 | STORY-C |
+| `src/mcp_htmleditor/export/pptx_text.py` | create | DR-004 | STORY-D |
+| `src/mcp_htmleditor/export/pptx_images.py`, `pptx_arch.py` | create | DR-004 | STORY-E |
+| `src/mcp_htmleditor/export/pptx_gantt.py`, `pptx_blocks.py` | create | DR-004 | STORY-F |
+| `src/mcp_htmleditor/export/pptx_flow.py`, `pptx_chrome.py` | create | DR-004 | STORY-G |
+| `src/mcp_htmleditor/static/editor-drag.js` | create | DR-006 | STORY-H |
+| `src/mcp_htmleditor/static/editor-blocks.js`, `editor-slides.js` | create | DR-006 | STORY-I |
+| `src/mcp_htmleditor/static/editor-save.js`, `editor-menus.js` | create | DR-006 | STORY-J |
+| `src/mcp_htmleditor/static/editor-format.js`, `editor-edit.js` | create | DR-006 | STORY-K |
+| `src/mcp_htmleditor/static/editor-undo.js` | create | DR-006 | STORY-L |
+| `src/mcp_htmleditor/static/editor.js` | edit (shrinks each story) | DR-006 | STORY-H..L |
+| `src/mcp_htmleditor/static/editor.html` | edit (script tags) | DR-006 | STORY-H..L |
+| `tests/test_static_scripts.py` | create (DT-004, DT-012) | DR-006, DR-008 | STORY-L |
+| `tools/check_ei_insert.py` | edit (load 11 scripts) | DR-006 | STORY-L |
+| `skill/types/arch-diagram.md`, `gantt.md`, `medical.md`, `skill/checks/arch-diagram-checklist.md` | edit (paths of moved methods) | DR-004 | STORY-M |
+| `README.md`, `AGENTS.md`, `.agent_docs/architecture.md`, `html-conventions.md`, `observability.md` | edit | DR-004, DR-006 | STORY-N |
+| `tests/test_size_caps.py` | create (DT-011) | DR-004, DR-006 | STORY-O |
+| `skill/types/website.md`, `mail.md`, `tools/gen_ei_bootstrap.py` | edit (comment or name) | DR-006 | STORY-O |
+
+### Test strategy
+
+| Test | Level | Driver | Location | Story |
+|---|---|---|---|---|
+| DT-001 slide XML hashes | integration | pytest, `to_pptx` on 10 files | `tests/test_export_golden.py` | STORY-A |
+| DT-002 detector table (Python + browser) | integration + E2E | pytest, Playwright for `detectTemplate` | `tests/test_charter_detection.py` | STORY-A |
+| DT-010 registry sole source | unit (source inspection) | pytest, `inspect.getsource` | `tests/test_charters.py` | STORY-B |
+| DT-003 names re-exported | unit | pytest import | `tests/test_pptx_names.py` | STORY-C |
+| DT-004, DT-012 scripts served, order, syntax, smoke | integration + E2E | pytest, real HTTP server, `node --check`, Playwright | `tests/test_static_scripts.py` | STORY-L |
+| DT-011 size caps | unit | pytest line count | `tests/test_size_caps.py` | STORY-O |
+| DT-013 quality gate | gate | `make check` | n/a | STORY-O |
+| Non regression (8.1) | suite | `make test` | whole `tests/` | every story; criterion closed in STORY-O |
+
+DT-001 is re run (it is part of `make test`) by every export story D..G.
+
+## Stories
+
+Every story restates: the existing suite passes unmodified (`make test`), and `make check` is green on main after it lands.
+
+| Story | Title | Priority | Requirements | Depends on | min_tier | Closes spec |
+|---|---|---|---|---|---|---|
+| STORY-A | Record golden slide XML hashes and detector table | P1 | DR-007 | main | 2 | no |
+| STORY-B | Charter registry, templates and detectors read it | P1 | DR-001, DR-002, DR-003 | STORY-A | 2 | no |
+| STORY-C | `pptx_model.py` with types, constants, base class | P1 | DR-005, DR-009, DR-010 | STORY-B | 2 | no |
+| STORY-D | Extract text and primitives mixin | P1 | DR-004, DR-010 | STORY-C | 2 | no |
+| STORY-E | Extract images and arch mixins | P1 | DR-004, DR-010 | STORY-D | 2 | no |
+| STORY-F | Extract Gantt and blocks mixins | P1 | DR-004, DR-010 | STORY-E | 2 | no |
+| STORY-G | Extract flow and chrome mixins | P1 | DR-004, DR-010 | STORY-F | 2 | no |
+| STORY-H | Extract node and block drag script | P1 | DR-006 | STORY-G | 2 | no |
+| STORY-I | Extract blocks and slides scripts | P1 | DR-006 | STORY-H | 2 | no |
+| STORY-J | Extract save and menus scripts | P1 | DR-006 | STORY-I | 2 | no |
+| STORY-K | Extract format and edit scripts | P1 | DR-006 | STORY-J | 2 | no |
+| STORY-L | Extract undo script, order and serving tests | P1 | DR-006, DR-008 | STORY-K | 2 | no |
+| STORY-M | Fix skill documents naming moved exporter methods | P2 | DR-004 | STORY-G | 2 | no |
+| STORY-N | Update README, AGENTS and agent docs | P2 | DR-004, DR-006 | STORY-L, STORY-M | 2 | no |
+| STORY-O | Size caps, remaining mentions, full gate | P1 | DR-004, DR-006, DR-007, DR-008 | STORY-N | 2 | yes |
+
+Counts: `rg -o 'DR-[0-9]{3}' design.md | sort -u` gives DR-001..DR-010 (10), every one cited above; `rg -o 'DT-[0-9]{3}' design.md | sort -u` gives DT-001..004, DT-010..013 (8), each in exactly one story.

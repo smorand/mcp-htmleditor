@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: L
 > Depth evidence: 4 areas touched (command line, agent tool surface, slide structure rules, quality rules), new persisted-file edit operations, more than 15 anticipated requirements
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-03
 > Project: existing
 > From backlog: n/a

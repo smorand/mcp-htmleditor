@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: M
 > Depth evidence: 3 areas (save path, history, update flag and status), one new persisted concept (history), about 10 requirements
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-03
 > Project: existing
 > From backlog: n/a (resolves the intent of BL-0013, BL-0016; answers BL-0006 on template saves)
