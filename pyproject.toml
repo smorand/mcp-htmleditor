@@ -102,6 +102,7 @@ ignore = [
 # renderers share a uniform signature, and the geometry thresholds (inches on the
 # 13.333 x 7.5 in canvas) are far more readable inline than behind a constant.
 "src/mcp_htmleditor/export/to_pptx.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
+"src/mcp_htmleditor/export/pptx_model.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
 "src/mcp_htmleditor/export/pptx_style.py" = ["PLR2004"]
 "src/mcp_htmleditor/export/pptx_components.py" = ["PLR2004"]
 # ElementTree parses word/styles.xml produced locally by pandoc, not user input.

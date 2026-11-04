@@ -8,7 +8,7 @@
 | US-0005 | SPEC-0011 | `make check-generated` in the quality gate and docs | US-0004 | 2 | landed | story/US-0005-make-check-generated-in-the-gate | story/US-0004-check-mode-for-both-generators |
 | US-0006 | SPEC-0012 | record golden slide xml hashes and detector table | US-0005 | 2 | landed | story/US-0006-record-golden-slide-xml-hashes-and | story/US-0005-make-check-generated-in-the-gate |
 | US-0007 | SPEC-0012 | charter registry, templates and detectors read it | US-0006 | 2 | landed | story/US-0007-charter-registry-templates-and-detectors | story/US-0006-record-golden-slide-xml-hashes-and |
-| US-0008 | SPEC-0012 | pptx_model.py with types, constants, base class | US-0007 | 2 | todo | | |
+| US-0008 | SPEC-0012 | pptx_model.py with types, constants, base class | US-0007 | 2 | landed | story/US-0008-pptx-model-py-with-types-constants-base | story/US-0007-charter-registry-templates-and-detectors |
 | US-0009 | SPEC-0012 | extract text and primitives mixin | US-0008 | 2 | todo | | |
 | US-0010 | SPEC-0012 | extract images and arch mixins | US-0009 | 2 | todo | | |
 | US-0011 | SPEC-0012 | extract gantt and blocks mixins | US-0010 | 2 | todo | | |
