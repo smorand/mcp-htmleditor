@@ -6,8 +6,10 @@ traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -226,3 +228,22 @@ def get_skill(type: str | None = None) -> str:  # noqa: A002 - argument name "ty
             return library.core_output() if type is None else library.topic_output(type)
         except SkillError as exc:
             raise ToolError(exc.message) from exc
+
+
+def registered_tool_names() -> list[str]:
+    """Names of the tools registered on the server, in registration order.
+
+    Synchronous. When the calling thread already runs an event loop (a sync Playwright session
+    keeps one alive), the listing runs in a worker thread with its own loop instead of nesting
+    ``asyncio.run``; async callers should still compute the names before awaiting.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return _list_tool_names()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(_list_tool_names).result()
+
+
+def _list_tool_names() -> list[str]:
+    return [tool.name for tool in asyncio.run(mcp.list_tools())]

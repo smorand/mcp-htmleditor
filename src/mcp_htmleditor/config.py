@@ -7,6 +7,7 @@ prefixed ``HTMLEDITOR_``, a local ``.env`` file, or the XDG defaults.
     templates ~/.config/mcp-htmleditor/templates    HTMLEDITOR_TEMPLATES_DIR
     arch checks ~/.config/mcp-htmleditor/arch-checks HTMLEDITOR_ARCH_CHECKS_DIR
     skill     bundled skill/ (repo, then package)     HTMLEDITOR_SKILL_DIR
+    routing skill ~/.pi/agent/dynamic-skills/html-editor/SKILL.md  HTMLEDITOR_ROUTING_SKILL
     logs      ~/.cache/mcp-htmleditor/logs          HTMLEDITOR_LOGS, HTMLEDITOR_LOG_DIR
     cache     ~/.cache/mcp-htmleditor               HTMLEDITOR_CACHE_DIR
     reference ~/.cache/mcp-htmleditor/reference     (generated pandoc reference.docx)
@@ -50,6 +51,7 @@ _PATH_FIELDS = (
     "templates_dir_override",
     "arch_checks_dir_override",
     "skill_dir_override",
+    "routing_skill_override",
     "logs_override",
     "log_dir_override",
     "cache_dir_override",
@@ -67,6 +69,7 @@ _SIGNIFICANT_ENV_VARS = (
     "HTMLEDITOR_TEMPLATES_DIR",
     "HTMLEDITOR_ARCH_CHECKS_DIR",
     "HTMLEDITOR_SKILL_DIR",
+    "HTMLEDITOR_ROUTING_SKILL",
     "HTMLEDITOR_LOGS",
     "HTMLEDITOR_LOG_DIR",
     "HTMLEDITOR_CACHE_DIR",
@@ -107,6 +110,7 @@ class Settings(BaseSettings):
     templates_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_TEMPLATES_DIR")
     arch_checks_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_ARCH_CHECKS_DIR")
     skill_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_SKILL_DIR")
+    routing_skill_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_ROUTING_SKILL")
     logs_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LOGS")
     log_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LOG_DIR")
     cache_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_CACHE_DIR")
@@ -185,6 +189,13 @@ class Settings(BaseSettings):
             Path(__file__).resolve().parent / "skill",
         )
         return next((c for c in candidates if c.is_dir()), candidates[0])
+
+    @property
+    def routing_skill_path(self) -> Path:
+        """Installed routing skill file: HTMLEDITOR_ROUTING_SKILL, else the Pi dynamic skills directory."""
+        return (
+            self.routing_skill_override or Path.home() / ".pi" / "agent" / "dynamic-skills" / "html-editor" / "SKILL.md"
+        )
 
     @property
     def cache_dir(self) -> Path:
@@ -266,6 +277,11 @@ def arch_checks_dir() -> Path:
 def skill_dir() -> Path:
     """Skill directory (HTMLEDITOR_SKILL_DIR, else the bundled skill/)."""
     return get_settings().skill_dir
+
+
+def routing_skill_path() -> Path:
+    """Installed routing skill file (HTMLEDITOR_ROUTING_SKILL, else the Pi dynamic skills directory)."""
+    return get_settings().routing_skill_path
 
 
 def log_dir() -> Path:

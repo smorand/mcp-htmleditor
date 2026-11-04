@@ -66,15 +66,19 @@ def skill_cmd(topic: str | None, show_all: bool) -> None:
 @main.command("skill-audit")
 @click.option("--json", "as_json", is_flag=True, help="Machine readable report.")
 def skill_audit_cmd(as_json: bool) -> None:
-    """Audit the skill: size, estimated tokens and budget of the core and each topic.
+    """Audit the skill: sizes and budgets, tool list, stale statements and the routing skill.
 
     Exits 0 when no problem is found, 1 otherwise. Never prompts.
     """
     from . import arch_checks
-    from .skill_audit import format_json, format_text, run_audit
+    from .config import routing_skill_path
+    from .mcp_server import registered_tool_names
+    from .skill_audit import format_json, format_text, read_routing_skill, run_audit, source_routing_skill_path
     from .skill_content import build_library
 
-    report = run_audit(build_library(read_checklist=arch_checks.read_shipped_checklist))
+    library = build_library(read_checklist=arch_checks.read_shipped_checklist)
+    routing_text = read_routing_skill(routing_skill_path(), source_routing_skill_path())
+    report = run_audit(library, registered_tool_names(), routing_text)
     click.echo(format_json(report) if as_json else format_text(report), nl=False)
     if report.problems:
         raise click.exceptions.Exit(1)

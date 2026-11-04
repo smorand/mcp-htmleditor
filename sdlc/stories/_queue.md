@@ -24,7 +24,7 @@
 | US-0021 | SPEC-0006 | topic engine and `skill --type/--all` | US-0020 | 2 | landed | story/US-0021-topic-engine-and-skill-type-all | story/US-0020-size-caps-remaining-mentions-full-gate |
 | US-0022 | SPEC-0006 | `get_skill` tool and checklist fallback | US-0021 | 2 | landed | story/US-0022-get-skill-tool-and-checklist-fallback | story/US-0021-topic-engine-and-skill-type-all |
 | US-0023 | SPEC-0006 | `skill-audit` sizes, budgets, missing items, json | US-0022 | 2 | landed | story/US-0023-skill-audit-sizes-and-budgets | main |
-| US-0024 | SPEC-0006 | audit tool list check and stale statement check | US-0023 | 2 | todo | | |
+| US-0024 | SPEC-0006 | audit tool list check and stale statement check | US-0023 | 2 | landed | story/US-0024-audit-tool-list-and-stale-checks | story/US-0023-skill-audit-sizes-and-budgets |
 | US-0025 | SPEC-0006 | core text, routing skill, shipped content gates | US-0024 | 2 | todo | | |
 | US-0026 | SPEC-0006 | topics slides-carbon and slides-ei | US-0025 | 2 | todo | | |
 | US-0027 | SPEC-0006 | topics medical and medical-sources | US-0025 | 2 | todo | | |

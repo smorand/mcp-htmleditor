@@ -9,6 +9,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from mcp_htmleditor import cli as cli_module
+from mcp_htmleditor import mcp_server
 from mcp_htmleditor.cli import main
 from tests.conftest import SKILL_TOPICS, SkillTree
 
@@ -19,6 +20,15 @@ TOPIC_NAMES = [name for name, _ in SKILL_TOPICS]
 def no_global_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
     """The group callback configures the process wide tracer, which tests/test_tracing.py owns."""
     monkeypatch.setattr(cli_module, "configure_tracing", lambda settings=None: None)
+
+
+@pytest.fixture(autouse=True)
+def no_tool_or_routing_checks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """These tests cover sizes and budgets only: no registered tools, a clean routing skill."""
+    routing = tmp_path / "routing-SKILL.md"
+    routing.write_text("# Routing\n", encoding="utf-8")
+    monkeypatch.setenv("HTMLEDITOR_ROUTING_SKILL", str(routing))
+    monkeypatch.setattr(mcp_server, "registered_tool_names", lambda: [])
 
 
 def audit(*args: str) -> Result:
