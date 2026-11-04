@@ -56,7 +56,7 @@ La charte est détectée (tokens `--med-*` médicale, `--ei-*` Euro-Information,
 
 ### Diagnostics et vérification
 
-La commande affiche le nombre de slides produites, liste sur stderr chaque élément ignoré, et sort en code non nul si aucune slide n'est écrite. Un document sans `data-type="slide"` produit une slide unique avec avertissement.
+La commande affiche le nombre de slides produites, liste sur stderr chaque élément ignoré, et sort en code non nul si aucune slide n'est écrite. Un document sans `data-type="slide"` est refusé : `error: No slide exported: check that the document has data-type="slide" elements.`
 
 ```bash
 mcp-htmleditor export pptx pres.html /tmp/pres.pptx

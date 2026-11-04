@@ -16,13 +16,17 @@ import sys
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
 from .config import get_settings
 from .logging_config import setup_logging
-from .tracing import configure_tracing, trace_span
+from .tracing import configure_tracing
 from .version import __version__
+
+if TYPE_CHECKING:
+    from .deck.tools import ExportOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -105,22 +109,24 @@ def skill_audit_cmd(as_json: bool) -> None:
 
 
 @main.command("templates")
+@deck_command
 def templates_cmd() -> None:
     """List the available presentation/document templates."""
-    from .templates import list_templates
+    from .deck.tools import template_listing
 
     click.echo("Templates disponibles (mcp-htmleditor new <key> <fichier>):\n")
-    for key, desc in list_templates():
-        click.echo(f"  {key:<8} {desc}")
+    for entry in template_listing():
+        click.echo(f"  {entry['key']:<8} {entry['description']}")
 
 
 @main.command("new")
 @click.argument("template")
-@click.argument("output_file")
+@click.argument("output_file", type=click.Path(dir_okay=False))
 @click.option("--serve", is_flag=True, help="Ouvrir l'éditeur sur le fichier créé.")
 @click.option("--port", default=None, type=int, help="HTTP port (avec --serve).")
 @click.option("--host", default=None, help="Adresse d'écoute (avec --serve).")
 @click.option("--no-browser", is_flag=True, help="Ne pas ouvrir le navigateur (avec --serve).")
+@deck_command
 def new_cmd(  # noqa: PLR0913, PLR0917 - one parameter per CLI flag, click passes them by name
     template: str,
     output_file: str,
@@ -134,26 +140,9 @@ def new_cmd(  # noqa: PLR0913, PLR0917 - one parameter per CLI flag, click passe
     TEMPLATE is a template key (see `mcp-htmleditor templates`): ei, carbon, doc.
     OUTPUT_FILE is the destination path for the new HTML file.
     """
-    import shutil
+    from .deck.tools import create_file
 
-    from .templates import list_templates, template_path
-
-    try:
-        src = template_path(template)
-    except KeyError:
-        keys = ", ".join(k for k, _ in list_templates())
-        raise click.ClickException(f"Template inconnu: '{template}'. Templates disponibles: {keys}") from None
-    except FileNotFoundError as exc:
-        raise click.ClickException(f"Fichier template manquant: {exc}") from None
-
-    dest = Path(output_file)
-    if dest.exists():
-        raise click.ClickException(f"Le fichier existe déjà: {dest}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with trace_span("file.write", {"file.path": str(dest), "template.key": template}) as span:
-        shutil.copyfile(src, dest)
-        span.set_attribute("file.size", dest.stat().st_size)
-    logger.info("Created %s from template %s", dest, template)
+    dest = create_file(template, output_file)
     click.echo(f"Créé: {dest}  (template: {template})")
 
     if serve:
@@ -357,9 +346,10 @@ def _read_operations(source: str) -> object:
 
 
 @main.command("export")
-@click.argument("format", type=click.Choice(["pptx", "docx"]))
-@click.argument("input_file", type=click.Path(exists=True, dir_okay=False))
-@click.argument("output_file")
+@click.argument("format")
+@click.argument("input_file", type=click.Path(dir_okay=False))
+@click.argument("output_file", type=click.Path(dir_okay=False))
+@deck_command
 def export_cmd(format: str, input_file: str, output_file: str) -> None:  # noqa: A002 - CLI argument name
     """Export an HTML file to PPTX or DOCX.
 
@@ -367,47 +357,25 @@ def export_cmd(format: str, input_file: str, output_file: str) -> None:  # noqa:
     INPUT_FILE is the source HTML file.
     OUTPUT_FILE is the destination file path.
     """
+    from .deck.tools import export_file
+
+    outcome = export_file(input_file, format, output_file)
     if format == "pptx":
-        _export_pptx(input_file, output_file)
+        click.echo(f"Exporting {input_file} → {output_file} (PPTX)")
     else:
-        _export_docx(input_file, output_file)
-
-
-def _export_pptx(input_file: str, output_file: str) -> None:
-    """Run the PPTX export and print its report."""
-    from .export.to_pptx import to_pptx
-
-    click.echo(f"Exporting {input_file} → {output_file} (PPTX)")
-    report = to_pptx(input_file, output_file)
-    for warning in report.warnings:
+        click.echo(f"Exporting {input_file} → {output_file} (DOCX via pandoc)")
+        _echo_charter(outcome)
+    for warning in outcome.warnings:
         click.echo(f"Attention: {warning}", err=True)
-    if report.slide_count == 0:
-        raise click.ClickException(
-            'Aucune slide exportee: verifiez que le document contient des elements data-type="slide".'
-        )
-    click.echo(f"Done. {report.slide_count} slide(s) exportee(s).")
+    if format == "pptx":
+        click.echo(f"Done. {outcome.slide_count} slide(s) exportee(s).")
+    else:
+        click.echo("Done.")
 
 
-def _export_docx(input_file: str, output_file: str) -> None:
-    """Run the DOCX export and print its report."""
-    import subprocess
-
-    from .export.to_docx import to_docx
-
-    click.echo(f"Exporting {input_file} → {output_file} (DOCX via pandoc)")
-    try:
-        result = to_docx(input_file, output_file)
-    except FileNotFoundError:
-        message = "pandoc introuvable dans le PATH: installez pandoc pour exporter en DOCX."
-        raise click.ClickException(message) from None
-    except subprocess.CalledProcessError as exc:
-        detail = (exc.stderr or "").strip() or f"code de sortie {exc.returncode}"
-        raise click.ClickException(f"pandoc a echoue: {detail}") from None
-
-    if result.reference_docx is not None:
-        click.echo(f"Charte: {result.charter} (reference.docx: {result.reference_docx})")
-    elif result.charter is None:
+def _echo_charter(outcome: ExportOutcome) -> None:
+    """Print the DOCX charter line, if any."""
+    if outcome.reference_docx is not None:
+        click.echo(f"Charte: {outcome.charter} (reference.docx: {outcome.reference_docx})")
+    elif outcome.charter is None:
         click.echo("Charte: standard (styles pandoc par defaut)")
-    for warning in result.warnings:
-        click.echo(f"Attention: {warning}", err=True)
-    click.echo("Done.")
