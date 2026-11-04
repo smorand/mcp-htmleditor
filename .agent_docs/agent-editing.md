@@ -150,3 +150,13 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
 - `click.testing.CliRunner` translates `\r\n` in captured output; the real command does not. Test
   CRLF on `deck.read.get_slide`.
 - `slide_range(nodes, node)` keeps `nodes` only because the story contract fixes the signature.
+
+## Lint in `outline` and `patch` (US-0044)
+
+- `outline`: `lint_deck` runs once; `slides[i].problems` counts the problems with `slide_index == i`
+  (warnings and errors). Whole file problems (slide `-`) are counted nowhere.
+- `patch`: the assembled and renumbered text is parsed with `deck_from_text` (not read back from disk)
+  and linted once. `Working.touched_indexes()` maps touched atoms (set_text even when the text is
+  unchanged, replaced, inserted) to final slide indexes, so flags follow moves and deletes. Result
+  `problems` = `{code,severity,slide,message}` of those slides, slide order then code, ids after
+  renumbering. Same list on `--dry-run`. Lint never blocks the write. No touched slide: no lint run.

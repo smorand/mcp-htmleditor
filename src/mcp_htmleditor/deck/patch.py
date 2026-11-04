@@ -8,6 +8,7 @@ patch is renumbered once (``renumber.py``).
 Cost: one scan and one parse of the file, one scan and one parse of the slide per ``set_text`` or ``replace_slide``,
 one parse of the html per ``insert_slide`` or ``replace_slide``, and for a structural patch one more scan
 and parse of the assembled text.
+A patch that touched a slide also parses and lints the assembled text once (``problems`` of the touched slides).
 """
 
 from __future__ import annotations
@@ -23,7 +24,8 @@ from bs4 import BeautifulSoup
 from bs4.element import Comment, NavigableString, Tag
 
 from ..fileio import atomic_write
-from . import Deck, DeckError, load_deck, slide_id
+from . import Deck, DeckError, deck_from_text, load_deck, slide_id
+from .lint import lint_deck
 from .renumber import apply_edits, renumber_edits
 from .scan import Node, large_images, scan
 
@@ -91,6 +93,11 @@ class Working:
         """Return the number of slide atoms."""
         return sum(atom.is_slide for atom in self._atoms)
 
+    def touched_indexes(self) -> set[int]:
+        """Return the final index of every touched slide atom."""
+        slides = [atom for atom in self._atoms if atom.is_slide]
+        return {index for index, atom in enumerate(slides) if atom.touched}
+
     def text(self) -> str:
         """Return the file text: the atoms joined."""
         return "".join(atom.pre + atom.body for atom in self._atoms)
@@ -108,8 +115,7 @@ class Working:
         position = self._require_slide(slide)
         atom = self._atoms[position]
         edited = _splice_text(atom.body, slide, selector, text)
-        if edited != atom.body:
-            self._atoms[position] = replace(atom, body=edited, touched=True)
+        self._atoms[position] = replace(atom, body=edited, touched=True)
 
     def replace_slide(self, slide: str, html: str) -> None:
         """Replace the slide range by ``html``, each ``data:ref:img-N`` restored from the current slide text."""
@@ -201,10 +207,27 @@ def apply_patch(
     is_changed = text != deck.text
     if is_changed and not dry_run:
         _write(file, data, set_update_flag)
-    result: dict[str, Any] = {"ok": True, "changed": is_changed, "slides": working.slide_count, "problems": []}
+    result: dict[str, Any] = {
+        "ok": True,
+        "changed": is_changed,
+        "slides": working.slide_count,
+        "problems": _touched_problems(file, text, working),
+    }
     if dry_run:
         result["dry_run"] = True
     return result
+
+
+def _touched_problems(file: str, text: str, working: Working) -> list[dict[str, Any]]:
+    """Lint the assembled ``text`` once and keep the problems of the touched slides (DEC-005)."""
+    touched = working.touched_indexes()
+    if not touched:
+        return []
+    return [
+        {"code": p.code, "severity": p.severity, "slide": p.slide, "message": p.message}
+        for p in lint_deck(deck_from_text(file, text))
+        if p.slide_index in touched
+    ]
 
 
 def _parse_operation(number: int, item: object) -> Operation:

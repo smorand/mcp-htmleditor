@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from typing import Any
 
 from bs4.element import Comment, NavigableString, Tag
 
 from . import Deck, DeckError, document_article, load_deck, slide_id
+from .lint import lint_deck
 from .scan import hide_images, scan, slide_range
 
 HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5")
@@ -44,6 +46,7 @@ def get_slide(file: str, slide_id_: str) -> str:
 
 
 def _slide_facts(deck: Deck) -> list[dict[str, Any]]:
+    counts = Counter(problem.slide_index for problem in lint_deck(deck))
     return [
         {
             "index": index,
@@ -52,7 +55,7 @@ def _slide_facts(deck: Deck) -> list[dict[str, Any]]:
             "slide_type": str(slide.get("data-slide-type", "")),
             "words": count_words(slide),
             "images": len(slide.find_all("img")),
-            "problems": 0,
+            "problems": counts[index],
         }
         for index, slide in enumerate(deck.slides)
     ]

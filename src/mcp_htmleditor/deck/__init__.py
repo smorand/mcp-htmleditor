@@ -41,14 +41,19 @@ class Deck:
 
 def load_deck(file: str) -> Deck:
     """Read and parse ``file``; raise ``DeckError`` when it is missing or not UTF-8."""
-    from ..export.to_pptx import find_slides  # noqa: PLC0415 - python-pptx costs 0.29 s, never at import
-
     try:
         text = Path(file).read_bytes().decode("utf-8")
     except FileNotFoundError:
         raise DeckError(f"File not found: {file}") from None
     except UnicodeDecodeError:
         raise DeckError(f"File is not valid UTF-8: {file}") from None
+    return deck_from_text(file, text)
+
+
+def deck_from_text(file: str, text: str) -> Deck:
+    """Parse ``text`` as the content of ``file``, without reading the disk."""
+    from ..export.to_pptx import find_slides  # noqa: PLC0415 - python-pptx costs 0.29 s, never at import
+
     soup = BeautifulSoup(text, "html.parser")
     slides = tuple(find_slides(soup))
     doc_type = detect_doc_type(soup, bool(slides))

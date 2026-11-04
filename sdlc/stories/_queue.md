@@ -45,7 +45,7 @@
 | US-0041 | SPEC-0007 | `patch` tool and editor flag | US-0040, US-0025 | 2 | landed | story/US-0041-patch-tool-and-editor-flag | story/US-0040-insert-move-and-replace-slide |
 | US-0042 | SPEC-0007 | `lint` command and structure rules | US-0038 | 2 | landed | story/US-0042-lint-command-and-structure-rules | story/US-0041-patch-tool-and-editor-flag |
 | US-0043 | SPEC-0007 | charter rules l007 to l011 | US-0042 | 2 | landed | story/US-0043-charter-rules-l007-to-l011 | story/US-0042-lint-command-and-structure-rules |
-| US-0044 | SPEC-0007 | lint problems in `outline` and `patch` | US-0040, US-0043 | 2 | todo | | |
+| US-0044 | SPEC-0007 | lint problems in `outline` and `patch` | US-0040, US-0043 | 2 | landed | story/US-0044-lint-problems-in-outline-and-patch | story/US-0043-charter-rules-l007-to-l011 |
 | US-0045 | SPEC-0007 | template, new and export services on the command line | US-0034 | 2 | todo | | |
 | US-0046 | SPEC-0007 | `lint`, `list_templates`, `new_file`, `export` tools | US-0043, US-0045, US-0041, US-0025 | 2 | todo | | |
 | US-0047 | SPEC-0009 | state per file in the state directory, expiring update flag | US-0046 | 3 | todo | | |

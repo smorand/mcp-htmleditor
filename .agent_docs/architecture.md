@@ -184,3 +184,17 @@ section of `skill/core.md` in the same story, otherwise `skill-audit` reports it
 start of those lines are read). The skill text never states a tool count. The previous skill is frozen
 in `docs/skill-archive/`; code comments that still name `skill/types/*` or `skill/workflow-*` are
 stale (backlog).
+
+## Deck service layer (`deck/`, `fileio.py`)
+
+| Module | Role |
+|--------|------|
+| `deck/__init__.py` | `Deck`, `DeckError`, `load_deck(file)` and `deck_from_text(file, text)` (parse text without the disk), charter and type detection |
+| `deck/scan.py` | Tag scanner with source offsets, image hiding, slide ranges |
+| `deck/read.py` | `outline` (per slide `problems` = lint count, warnings included, whole file problems excluded) and `get_slide` |
+| `deck/patch.py` | `apply_patch`: atoms with `touched`, one atomic write; `problems` = lint of the assembled, renumbered text restricted to touched slides |
+| `deck/renumber.py` | Renumbering of ids, counters, `TOTAL`, `slideNames` after a structural patch |
+| `deck/lint.py` | `lint_deck`, `Problem`, rules L001 to L006, reports |
+| `deck/charter_rules.py` | Charter rules L007 to L011 |
+| `deck/tools.py` | Not present yet (US-0046 adds it) |
+| `fileio.py` | `atomic_write`: temp file then rename, the only writer of `patch` (`os.replace`) |
