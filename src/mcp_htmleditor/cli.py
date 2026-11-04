@@ -8,9 +8,12 @@ once, in the group callback, and the resulting settings are passed down.
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 import os
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 
 import click
@@ -21,6 +24,22 @@ from .tracing import configure_tracing, trace_span
 from .version import __version__
 
 logger = logging.getLogger(__name__)
+
+
+def deck_command[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    """Turn a ``DeckError`` raised by the command body into ``error: <message>`` and status 1."""
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        from .deck import DeckError
+
+        try:
+            return func(*args, **kwargs)
+        except DeckError as exc:
+            click.echo(f"error: {exc}", err=True)
+            raise SystemExit(1) from exc
+
+    return wrapper
 
 
 @click.group()
@@ -268,6 +287,16 @@ def arch_layout_cmd(file: str, diagram_id: str | None) -> None:
         click.echo('Aucun diagramme declaratif trouve (data-type="arch-diagram" avec un arch-row): rien a faire.')
     else:
         click.echo(f"Done. {report.diagrams_updated} diagramme(s) recalcule(s).")
+
+
+@main.command("outline")
+@click.argument("file", type=click.Path(dir_okay=False))
+@deck_command
+def outline_cmd(file: str) -> None:
+    """Print the structure of FILE as JSON: charter, type, slides or headings, never image data."""
+    from .deck.read import outline
+
+    click.echo(json.dumps(outline(file), separators=(",", ":"), ensure_ascii=False))
 
 
 @main.command("export")
