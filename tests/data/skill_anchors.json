@@ -1,0 +1,35 @@
+{
+  "slides-carbon": [
+    "data-type=\"slide\"",
+    "data-id=\"slide-N\"",
+    "data-title",
+    "const TOTAL = N;",
+    "slideNames",
+    "border-bottom: 4px solid var(--ibm-blue-60)",
+    "Ne jamais la supprimer",
+    "font-weight: 300",
+    "class=\"slide dense\"",
+    "cds-structured-list compact",
+    "cds-notification",
+    "stat-grid",
+    "buildOptions()",
+    "Ne jamais supprimer les `data-type`, `data-id`, `data-title`"
+  ],
+  "slides-ei": [
+    "Table de correspondance des classes",
+    ".slide-inner",
+    ".slide-title-rule",
+    ".slide-foot-page",
+    "logo-disc",
+    "Slide 0N / TT",
+    "data-asset-chevrons",
+    "--ei-blue",
+    "--ei-orange",
+    "slide-cover-img",
+    "slide-section-body",
+    "data-title",
+    "class=\"slide dense\"",
+    "Ne jamais supprimer les `data-type`, `data-id`, `data-title`",
+    "buildOptions()"
+  ]
+}

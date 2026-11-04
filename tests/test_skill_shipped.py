@@ -181,3 +181,18 @@ def test_shipped_topics_gates() -> None:
             assert references == [], topic
         for anchor in anchors.get(topic, []):
             assert anchor in text, (topic, anchor)
+
+
+def test_anchored_topics_have_a_topic_file() -> None:
+    """Every key of the anchors file has a shipped topic file that satisfies its gates and anchors."""
+    from mcp_htmleditor.skill_audit import find_stale
+
+    library = _library()
+    for topic, anchors in _anchors().items():
+        assert (SKILL_DIR / "topics" / f"{topic}.md").is_file(), topic
+        text = library.topic_output(topic)
+        assert len(text.encode("utf-8")) <= TOPIC_BUDGET_BYTES, topic
+        assert find_stale(text, include_counts=False) == [], topic
+        assert not any(dash in text for dash in DASHES), topic
+        for anchor in anchors:
+            assert anchor in text, (topic, anchor)

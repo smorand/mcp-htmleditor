@@ -24,3 +24,7 @@ A gate that fails at random trains people to rerun it. The expected state is rea
 ## Notes
 
 Likely a fixed wait versus the poll or save latency under CPU load. Reproduce with the suite under parallel load first. Next: `/sdlc-analysis BL-0024`.
+
+## Update 2026-11-03 (implement US-0026)
+
+A third flaky e2e test showed up once during `make check` and passed on rerun without change: `tests/test_undo_redo_e2e.py::test_undo_redo_document_block_insert[chromium]`. Same family (Chromium e2e timing under load).
