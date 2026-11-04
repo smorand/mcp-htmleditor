@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 11 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 15 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -18,9 +18,12 @@ from fastmcp.exceptions import ToolError
 
 from .arch_layout import layout_file
 from .deck import DeckError
+from .deck.lint import lint_file
 from .deck.patch import apply_patch
 from .deck.read import get_slide as read_slide
 from .deck.read import outline as read_outline
+from .deck.tools import create_file, export_file
+from .deck.tools import template_listing as list_template_entries
 from .http_server import (
     is_server_running,
     start_http_server,
@@ -299,6 +302,85 @@ def patch(file: str, ops: list[Any], dry_run: bool = False) -> dict[str, Any]:
             return apply_patch(file, ops, dry_run=dry_run, set_update_flag=get_state().set_update_flag)
         except DeckError as exc:
             raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def lint(file: str) -> dict[str, Any]:
+    """Check a file against the structure and charter rules and report every problem with a verdict.
+
+    Same object as the JSON printed by ``mcp-htmleditor lint --json``; a file with errors is still a result,
+    read ``errors`` to decide.
+
+    Args:
+        file: Path to the HTML file.
+
+    Returns:
+        Dict with keys: problems (code, severity, slide, message), errors, warnings.
+
+    Raises:
+        ToolError: the file is missing or unreadable (the command line error line without ``error: ``).
+    """
+    with trace_span("mcp.lint", {"file.path": file}):
+        try:
+            return lint_file(file)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def list_templates() -> list[dict[str, str]]:
+    """List the template keys with their description, in the order of ``mcp-htmleditor templates``."""
+    with trace_span("mcp.list_templates"):
+        return list_template_entries()
+
+
+@mcp.tool()
+def new_file(template: str, file: str) -> dict[str, Any]:
+    """Create a file from a template key; an existing target is refused. Nothing is served or opened.
+
+    Same operation as ``mcp-htmleditor new`` without ``--serve``; call ``start_server`` to edit the file.
+
+    Args:
+        template: A key returned by ``list_templates``.
+        file: Path of the file to create; parent folders are created.
+
+    Returns:
+        Dict with keys: ok, file (the path as given).
+
+    Raises:
+        ToolError: unknown template, existing target or failed write.
+    """
+    with trace_span("mcp.new_file", {"file.path": file, "template.key": template}):
+        try:
+            create_file(template, file)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+        return {"ok": True, "file": file}
+
+
+@mcp.tool()
+def export(file: str, format: str, output: str) -> dict[str, Any]:  # noqa: A002 - argument name "format" is the contract
+    """Export a presentation to pptx or a document to docx.
+
+    Same operation as ``mcp-htmleditor export``.
+
+    Args:
+        file: Path to the HTML source.
+        format: ``pptx`` or ``docx``.
+        output: Path of the file to write.
+
+    Returns:
+        Dict with keys: ok, output, warnings (the export warnings, a list of text).
+
+    Raises:
+        ToolError: unknown format, missing file, no slide to export, pandoc missing or failing.
+    """
+    with trace_span("mcp.export", {"file.path": file, "export.format": format}):
+        try:
+            outcome = export_file(file, format, output)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+        return {"ok": True, "output": outcome.output, "warnings": outcome.warnings}
 
 
 def registered_tool_names() -> list[str]:

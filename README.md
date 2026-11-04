@@ -154,14 +154,33 @@ mcp-htmleditor export pptx input.html output.pptx
 mcp-htmleditor export docx input.html output.docx
 ```
 
-### Read a file without its images
+### Read, check and edit a file without touching its images
 
 ```bash
 mcp-htmleditor outline input.html           # JSON: charter, type, slides, headings
 mcp-htmleditor get-slide input.html slide-3 # HTML of one slide, large images as data:ref:img-N
+mcp-htmleditor patch input.html --ops ops.json [--dry-run]  # atomic slide operations, counters renumbered
+mcp-htmleditor lint input.html [--json]     # structure and charter rules, exit 1 on an error
 ```
 
-Both are also MCP tools (`outline`, `get_slide`) with the same results and the same error text.
+### The seven agent operations
+
+Each one is a command and an MCP tool with the same result and the same error text; the tool error is the
+command line error line without its `error: ` prefix.
+
+| Operation | Command | Tool |
+|---|---|---|
+| Read the structure | `outline FILE` | `outline(file)` |
+| Read one slide | `get-slide FILE ID` | `get_slide(file, id)` |
+| Edit slides | `patch FILE --ops PATH` | `patch(file, ops, dry_run)` |
+| Check a file | `lint FILE [--json]` | `lint(file)` |
+| List templates | `templates` | `list_templates()` |
+| Create a file | `new TEMPLATE FILE` (without `--serve`) | `new_file(template, file)` |
+| Export | `export FORMAT FILE OUTPUT` | `export(file, format, output)` |
+
+`new` and `export` errors are now English `error: ...` lines on the error output with exit status 1, for
+example `error: File already exists: a.html` or `error: Unknown export format "foo". Valid formats: pptx, docx`.
+`new_file` never starts the server or opens a browser: call `start_server` to edit the created file.
 
 ### Architecture diagram layout
 
@@ -231,6 +250,10 @@ figures must be PNG, never SVG.
 | `outline(file)` | Structure of a file (charter, type, slides, headings) as a JSON object, without any image data. Same object as `mcp-htmleditor outline`. |
 | `get_slide(file, id)` | HTML of one slide, every image with a data address over 1 000 characters replaced by `data:ref:img-N`. Same text as `mcp-htmleditor get-slide`. |
 | `patch(file, ops, dry_run=False)` | Apply validated, atomic, self renumbering slide operations (`set_text`, `replace_slide`, `insert_slide`, `delete_slide`, `move_slide`) in one write. `update_in_progress` is true only around the write; a dry run or a no change patch touches neither the flag nor the modification time. Same result as `mcp-htmleditor patch`; errors carry the command line error text without `error: `. |
+| `lint(file)` | Check a file against the structure and charter rules; returns `{problems, errors, warnings}`, the same object as `mcp-htmleditor lint --json`. |
+| `list_templates()` | The template keys with their description, `[{key, description}]`, in the order of `mcp-htmleditor templates`. |
+| `new_file(template, file)` | Create a file from a template key; refuses an existing target; does not serve it. Returns `{ok, file}`. |
+| `export(file, format, output)` | Export a presentation to `pptx` or a document to `docx`. Returns `{ok, output, warnings}`. |
 
 ### Multiple presentations at once
 
@@ -378,7 +401,7 @@ prompts and credentials are never traced. Details in `.agent_docs/observability.
 
 ```
 src/mcp_htmleditor/
-├── cli.py           CLI: templates, new, serve, skill, skill-audit, mcp, export (-v/-q, --version)
+├── cli.py           CLI: templates, new, serve, skill, skill-audit, mcp, export, outline, get-slide, patch, lint (-v/-q, --version)
 ├── config.py        Settings (pydantic-settings): XDG paths, ports, OTel
 ├── logging_config.py setup_logging(): rich console on stderr + rotating file
 ├── tracing.py       configure_tracing(), trace_span(), JSONL span exporter
@@ -387,7 +410,7 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 11 tools
+├── mcp_server.py    FastMCP server with 15 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/

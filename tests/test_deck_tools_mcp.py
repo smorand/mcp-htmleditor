@@ -26,6 +26,7 @@ def carbon_file(tmp_path: Path) -> str:
 
 
 def test_outline_tool_equals_the_cli_json(ei_file: str) -> None:
+    """SPEC-0007/E2E-001: the outline of DECK-EI, CLI and tool."""
     stdout, _, status = run_cli("outline", ei_file)
     ok, value = call_tool("outline", file=ei_file)
 
@@ -44,6 +45,7 @@ def test_outline_tool_equals_the_cli_json(ei_file: str) -> None:
 
 
 def test_get_slide_tool_returns_the_cli_html_with_a_reference(ei_file: str) -> None:
+    """SPEC-0007/E2E-003: one slide through the tool, large image replaced by a reference."""
     stdout, _, status = run_cli("get-slide", ei_file, "slide-3")
     ok, html = call_tool("get_slide", file=ei_file, id="slide-3")
 

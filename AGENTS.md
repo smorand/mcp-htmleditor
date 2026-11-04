@@ -103,13 +103,13 @@ Load only what the task needs.
 | `.agent_docs/testing.md` | Test file map, coverage decisions, export regression set and validation procedure |
 | `.agent_docs/docker.md` | Image, compose, prod overlay, container checks |
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
-| `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`): outline, get-slide and the five `patch` operations, byte offset scanner and renumbering rules, gotchas |
+| `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 15 tool surface, scanner and renumbering rules, gotchas |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`
 (sources in `skill/core.md`, `skill/topics/`, `skill/checks/`). `docs/skill-archive/` keeps the
 previous monolithic skill, reference only.
 
-The MCP server exposes eleven tools, `get_skill`, `outline`, `get_slide` and `patch` included. A story that registers a tool adds
+The MCP server exposes fifteen tools, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file` and `export` included. A story that registers a tool adds
 one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
 story (`skill-audit` fails otherwise); see `.agent_docs/architecture.md`.
 

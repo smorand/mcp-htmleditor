@@ -47,6 +47,10 @@ mcp-htmleditor new <template> <file> [--serve]
 - outline: Read the structure of a file (charter, slides, headings) without any image data.
 - get_slide: Read the HTML of one slide, large images replaced by data:ref:img-N.
 - patch: Apply validated, atomic, self renumbering slide operations (set_text, replace_slide, insert_slide, delete_slide, move_slide) to a presentation; dry_run validates only.
+- lint: Check a file against the structure and charter rules; returns problems, errors and warnings.
+- list_templates: List the 8 template keys with their description.
+- new_file: Create a file from a template key; refuses an existing target.
+- export: Export a presentation to pptx or a document to docx.
 
 ## Topics
 

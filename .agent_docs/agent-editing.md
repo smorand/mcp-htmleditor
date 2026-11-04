@@ -1,7 +1,9 @@
-# Agent editing tools (SPEC-0007)
+# Agent editing tools (SPEC-0007, closed by US-0046)
 
-Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `DeckError` into
-`error: <message>` on stderr and exit status 1 (`deck_command`).
+Service layer in `src/mcp_htmleditor/deck/`; it never prints. `cli.py` echoes the results and turns
+`DeckError` into `error: <message>` on stderr and exit status 1 (`deck_command`). `mcp_server.py` calls the
+same functions and turns `DeckError` into `ToolError(<message>)`, so a tool error is the command line error
+line without its `error: ` prefix. Never a second implementation of a rule in a tool.
 
 ## Formats
 
@@ -125,6 +127,16 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
 - Mutators `replace_in_slide` and `add_style` in `tests/deck_support.py`. DECK-CARBON cover no longer
   keeps `Contenu de la slide…` (replaced by the same text as the other slides), so it is lint clean.
 
+## Lint inside `outline` and `patch` (US-0044)
+
+- `outline`: `lint_deck` runs once; `slides[i].problems` counts the problems with `slide_index == i`
+  (warnings and errors). Whole file problems (slide `-`) are counted nowhere.
+- `patch`: the assembled and renumbered text is parsed with `deck_from_text` (not read back from disk)
+  and linted once. `Working.touched_indexes()` maps touched atoms (set_text even when the text is
+  unchanged, replaced, inserted) to final slide indexes, so flags follow moves and deletes. Result
+  `problems` = `{code,severity,slide,message}` of those slides, slide order then code, ids after
+  renumbering. Same list on `--dry-run`. Lint never blocks the write. No touched slide: no lint run.
+
 ## Scanner (`deck/scan.py`)
 
 - `scan(text)` returns `Node(tag, start, start_end, end_start, end_end, line, col)` in document order,
@@ -150,13 +162,33 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
 - `click.testing.CliRunner` translates `\r\n` in captured output; the real command does not. Test
   CRLF on `deck.read.get_slide`.
 - `slide_range(nodes, node)` keeps `nodes` only because the story contract fixes the signature.
+- `fastmcp.Client` calls from a test must not run in the caller's thread (the e2e suite keeps an event loop
+  alive): `call_tool` uses its own thread.
+- Nothing may reach the process stdout in the MCP process: it carries the protocol frames. Log to stderr only.
 
-## Lint in `outline` and `patch` (US-0044)
+## Tool surface (15 tools, US-0037, US-0041, US-0046)
 
-- `outline`: `lint_deck` runs once; `slides[i].problems` counts the problems with `slide_index == i`
-  (warnings and errors). Whole file problems (slide `-`) are counted nowhere.
-- `patch`: the assembled and renumbered text is parsed with `deck_from_text` (not read back from disk)
-  and linted once. `Working.touched_indexes()` maps touched atoms (set_text even when the text is
-  unchanged, replaced, inserted) to final slide indexes, so flags follow moves and deletes. Result
-  `problems` = `{code,severity,slide,message}` of those slides, slide order then code, ids after
-  renumbering. Same list on `--dry-run`. Lint never blocks the write. No touched slide: no lint run.
+| Tool | Service call | Result |
+|---|---|---|
+| `outline(file)` | `read.outline` | same object as `outline` |
+| `get_slide(file, id)` | `read.get_slide` | same text as `get-slide` |
+| `patch(file, ops, dry_run)` | `patch.apply_patch` with `set_update_flag` | same object as `patch` |
+| `lint(file)` | `lint.lint_file` | same object as `lint --json`; errors in the report are a result, not a `ToolError` |
+| `list_templates()` | `tools.template_listing` | `[{"key","description"}]`, registry order |
+| `new_file(template, file)` | `tools.create_file` | `{"ok":true,"file":<as given>}`; never serves, never opens a browser |
+| `export(file, format, output)` | `tools.export_file` | `{"ok":true,"output","warnings":[...]}` |
+
+- The set is start_server, stop_server, get_status, open_file, update_start, update_end, layout_arch_diagram,
+  get_skill plus the seven above. Each body runs in `trace_span("mcp.<tool>")`. A new tool needs its
+  `- <name>: <description>` line in `## Tools` of `skill/core.md` (core budget 7 000 bytes, `skill-audit`).
+- `export` and `get_skill`/`get_slide` parameters shadow builtins (`format`, `type`, `id`): `noqa: A002`.
+- `deck/tools.py` (US-0045): `export_file` checks the format first (`Unknown export format "x". Valid formats:
+  pptx, docx`, exact lower case), `create_file` checks the template key before the target and writes with
+  exclusive creation (`File already exists: <file>`, never overwrites even when the file appears late). The
+  exporters are imported lazily. `new` and `export` errors are the English `error: ...` lines since US-0045.
+- Tests: `tests/deck_support.py` `call_tool` (in process `fastmcp.Client`, own thread) and `run_cli`;
+  `tests/test_deck_tools_surface.py` holds E2E-010, 011, 028, tool vs CLI equality, the 15 name equality between
+  server and core, stdout cleanliness of a real `mcp-htmleditor mcp` process, and the spec closure test.
+- Closure test: acceptance ids E2E-001 to E2E-041 are read by `ast` from `tests/test_deck_*.py`, in the test
+  function name, its docstring or the comment lines right above it (the older tests carry the id in a docstring or
+  comment, not in the name; renaming them was more invasive). A new test of the spec must carry its id there.

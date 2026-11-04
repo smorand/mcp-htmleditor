@@ -47,7 +47,7 @@
 | US-0043 | SPEC-0007 | charter rules l007 to l011 | US-0042 | 2 | landed | story/US-0043-charter-rules-l007-to-l011 | story/US-0042-lint-command-and-structure-rules |
 | US-0044 | SPEC-0007 | lint problems in `outline` and `patch` | US-0040, US-0043 | 2 | landed | story/US-0044-lint-problems-in-outline-and-patch | story/US-0043-charter-rules-l007-to-l011 |
 | US-0045 | SPEC-0007 | template, new and export services on the command line | US-0034 | 2 | landed | story/US-0045-template-new-and-export-services | story/US-0044-lint-problems-in-outline-and-patch |
-| US-0046 | SPEC-0007 | `lint`, `list_templates`, `new_file`, `export` tools | US-0043, US-0045, US-0041, US-0025 | 2 | todo | | |
+| US-0046 | SPEC-0007 | `lint`, `list_templates`, `new_file`, `export` tools | US-0043, US-0045, US-0041, US-0025 | 2 | landed | story/US-0046-lint-templates-new-and-export-tools | story/US-0045-template-new-and-export-services |
 | US-0047 | SPEC-0009 | state per file in the state directory, expiring update flag | US-0046 | 3 | todo | | |
 | US-0048 | SPEC-0009 | atomic, guarded, conflict aware browser save (server side) | US-0047, US-0038 | 2 | todo | | |
 | US-0049 | SPEC-0009 | conflict choice, save failures and server loss in the editor | US-0048, US-0017 | 2 | todo | | |
