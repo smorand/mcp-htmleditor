@@ -508,7 +508,7 @@ vérifier que la bande de sources et le numéro de page sont visibles.
 
 ## 11. Export PPTX de la charte
 
-Le décor est dessiné par `_chrome_medical()` (`export/to_pptx.py`):
+Le décor est dessiné par `_chrome_medical()` (`export/pptx_chrome.py`):
 
 - fond selon le `data-slide-type`: blanc par défaut, `--med-dark` si la slide porte
   `dark`, panneau gris pour `section`, bleu nuit pour `thanks`;

@@ -201,7 +201,7 @@ Gantt entièrement en `style="..."` inline, sans `data-type="gantt"` ni
 sans exiger d'attribut ou de classe: c'est délibéré, pour rester correct sur un
 fichier qu'on ne peut pas ou ne doit pas réécrire juste pour l'export.
 
-Forme reconnue (voir `_is_inline_gantt`/`_is_inline_gantt_row` dans `to_pptx.py`):
+Forme reconnue (voir `_is_inline_gantt`/`_is_inline_gantt_row` dans `pptx_gantt.py`):
 
 ```html
 <div style="display:flex; align-items:stretch; min-height:26px;">

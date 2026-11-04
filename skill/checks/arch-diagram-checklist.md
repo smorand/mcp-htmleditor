@@ -172,10 +172,10 @@ Après tout calcul de layout (`mcp-htmleditor arch-layout` ou l'outil MCP
 ## Export PPTX (fidélité)
 
 - [ ] Un nœud imbriqué dans un `arch-col` s'exporte-t-il à la bonne position ?
-      (Bug corrigé dans `to_pptx.py::_render_arch_children` — vérifier sur tout
+      (Bug corrigé dans `pptx_arch.py::_render_arch_children` — vérifier sur tout
       nouveau cas de nesting profond ou de primitive ajoutée depuis.)
 - [ ] Un badge numéroté (`data-step`) s'exporte-t-il en cercle coloré avec le
-      numéro centré ? (`to_pptx.py::_render_arch_badge`, corrigé — vérifier sur
+      numéro centré ? (`pptx_arch.py::_render_arch_badge`, corrigé — vérifier sur
       tout nouveau cas si le format du badge a changé depuis.)
 - [ ] Comparer visuellement le rendu PPTX (LibreOffice ou PowerPoint) au rendu
       navigateur: les proportions doivent rester proches — le PPTX approxime

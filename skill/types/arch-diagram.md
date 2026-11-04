@@ -70,7 +70,7 @@ Les deux appellent la même fonction Python, zéro comportement différent.
 - **Invariant CSS dur**: `arch-row`/`arch-lane` ne doivent **jamais** recevoir
   `position:relative`. Les `%` calculés sur les `arch-node`/`arch-edge` se résolvent
   contre le conteneur `arch-diagram` de premier niveau, exactement comme l'export PPTX
-  les relit (`export/to_pptx.py::_render_arch`, traversée récursive) — poser
+  les relit (`export/pptx_arch.py::_render_arch`, traversée récursive) — poser
   `position:relative` sur un wrapper intermédiaire romprait cette parité en silence.
 
 ### Primitives avancées (V2): piles imbriquées, alignement, badges d'étape
@@ -120,7 +120,7 @@ Trois ajouts pour couvrir les diagrammes narratifs (flux numérotés, cartes ave
 
 Limite connue: le badge (`arch-edge-badge`) n'est pas encore converti à l'export PPTX
 (seul le segment/pointe/label le sont); documenté comme élément perdu à l'export tant
-que `export/to_pptx.py` n'a pas de branche dédiée.
+que `export/pptx_arch.py` n'a pas de branche dédiée.
 
 ### Édition à la souris (mode édition du navigateur)
 
