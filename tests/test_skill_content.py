@@ -64,7 +64,7 @@ def test_e2e_003_all_is_core_then_topics(skill_tree: SkillTree) -> None:
     assert not result.stdout.endswith("\n\n")
     assert result.stdout.startswith(SKILL_CORE_TITLE)
     assert result.stdout.count("\n\n# Skill topic: ") == 15
-    assert "checklist item" not in result.stdout
+    assert result.stdout.count("checklist item") == 1
 
 
 def test_core_output_is_stripped_with_one_newline(skill_tree: SkillTree) -> None:
@@ -159,3 +159,27 @@ def test_skill_dir_default_is_the_bundled_directory(monkeypatch: pytest.MonkeyPa
     assert config_module.skill_dir().name == "skill"
     assert "HTMLEDITOR_SKILL_DIR" in config_module._SIGNIFICANT_ENV_VARS
     assert "skill_dir_override" in config_module._PATH_FIELDS
+
+
+def test_arch_qa_output_is_topic_blank_line_checklist_newline(skill_tree: SkillTree) -> None:
+    library = skill_content.build_library(read_checklist=lambda: "\n- [ ] item one\n- [ ] item two\n\n")
+    text = library.topic_output("arch-qa")
+    assert (
+        text == "# Skill topic: arch-qa\n\n## Rules for arch-qa\n\nBody of arch-qa.\n\n- [ ] item one\n- [ ] item two\n"
+    )
+
+
+@pytest.mark.parametrize("checklist", ["", "  \n\n"])
+def test_arch_qa_with_an_empty_checklist_is_not_installed(skill_tree: SkillTree, checklist: str) -> None:
+    library = skill_content.build_library(read_checklist=lambda: checklist)
+    with pytest.raises(skill_content.NotInstalledError) as error:
+        library.topic_output("arch-qa")
+    assert error.value.exit_code == 1
+    assert error.value.message == 'Skill topic "arch-qa" has no checklist installed'
+    assert library.topic_output("gantt") == "# Skill topic: gantt\n\n## Rules for gantt\n\nBody of gantt.\n"
+
+
+def test_arch_qa_cli_exit_status_when_no_checklist_exists(skill_tree: SkillTree) -> None:
+    skill_tree.checklist_path.unlink()
+    assert_failure(run("--type", "arch-qa"), 'Skill topic "arch-qa" has no checklist installed', 1)
+    assert_failure(run("--all"), 'Skill topic "arch-qa" has no checklist installed', 1)

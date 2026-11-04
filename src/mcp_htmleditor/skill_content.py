@@ -56,6 +56,8 @@ BOTH_OPTIONS_MESSAGE = "Error: --type and --all cannot be used together"
 CORE_NOT_INSTALLED_MESSAGE = "Skill core is not installed"
 UNKNOWN_TOPIC_TEMPLATE = 'Unknown skill topic "{topic}". Valid topics: {valid}'
 TOPIC_NOT_INSTALLED_TEMPLATE = 'Skill topic "{topic}" is not installed'
+CHECKLIST_NOT_INSTALLED_TEMPLATE = 'Skill topic "{topic}" has no checklist installed'
+CHECKLIST_TOPIC = "arch-qa"
 
 
 class SkillError(Exception):
@@ -90,14 +92,19 @@ class SkillLibrary:
         return text.rstrip() + "\n"
 
     def topic_output(self, topic: str) -> str:
-        """Return one topic under its ``# Skill topic: <t>`` line; the core is never read."""
+        """Return one topic under its ``# Skill topic: <t>`` line, ``arch-qa`` followed by its checklist."""
         if topic not in TOPIC_NAMES:
             raise UnknownTopicError(UNKNOWN_TOPIC_TEMPLATE.format(topic=topic, valid=", ".join(TOPIC_NAMES)))
         try:
             body = (self.skill_dir / TOPICS_DIRNAME / f"{topic}.md").read_text(encoding="utf-8")
         except FileNotFoundError as exc:
             raise NotInstalledError(TOPIC_NOT_INSTALLED_TEMPLATE.format(topic=topic)) from exc
-        return f"# Skill topic: {topic}\n\n{body.strip()}\n"
+        if topic != CHECKLIST_TOPIC:
+            return f"# Skill topic: {topic}\n\n{body.strip()}\n"
+        checklist = self.read_checklist().strip()
+        if not checklist:
+            raise NotInstalledError(CHECKLIST_NOT_INSTALLED_TEMPLATE.format(topic=topic))
+        return f"# Skill topic: {topic}\n\n{body.strip()}\n\n{checklist}\n"
 
     def all_output(self) -> str:
         """Return the core then every topic, one empty line between parts; first missing part raises."""

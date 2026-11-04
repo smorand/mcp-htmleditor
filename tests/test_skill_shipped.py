@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from mcp_htmleditor import arch_checks
 from mcp_htmleditor.skill_content import SkillLibrary
 
 REPO = Path(__file__).resolve().parents[1]
@@ -56,8 +57,7 @@ DASHES = ("\u2014", "\u2013")
 
 
 def _library() -> SkillLibrary:
-
-    return SkillLibrary(SKILL_DIR, lambda: "")
+    return SkillLibrary(SKILL_DIR, arch_checks.read_shipped_checklist)
 
 
 def _existing_topics() -> list[str]:

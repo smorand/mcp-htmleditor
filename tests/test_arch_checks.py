@@ -155,9 +155,9 @@ def test_shipped_arch_qa_output_with_the_shipped_checklist_fits_the_topic_budget
     monkeypatch.delenv("HTMLEDITOR_SKILL_DIR", raising=False)
     config.reset_settings_cache()
     library = build_library(read_checklist=arch_checks.read_shipped_checklist)
-    # Design 3 rendering: workflow text, an empty line, the checklist (the code appends it in a later story).
-    head, _, body = library.topic_output("arch-qa").partition("\n\n")
-    text = f"{head}\n\n{body.strip()}\n\n{library.read_checklist().strip()}\n"
+    text = library.topic_output("arch-qa")
+    shipped = SHIPPED_CHECKLIST.read_text(encoding="utf-8")
+    assert text == f"# Skill topic: arch-qa\n\n{TOPIC_FILE.read_text(encoding='utf-8').strip()}\n\n{shipped.strip()}\n"
 
     assert len(text.encode("utf-8")) <= TOPIC_BUDGET_BYTES
     assert text.splitlines()[0] == "# Skill topic: arch-qa"
@@ -230,7 +230,10 @@ def test_e2e_025_unusable_user_location_resolves_to_the_shipped_checklist(
     result = CliRunner().invoke(main, ["arch-checklist"])
     assert result.exit_code == 0
     assert "2 passes" in result.stdout
-    assert CliRunner().invoke(main, ["skill", "--type", "arch-qa"]).exit_code == 0
+    skill = CliRunner().invoke(main, ["skill", "--type", "arch-qa"])
+    assert skill.exit_code == 0
+    assert SHIPPED_CHECKLIST.read_text(encoding="utf-8").strip() in skill.stdout
+    assert "2 passes" in skill.stdout and "arch-col" in skill.stdout
 
 
 def test_e2e_025_larger_user_checklist_is_printed_unchanged(
@@ -247,3 +250,18 @@ def test_e2e_025_larger_user_checklist_is_printed_unchanged(
     result = CliRunner().invoke(main, ["arch-checklist"])
     assert result.exit_code == 0
     assert text.strip() in result.stdout
+    skill = CliRunner().invoke(main, ["skill", "--type", "arch-qa"])
+    assert skill.exit_code == 0
+    assert skill.stdout.endswith(f"\n\n{text.strip()}\n")
+
+
+def test_skill_audit_measures_arch_qa_with_the_shipped_checklist(
+    monkeypatch: pytest.MonkeyPatch, no_global_tracing: None
+) -> None:
+    monkeypatch.delenv("HTMLEDITOR_SKILL_DIR", raising=False)
+    config.reset_settings_cache()
+    text = build_library(read_checklist=arch_checks.read_shipped_checklist).topic_output("arch-qa")
+    result = CliRunner().invoke(main, ["skill-audit"])
+    line = next(row for row in result.stdout.splitlines() if "arch-qa" in row)
+    assert str(len(text.encode("utf-8"))) in line.replace(" ", "").replace(",", "")
+    assert line.rstrip().endswith("OK")
