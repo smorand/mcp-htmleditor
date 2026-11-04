@@ -163,5 +163,29 @@
     "position:relative",
     "Garder `data-x`/`data-y` strictement égaux aux `left`/`top` du style inline",
     "12 points"
+  ],
+  "arch-diagram": [
+    "Ne jamais calculer de position à la main",
+    "mcp-htmleditor arch-layout",
+    "layout_arch_diagram",
+    "data-type=\"arch-row\"",
+    "arch-col",
+    "arch-spacer",
+    "arch-lane",
+    "data-step",
+    "data-span",
+    "data-height-weight",
+    "`position:relative`. Les `%` calculés",
+    "data-from",
+    "data-to",
+    "data-layout=\"manual\""
+  ],
+  "templates": [
+    "pandoc input.pptx -o output.html --standalone --extract-media=./media",
+    "data-type=\"slide\"",
+    "data-editable=\"text\"",
+    "data-doc-type=\"presentation\"",
+    "templates/reference/slides/",
+    "base64"
   ]
 }
