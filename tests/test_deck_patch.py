@@ -389,7 +389,6 @@ def test_deck_patch_a_document_reports_the_presentation_before_a_later_shape_err
     [
         {"op": "replace_slide", "id": "slide-1", "html": "<article></article>"},
         {"op": "insert_slide", "after": "slide-1", "html": "<article></article>"},
-        {"op": "delete_slide", "id": "slide-1"},
         {"op": "move_slide", "id": "slide-1", "after": "slide-2"},
     ],
 )

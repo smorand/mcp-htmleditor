@@ -17,8 +17,8 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
 
 ## `patch FILE --ops PATH|- [--dry-run]` (`deck/patch.py`, US-0038)
 
-- Operations are a JSON list; the five names are parsed and validated, only `set_text` runs for now
-  (the other four fail with `operation "<op>" is not supported yet` once their ids exist):
+- Operations are a JSON list; the five names are parsed and validated, `set_text` and `delete_slide` run
+  (the other three fail with `operation "<op>" is not supported yet` once their ids exist, US-0040):
   `set_text{id,selector,text}`, `replace_slide{id,html}`, `insert_slide{after,html}`, `delete_slide{id}`,
   `move_slide{id,after}`. Result, compact: `{"ok","changed","slides","problems"}` plus a last `dry_run`.
 - Check order: template guard (resolved path holds `templates/bootstrap` or `templates/reference`), file
@@ -37,6 +37,33 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
 - Write: `fileio.atomic_write` (mkstemp in the directory, fsync, mode copied, `Path.replace`, temp removed on
   failure, symlinks followed, `file.write` span). The update flag is an injected callback, True only around
   the write, never on dry run or no change. UTF-8 BOM and CRLF are kept.
+- `delete_slide{id}` (US-0039): drops the slide atom (its `pre` goes with it, so deleting the last slide leaves
+  the text after it as is). Order: `unknown slide id` (also for an id deleted earlier in the patch, ids always
+  designate the ORIGINAL slides), then `cannot delete the last slide` when the working copy holds one slide.
+  Sets `Working.is_structural`.
+- Dry run (`dry_run=True`, `--dry-run`): the whole pipeline runs, only the write is skipped; errors identical.
+
+## Renumbering (`deck/renumber.py`, US-0039)
+
+- `renumber_edits(text) -> list[Edit]`, `apply_edits(text, edits)` (from the end). Runs ONCE on the assembled
+  text after all operations, only if the patch held a structural operation; `set_text` alone never renumbers.
+  Cost: one scan, one parse, one linear pass over the slides.
+- Idempotence: an edit whose replacement equals the current bytes is dropped; a consistent file gives `[]`
+  and stays byte identical (tests on the three presentation fixtures and after a delete).
+- Rules (same observable result as `renumberSlides` in `static/editor-slides.js`): slides from `find_slides`;
+  `id` and `data-id` set to `slide-N` (appended after the last attribute when missing, `id` first); `active`
+  removed everywhere and added on slide 0 (other classes and their order kept, an existing `active` on slide 0
+  stays where it is); eyebrow pattern `Slide <n> / <total>` becomes `Slide 0N / TT`; Carbon
+  `.slide-footer-right` pattern becomes `Slide N / TT`, other charters `.slide-foot-page` content becomes `N`
+  (charter from `detect_charter`); absent elements are never created; first element of each kind only.
+- Script: `const TOTAL = <n>;` only its digits change; `const slideNames = [...];` is rewritten one entry per
+  line, first entry's indent, trailing comma, closing `];` at the `const` line's indent, line ending of the
+  existing block (CRLF kept). Entries: `data-title` decoded, `\` `"` newline escaped, `</` written `<\/`;
+  a slide with no `data-title` gets `Slide` (as the editor does). Nothing is created when a constant is
+  missing; `slideNames.forEach` is not matched. The list ends at the first `]` outside a string.
+- Limits: a duplicated attribute is edited on its first occurrence only; a counter written through an entity
+  is not recognised.
+
 - Tests: `assert_only_region_changed(before, after, marker)` in `tests/deck_support.py` proves byte identity
   outside the element found by plain substring search.
 

@@ -1,9 +1,11 @@
 """Apply a list of operations to a deck file in one atomic write (SPEC-0007 FR-NEW-003, FR-NEW-004).
 
 The file text is cut into a working copy: an ordered list of raw gaps and slide atoms (DEC-003). Only
-``set_text`` is executed; the four structural operations are parsed and validated, then refused until
-they land. The output is the join of the atoms, so bytes outside an edit are identical by construction.
-Cost: one scan and one parse of the file, plus one scan and one parse of the slide per ``set_text``.
+``set_text`` and ``delete_slide`` are executed; the other structural operations are parsed and validated,
+then refused until they land. The output is the join of the atoms, so bytes outside an edit are identical
+by construction. After the last operation a structural patch is renumbered once (``renumber.py``).
+Cost: one scan and one parse of the file, one scan and one parse of the slide per ``set_text``, and for a
+structural patch one more scan and parse of the assembled text.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from bs4.element import Tag
 
 from ..fileio import atomic_write
 from . import Deck, DeckError, load_deck, slide_id
+from .renumber import apply_edits, renumber_edits
 from .scan import Node, scan
 
 TEMPLATE_FOLDERS = (("templates", "bootstrap"), ("templates", "reference"))
@@ -59,6 +62,7 @@ class Working:
     def __init__(self, deck: Deck) -> None:
         self._atoms: list[Atom] = []
         self._position: dict[str, int] = {}
+        self.is_structural = False
         nodes: dict[tuple[int | None, int | None], Node] = {(node.line, node.col): node for node in scan(deck.text)}
         cursor = 0
         for index, tag in enumerate(deck.slides):
@@ -83,6 +87,15 @@ class Working:
         if slide not in self._position:
             raise OperationError(f'unknown slide id "{slide}"')
         return self._position[slide]
+
+    def delete_slide(self, slide: str) -> None:
+        """Remove the atom of ``slide``: its leading line break and the slide; the last slide is protected."""
+        position = self.require_slide(slide)
+        if self.slide_count == 1:
+            raise OperationError("cannot delete the last slide")
+        self._atoms[position] = Atom("", None, touched=True)
+        del self._position[slide]
+        self.is_structural = True
 
     def set_text(self, slide: str, selector: str, text: str) -> None:
         """Replace the inner content of the first element matching ``selector`` in ``slide`` by ``text``."""
@@ -128,8 +141,11 @@ def apply_patch(
             _apply_operation(working, deck, operation)
         except OperationError as exc:
             raise _failure(number, str(exc)) from exc
-    data = working.text().encode("utf-8")
-    is_changed = working.text() != deck.text
+    text = working.text()
+    if working.is_structural:
+        text = apply_edits(text, renumber_edits(text))
+    data = text.encode("utf-8")
+    is_changed = text != deck.text
     if is_changed and not dry_run:
         _write(file, data, set_update_flag)
     result: dict[str, Any] = {"ok": True, "changed": is_changed, "slides": working.slide_count, "problems": []}
@@ -164,6 +180,9 @@ def _apply_operation(working: Working, deck: Deck, operation: Operation) -> None
     fields = operation.fields
     if operation.op == "set_text":
         working.set_text(fields["id"], fields["selector"], fields["text"])
+        return
+    if operation.op == "delete_slide":
+        working.delete_slide(fields["id"])
         return
     for field in SLIDE_REFERENCES:
         if field in fields:
