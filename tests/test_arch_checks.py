@@ -5,8 +5,28 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
 from mcp_htmleditor import arch_checks, config
+from mcp_htmleditor import cli as cli_module
+from mcp_htmleditor.cli import main
+from mcp_htmleditor.skill_audit import find_stale
+from mcp_htmleditor.skill_content import TOPIC_BUDGET_BYTES, build_library
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SHIPPED_SKILL = REPO_ROOT / "skill"
+TOPIC_FILE = SHIPPED_SKILL / "topics" / "arch-qa.md"
+SHIPPED_CHECKLIST = SHIPPED_SKILL / "checks" / "arch-diagram-checklist.md"
+ARCHIVE = REPO_ROOT / "docs" / "skill-archive"
+PART_BUDGET_BYTES = 3800
+ARCHIVED_CHECKLIST_BYTES = 11860  # the pre cut file at HEAD of US-0032 (the spec text says 11 856)
+DASHES = ("\u2014", "\u2013")
+
+
+@pytest.fixture
+def no_global_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CLI group would install the process wide tracer, which tests/test_tracing.py owns."""
+    monkeypatch.setattr(cli_module, "configure_tracing", lambda settings=None: None)
 
 
 def test_checklist_path_falls_back_to_the_bundled_repo_copy() -> None:
@@ -118,3 +138,112 @@ def test_read_shipped_checklist_is_empty_on_any_failure(tmp_path: Path, monkeypa
     _use_checks(monkeypatch, tmp_path / "none", shipped)
 
     assert arch_checks.read_shipped_checklist() == ""
+
+
+def _bytes(path: Path) -> int:
+    return len(path.read_bytes())
+
+
+def test_shipped_parts_respect_their_size_bounds() -> None:
+    assert _bytes(TOPIC_FILE) <= PART_BUDGET_BYTES
+    assert _bytes(SHIPPED_CHECKLIST) <= PART_BUDGET_BYTES
+
+
+def test_shipped_arch_qa_output_with_the_shipped_checklist_fits_the_topic_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("HTMLEDITOR_SKILL_DIR", raising=False)
+    config.reset_settings_cache()
+    library = build_library(read_checklist=arch_checks.read_shipped_checklist)
+    # Design 3 rendering: workflow text, an empty line, the checklist (the code appends it in a later story).
+    head, _, body = library.topic_output("arch-qa").partition("\n\n")
+    text = f"{head}\n\n{body.strip()}\n\n{library.read_checklist().strip()}\n"
+
+    assert len(text.encode("utf-8")) <= TOPIC_BUDGET_BYTES
+    assert text.splitlines()[0] == "# Skill topic: arch-qa"
+    assert text.endswith("\n") and not text.endswith("\n\n")
+    assert "2 passes" in text and "arch-col" in text
+    assert not [line for line in text.splitlines() if line.startswith("Reference:")]
+
+
+def test_shipped_checklist_keeps_its_load_bearing_words() -> None:
+    text = SHIPPED_CHECKLIST.read_text(encoding="utf-8")
+
+    assert "2 passes" in text
+    assert "arch-col" in text
+    assert "- [ ] " in text
+    assert "# Skill topic:" not in text
+
+
+def test_topic_file_keeps_the_protocol_names() -> None:
+    text = TOPIC_FILE.read_text(encoding="utf-8")
+
+    for name in (
+        "mcp-htmleditor arch-layout",
+        "layout_arch_diagram",
+        "mcp-htmleditor arch-checklist",
+        "2 passes maximum",
+        "mcp-htmleditor skill --type create",
+        "mcp-htmleditor skill --type arch-diagram",
+    ):
+        assert name in text, name
+    assert "# Skill topic:" not in text
+
+
+@pytest.mark.parametrize("path", [TOPIC_FILE, SHIPPED_CHECKLIST])
+def test_arch_qa_texts_have_no_stale_statement_nor_dash(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
+
+    assert find_stale(text, include_counts=False) == []
+    assert not any(dash in text for dash in DASHES)
+    assert "skill/workflow-arch-qa.md" not in text
+    assert "skill/types/" not in text
+
+
+def test_workflow_text_and_original_checklist_are_archived() -> None:
+    assert not (SHIPPED_SKILL / "workflow-arch-qa.md").exists()
+    assert (ARCHIVE / "workflow-arch-qa.md").stat().st_size > 0
+    assert _bytes(ARCHIVE / "arch-diagram-checklist.md") == ARCHIVED_CHECKLIST_BYTES
+
+
+def _use_user_location(monkeypatch: pytest.MonkeyPatch, user: Path) -> None:
+    monkeypatch.setenv("HTMLEDITOR_ARCH_CHECKS_DIR", str(user))
+    config.reset_settings_cache()
+
+
+@pytest.mark.parametrize("kind", ["empty", "directory"])
+def test_e2e_025_unusable_user_location_resolves_to_the_shipped_checklist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, no_global_tracing: None, kind: str
+) -> None:
+    """Empty file or directory at the user location: the shipped (cut) checklist is read, the command exits 0."""
+    user = tmp_path / "user-checks"
+    user.mkdir()
+    target = user / arch_checks.CHECKLIST_FILENAME
+    if kind == "empty":
+        target.write_text("", encoding="utf-8")
+    else:
+        target.mkdir()
+    _use_user_location(monkeypatch, user)
+
+    assert arch_checks.read_checklist() == SHIPPED_CHECKLIST.read_text(encoding="utf-8")
+    assert arch_checks.read_checklist() == arch_checks.read_shipped_checklist()
+    result = CliRunner().invoke(main, ["arch-checklist"])
+    assert result.exit_code == 0
+    assert "2 passes" in result.stdout
+    assert CliRunner().invoke(main, ["skill", "--type", "arch-qa"]).exit_code == 0
+
+
+def test_e2e_025_larger_user_checklist_is_printed_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, no_global_tracing: None
+) -> None:
+    user = tmp_path / "user-checks"
+    user.mkdir()
+    text = "- [ ] one\n" * 900
+    (user / arch_checks.CHECKLIST_FILENAME).write_text(text, encoding="utf-8")
+    _use_user_location(monkeypatch, user)
+
+    assert len(text) > _bytes(SHIPPED_CHECKLIST)
+    assert arch_checks.read_checklist() == text
+    result = CliRunner().invoke(main, ["arch-checklist"])
+    assert result.exit_code == 0
+    assert text.strip() in result.stdout
