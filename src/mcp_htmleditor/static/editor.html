@@ -50,6 +50,17 @@
     </button>
   </div>
 
+  <!-- Save notices (SPEC-0009): never focused by script, no autofocus; only the two conflict buttons are focusable -->
+  <div id="notices" role="status">
+    <div id="save-conflict" class="notice" hidden>
+      <span class="notice-text">The file changed on disk. Reload to see the changes, or keep your version.</span>
+      <button type="button" id="save-conflict-reload">Reload</button>
+      <button type="button" id="save-conflict-keep">Keep mine</button>
+    </div>
+    <div id="save-error" class="notice" hidden><span class="notice-text"></span></div>
+    <div id="connection-lost" class="notice" hidden><span class="notice-text">Connection to the editor server lost</span></div>
+  </div>
+
   <!-- Slide-type picker modal -->
   <div id="slide-picker" style="display:none">
     <div class="picker-backdrop"></div>

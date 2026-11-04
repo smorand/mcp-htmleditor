@@ -16,7 +16,13 @@
    State
    ============================================================ */
 let pollInterval = 1000;
-let lastMtime     = null;
+let lastMtime     = null;      // the poll's reload detector
+let baseMtime     = null;      // mtime this page last read or wrote; sent with each save (FR-NEW-002)
+let conflictActive = false;    // a save was refused with 409 and the choice is pending
+let conflictMtime = null;      // mtime of the 409 answer, adopted by Reload
+let pollFailures  = 0;         // consecutive failed status polls
+let saveChain     = Promise.resolve(); // saves run one after the other
+let saveCount     = 0;        // finished saves, lets a poll spot a save that happened during it
 let wasUpdating   = false;
 let editMode      = false;
 let saveTimer     = null;
@@ -29,6 +35,8 @@ let insertPosition = null;    // 'before' | 'after' when slide picker is open
 let blockPosition  = null;    // 'before' | 'after' when block picker is open
 let lastDocRange   = null;    // saved caret range in document mode
 let archConnectSource = null; // {node, doc} while picking an edge's target node
+
+const POLL_FAILURE_LIMIT = 3;
 
 const frame        = document.getElementById('content-frame');
 const undoBtn       = document.getElementById('undo-btn');
@@ -74,12 +82,15 @@ const docActions   = document.getElementById('toolbar-doc-actions');
     const st = await fetch('/status').then(r => r.json());
     pollInterval = st.poll_interval || 1000;
     lastMtime    = st.mtime;
+    baseMtime    = st.mtime != null ? st.mtime : null;
     const name   = (st.filename || '').split('/').pop();
     document.getElementById('toolbar-filename').textContent = name;
     document.title = name || 'HTML Editor';
   } catch (e) {
     console.warn('Could not reach /status', e);
   }
+
+  initNotices();
 
   editBtn.addEventListener('click', () => {
     editMode = !editMode;
@@ -296,12 +307,20 @@ function triggerExport(format) {
     .finally(() => { btn.disabled = false; btn.textContent = label; });
 }
 async function pollStatus() {
+  const savesBefore = saveCount;
   let status;
-  try { status = await fetch('/status').then(r => r.json()); }
-  catch (e) { return; }
+  try {
+    const res = await fetch('/status');
+    if (res.status !== 200) throw new Error('status ' + res.status);
+    status = await res.json();
+  } catch (e) { notePollFailure(); return; }
+  notePollSuccess();
+  // A save started or finished while this poll was in flight: its mtime may predate our own write.
+  if (selfSaving || saveCount !== savesBefore) return;
 
   const name = (status.filename || '').split('/').pop();
   document.getElementById('toolbar-filename').textContent = name || '—';
+  if (baseMtime === null && status.mtime != null) baseMtime = status.mtime;
 
   if (status.update_in_progress) {
     overlay.style.display = 'flex';
@@ -319,11 +338,14 @@ async function pollStatus() {
     if ((wasUpdating || externalChange) && !status.update_in_progress) {
       wasUpdating = false;
       lastMtime   = status.mtime;
+      baseMtime   = status.mtime; // the page now shows this version of the file
+      conflictActive = false;
+      hideNotice('save-conflict');
       reloadFrame();
       return;
     }
   }
-  lastMtime = status.mtime;
+  lastMtime = status.mtime; // baseMtime stays: unsaved edits are still based on the version they started from
 }
 
 function reloadFrame() {

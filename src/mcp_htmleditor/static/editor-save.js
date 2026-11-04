@@ -5,7 +5,15 @@ function onEditableInput()  { markPending(); clearTimeout(saveTimer); saveTimer 
 function onEditableBlur()   { clearTimeout(saveTimer); saveContent(); }
 function scheduleSave()     { markPending(); clearTimeout(saveTimer); saveTimer = setTimeout(saveContent, 600); }
 
-async function saveContent() {
+/* Saves run one after the other, so a save never sends a base mtime that an earlier one is about to replace. */
+function saveContent(options) {
+  saveChain = saveChain.then(() => runSave(options));
+  return saveChain;
+}
+
+async function runSave(options) {
+  const force = !!(options && options.force === true);
+  if (conflictActive && !force) return; // the conflict choice comes first, no autosave meanwhile
   try {
     const doc = frame.contentDocument;
     if (!doc) return;
@@ -22,28 +30,95 @@ async function saveContent() {
     clone.querySelectorAll('._mcp_drag_handle, ._mcp_drop_indicator').forEach(node => node.remove());
     clone.querySelectorAll('._mcp_drag_host').forEach(host => host.classList.remove('_mcp_drag_host'));
 
-    const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+    const payload = { html: '<!DOCTYPE html>\n' + clone.outerHTML };
+    if (baseMtime !== null) payload.base_mtime = baseMtime;
+    if (force) payload.force = true;
 
     selfSaving = true;
-    await fetch('/content', {
+    const res = await fetch('/content', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html }),
+      body: JSON.stringify(payload),
     });
+    let answer = {};
+    try { answer = await res.json(); } catch (e) { /* no JSON body: the status alone decides */ }
 
-    // Adopt the on-disk mtime produced by our own write, so the next poll
-    // does not mistake it for an external change and reload the iframe.
-    try {
-      const st = await fetch('/status').then(r => r.json());
-      lastMtime = st.mtime;
-    } catch (e) { /* keep previous mtime; worst case one harmless reload */ }
-    selfSaving = false;
-
-    markSaved();
-    saveTimer = null;
-
+    if (res.status === 200) onSaveAccepted(answer);
+    else if (res.status === 409) onSaveConflict(answer);
+    else showSaveError(answer.error || res.statusText || ('HTTP ' + res.status));
   } catch (e) {
+    showSaveError(e && e.message ? e.message : String(e));
+  } finally {
     selfSaving = false;
-    console.warn('Save failed:', e);
+    saveCount++;
   }
+}
+
+/** 200: the answer's mtime is both the next base and the poll's reference, so our own write never reloads. */
+function onSaveAccepted(answer) {
+  if (typeof answer.mtime === 'number') { baseMtime = answer.mtime; lastMtime = answer.mtime; }
+  conflictActive = false;
+  pollFailures = 0;
+  hideNotice('save-conflict');
+  hideNotice('save-error');
+  hideNotice('connection-lost');
+  markSaved();
+  saveTimer = null;
+}
+
+/** 409: the file changed on disk; keep the unsaved state and let the user choose. */
+function onSaveConflict(answer) {
+  conflictActive = true;
+  conflictMtime = typeof answer.mtime === 'number' ? answer.mtime : null;
+  hideNotice('save-error');
+  showNotice('save-conflict');
+}
+
+/* ============================================================
+   Notices (#notices): no focusable element except the two conflict buttons, never focused by script
+   ============================================================ */
+function showNotice(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (text !== undefined) el.querySelector('.notice-text').textContent = text;
+  el.hidden = false;
+}
+
+function hideNotice(id) {
+  const el = document.getElementById(id);
+  if (el) el.hidden = true;
+}
+
+function showSaveError(text) {
+  console.warn('Save failed:', text);
+  showNotice('save-error', 'Save failed: ' + text);
+}
+
+/** Reload: show the file as it is on disk, drop the unsaved edits, forget the conflict. */
+function reloadFromDisk() {
+  clearTimeout(saveTimer);
+  if (conflictMtime !== null) { baseMtime = conflictMtime; lastMtime = conflictMtime; }
+  conflictActive = false;
+  hideNotice('save-conflict');
+  hideNotice('save-error');
+  markSaved();
+  reloadFrame();
+}
+
+function initNotices() {
+  const reload = document.getElementById('save-conflict-reload');
+  const keep = document.getElementById('save-conflict-keep');
+  if (reload) reload.addEventListener('click', reloadFromDisk);
+  if (keep) keep.addEventListener('click', () => saveContent({ force: true }));
+}
+
+/** One status poll: count failures, show the notice at three in a row, clear it at the next success. */
+function notePollFailure() {
+  pollFailures++;
+  if (pollFailures >= POLL_FAILURE_LIMIT) showNotice('connection-lost');
+}
+
+function notePollSuccess() {
+  pollFailures = 0;
+  hideNotice('connection-lost');
 }
