@@ -30,7 +30,7 @@
 | US-0027 | SPEC-0006 | topics medical and medical-sources | US-0025 | 2 | landed | story/US-0027-topics-medical-and-medical-sources | story/US-0026-topics-slides-carbon-and-slides-ei |
 | US-0028 | SPEC-0006 | topics create and export | US-0025 | 2 | landed | story/US-0028-topics-create-and-export | story/US-0027-topics-medical-and-medical-sources |
 | US-0029 | SPEC-0006 | topics document and mail | US-0025 | 2 | landed | story/US-0029-topics-document-and-mail | story/US-0028-topics-create-and-export |
-| US-0030 | SPEC-0006 | topics website and tables | US-0025 | 2 | todo | | |
+| US-0030 | SPEC-0006 | topics website and tables | US-0025 | 2 | landed | story/US-0030-topics-website-and-tables | story/US-0029-topics-document-and-mail |
 | US-0031 | SPEC-0006 | topics gantt and annotated-image | US-0025 | 2 | todo | | |
 | US-0032 | SPEC-0006 | topics arch-diagram and templates | US-0025 | 2 | todo | | |
 | US-0033 | SPEC-0006 | topic arch-qa and the cut shipped checklist | US-0025 | 2 | todo | | |
