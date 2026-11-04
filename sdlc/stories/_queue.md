@@ -27,7 +27,7 @@
 | US-0024 | SPEC-0006 | audit tool list check and stale statement check | US-0023 | 2 | landed | story/US-0024-audit-tool-list-and-stale-checks | story/US-0023-skill-audit-sizes-and-budgets |
 | US-0025 | SPEC-0006 | core text, routing skill, shipped content gates | US-0024 | 2 | landed | story/US-0025-core-text-routing-skill-and-gates | story/US-0024-audit-tool-list-and-stale-checks |
 | US-0026 | SPEC-0006 | topics slides-carbon and slides-ei | US-0025 | 2 | landed | story/US-0026-topics-slides-carbon-and-slides-ei | story/US-0025-core-text-routing-skill-and-gates |
-| US-0027 | SPEC-0006 | topics medical and medical-sources | US-0025 | 2 | todo | | |
+| US-0027 | SPEC-0006 | topics medical and medical-sources | US-0025 | 2 | landed | story/US-0027-topics-medical-and-medical-sources | story/US-0026-topics-slides-carbon-and-slides-ei |
 | US-0028 | SPEC-0006 | topics create and export | US-0025 | 2 | todo | | |
 | US-0029 | SPEC-0006 | topics document and mail | US-0025 | 2 | todo | | |
 | US-0030 | SPEC-0006 | topics website and tables | US-0025 | 2 | todo | | |

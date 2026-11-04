@@ -31,5 +31,40 @@
     "class=\"slide dense\"",
     "Ne jamais supprimer les `data-type`, `data-id`, `data-title`",
     "buildOptions()"
+  ],
+  "medical": [
+    "Jamais de mélange de chartes",
+    "--med-teal",
+    "--med-orange",
+    ".med-band",
+    "<i></i><b></b>",
+    "class=\"slide dark\"",
+    "w-25",
+    "w-70",
+    "data-slide-type",
+    ".slide-foot-page",
+    "Trebuchet MS",
+    "make sync-medical-css",
+    "jamais de sens porté par la seule couleur",
+    "Ne jamais réduire la taille de police",
+    "class=\"slide dense\"",
+    "class=\"med-table compact\"",
+    "16 layouts",
+    "Chaque enfant direct d'une rangée porte une classe de largeur explicite"
+  ],
+  "medical-sources": [
+    ".med-source",
+    "src-title",
+    "Vancouver",
+    "ICMJE",
+    "DICOM",
+    "PatientName",
+    "AccessionNumber",
+    "Toute slide portant des pixels de tiers a une ligne",
+    "Citer n'est pas obtenir un droit",
+    "J+14",
+    "Figure N reproduite de",
+    "Jamais",
+    "Courtoisie de l'unité de pneumologie interventionnelle"
   ]
 }
