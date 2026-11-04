@@ -308,3 +308,10 @@ class _BuilderBase:
     article: Tag
     index: int
     handled: set[int]
+
+    def _has_block_children(self, element: Tag) -> bool:
+        raise NotImplementedError
+
+    @staticmethod
+    def _is_block_child(child: Tag) -> bool:
+        raise NotImplementedError
