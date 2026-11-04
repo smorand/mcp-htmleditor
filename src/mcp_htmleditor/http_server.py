@@ -511,7 +511,7 @@ def write_save(target: Path, request: SaveRequest) -> float:
     # so the file stays clean for LLM agents.
     if "<html" not in html.lower():
         html = _rebuild_full_html(html, str(target))
-    atomic_write(target, _strip_editor_artifacts(html))
+    atomic_write(target, _strip_editor_artifacts(html), reason="keep-mine" if request.force else "browser-save")
     return target.stat().st_mtime
 
 

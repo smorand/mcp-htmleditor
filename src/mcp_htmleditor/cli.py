@@ -345,6 +345,32 @@ def _read_operations(source: str) -> object:
         raise DeckError(f"Invalid operations JSON: {exc}") from exc
 
 
+@main.command("history")
+@click.argument("file", type=click.Path(dir_okay=False))
+@deck_command
+def history_cmd(file: str) -> None:
+    """List the kept versions of FILE, newest first."""
+    from .history import list_versions
+
+    _, versions = list_versions(file)
+    for version in versions:
+        click.echo(f"{version.id}  {version.bytes} bytes  {version.reason}")
+    if not versions:
+        click.echo(f"No history for {file}")
+
+
+@main.command("restore")
+@click.argument("file", type=click.Path(dir_okay=False))
+@click.argument("version_id")
+@deck_command
+def restore_cmd(file: str, version_id: str) -> None:
+    """Put version VERSION_ID of FILE back, keeping the current content in the history first."""
+    from .history import restore_version
+
+    restore_version(file, version_id)
+    click.echo(f"Restored {file} to {version_id}")
+
+
 @main.command("export")
 @click.argument("format")
 @click.argument("input_file", type=click.Path(dir_okay=False))
