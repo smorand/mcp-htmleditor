@@ -66,5 +66,32 @@
     "Figure N reproduite de",
     "Jamais",
     "Courtoisie de l'unité de pneumologie interventionnelle"
+  ],
+  "create": [
+    "Une modification humaine trouvée sur le fichier est volontaire",
+    "data-editable=\"text\"",
+    "data-editable=\"resize,reposition\"",
+    "data-doc-type=\"presentation\"",
+    "Kebab-case",
+    "toujours copier `slides-empty.html`",
+    "update_start()",
+    "update_end()",
+    "Réécrire le fichier HTML COMPLET",
+    "jamais supposer 7842 en dur",
+    "Ne jamais supprimer: data-type, data-id, data-title"
+  ],
+  "export": [
+    "mcp-htmleditor export pptx input.html output.pptx",
+    "mcp-htmleditor export docx input.html output.docx",
+    "data-doc-type=\"presentation\"",
+    "data-doc-template",
+    "reference.docx",
+    "--reference-doc",
+    "Perdu",
+    "Approximé",
+    "Converti fidèlement",
+    "16:9",
+    "SVG",
+    "base64"
   ]
 }
