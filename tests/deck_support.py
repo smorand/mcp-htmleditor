@@ -128,6 +128,7 @@ def _retitle_cover(charter: str, cover: str, title: str, total: int) -> str:
     if charter == "carbon":
         cover = cover.replace("<strong>Titre</strong> de la présentation", f"<strong>{title}</strong>")
         cover = cover.replace("Slide 01 / 01", f"Slide 01 / {total:02d}").replace("Slide 1 / 1", f"Slide 1 / {total}")
+        cover = cover.replace("Contenu de la slide…", f"Texte de {title}.")
     if charter == "medical":
         cover = cover.replace("Titre de la <span>présentation</span>", title)
     return cover
@@ -305,3 +306,15 @@ def set_names_len(html: str, n: int) -> str:
     """Return ``html`` with the ``slideNames`` list rewritten to ``n`` entries."""
     names = "".join(f'    "Nom {i}",\n' for i in range(n))
     return re.sub(r"const slideNames = \[.*?\];", lambda _: f"const slideNames = [\n{names}  ];", html, flags=re.S)
+
+
+def replace_in_slide(html: str, slide_index: int, old: str, new: str) -> str:
+    """Return ``html`` with every ``old`` of slide ``slide_index`` replaced by ``new`` (``old`` must be there)."""
+    start, end = _slide_bounds(html, slide_index)
+    assert old in html[start:end], f"{old!r} is not in slide {slide_index}"
+    return html[:start] + html[start:end].replace(old, new) + html[end:]
+
+
+def add_style(html: str, slide_index: int, style_fragment: str) -> str:
+    """Return ``html`` with a ``<span>`` carrying ``style="<style_fragment>"`` appended to the slide body."""
+    return inject_html(html, slide_index, f'<span style="{style_fragment}">x</span>')

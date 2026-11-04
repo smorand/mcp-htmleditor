@@ -1,9 +1,10 @@
-"""Lint a presentation: structure rules L001 to L006 (SPEC-0007 FR-NEW-012, FR-NEW-013, DEC-008).
+"""Lint a file: structure rules L001 to L006, charter rules L007 to L011 (SPEC-0007 FR-NEW-012 to FR-NEW-014, DEC-008).
 
 Rules are plain functions held in two tables keyed by code: file scope rules read the whole deck and
 return ``(slide index or None, message)`` pairs, slide scope rules return messages for one slide.
-``lint_deck`` runs both, then orders the problems (whole file first, slide index, code; stable inside a
-code). A file that is not a presentation has no problem here. Expected counters are recomputed here, never
+The charter rules are in ``charter_rules.py``. ``lint_deck`` runs all of them, then orders the problems
+(whole file first, slide index, code; stable inside a code). A file that is not a presentation only gets
+L010 (remote images), with no slide. Expected counters are recomputed here, never
 read from ``deck/renumber.py`` (only its counter pattern is shared). No printing.
 """
 
@@ -17,6 +18,7 @@ from typing import Any
 from bs4.element import Comment, NavigableString, Tag
 
 from . import Deck, load_deck, slide_id
+from .charter_rules import WARNING, charter_problems, remote_image_message, remote_image_problems
 from .renumber import COUNTER
 
 ERROR = "error"
@@ -47,15 +49,48 @@ FilePair = tuple[int | None, str]
 
 def lint_deck(deck: Deck) -> list[Problem]:
     """Return every problem of ``deck``, ordered whole file first, then slide by slide, then by code."""
-    if deck.doc_type != "presentation":
-        return []
+    problems = _image_problems(deck)
+    if deck.doc_type == "presentation":
+        problems.extend(_structure_problems(deck))
+        problems.extend(_charter_problems(deck))
+    return sorted(problems, key=lambda p: (-1 if p.slide_index is None else p.slide_index, p.code))
+
+
+def _structure_problems(deck: Deck) -> list[Problem]:
     problems: list[Problem] = []
     for code, file_rule in FILE_RULES.items():
         problems.extend(_problem(deck, code, index, message) for index, message in file_rule(deck))
     for index, slide in enumerate(deck.slides):
         for code, slide_rule in SLIDE_RULES.items():
             problems.extend(_problem(deck, code, index, message) for message in slide_rule(deck, slide, index))
-    return sorted(problems, key=lambda p: (-1 if p.slide_index is None else p.slide_index, p.code))
+    return problems
+
+
+def _charter_problems(deck: Deck) -> list[Problem]:
+    return [
+        _problem(deck, code, index, message, severity)
+        for index, slide in enumerate(deck.slides)
+        for code, severity, message in charter_problems(slide, deck.charter)
+    ]
+
+
+def _image_problems(deck: Deck) -> list[Problem]:
+    """L010 for every file type: per slide in a presentation, else (and outside every slide) slide ``-``."""
+    if deck.doc_type != "presentation":
+        return [_problem(deck, "L010", None, message, WARNING) for message in remote_image_problems(deck.soup)]
+    problems = [
+        _problem(deck, "L010", index, message, WARNING)
+        for index, slide in enumerate(deck.slides)
+        for message in remote_image_problems(slide)
+    ]
+    inside = {id(image) for slide in deck.slides for image in slide.find_all("img")}
+    outside = (
+        message
+        for image in deck.soup.find_all("img")
+        if id(image) not in inside and (message := remote_image_message(image))
+    )
+    problems.extend(_problem(deck, "L010", None, message, WARNING) for message in outside)
+    return problems
 
 
 def lint_file(file: str) -> dict[str, Any]:
@@ -91,9 +126,9 @@ def _plural(number: int, noun: str) -> str:
     return f"{number} {noun}" if number == 1 else f"{number} {noun}s"
 
 
-def _problem(deck: Deck, code: str, index: int | None, message: str) -> Problem:
+def _problem(deck: Deck, code: str, index: int | None, message: str, severity: str = ERROR) -> Problem:
     label = None if index is None else _label(deck.slides[index], index)
-    return Problem(code, ERROR, index, label, message)
+    return Problem(code, severity, index, label, message)
 
 
 def _label(slide: Tag, index: int) -> str:

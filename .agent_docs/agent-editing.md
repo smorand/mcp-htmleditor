@@ -93,8 +93,8 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
   slide id: `data-id`, `id`, `slide-<index>`), then `lint: OK|FAIL (N errors, M warnings)` (`1 error`
   singular). Order: whole file, slide index, code, stable inside a code. `--json` prints only
   `{"problems":[{code,severity,slide,message}],"errors":n,"warnings":n}`, compact, `ensure_ascii` off.
-  Exit 1 when an error exists, warnings alone exit 0. Only presentations are checked (documents, mails
-  and websites return no problem until L010).
+  Exit 1 when an error exists, warnings alone exit 0. Structure and charter rules apply to presentations
+  only; every other file type gets L010 alone (slide `-`).
 - Rules are functions in two tables keyed by code (`FILE_RULES`, `SLIDE_RULES`): L002 TOTAL, L003
   `slideNames` length, L004 duplicate beats out of order, L001 missing attributes, L005 counters (only
   an existing one; eyebrow, then Carbon footer or page element), L006 template text (scripts, styles
@@ -103,8 +103,27 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
   and backtick with `\` escapes, `//` and `/* */` comments skipped, a nested group counts as one entry.
 - Gotchas: a slide without `data-type` is only found by `find_slides` when no slide has it, so L001
   `data-type` fires on decks where none has it. `tests/deck_support.py` mutators find slides by
-  `<article\s`, because the bootstrap comments mention a bare `<article>`. The Carbon fixture cover keeps
-  the bootstrap line `Contenu de la slide`, so DECK-CARBON is not L006 clean.
+  `<article\s`, because the bootstrap comments mention a bare `<article>`.
+
+## Charter rules L007 to L011 (`deck/charter_rules.py`, US-0043)
+
+- `lint_deck` adds per slide `charter_problems(slide, charter)` (L007, L008, L009, L011 with their
+  severity, from the `deck.charter` key; unknown key: nothing) and L010 (`remote_image_problems`). The
+  class tables (`FOREIGN_CLASSES`), flex rows, width classes and `PALETTES` live in that module only.
+- L007: `class` attribute of every element, the slide itself included (bs4 splits on any whitespace),
+  names compared as written (case sensitive), one problem per distinct class per slide, first occurrence
+  order. Message names the charter key.
+- L008 (medical): one problem per direct child element of a flex row without a `w-25|30|33|40|50|60|70`
+  class; the message names the row class (first one in the element's class list). L009 (medical): exempt
+  `data-slide-type` `title` and `thanks`; any `img` needs a `.med-source` with non blank text.
+- L010: `src` of `img` (stripped, scheme case insensitive, shown stripped). Presentation: per slide, an
+  image outside every slide gets slide `-`; other types: all images, slide `-`. `//host` is not remote.
+- L011: hex colours of `style` attributes only (never `<style>`), after removing `url(...)` and `/* */`
+  (a data URI or fragment id is not a colour). One warning per distinct colour per slide, identity is the
+  upper case 6 digit form (`#abc` and `#AABBCC` are one), shown as first written. Accepted: palette,
+  white, black, any R=G=B. `rgb()`, `var()`, names, 4 and 8 digit hex are ignored (regex lookahead).
+- Mutators `replace_in_slide` and `add_style` in `tests/deck_support.py`. DECK-CARBON cover no longer
+  keeps `Contenu de la slide…` (replaced by the same text as the other slides), so it is lint clean.
 
 ## Scanner (`deck/scan.py`)
 
