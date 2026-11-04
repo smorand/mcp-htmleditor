@@ -87,6 +87,25 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
 - Tests: `assert_only_region_changed(before, after, marker)` in `tests/deck_support.py` proves byte identity
   outside the element found by plain substring search.
 
+## `lint FILE [--json]` (`deck/lint.py`, US-0042)
+
+- Output: one line per problem `<severity> <code> <slide> <message>` (`-` for the whole file, else the
+  slide id: `data-id`, `id`, `slide-<index>`), then `lint: OK|FAIL (N errors, M warnings)` (`1 error`
+  singular). Order: whole file, slide index, code, stable inside a code. `--json` prints only
+  `{"problems":[{code,severity,slide,message}],"errors":n,"warnings":n}`, compact, `ensure_ascii` off.
+  Exit 1 when an error exists, warnings alone exit 0. Only presentations are checked (documents, mails
+  and websites return no problem until L010).
+- Rules are functions in two tables keyed by code (`FILE_RULES`, `SLIDE_RULES`): L002 TOTAL, L003
+  `slideNames` length, L004 duplicate beats out of order, L001 missing attributes, L005 counters (only
+  an existing one; eyebrow, then Carbon footer or page element), L006 template text (scripts, styles
+  and comments excluded, whitespace collapsed). Absent `TOTAL` or `slideNames` is not a problem.
+- `count_literals` counts the top level entries of the `slideNames` list: string literals in `"`, `'`
+  and backtick with `\` escapes, `//` and `/* */` comments skipped, a nested group counts as one entry.
+- Gotchas: a slide without `data-type` is only found by `find_slides` when no slide has it, so L001
+  `data-type` fires on decks where none has it. `tests/deck_support.py` mutators find slides by
+  `<article\s`, because the bootstrap comments mention a bare `<article>`. The Carbon fixture cover keeps
+  the bootstrap line `Contenu de la slide`, so DECK-CARBON is not L006 clean.
+
 ## Scanner (`deck/scan.py`)
 
 - `scan(text)` returns `Node(tag, start, start_end, end_start, end_end, line, col)` in document order,

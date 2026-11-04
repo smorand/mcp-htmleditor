@@ -265,3 +265,43 @@ def call_tool(name: str, **arguments: str) -> tuple[bool, Any]:
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(asyncio.run, session()).result()
+
+
+def set_total(html: str, n: int) -> str:
+    """Return ``html`` with the ``const TOTAL`` constant set to ``n``."""
+    return re.sub(r"const TOTAL = \d+;", f"const TOTAL = {n};", html)
+
+
+def _slide_bounds(html: str, slide_index: int) -> tuple[int, int]:
+    """Return the offsets of the start of the Nth ``<article`` and the end of its ``</article>``."""
+    starts = [m.start() for m in re.finditer(r"<article\s", html)]
+    start = starts[slide_index]
+    return start, html.index("</article>", start) + len("</article>")
+
+
+def drop_attr(html: str, slide_index: int, attr: str) -> str:
+    """Return ``html`` with the attribute ``attr`` removed from the start tag of slide ``slide_index``."""
+    start, _ = _slide_bounds(html, slide_index)
+    tag_end = html.index(">", start) + 1
+    tag = re.sub(rf'\s+{re.escape(attr)}="[^"]*"', "", html[start:tag_end], count=1)
+    return html[:start] + tag + html[tag_end:]
+
+
+def inject_html(html: str, slide_index: int, fragment: str) -> str:
+    """Return ``html`` with ``fragment`` appended inside the ``.slide-body`` of slide ``slide_index``."""
+    start, end = _slide_bounds(html, slide_index)
+    body = html.index('class="slide-body"', start)
+    assert body < end, "the slide has no .slide-body"
+    depth = 0
+    for match in re.finditer(r"<div\b|</div>", html[body:end]):
+        depth += 1 if match.group().startswith("<div") else -1
+        if depth == -1:
+            at = body + match.start()
+            return html[:at] + fragment + html[at:]
+    raise AssertionError("unbalanced .slide-body")
+
+
+def set_names_len(html: str, n: int) -> str:
+    """Return ``html`` with the ``slideNames`` list rewritten to ``n`` entries."""
+    names = "".join(f'    "Nom {i}",\n' for i in range(n))
+    return re.sub(r"const slideNames = \[.*?\];", lambda _: f"const slideNames = [\n{names}  ];", html, flags=re.S)

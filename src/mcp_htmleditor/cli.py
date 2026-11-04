@@ -311,6 +311,24 @@ def get_slide_cmd(file: str, slide_id: str) -> None:
     click.echo(get_slide(file, slide_id))
 
 
+@main.command("lint")
+@click.argument("file", type=click.Path(dir_okay=False))
+@click.option("--json", "as_json", is_flag=True, help="Print the report as compact JSON only.")
+@deck_command
+def lint_cmd(file: str, as_json: bool) -> None:
+    """Check FILE against the structure rules and print every problem then a verdict; exit 1 on an error."""
+    from .deck import load_deck
+    from .deck.lint import ERROR, format_report, lint_deck, report_dict
+
+    problems = lint_deck(load_deck(file))
+    if as_json:
+        click.echo(json.dumps(report_dict(problems), separators=(",", ":"), ensure_ascii=False))
+    else:
+        click.echo("\n".join(format_report(problems)))
+    if any(p.severity == ERROR for p in problems):
+        raise SystemExit(1)
+
+
 @main.command("patch")
 @click.argument("file", type=click.Path(dir_okay=False))
 @click.option("--ops", "ops_source", required=True, help="Operations JSON file, or - for standard input.")
