@@ -4,7 +4,7 @@
 | US-0002 | SPEC-0005 | refuse foreign origins and host names, drop cors | main | 2 | landed | story/US-0002-refuse-foreign-origins-and-hosts | da1681aa86218fc2f8d94b115ea7a25a37900bb7 |
 | US-0003 | SPEC-0005 | json only saves, refused preflight, editor non regression | US-0002 | 2 | landed | story/US-0003-json-only-saves-and-refused-preflight | cbf109a283ff53c5b8bc4250fb1bb9d44608250b |
 | US-0068 | SPEC-0011 | resync the euro-information reference deck with its generated bootstrap | main | 2 | landed | story/US-0068-resync-ei-reference-with-bootstrap | main |
-| US-0004 | SPEC-0011 | `--check` mode for both generators | main | 2 | todo | | |
+| US-0004 | SPEC-0011 | `--check` mode for both generators | main | 2 | landed | story/US-0004-check-mode-for-both-generators | story/US-0068-resync-ei-reference-with-bootstrap |
 | US-0005 | SPEC-0011 | `make check-generated` in the quality gate and docs | US-0004 | 2 | todo | | |
 | US-0006 | SPEC-0012 | record golden slide xml hashes and detector table | US-0005 | 2 | todo | | |
 | US-0007 | SPEC-0012 | charter registry, templates and detectors read it | US-0006 | 2 | todo | | |

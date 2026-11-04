@@ -11,13 +11,17 @@ ce qui permet a l'editeur de resoudre `{{CHEVRONS}}` quand le document ne
 contient encore aucune slide a pied de page (voir resolveTemplateAssets dans
 static/editor.js).
 
-Usage: python3 tools/gen_ei_bootstrap.py   (ou `make bootstrap-ei`)
+Usage: python3 tools/gen_ei_bootstrap.py           (ou `make bootstrap-ei`)
+       python3 tools/gen_ei_bootstrap.py --check   (rapporte l'etat, n'ecrit rien)
 """
 
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
+
+from freshness import report_line, source_missing_error
 
 ROOT = Path(__file__).resolve().parents[1]
 REF = ROOT / "templates/reference/slides/euro-information.html"
@@ -39,13 +43,17 @@ TYPES_LINE_NEW = (
 )
 
 
-def main() -> None:
-    src = REF.read_text(encoding="utf-8")
-
+def find_chevrons(src: str) -> str:
+    """Return the chevrons data URI of the reference text ``src``."""
     match = re.search(r'<div class="slide-foot-logo"><span class="logo-disc"><img src="([^"]+)"', src)
     if not match:
         raise SystemExit(f"chevrons data URI introuvable dans {REF}")
-    chevrons = match.group(1)
+    return match.group(1)
+
+
+def generate(src: str) -> str:
+    """Return the bootstrap text derived from the reference text ``src``."""
+    chevrons = find_chevrons(src)
 
     # Ne garder que la slide titre: couper de la slide 2 a la fermeture de .slide-frame.
     start = src.index("    <!-- \u2550\u2550\u2550 SLIDE 2")
@@ -61,16 +69,37 @@ def main() -> None:
     )
     out = re.sub(r'(<span class="cds-tag" id="progress-tag">)\d+ / \d+(</span>)', r"\g<1>1 / 1\g<2>", out, count=1)
     out = re.sub(r"const TOTAL = \d+;", "const TOTAL = 1;", out, count=1)
-    out = re.sub(
+    return re.sub(
         r"const slideNames = \[[\s\S]*?\];",
         'const slideNames = [\n    "Titre de la pr\u00e9sentation",\n  ];',
         out,
         count=1,
     )
 
+
+def check() -> int:
+    """Print the freshness line of the bootstrap; return 0 only when fresh."""
+    if not REF.is_file():
+        print(source_missing_error(REF.relative_to(ROOT).as_posix()), file=sys.stderr)
+        return 1
+    actual = OUT.read_text(encoding="utf-8") if OUT.is_file() else None
+    line, is_fresh = report_line(
+        OUT.relative_to(ROOT).as_posix(), generate(REF.read_text(encoding="utf-8")), actual, "bootstrap-ei"
+    )
+    print(line)
+    return 0 if is_fresh else 1
+
+
+def main(argv: list[str]) -> int:
+    """Regenerate the bootstrap, or only report its state with ``--check``."""
+    if "--check" in argv:
+        return check()
+    src = REF.read_text(encoding="utf-8")
+    out = generate(src)
     OUT.write_text(out, encoding="utf-8")
-    print(f"ecrit {OUT.relative_to(ROOT)} ({len(out)} caracteres, chevrons {len(chevrons)} caracteres)")
+    print(f"ecrit {OUT.relative_to(ROOT)} ({len(out)} caracteres, chevrons {len(find_chevrons(src))} caracteres)")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main(sys.argv[1:]))

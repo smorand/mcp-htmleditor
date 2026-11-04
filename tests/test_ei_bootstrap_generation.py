@@ -14,8 +14,7 @@ BOOTSTRAP = "templates/bootstrap/slides-ei-empty.html"
 
 def test_committed_bootstrap_equals_its_generation(tmp_path: Path) -> None:
     """Regenerating in a temporary copy reproduces the committed bootstrap byte for byte."""
-    (tmp_path / "tools").mkdir()
-    shutil.copy(REPO / "tools" / "gen_ei_bootstrap.py", tmp_path / "tools" / "gen_ei_bootstrap.py")
+    shutil.copytree(REPO / "tools", tmp_path / "tools", ignore=shutil.ignore_patterns("__pycache__"))
     for relative in (REFERENCE, BOOTSTRAP):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
