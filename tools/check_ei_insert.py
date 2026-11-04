@@ -2,12 +2,14 @@
 """Verification visuelle de l'insertion de slides EI dans un fichier neuf.
 
 Ce controle ne peut pas etre un test unitaire: il faut un vrai navigateur pour
-executer editor.js dans l'iframe. Il est donc hors de `make check` et se lance a
-la main apres toute modification de:
+executer les onze scripts de l'editeur (slide-layouts.js, doc-blocks.js, editor-undo.js,
+editor-edit.js, editor-format.js, editor-menus.js, editor-save.js, editor-slides.js,
+editor-blocks.js, editor-drag.js, editor.js, charges dans cet ordre par editor.html) dans l'iframe.
+Il est donc hors de `make check` et se lance a la main apres toute modification de:
 
   - templates/bootstrap/slides-ei-empty.html (ou de la reference qui le genere)
   - static/slide-layouts.js (LAYOUT_SETS.ei)
-  - static/editor.js (resolveTemplateAssets, renumberSlides)
+  - static/editor-slides.js, static/editor.js (resolveTemplateAssets, renumberSlides)
 
 Ce qu'il verifie, sur un fichier cree par `mcp-htmleditor new ei`:
   1. le logo de pied d'une slide inseree a bien un data URI (repli
