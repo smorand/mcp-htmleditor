@@ -70,6 +70,12 @@ This story carries no spec E2E test (E2E-017 and E2E-025 were landed with the ma
 - Relocation: `skill/workflow-arch-qa.md` is no longer present under `skill/`; `docs/skill-archive/workflow-arch-qa.md` exists and is not empty; `docs/skill-archive/arch-diagram-checklist.md` exists and has 11 856 bytes.
 - Behavior kept: a user checklist of 9 000 bytes is still printed unchanged by `skill --type arch-qa` (covered by the E2E-017 test of US-0023; must stay green).
 
+### Carry-over from US-0022: SPEC-0006/E2E-025 at the command line
+
+US-0022 could not assert, through `mcp-htmleditor skill --type arch-qa`, that the output holds the shipped checklist: `skill_content.py` was off limits there and the arch-qa rendering (workflow text, an empty line, the checklist) lands in this story. This story adds the missing assertions to `tests/test_arch_checks.py` or `tests/test_skill_content.py`:
+- **Given** the user's checklist location holds an empty file, **When** the user runs `mcp-htmleditor skill --type arch-qa`, **Then** the output holds the shipped checklist and the exit status is 0; with the location being a directory the output and the exit status are the same.
+- **Given** the user checklist is a non empty file larger than the shipped one, **Then** the output prints it unchanged.
+
 ## Constraints
 
 - Files not to touch: Python sources, `skill/core.md`, other topics, `tests/test_skill_shipped.py`, `tests/data/skill_anchors.json`.

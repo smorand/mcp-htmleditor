@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 7 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 8 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from .arch_layout import layout_file
 from .http_server import (
@@ -19,6 +20,7 @@ from .http_server import (
     start_http_server,
     stop_http_server,
 )
+from .skill_content import SkillError, build_library
 from .state import get_state
 from .tracing import trace_span
 
@@ -204,3 +206,23 @@ def run_mcp_server() -> None:
     """
     logger.info("Starting MCP server (stdio transport)")
     mcp.run(transport="stdio")
+
+
+@mcp.tool()
+def get_skill(type: str | None = None) -> str:  # noqa: A002 - argument name "type" is the contract
+    """Return the skill core, or one topic when type is given.
+
+    Same text as ``mcp-htmleditor skill`` (``--type <topic>`` when type is set).
+
+    Args:
+        type: Topic name. Omit it to get the core.
+
+    Raises:
+        ToolError: the topic is unknown, empty, or not installed (or the core is missing).
+    """
+    with trace_span("mcp.get_skill", {"skill.topic": type or "core"}):
+        library = build_library()
+        try:
+            return library.core_output() if type is None else library.topic_output(type)
+        except SkillError as exc:
+            raise ToolError(exc.message) from exc
