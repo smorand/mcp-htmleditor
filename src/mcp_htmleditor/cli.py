@@ -36,15 +36,31 @@ def main(verbose: int, quiet: bool) -> None:
 
 
 @main.command("skill")
-def skill_cmd() -> None:
-    """Print the full mcp-htmleditor skill (index + all sub-documents).
+@click.option("--type", "topic", default=None, help="Print one topic instead of the core.")
+@click.option("--all", "show_all", is_flag=True, help="Print the core then every topic.")
+def skill_cmd(topic: str | None, show_all: bool) -> None:
+    """Print the mcp-htmleditor skill: the core, one topic (--type) or everything (--all).
 
-    Used by the dynamic Pi skill: it simply runs `mcp-htmleditor skill`
-    so the skill content lives here and stays in sync with the tool.
+    Used by the dynamic Pi skill, so the skill content lives here and stays in
+    sync with the tool. Errors are one line on stderr, nothing on stdout.
     """
-    from .skill_content import build_skill_content
+    from .skill_content import BOTH_OPTIONS_MESSAGE, SkillError, build_library
 
-    click.echo(build_skill_content())
+    if topic is not None and show_all:
+        click.echo(BOTH_OPTIONS_MESSAGE, err=True)
+        raise click.exceptions.Exit(2)
+    library = build_library()
+    try:
+        if show_all:
+            text = library.all_output()
+        elif topic is not None:
+            text = library.topic_output(topic)
+        else:
+            text = library.core_output()
+    except SkillError as exc:
+        click.echo(exc.message, err=True)
+        raise click.exceptions.Exit(exc.exit_code) from exc
+    click.echo(text, nl=False)
 
 
 @main.command("templates")

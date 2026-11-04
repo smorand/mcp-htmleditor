@@ -21,7 +21,7 @@
 | US-0018 | SPEC-0012 | fix skill documents naming moved methods | US-0012 | 2 | landed | story/US-0018-fix-skill-documents-naming-moved-methods | story/US-0017-extract-undo-script-order-and-serving |
 | US-0019 | SPEC-0012 | update readme, agents and agent docs | US-0017, US-0018 | 2 | landed | story/US-0019-update-readme-agents-and-agent-docs | story/US-0018-fix-skill-documents-naming-moved-methods |
 | US-0020 | SPEC-0012 | size caps, remaining mentions, full gate | US-0019 | 2 | landed | story/US-0020-size-caps-remaining-mentions-full-gate | story/US-0019-update-readme-agents-and-agent-docs |
-| US-0021 | SPEC-0006 | topic engine and `skill --type/--all` | US-0020 | 2 | todo | | |
+| US-0021 | SPEC-0006 | topic engine and `skill --type/--all` | US-0020 | 2 | landed | story/US-0021-topic-engine-and-skill-type-all | story/US-0020-size-caps-remaining-mentions-full-gate |
 | US-0022 | SPEC-0006 | `get_skill` tool and checklist fallback | US-0021 | 2 | todo | | |
 | US-0023 | SPEC-0006 | `skill-audit` sizes, budgets, missing items, json | US-0022 | 2 | todo | | |
 | US-0024 | SPEC-0006 | audit tool list check and stale statement check | US-0023 | 2 | todo | | |

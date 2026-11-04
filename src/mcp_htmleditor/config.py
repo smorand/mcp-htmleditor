@@ -6,6 +6,7 @@ prefixed ``HTMLEDITOR_``, a local ``.env`` file, or the XDG defaults.
     bin       ~/.local/bin                          HTMLEDITOR_BIN_DIR
     templates ~/.config/mcp-htmleditor/templates    HTMLEDITOR_TEMPLATES_DIR
     arch checks ~/.config/mcp-htmleditor/arch-checks HTMLEDITOR_ARCH_CHECKS_DIR
+    skill     bundled skill/ (repo, then package)     HTMLEDITOR_SKILL_DIR
     logs      ~/.cache/mcp-htmleditor/logs          HTMLEDITOR_LOGS, HTMLEDITOR_LOG_DIR
     cache     ~/.cache/mcp-htmleditor               HTMLEDITOR_CACHE_DIR
     reference ~/.cache/mcp-htmleditor/reference     (generated pandoc reference.docx)
@@ -48,6 +49,7 @@ _INT_FALLBACKS = {"port": DEFAULT_PORT, "poll_interval": DEFAULT_POLL_INTERVAL}
 _PATH_FIELDS = (
     "templates_dir_override",
     "arch_checks_dir_override",
+    "skill_dir_override",
     "logs_override",
     "log_dir_override",
     "cache_dir_override",
@@ -64,6 +66,7 @@ _SIGNIFICANT_ENV_VARS = (
     "HTMLEDITOR_POLL_INTERVAL",
     "HTMLEDITOR_TEMPLATES_DIR",
     "HTMLEDITOR_ARCH_CHECKS_DIR",
+    "HTMLEDITOR_SKILL_DIR",
     "HTMLEDITOR_LOGS",
     "HTMLEDITOR_LOG_DIR",
     "HTMLEDITOR_CACHE_DIR",
@@ -103,6 +106,7 @@ class Settings(BaseSettings):
 
     templates_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_TEMPLATES_DIR")
     arch_checks_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_ARCH_CHECKS_DIR")
+    skill_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_SKILL_DIR")
     logs_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LOGS")
     log_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LOG_DIR")
     cache_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_CACHE_DIR")
@@ -170,6 +174,17 @@ class Settings(BaseSettings):
         ``skill/workflow-arch-qa.md`` for how it is used).
         """
         return self.arch_checks_dir_override or self.config_dir / "arch-checks"
+
+    @property
+    def skill_dir(self) -> Path:
+        """Skill directory: HTMLEDITOR_SKILL_DIR, else the repo skill/, else the package skill/."""
+        if self.skill_dir_override:
+            return self.skill_dir_override
+        candidates = (
+            Path(__file__).resolve().parents[2] / "skill",
+            Path(__file__).resolve().parent / "skill",
+        )
+        return next((c for c in candidates if c.is_dir()), candidates[0])
 
     @property
     def cache_dir(self) -> Path:
@@ -246,6 +261,11 @@ def templates_dir() -> Path:
 def arch_checks_dir() -> Path:
     """User-editable arch-diagram QA checklist directory (HTMLEDITOR_ARCH_CHECKS_DIR)."""
     return get_settings().arch_checks_dir
+
+
+def skill_dir() -> Path:
+    """Skill directory (HTMLEDITOR_SKILL_DIR, else the bundled skill/)."""
+    return get_settings().skill_dir
 
 
 def log_dir() -> Path:
