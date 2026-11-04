@@ -11,7 +11,8 @@ prefixed ``HTMLEDITOR_``, a local ``.env`` file, or the XDG defaults.
     logs      ~/.cache/mcp-htmleditor/logs          HTMLEDITOR_LOGS, HTMLEDITOR_LOG_DIR
     cache     ~/.cache/mcp-htmleditor               HTMLEDITOR_CACHE_DIR
     reference ~/.cache/mcp-htmleditor/reference     (generated pandoc reference.docx)
-    state     next to the edited HTML file          (.mcp_state.json)
+    state     ~/.local/state/mcp-htmleditor         HTMLEDITOR_STATE_DIR, XDG_STATE_HOME
+              (no home: <tmp>/mcp-htmleditor-<uid>; never next to the edited file)
 
 Other variables:
     HTMLEDITOR_HOST              HTTP bind address (default localhost)
@@ -21,6 +22,7 @@ Other variables:
     HTMLEDITOR_OTEL_API_KEY      bearer token sent to the OTLP endpoint
     XDG_CONFIG_HOME              base for config (default ~/.config)
     XDG_CACHE_HOME               base for cache  (default ~/.cache)
+    XDG_STATE_HOME               base for state  (default ~/.local/state)
 
 The module level helpers (:func:`templates_dir`, :func:`log_dir`, ...) are the
 public API used across the codebase; they all delegate to :func:`get_settings`.
@@ -31,6 +33,7 @@ process that never changes its environment builds them exactly once.
 from __future__ import annotations
 
 import os
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -58,6 +61,8 @@ _PATH_FIELDS = (
     "bin_dir_override",
     "xdg_config_home_override",
     "xdg_cache_home_override",
+    "state_dir_override",
+    "xdg_state_home_override",
 )
 
 # Environment variables that change the resolved configuration. Used only to key
@@ -78,6 +83,8 @@ _SIGNIFICANT_ENV_VARS = (
     "HTMLEDITOR_OTEL_API_KEY",
     "XDG_CONFIG_HOME",
     "XDG_CACHE_HOME",
+    "HTMLEDITOR_STATE_DIR",
+    "XDG_STATE_HOME",
 )
 
 
@@ -117,6 +124,8 @@ class Settings(BaseSettings):
     bin_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_BIN_DIR")
     xdg_config_home_override: Path | None = Field(default=None, validation_alias="XDG_CONFIG_HOME")
     xdg_cache_home_override: Path | None = Field(default=None, validation_alias="XDG_CACHE_HOME")
+    state_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_STATE_DIR")
+    xdg_state_home_override: Path | None = Field(default=None, validation_alias="XDG_STATE_HOME")
 
     @field_validator("port", "poll_interval", mode="before")
     @classmethod
@@ -223,6 +232,22 @@ class Settings(BaseSettings):
         return self.cache_dir / "reference"
 
     @property
+    def state_dir(self) -> Path:
+        """Editor state directory: HTMLEDITOR_STATE_DIR, XDG_STATE_HOME, ~/.local/state, else <tmp>.
+
+        Without a home directory (``Path.home()`` raises), falls back to
+        ``<tempfile.gettempdir()>/mcp-htmleditor-<uid>``.
+        """
+        if self.state_dir_override:
+            return self.state_dir_override
+        if self.xdg_state_home_override:
+            return self.xdg_state_home_override / APP_NAME
+        try:
+            return Path.home() / ".local" / "state" / APP_NAME
+        except RuntimeError:
+            return Path(tempfile.gettempdir()) / f"{APP_NAME}-{os.getuid()}"
+
+    @property
     def bin_dir(self) -> Path:
         """Executable install target: ~/.local/bin."""
         return self.bin_dir_override or Path.home() / ".local" / "bin"
@@ -297,6 +322,11 @@ def cache_dir() -> Path:
 def reference_dir() -> Path:
     """Directory holding the generated pandoc reference.docx files."""
     return get_settings().reference_dir
+
+
+def state_dir() -> Path:
+    """Editor state directory (HTMLEDITOR_STATE_DIR, else XDG_STATE_HOME, else ~/.local/state)."""
+    return get_settings().state_dir
 
 
 def bin_dir() -> Path:

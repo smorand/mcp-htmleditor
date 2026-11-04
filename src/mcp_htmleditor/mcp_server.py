@@ -105,18 +105,12 @@ def get_status() -> dict[str, Any]:
     """Return the current server status.
 
     Returns:
-        Dict with keys: file, port, pid, update_in_progress, mtime, running.
+        Dict with keys: file, port, pid, update_in_progress, update_expires_in, mtime, running.
+        `update_expires_in` is the whole seconds left on the update flag (1 to 120), else null.
     """
     state = get_state()
     with trace_span("mcp.get_status", {"server.running": is_server_running()}):
-        return {
-            "file": state.current_file,
-            "port": state.port,
-            "pid": state.server_pid,
-            "update_in_progress": state.update_in_progress,
-            "mtime": state.get_mtime(),
-            "running": is_server_running(),
-        }
+        return {**state.snapshot(), "running": is_server_running()}
 
 
 @mcp.tool()
@@ -146,15 +140,16 @@ def update_start() -> dict[str, Any]:
 
     Sets the update_in_progress flag so the browser shows the
     'modification en cours' overlay and does not apply concurrent
-    mtime-triggered reloads.
+    mtime-triggered reloads. The flag expires by itself 120 seconds after the
+    last call; calling again restarts the 120 seconds.
 
     Returns:
-        Dict with key: ok.
+        Dict with keys: ok, expires_in (seconds, 120).
     """
     state = get_state()
     with trace_span("mcp.update_start", {"file.path": state.current_file or ""}):
-        state.set_update_flag(True)
-    return {"ok": True}
+        expires_in = state.start_update()
+    return {"ok": True, "expires_in": expires_in}
 
 
 @mcp.tool()
@@ -169,7 +164,7 @@ def update_end() -> dict[str, Any]:
     """
     state = get_state()
     with trace_span("mcp.update_end", {"file.path": state.current_file or ""}):
-        state.set_update_flag(False)
+        state.end_update()
     return {"ok": True}
 
 

@@ -23,6 +23,15 @@ def reset_settings() -> Iterator[None]:
     config_module.reset_settings_cache()
 
 
+@pytest.fixture(autouse=True)
+def isolate_state_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Point HTMLEDITOR_STATE_DIR at a per test directory, so no test touches the real ~/.local/state."""
+    state_dir = tmp_path_factory.mktemp("state") / "mcp-htmleditor"
+    monkeypatch.setenv("HTMLEDITOR_STATE_DIR", str(state_dir))
+    config_module.reset_settings_cache()
+    return state_dir
+
+
 @pytest.fixture
 def reset_state() -> Iterator[None]:
     """Reset the EditorState singleton around each test.

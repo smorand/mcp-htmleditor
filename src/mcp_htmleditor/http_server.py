@@ -281,6 +281,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         payload: dict[str, Any] = {
             "mtime": state.get_mtime(),
             "update_in_progress": state.update_in_progress,
+            "update_expires_in": state.update_expires_in,
             "filename": state.current_file,
             "poll_interval": state.poll_interval,
             "port": state.port,
