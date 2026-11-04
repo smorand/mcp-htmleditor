@@ -12,7 +12,7 @@
 | US-0009 | SPEC-0012 | extract text and primitives mixin | US-0008 | 2 | landed | story/US-0009-extract-text-and-primitives-mixin | story/US-0008-pptx-model-py-with-types-constants-base |
 | US-0010 | SPEC-0012 | extract images and arch mixins | US-0009 | 2 | landed | story/US-0010-extract-images-and-arch-mixins | story/US-0009-extract-text-and-primitives-mixin |
 | US-0011 | SPEC-0012 | extract gantt and blocks mixins | US-0010 | 2 | landed | story/US-0011-extract-gantt-and-blocks-mixins | story/US-0010-extract-images-and-arch-mixins |
-| US-0012 | SPEC-0012 | extract flow and chrome mixins | US-0011 | 2 | todo | | |
+| US-0012 | SPEC-0012 | extract flow and chrome mixins | US-0011 | 2 | landed | story/US-0012-extract-flow-and-chrome-mixins | story/US-0011-extract-gantt-and-blocks-mixins |
 | US-0013 | SPEC-0012 | extract node and block drag script | US-0012 | 2 | todo | | |
 | US-0014 | SPEC-0012 | extract blocks and slides scripts | US-0013 | 2 | todo | | |
 | US-0015 | SPEC-0012 | extract save and menus scripts | US-0014 | 2 | todo | | |

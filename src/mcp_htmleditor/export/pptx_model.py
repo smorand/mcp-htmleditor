@@ -404,3 +404,39 @@ class _BuilderBase:
 
     def _wrap_legend_entries(self, entries: list[Tag], width: float, style: TextStyle) -> list[list[Tag]]:
         raise NotImplementedError
+
+    def _render_block(self, block: _Block, box: Box) -> None:
+        raise NotImplementedError
+
+    def _is_inline_gantt(self, element: Tag) -> bool:
+        raise NotImplementedError
+
+    def _gantt_block(self, element: Tag, width: float) -> _Block:
+        raise NotImplementedError
+
+    def _arch_block(self, element: Tag, width: float) -> _Block:
+        raise NotImplementedError
+
+    def _annotated_block(self, element: Tag, width: float) -> _Block:
+        raise NotImplementedError
+
+    def _table_block(self, element: Tag, width: float) -> _Block:
+        raise NotImplementedError
+
+    def _panel_block(self, element: Tag, width: float) -> _Block:
+        raise NotImplementedError
+
+    def _grid_block(self, element: Tag, width: float) -> _Block:
+        raise NotImplementedError
+
+    def _image_block(self, element: Tag, width: float) -> _Block:
+        raise NotImplementedError
+
+    def _add_picture(self, box: Box, src: str, mode: str = "fit") -> Any:
+        raise NotImplementedError
+
+    def _slide_kind(self) -> str:
+        raise NotImplementedError
+
+    def _collect_all(self, elements: list[Tag], width: float) -> list[_Block]:
+        raise NotImplementedError
