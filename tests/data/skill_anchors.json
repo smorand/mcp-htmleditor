@@ -93,5 +93,31 @@
     "16:9",
     "SVG",
     "base64"
+  ],
+  "document": [
+    "data-doc-type=\"document\"",
+    "data-doc-template",
+    "doc-title",
+    "doc-h1",
+    "vraies balises semantiques",
+    "_mcp_drag_handle",
+    "data-editable=\"text\"",
+    "reference.docx",
+    "Heading1",
+    "colgroup",
+    "PNG"
+  ],
+  "mail": [
+    "role=\"presentation\"",
+    "width=\"640\"",
+    "style=\"\"",
+    "text-align:justify",
+    "Pas de `<script>`",
+    "data-doc-template=\"mail\"",
+    "Helvetica",
+    "#0f62fe",
+    "#161616",
+    "Cloner une section existante",
+    "Flexbox"
   ]
 }
