@@ -15,7 +15,7 @@
 | US-0012 | SPEC-0012 | extract flow and chrome mixins | US-0011 | 2 | landed | story/US-0012-extract-flow-and-chrome-mixins | story/US-0011-extract-gantt-and-blocks-mixins |
 | US-0013 | SPEC-0012 | extract node and block drag script | US-0012 | 2 | landed | story/US-0013-extract-node-and-block-drag-script | story/US-0012-extract-flow-and-chrome-mixins |
 | US-0014 | SPEC-0012 | extract blocks and slides scripts | US-0013 | 2 | landed | story/US-0014-extract-blocks-and-slides-scripts | story/US-0013-extract-node-and-block-drag-script |
-| US-0015 | SPEC-0012 | extract save and menus scripts | US-0014 | 2 | todo | | |
+| US-0015 | SPEC-0012 | extract save and menus scripts | US-0014 | 2 | landed | story/US-0015-extract-save-and-menus-scripts | story/US-0014-extract-blocks-and-slides-scripts |
 | US-0016 | SPEC-0012 | extract format and edit scripts | US-0015 | 2 | todo | | |
 | US-0017 | SPEC-0012 | extract undo script, order and serving tests | US-0016 | 2 | todo | | |
 | US-0018 | SPEC-0012 | fix skill documents naming moved methods | US-0012 | 2 | todo | | |
