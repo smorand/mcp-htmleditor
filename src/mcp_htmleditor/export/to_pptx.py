@@ -23,9 +23,6 @@ Fidelity notes live in ``skill/workflow-export.md``.
 
 from __future__ import annotations
 
-import base64
-import binascii
-import io
 import logging
 import math
 import re
@@ -42,14 +39,13 @@ from pptx.enum.text import MSO_ANCHOR
 from pptx.util import Inches, Pt
 
 from ..tracing import trace_span
+from .pptx_arch import ArchMixin
 from .pptx_components import (
     GANTT_DATES_PX,
     GANTT_LABEL_PX,
     GanttRow,
     TableGrid,
-    apply_transform,
     color_of,
-    first_pct,
     gantt_geometry,
     gantt_period,
     gantt_task_band,
@@ -57,11 +53,10 @@ from .pptx_components import (
     is_light,
     set_cell_border,
 )
+from .pptx_images import ImagesMixin
 from .pptx_model import (
-    _ANNOT_CLASS_COLORS,
     _NOTIF_VARIANTS,
     _PX_FLEX_BASIS_RE,
-    _SHAPES,
     BAR_KEYS,
     BLOCK_TAGS,
     FILL_KEYS,
@@ -199,7 +194,7 @@ def _has_slide_ancestor(element: Tag, slides: list[Tag]) -> bool:
 # ---------------------------------------------------------------------------
 
 
-class _SlideBuilder(TextMixin, _BuilderBase):
+class _SlideBuilder(ArchMixin, ImagesMixin, TextMixin, _BuilderBase):
     """Render one HTML slide element onto one python-pptx slide."""
 
     def __init__(self, context: _Context, slide: Any, article: Tag, index: int) -> None:
@@ -1519,331 +1514,6 @@ class _SlideBuilder(TextMixin, _BuilderBase):
         if not rows:
             self.ctx.report.warn('Gantt sans tache data-type="gantt-task": bloc ignore.')
         return rows
-
-    def _render_arch(self, box: Box, element: Tag) -> None:
-        """Render an architecture diagram: nodes as shapes, edges as lines."""
-        background = self._element_color(element)
-        if background:
-            self._rect(box, fill=background, line=self.theme.border)
-        nodes = self._render_arch_children(box, element)
-        if not nodes:
-            self.ctx.report.warn('Schema sans noeud data-type="arch-node": seul le cadre est exporte.')
-
-    def _render_arch_children(self, container: Box, element: Tag) -> int:
-        """Recursively render arch-node/-line/-tip/-label descendants of ``element``.
-
-        Switches ``container`` when descending into an ``arch-col``: in the browser
-        an arch-col is itself ``position:absolute``, which per CSS makes it the
-        containing block for its OWN children's percentages (see
-        ``arch_layout.py``'s ``_to_local`` and ``.agent_docs/html-conventions.md``).
-        Reading a nested node's ``data-x``/``data-y`` against the outer diagram box
-        instead of its col's box would shrink and misplace it exactly like the CSS
-        bug that ``_to_local`` exists to prevent, just in the exported deck instead
-        of the browser. Every other wrapper (``arch-row``, plain decorative divs)
-        stays inert and keeps the same container, matching the browser exactly.
-        """
-        nodes = 0
-        for child in element.find_all(True, recursive=False):
-            if not isinstance(child, Tag) or child.name in SKIP_TAGS:
-                continue
-            dtype = str(child.get("data-type") or "")
-            if dtype == "arch-node":
-                self._render_arch_node(container, child)
-                nodes += 1
-            elif dtype == "arch-col":
-                col_box = self._node_box(container, child, default_w=20.0, default_h=12.0)
-                nodes += self._render_arch_children(col_box, child)
-            elif has_class(child, "arch-line-h", "arch-line-v"):
-                self._render_arch_line(container, child)
-            elif has_class(child, "arch-tip"):
-                self._render_arch_tip(container, child)
-            elif has_class(child, "arch-edge-label") or dtype == "arch-edge":
-                self._render_arch_label(container, child)
-            elif has_class(child, "arch-edge-badge"):
-                self._render_arch_badge(container, child)
-            else:
-                nodes += self._render_arch_children(container, child)
-        return nodes
-
-    def _node_box(self, container: Box, element: Tag, default_w: float, default_h: float) -> Box:
-        """Resolve the box of a positioned child, in the container reference.
-
-        Percentages are relative to the container, as documented for
-        ``data-x`` / ``data-y``, never to the slide.
-        """
-        props = style_props(element)
-        x = first_pct(element.get("data-x"), props.get("left"))
-        y = first_pct(element.get("data-y"), props.get("top"))
-        w = first_pct(element.get("data-width"), props.get("width"), default=default_w)
-        h = first_pct(element.get("data-height"), props.get("height"), default=default_h)
-        box = container.pct(x, y, w, h)
-        return apply_transform(box, props)
-
-    def _render_arch_node(self, container: Box, node: Tag) -> None:
-        """Render one diagram node as a filled, outlined and labelled shape."""
-        box = self._node_box(container, node, default_w=20.0, default_h=12.0)
-        props = style_props(node)
-        shape_name = str(node.get("data-shape") or "box").lower()
-        shape = self._rect(
-            box,
-            fill=self._element_color(node) or "FFFFFF",
-            shape=_SHAPES.get(shape_name, MSO_SHAPE.ROUNDED_RECTANGLE),
-            radius_px=parse_px(props.get("border-radius", "")) or 4.0,
-        )
-        merged = self.res.props(node)
-        line = color_of(merged, ("border", "border-color"), self.res)
-        shape.line.color.rgb = RGBColor.from_string(line or self.theme.primary)
-        shape.line.width = Pt(1.25)
-        frame = shape.text_frame
-        frame.word_wrap = True
-        frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-        frame.margin_left = frame.margin_right = Inches(0.04)
-        frame.margin_top = frame.margin_bottom = Inches(0.02)
-        color = parse_color(merged.get("color"), self.res.css_vars) or self.theme.text
-        base = TextStyle(size=11, bold=True, color=color, align="center", space_after=0)
-        self._write(frame, self._paragraphs(node, base) or [_Para(base, [(str(node.get("data-label") or ""), base)])])
-
-    def _render_arch_line(self, container: Box, edge: Tag) -> None:
-        """Render an edge segment as a thin filled rectangle."""
-        props = style_props(edge)
-        thickness = 1.5 * PX_IN
-        horizontal = has_class(edge, "arch-line-h")
-        x = parse_pct(props.get("left", "0%"))
-        y = parse_pct(props.get("top", "0%"))
-        length = parse_pct(props.get("width" if horizontal else "height", "0%"))
-        if length <= 0:
-            return
-        if horizontal:
-            box = container.pct(x, y, length, 0.1)
-            box = Box(box.left, box.top - thickness / 2, box.width, thickness)
-        else:
-            box = container.pct(x, y, 0.1, length)
-            box = Box(box.left - thickness / 2, box.top, thickness, box.height)
-        self._rect(box, fill=self._edge_color(edge))
-
-    def _render_arch_tip(self, container: Box, tip: Tag) -> None:
-        """Render an arrow head as a small rotated triangle."""
-        props = style_props(tip)
-        size = 8.0 * PX_IN
-        x = parse_pct(props.get("left", "0%"))
-        y = parse_pct(props.get("top", "0%"))
-        anchor = container.pct(x, y, 0.1, 0.1)
-        rotations = {"arch-tip-r": 90, "arch-tip-l": 270, "arch-tip-d": 180, "arch-tip-u": 0}
-        rotation = next(
-            (deg for name, deg in rotations.items() if has_class(tip, name)),
-            90,
-        )
-        box = Box(anchor.left - size / 2, anchor.top - size / 2, size, size)
-        shape = self._rect(box, fill=self._edge_color(tip), shape=MSO_SHAPE.ISOSCELES_TRIANGLE)
-        shape.rotation = rotation
-
-    def _render_arch_badge(self, container: Box, badge: Tag) -> None:
-        """Render a numbered step badge (``data-step``) as a small filled circle.
-
-        Mirrors the browser's ``.arch-edge-badge`` (14px circle, centered white
-        bold number, background from the edge's own color): closes the PPTX
-        fidelity gap documented in ``.agent_docs/html-conventions.md`` and the
-        arch-diagram QA checklist.
-        """
-        text = badge.get_text(strip=True)
-        if not text:
-            return
-        props = style_props(badge)
-        x = parse_pct(props.get("left", "0%"))
-        y = parse_pct(props.get("top", "0%"))
-        size = 14.0 * PX_IN
-        anchor = container.pct(x, y, 0.1, 0.1)
-        box = Box(anchor.left - size / 2, anchor.top - size / 2, size, size)
-        fill = color_of(self.res.props(badge), ("background", "background-color"), self.res) or self.theme.primary
-        shape = self._rect(box, fill=fill, shape=MSO_SHAPE.OVAL)
-        frame = shape.text_frame
-        frame.margin_left = frame.margin_right = frame.margin_top = frame.margin_bottom = 0
-        frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-        style = TextStyle(size=8, bold=True, color="FFFFFF", align="center", space_after=0)
-        self._write(frame, [_Para(style, [(text, style)])])
-
-    def _render_arch_label(self, container: Box, label: Tag) -> None:
-        """Render an edge label, or a text based arrow, inside the diagram."""
-        text = label.get_text(" ", strip=True)
-        if not text:
-            return
-        props = style_props(label)
-        x = parse_pct(props.get("left", "0%"))
-        y = parse_pct(props.get("top", "0%"))
-        width_pct = parse_pct(props.get("width", "0%")) or 18.0
-        box = container.pct(x, y, width_pct, 0.1)
-        box = Box(box.left, box.top - 0.09, max(box.width, 0.5), 0.2)
-        box = apply_transform(box, props)
-        style = self.res.apply(
-            TextStyle(size=9.5, color="secondary", space_after=0, align="center"),
-            self.res.props(label),
-        )
-        _, frame = self._textbox(box, anchor="middle")
-        self._write(frame, [_Para(style, [(text, style)])])
-
-    def _edge_color(self, edge: Tag) -> str:
-        """Resolve the stroke color of an edge element."""
-        color = color_of(
-            self.res.props(edge),
-            ("background", "background-color", "border-top-color", "border-color", "color"),
-            self.res,
-        )
-        return color or self.theme.primary
-
-    def _render_annotated_image(self, box: Box, element: Tag) -> None:
-        """Render an annotated image and place its callouts over the picture."""
-        img = element.find("img")
-        if not isinstance(img, Tag):
-            self.ctx.report.warn("Bloc annotated-image sans <img>: annotations seules exportees.")
-            image_box = box
-        else:
-            width = min(box.width, self._max_width(element, box.width))
-            centered = "auto" in style_props(element).get("margin", "")
-            frame = box.center_horizontally(width) if centered else box.resize(width=width)
-            picture = self._add_picture(frame, str(img.get("src") or ""), mode="fit")
-            image_box = (
-                Box(
-                    inches(picture.left),
-                    inches(picture.top),
-                    inches(picture.width),
-                    inches(picture.height),
-                )
-                if picture
-                else frame
-            )
-        for annotation in element.find_all(attrs={"data-type": "annotation"}):
-            if isinstance(annotation, Tag):
-                self._render_annotation(image_box, annotation)
-
-    def _render_annotation(self, image_box: Box, annotation: Tag) -> None:
-        """Render one callout positioned in percentages of the image box."""
-        text = annotation.get_text(" ", strip=True)
-        if not text:
-            return
-        props = style_props(annotation)
-        x = first_pct(annotation.get("data-x"), props.get("left"))
-        y = first_pct(annotation.get("data-y"), props.get("top"))
-        fill, fg = self._annotation_colors(annotation)
-        size = 9.5
-        width = min(len(text) * size * 0.56 / 72.0 + 0.16, image_box.width * 0.9)
-        height = 0.24
-        box = Box(
-            image_box.left + image_box.width * x / 100.0,
-            image_box.top + image_box.height * y / 100.0,
-            width,
-            height,
-        )
-        self._rect(box, fill=fill)
-        style = TextStyle(size=size, bold=True, color=fg, align="center", space_after=0)
-        _, frame = self._textbox(box, anchor="middle")
-        self._write(frame, [_Para(style, [(text, style)])])
-
-    def _annotation_colors(self, annotation: Tag) -> tuple[str, str]:
-        """Resolve the (fill, text) colors of an annotation."""
-        props = self.res.props(annotation)
-        fill = color_of(props, FILL_KEYS, self.res)
-        color = parse_color(props.get("color"), self.res.css_vars)
-        if not fill:
-            for name in classes(annotation):
-                if name in _ANNOT_CLASS_COLORS:
-                    fill, fallback = _ANNOT_CLASS_COLORS[name]
-                    return fill, color or fallback
-        return fill or "FFF176", color or "262626"
-
-    def _render_image(self, box: Box, element: Tag) -> None:
-        """Render a standalone image, fitted inside its block."""
-        self._add_picture(box, str(element.get("src") or ""), mode="fit")
-
-    # -- shapes and pictures ----------------------------------------------
-
-    def _image_source(self, src: str) -> io.BytesIO | str | None:
-        """Resolve an image source to something python-pptx can read.
-
-        Data URIs are decoded in memory; relative paths resolve against the
-        directory of the HTML file; remote URLs are refused.
-        """
-        if not src:
-            return None
-        if src.startswith("data:"):
-            header, _, payload = src.partition(",")
-            if "base64" not in header or not payload:
-                self.ctx.report.warn("Image data URI non base64 ignoree.")
-                return None
-            try:
-                return io.BytesIO(base64.b64decode(payload, validate=False))
-            except (binascii.Error, ValueError):
-                self.ctx.report.warn("Image data URI illisible ignoree.")
-                return None
-        if src.startswith(("http://", "https://", "//")):
-            self.ctx.report.warn(f"Image distante non telechargee: {src[:60]}")
-            return None
-        path = Path(src)
-        if not path.is_absolute():
-            path = self.ctx.base_dir / path
-        if not path.exists():
-            self.ctx.report.warn(f"Image introuvable, ignoree: {path}")
-            return None
-        return str(path)
-
-    def _image_aspect(self, src: str) -> float | None:
-        """Return the width / height ratio of an image, ``None`` if unknown."""
-        source = self._image_source(src)
-        if source is None:
-            return None
-        try:
-            picture = self.slide.shapes.add_picture(source, 0, 0)
-        except Exception as exc:
-            self.ctx.report.warn(f"Image non decodable ignoree: {exc}")
-            return None
-        aspect = picture.width / picture.height if picture.height else None
-        picture._element.getparent().remove(picture._element)
-        return aspect
-
-    def _add_picture(self, box: Box, src: str, mode: str = "fit") -> Any:
-        """Insert a picture in ``box``.
-
-        Modes: ``fit`` keeps the aspect ratio inside the box and centers it,
-        ``cover`` fills the box and crops the overflow (CSS ``object-fit:
-        cover``), ``fit-height`` keeps the height and derives the width,
-        ``stretch`` forces the box dimensions.
-        """
-        source = self._image_source(src)
-        if source is None:
-            return None
-        if isinstance(source, io.BytesIO):
-            source.seek(0)
-        try:
-            picture = self.slide.shapes.add_picture(source, Inches(box.left), Inches(box.top))
-        except Exception as exc:
-            self.ctx.report.warn(f"Image non inseree ({exc}): {src[:40]}")
-            return None
-        natural = picture.width / picture.height if picture.height else 1.0
-
-        if mode == "stretch":
-            picture.width, picture.height = Inches(box.width), Inches(box.height)
-            return picture
-        if mode == "fit-height":
-            picture.height = Inches(box.height)
-            picture.width = Inches(box.height * natural)
-            return picture
-        if mode == "cover":
-            picture.width, picture.height = Inches(box.width), Inches(box.height)
-            target = box.width / box.height
-            if natural > target:
-                crop = (1.0 - target / natural) / 2.0
-                picture.crop_left = crop
-                picture.crop_right = crop
-            elif natural < target:
-                crop = (1.0 - natural / target) / 2.0
-                picture.crop_top = crop
-                picture.crop_bottom = crop
-            return picture
-        scale = min(box.width / natural, box.height) if natural else box.height
-        width, height = scale * natural, scale
-        picture.width, picture.height = Inches(width), Inches(height)
-        picture.left = Inches(box.left + (box.width - width) / 2.0)
-        picture.top = Inches(box.top + (box.height - height) / 2.0)
-        return picture
 
 
 __all__ = ["ExportReport", "find_slides", "to_pptx"]

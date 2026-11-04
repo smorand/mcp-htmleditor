@@ -315,3 +315,31 @@ class _BuilderBase:
     @staticmethod
     def _is_block_child(child: Tag) -> bool:
         raise NotImplementedError
+
+    def _element_color(self, element: Tag) -> str | None:
+        raise NotImplementedError
+
+    @staticmethod
+    def _max_width(element: Tag, width: float) -> float:
+        raise NotImplementedError
+
+    def _paragraphs(self, element: Tag, base: TextStyle, level: int = 0) -> list[_Para]:
+        raise NotImplementedError
+
+    def _rect(  # noqa: PLR0913 - one flag per optional shape trait, all keyword-only
+        self,
+        box: Box,
+        fill: str | None = None,
+        line: str | None = None,
+        *,
+        shape: Any = MSO_SHAPE.RECTANGLE,
+        radius_px: float | None = None,
+        hatch: bool = False,
+    ) -> Any:
+        raise NotImplementedError
+
+    def _textbox(self, box: Box, anchor: str = "top", wrap: bool = True) -> tuple[Any, Any]:
+        raise NotImplementedError
+
+    def _write(self, frame: Any, paras: list[_Para]) -> None:
+        raise NotImplementedError
