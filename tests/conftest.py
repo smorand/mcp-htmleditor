@@ -2,13 +2,36 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import http.client
+import json
+import platform
+import socket
+import time
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from mcp_htmleditor import config as config_module
 from mcp_htmleditor import state as state_module
+from mcp_htmleditor.http_server import start_http_server, stop_http_server
+from tests.deck_support import deck_ei, write_deck
+
+
+def _chromium_cache_dir() -> Path:
+    home = Path.home()
+    if platform.system() == "Darwin":
+        return home / "Library" / "Caches" / "ms-playwright"
+    return home / ".cache" / "ms-playwright"
+
+
+HAS_CHROMIUM = any(_chromium_cache_dir().glob("chromium-*"))
+needs_chromium = pytest.mark.skipif(
+    not HAS_CHROMIUM,
+    reason="Playwright Chromium is not installed; run `make sync`",
+)
 
 
 @pytest.fixture(autouse=True)
@@ -137,3 +160,80 @@ def skill_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SkillTree:
     monkeypatch.setenv("HTMLEDITOR_ARCH_CHECKS_DIR", str(tmp_path / "empty-checks"))
     config_module.reset_settings_cache()
     return tree
+
+
+@dataclass(frozen=True)
+class DeckReply:
+    """One answer of the editor server: status and decoded JSON body."""
+
+    status: int
+    body: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ServedDeck:
+    """A file served by a real editor server, with raw HTTP helpers."""
+
+    path: Path
+    port: int
+
+    def request(
+        self, method: str, route: str, body: bytes = b"", content_length: str | None = None, send_body: bool = True
+    ) -> DeckReply:
+        """Send a request with exactly the given Content-Length (default: the body size)."""
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=60)
+        try:
+            conn.putrequest(method, route, skip_accept_encoding=True)
+            conn.putheader("Content-Type", "application/json")
+            conn.putheader("Content-Length", str(len(body)) if content_length is None else content_length)
+            conn.endheaders(body if send_body else None)
+            response = conn.getresponse()
+            raw = response.read()
+            return DeckReply(status=response.status, body=json.loads(raw) if raw else {})
+        finally:
+            conn.close()
+
+    def status(self) -> dict[str, Any]:
+        """Return the JSON of ``GET /status``."""
+        return self.request("GET", "/status").body
+
+    def save(self, payload: dict[str, Any]) -> DeckReply:
+        """POST ``payload`` as JSON to ``/content``."""
+        return self.request("POST", "/content", json.dumps(payload).encode("utf-8"))
+
+
+def _wait_listening(port: int) -> None:
+    for _ in range(50):
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.1):
+                return
+        except OSError:
+            time.sleep(0.05)
+    pytest.fail(f"server on port {port} did not start in time")
+
+
+@pytest.fixture
+def serve_deck(reset_state: None) -> Iterator[Callable[[Path], ServedDeck]]:
+    """Return a function serving a file with a real editor server, stopped at teardown."""
+    started: list[int] = []
+
+    def serve(path: Path) -> ServedDeck:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = int(sock.getsockname()[1])
+        start_http_server(str(path), port=port, host="127.0.0.1")
+        started.append(port)
+        _wait_listening(port)
+        return ServedDeck(path=path, port=port)
+
+    yield serve
+    if started:
+        stop_http_server()
+
+
+@pytest.fixture
+def served_deck(tmp_path: Path, serve_deck: Callable[[Path], ServedDeck]) -> ServedDeck:
+    """DECK: an 8 slide Euro-Information deck ``deck.html`` in its own folder, served by the editor."""
+    folder = tmp_path / "work"
+    folder.mkdir()
+    return serve_deck(Path(write_deck(folder / "deck.html", deck_ei())))

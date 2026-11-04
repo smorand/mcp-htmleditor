@@ -11,7 +11,6 @@ Real browser tests, same harness pattern as ``test_undo_redo_e2e.py``: a real
 
 from __future__ import annotations
 
-import platform
 import socket
 import time
 from collections.abc import Iterator
@@ -24,6 +23,7 @@ from playwright.sync_api import Page, Route
 from mcp_htmleditor import config as config_module
 from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
+from tests.conftest import needs_chromium
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TITLE = "Titre du document"
@@ -32,20 +32,6 @@ SAVE_WAIT_MS = 1500  # > the 800 ms typing debounce plus the POST round trip
 TITLE_SELECTOR = 'h1[data-editable~="text"]'
 HEADING_SELECTOR = 'h2[data-editable~="text"]'
 SAVED_DOT_COLOR = "rgb(66, 190, 101)"
-
-
-def _chromium_cache_dir() -> Path:
-    home = Path.home()
-    if platform.system() == "Darwin":
-        return home / "Library" / "Caches" / "ms-playwright"
-    return home / ".cache" / "ms-playwright"
-
-
-HAS_CHROMIUM = any(_chromium_cache_dir().glob("chromium-*"))
-needs_chromium = pytest.mark.skipif(
-    not HAS_CHROMIUM,
-    reason="Playwright Chromium is not installed; run `make sync`",
-)
 
 
 @dataclass(frozen=True)

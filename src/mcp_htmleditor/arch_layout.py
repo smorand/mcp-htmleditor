@@ -33,6 +33,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, Tag
 
+from .fileio import atomic_write
 from .tracing import trace_span
 
 logger = logging.getLogger(__name__)
@@ -1199,7 +1200,7 @@ def layout_file(path: str | Path, diagram_id: str | None = None) -> LayoutReport
             warnings.extend(diagram_warnings)
 
         if updated:
-            file_path.write_text(str(soup), encoding="utf-8")
+            atomic_write(file_path, str(soup))
 
         span.set_attribute("arch_layout.diagrams_updated", updated)
         span.set_attribute("arch_layout.warnings", len(warnings))

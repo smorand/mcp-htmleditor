@@ -16,6 +16,7 @@ import re
 import socket
 import tempfile
 import threading
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,7 @@ from urllib.parse import urlparse, urlsplit
 from bs4 import BeautifulSoup, Tag
 
 from .config import PORT_RANGE_END, PORT_RANGE_START, default_host, default_port
+from .fileio import WriteError, atomic_write, is_template_path
 from .state import get_state
 from .tracing import trace_span
 from .version import __version__
@@ -55,6 +57,11 @@ _EDITOR_ARTIFACTS = {
 # Browser-extension attributes (Google Translate, Grammarly, etc.) that pollute
 # the serialized DOM and must be stripped on save.
 _EXTENSION_ATTR_PREFIXES = ("_msthash", "_msttexthash", "_msthidden", "data-gr-", "data-gramm")
+
+# A save body above 50 MiB is refused unread. A length of more than 10 significant digits is already above
+# the cap, so it never reaches ``int()``.
+MAX_SAVE_BYTES = 52_428_800
+MAX_LENGTH_DIGITS = 10
 
 
 # ---------------------------------------------------------------------------
@@ -289,55 +296,32 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         self._send_json(payload)
 
     def _receive_content(self) -> None:
-        """Receive updated HTML from the editor and write it to disk."""
+        """Receive updated HTML from the editor and write it to disk (SPEC-0009 save pipeline)."""
         state = get_state()
         if not state.current_file:
             self._send_json({"error": "No file loaded"}, status=404)
             return
-
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length)
-
-        # JSON only: a text/plain or form body is what a foreign page can send
-        # without a CORS preflight (SPEC-0005/BR-004).
-        content_type = self.headers.get("Content-Type", "")
-        if content_type.split(";", 1)[0].strip().lower() != "application/json":
-            self._refuse("unsupported content type", content_type, status=415)
-            return
         try:
-            data: dict[str, Any] = json.loads(body)
-            html: str = data.get("html", "")
-        except (json.JSONDecodeError, KeyError):
-            self._send_json({"error": "Invalid JSON body"}, status=400)
+            request = self._read_save_request()
+            refuse_template(state.current_file)
+            with state.save_lock:
+                mtime = write_save(Path(state.current_file), request)
+        except SaveRefusal as refusal:
+            logger.warning("Refused %s %s: %s", self.command, urlparse(self.path).path, refusal.payload["error"])
+            self._send_json(refusal.payload, status=refusal.status)
             return
-
-        # The editor sends the full document (DOCTYPE + html); strip ephemeral
-        # editor artifacts before writing so the file stays clean for LLM agents.
-        if "<html" not in html.lower():
-            html = _rebuild_full_html(html, state.current_file)
-
-        html = _strip_editor_artifacts(html)
-
-        # Safety: never overwrite reference/bootstrap templates. They are meant
-        # to be copied, not edited in place. Silently ignore such saves.
-        # Safety: never overwrite reference/bootstrap templates. They are meant
-        # to be copied, not edited in place. Silently ignore such saves.
-        normalized = state.current_file.replace("\\", "/")
-        if "/templates/bootstrap/" in normalized or "/templates/reference/" in normalized:
-            self._send_json({"ok": True, "skipped": "template file is read-only"})
+        except (OSError, WriteError) as exc:
+            logger.error("Save failed for %s: %s", state.current_file, exc)
+            self._send_json({"error": failure_text(exc)}, status=500)
             return
+        self._send_json({"ok": True, "mtime": mtime})
 
-        target = Path(state.current_file)
-        with trace_span("file.write", {"file.path": str(target), "file.size": len(html)}):
-            try:
-                target.write_text(html, encoding="utf-8")
-            except OSError as exc:
-                logger.error("Save failed for %s: %s", target, exc)
-                self._send_json({"error": str(exc)}, status=500)
-                return
-
-        logger.debug("Saved %s (%d bytes)", target, len(html))
-        self._send_json({"ok": True})
+    def _read_save_request(self) -> SaveRequest:
+        """Check the length, read the body, then check the content type and the JSON (spec order)."""
+        length = parse_content_length(self.headers.get("Content-Length"))
+        body = self.rfile.read(length)
+        check_content_type(self.headers.get("Content-Type", ""))
+        return parse_save_body(body)
 
     def _run_arch_layout(self) -> None:
         """Recompute every declarative arch-diagram in the current file.
@@ -364,9 +348,9 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         with trace_span("mcp.layout_arch_diagram", {"file.path": str(target)}) as span:
             try:
                 report = layout_file(target)
-            except OSError as exc:
+            except (OSError, WriteError) as exc:
                 logger.error("arch-layout failed for %s: %s", target, exc)
-                self._send_json({"error": str(exc)}, status=500)
+                self._send_json({"error": failure_text(exc)}, status=500)
                 return
             span.set_attribute("arch_layout.diagrams_updated", report.diagrams_updated)
             span.set_attribute("arch_layout.warnings", len(report.warnings))
@@ -435,6 +419,114 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             ".svg": "image/svg+xml",
             ".json": "application/json",
         }.get(ext, "application/octet-stream")
+
+
+# ---------------------------------------------------------------------------
+# Save pipeline (SPEC-0009): pure checks raising SaveRefusal, in the spec order
+# ---------------------------------------------------------------------------
+
+
+class SaveRefusal(Exception):  # noqa: N818 - name fixed by SPEC-0009 DEC-010
+    """A save refused before or instead of the write: the HTTP ``status`` and the JSON ``payload`` to answer."""
+
+    def __init__(self, status: int, payload: dict[str, Any]) -> None:
+        super().__init__(status, payload)
+        self.status = status
+        self.payload = payload
+
+
+@dataclass(frozen=True)
+class SaveRequest:
+    """The parts of a save body the server uses: the page, the version it last saw, and ``force``."""
+
+    html: str
+    base_mtime: float | None
+    force: bool
+
+
+def parse_content_length(raw: str | None) -> int:
+    """Return the declared body length: 0 when absent; 400 when not ASCII digits; 413 above the cap."""
+    if raw is None:
+        return 0
+    if not (raw.isascii() and raw.isdigit()):
+        raise SaveRefusal(400, {"error": "Invalid Content-Length"})
+    digits = raw.lstrip("0")
+    if len(digits) > MAX_LENGTH_DIGITS or int(digits or "0") > MAX_SAVE_BYTES:
+        raise SaveRefusal(413, {"error": "Request too large"})
+    return int(digits or "0")
+
+
+def check_content_type(content_type: str) -> None:
+    """JSON only: a text/plain or form body is what a foreign page can send without a CORS preflight."""
+    if content_type.split(";", 1)[0].strip().lower() != "application/json":
+        raise SaveRefusal(415, {"error": "unsupported content type"})
+
+
+def parse_save_body(body: bytes) -> SaveRequest:
+    """Read a save body: a JSON object with a string ``html``, else 400.
+
+    A ``base_mtime`` that is not a JSON number (a boolean included) counts as absent; only ``force`` equal
+    to ``true`` forces.
+    """
+    try:
+        data = json.loads(body)
+    except (ValueError, RecursionError):
+        data = None
+    if not isinstance(data, dict) or not isinstance(data.get("html"), str):
+        raise SaveRefusal(400, {"error": "Invalid JSON body"})
+    return SaveRequest(
+        html=data["html"], base_mtime=_number_or_none(data.get("base_mtime")), force=data.get("force") is True
+    )
+
+
+def _number_or_none(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    try:
+        return float(value)
+    except OverflowError:
+        return float("inf")
+
+
+def refuse_template(current_file: str) -> None:
+    """Templates are meant to be copied, not edited in place: answer 403 naming the absolute path."""
+    if is_template_path(current_file):
+        raise SaveRefusal(403, {"ok": False, "error": f"Refusing to modify a template: {current_file}"})
+
+
+def check_conflict(target: Path, base_mtime: float | None, force: bool) -> None:
+    """Refuse with 409 when the file changed since ``base_mtime``; a missing file reads as 0.0."""
+    if base_mtime is None or force:
+        return
+    current = _mtime_or_zero(target)
+    if current != base_mtime:
+        raise SaveRefusal(409, {"ok": False, "error": "File changed on disk", "mtime": current})
+
+
+def write_save(target: Path, request: SaveRequest) -> float:
+    """Check the conflict, clean the HTML, write it atomically and return the mtime after the write."""
+    check_conflict(target, request.base_mtime, request.force)
+    html = request.html
+    # The editor sends the full document (DOCTYPE + html); strip ephemeral editor artifacts before writing
+    # so the file stays clean for LLM agents.
+    if "<html" not in html.lower():
+        html = _rebuild_full_html(html, str(target))
+    atomic_write(target, _strip_editor_artifacts(html))
+    return target.stat().st_mtime
+
+
+def failure_text(exc: OSError | WriteError) -> str:
+    """The operating system message of a failed write (``strerror``, else the exception text)."""
+    if isinstance(exc, WriteError):
+        return exc.reason
+    return exc.strerror or str(exc)
+
+
+def _mtime_or_zero(target: Path) -> float:
+    try:
+        return target.stat().st_mtime
+    except FileNotFoundError:
+        return 0.0
 
 
 # ---------------------------------------------------------------------------
