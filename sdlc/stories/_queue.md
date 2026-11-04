@@ -41,7 +41,7 @@
 | US-0037 | SPEC-0007 | `outline` and `get_slide` tools | US-0036, US-0025 | 2 | landed | story/US-0037-outline-and-get-slide-tools | story/US-0036-get-slide-command-and-scanner |
 | US-0038 | SPEC-0007 | `patch` with `set_text`, atomic write, path guard | US-0036 | 2 | landed | story/US-0038-patch-set-text-atomic-write-path-guard | story/US-0037-outline-and-get-slide-tools |
 | US-0039 | SPEC-0007 | `delete_slide`, renumbering, dry run | US-0038 | 2 | landed | story/US-0039-delete-slide-renumbering-and-dry-run | story/US-0038-patch-set-text-atomic-write-path-guard |
-| US-0040 | SPEC-0007 | `insert_slide`, `move_slide`, `replace_slide` | US-0039 | 2 | todo | | |
+| US-0040 | SPEC-0007 | `insert_slide`, `move_slide`, `replace_slide` | US-0039 | 2 | landed | story/US-0040-insert-move-and-replace-slide | story/US-0039-delete-slide-renumbering-and-dry-run |
 | US-0041 | SPEC-0007 | `patch` tool and editor flag | US-0040, US-0025 | 2 | todo | | |
 | US-0042 | SPEC-0007 | `lint` command and structure rules | US-0038 | 2 | todo | | |
 | US-0043 | SPEC-0007 | charter rules l007 to l011 | US-0042 | 2 | todo | | |

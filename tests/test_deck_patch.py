@@ -384,22 +384,6 @@ def test_deck_patch_a_document_reports_the_presentation_before_a_later_shape_err
     assert_untouched(path, before)
 
 
-@pytest.mark.parametrize(
-    "operation",
-    [
-        {"op": "replace_slide", "id": "slide-1", "html": "<article></article>"},
-        {"op": "insert_slide", "after": "slide-1", "html": "<article></article>"},
-        {"op": "move_slide", "id": "slide-1", "after": "slide-2"},
-    ],
-)
-def test_deck_patch_structure_operations_are_not_supported_yet(tmp_path: Path, operation: dict[str, str]) -> None:
-    """A valid structural operation fails for now, after an earlier set_text, and writes nothing."""
-    path, before = ei_file(tmp_path)
-    reason = f'operation "{operation["op"]}" is not supported yet'
-    assert patch(path, [SET_TITLE_2, operation]) == ("", failure(2, reason), 1)
-    assert_untouched(path, before)
-
-
 def test_deck_patch_structure_operation_with_unknown_id(tmp_path: Path) -> None:
     """A structural operation naming an unknown slide id reports the id first."""
     path, _ = ei_file(tmp_path)

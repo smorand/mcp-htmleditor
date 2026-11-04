@@ -103,7 +103,7 @@ Load only what the task needs.
 | `.agent_docs/testing.md` | Test file map, coverage decisions, export regression set and validation procedure |
 | `.agent_docs/docker.md` | Image, compose, prod overlay, container checks |
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
-| `.agent_docs/agent-editing.md` | Deck service layer: outline, get-slide and patch formats, byte offset scanner rules and gotchas |
+| `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`): outline, get-slide and the five `patch` operations, byte offset scanner and renumbering rules, gotchas |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`
 (sources in `skill/core.md`, `skill/topics/`, `skill/checks/`). `docs/skill-archive/` keeps the

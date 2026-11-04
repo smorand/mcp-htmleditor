@@ -17,8 +17,7 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
 
 ## `patch FILE --ops PATH|- [--dry-run]` (`deck/patch.py`, US-0038)
 
-- Operations are a JSON list; the five names are parsed and validated, `set_text` and `delete_slide` run
-  (the other three fail with `operation "<op>" is not supported yet` once their ids exist, US-0040):
+- Operations are a JSON list; the five names are parsed, validated and run (US-0040 added the last three):
   `set_text{id,selector,text}`, `replace_slide{id,html}`, `insert_slide{after,html}`, `delete_slide{id}`,
   `move_slide{id,after}`. Result, compact: `{"ok","changed","slides","problems"}` plus a last `dry_run`.
 - Check order: template guard (resolved path holds `templates/bootstrap` or `templates/reference`), file
@@ -32,8 +31,10 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
   between start tag and end tag of the first match is replaced by the text with only `&`, `<`, `>` escaped.
   Void element: `has no content`. Each `set_text` rescans and reparses its own slide atom, so several edits
   of one slide stack correctly.
-- Working copy (`Working`): atoms of raw gaps and slides; a slide atom starts at its `pre` (spaces, tabs,
-  one line break) so it travels with the slide. Output is the join; equal to the input means no write.
+- Working copy (`Working`): `Atom(pre, body, orig_id, touched, is_slide)` for raw gaps and slides; a slide's `pre`
+  (spaces, tabs, one line break before it) travels with the slide, `body` is its range. Output is the join of
+  `pre + body`; equal to the input means no write. `orig_id` is the id in the ORIGINAL file, kept through move
+  and replace, `None` for an inserted slide (it cannot be designated) and for gaps; lookups scan the list.
 - Write: `fileio.atomic_write` (mkstemp in the directory, fsync, mode copied, `Path.replace`, temp removed on
   failure, symlinks followed, `file.write` span). The update flag is an injected callback, True only around
   the write, never on dry run or no change. UTF-8 BOM and CRLF are kept.
@@ -41,6 +42,25 @@ Service layer in `src/mcp_htmleditor/deck/`; it never prints, `cli.py` turns `De
   the text after it as is). Order: `unknown slide id` (also for an id deleted earlier in the patch, ids always
   designate the ORIGINAL slides), then `cannot delete the last slide` when the working copy holds one slide.
   Sets `Working.is_structural`.
+- `replace_slide{id,html}` (US-0040): checks in order `unknown slide id`, html shape, image reference. Writes the
+  html verbatim over the slide range (the `pre` is untouched, renumbering edits it later). Each token
+  `data:ref:img-(\d+)` becomes the full `src` of the Nth large image of the slide's CURRENT text in the working
+  copy (so a second replace of the same slide still finds the image); N = 0 or beyond the count (or more than 9
+  digits) fails with the token as written. No image in the html: the old image is simply gone.
+- `insert_slide{after,html}`: `after` is an original id or `start`. Same html rule; any token fails with the first
+  one found. After the reference slide: `eol + lead` of the reference's `pre` (`\r\n` when that `pre` holds it),
+  then the html, before any comment gap that follows. At `start`: the html takes the first slide's `pre`, the old
+  first slide gets `eol + lead` (no blank line). The new atom has `touched` and no `orig_id`.
+- `move_slide{id,after}`: `id` checked before `after`. The atom (own `pre` included) goes right after the
+  reference; at `start` it takes the first slide's `pre` and the old first slide gets `eol + lead`. Gaps (comments)
+  stay where they are. `after == id`, or `start` for the first slide, is a no-op that does not even mark the patch
+  structural. After a pop the reference is looked up again, so ids stay the original ones.
+- HTML check (`_check_slide_html`): BeautifulSoup `html.parser` for validation only, never serialization; one top
+  level Tag, comments and blank strings ignored, any other text, doctype or second element fails;
+  `data-type="slide"` and a non empty `data-id`. The root must also be closed (`scan(html)[0]` has
+  `end_start < end_end`, not the unclosed shape `end_start == end_end == len(html)`) and only whitespace and
+  comments may follow its end tag, so an unclosed fragment or a stray trailing `</div>` gets the same shape reason
+  (2026-11, review defect: the next slide used to be nested in the unclosed one, counters not renumbered).
 - Dry run (`dry_run=True`, `--dry-run`): the whole pipeline runs, only the write is skipped; errors identical.
 
 ## Renumbering (`deck/renumber.py`, US-0039)

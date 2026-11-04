@@ -139,6 +139,51 @@ def _slide(charter: str, i: int, title: str, total: int, image_chars: int | None
     return template.format(i=i, n=i + 1, total=total, title=title, image=image, png=TINY_PNG)
 
 
+_SLIDE_EI = """<article class="slide" data-type="slide" data-id="x" data-slide-type="content" data-title="{data_title}">
+  <div class="slide-inner">
+    <div class="slide-eyebrow" data-editable="text">{eyebrow}</div>
+    <h1 class="slide-h1" data-editable="text">{title}</h1>
+    <div class="slide-title-rule"></div>
+    <div class="slide-body" data-editable="text"><p>Texte de {title}.</p>{extra}</div>
+  </div>
+  <div class="slide-foot">
+    <span class="slide-foot-page">{page}</span>
+    <span class="slide-foot-title" data-editable="text">Réunion · Mois</span>
+  </div>
+</article>"""
+_SLIDE_CARBON = """<article class="slide" data-type="slide" data-id="x" data-title="{data_title}">
+  <div class="slide-header">
+    <div class="slide-eyebrow" data-editable="text">{eyebrow}</div>
+    <h1 class="slide-h1" data-editable="text"><strong>{title}</strong></h1>
+  </div>
+  <div class="slide-body" data-editable="text"><p>Texte de {title}.</p>{extra}</div>
+  <div class="slide-footer">
+    <span class="slide-footer-left" data-editable="text">Produit</span>
+    <span class="slide-footer-right">Slide {page} / 1</span>
+  </div>
+</article>"""
+
+
+def slide_html(  # noqa: PLR0913 - signature set by the story contract
+    charter: str,
+    title: str,
+    *,
+    eyebrow: str = "Slide 01 / 01",
+    page: str = "1",
+    data_title: str | None = None,
+    extra: str = "",
+) -> str:
+    """Return one valid slide element for ``ei`` or ``carbon``, as an agent would hand it to ``patch``.
+
+    ``data_title`` is written as is (already escaped); it defaults to ``title``. The counters are the
+    ones of a one slide deck: renumbering is expected to rewrite them.
+    """
+    template = {"ei": _SLIDE_EI, "carbon": _SLIDE_CARBON}[charter]
+    return template.format(
+        title=title, data_title=data_title if data_title is not None else title, eyebrow=eyebrow, page=page, extra=extra
+    )
+
+
 def deck_ei() -> str:
     """DECK-EI: 8 slides, a 1 500 character image on slide 3, a section slide last."""
     return build_deck("ei", EI_TITLES, image_chars=1500, image_slide=3)
