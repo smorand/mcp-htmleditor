@@ -106,6 +106,8 @@ ignore = [
 "src/mcp_htmleditor/export/pptx_text.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
 "src/mcp_htmleditor/export/pptx_arch.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
 "src/mcp_htmleditor/export/pptx_images.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
+"src/mcp_htmleditor/export/pptx_gantt.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
+"src/mcp_htmleditor/export/pptx_blocks.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
 "src/mcp_htmleditor/export/pptx_style.py" = ["PLR2004"]
 "src/mcp_htmleditor/export/pptx_components.py" = ["PLR2004"]
 # ElementTree parses word/styles.xml produced locally by pandoc, not user input.

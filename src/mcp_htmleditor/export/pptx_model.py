@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from bs4 import Tag
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN
 
+from .pptx_components import GanttRow
 from .pptx_style import (
     PX_IN,
     Box,
@@ -342,4 +344,63 @@ class _BuilderBase:
         raise NotImplementedError
 
     def _write(self, frame: Any, paras: list[_Para]) -> None:
+        raise NotImplementedError
+
+    @staticmethod
+    def _children(element: Tag) -> list[Tag]:
+        raise NotImplementedError
+
+    def _text_height(self, element: Tag, width: float, style: TextStyle) -> float:
+        raise NotImplementedError
+
+    def _consume(self, element: Tag, deep: bool = True) -> None:
+        raise NotImplementedError
+
+    def _is_panel(self, element: Tag) -> bool:
+        raise NotImplementedError
+
+    def _flow(self, region: _Region) -> None:
+        raise NotImplementedError
+
+    def _image_aspect(self, src: str) -> float | None:
+        raise NotImplementedError
+
+    def _render_image(self, box: Box, element: Tag) -> None:
+        raise NotImplementedError
+
+    def _render_annotated_image(self, box: Box, element: Tag) -> None:
+        raise NotImplementedError
+
+    def _render_arch(self, box: Box, element: Tag) -> None:
+        raise NotImplementedError
+
+    def _render_gantt(self, box: Box, element: Tag) -> None:
+        raise NotImplementedError
+
+    def _render_text(
+        self,
+        box: Box,
+        element: Tag,
+        style: TextStyle | None = None,
+        anchor: str = "top",
+    ) -> None:
+        raise NotImplementedError
+
+    def _gantt_legend_height(self, legend: Tag, width: float) -> float:
+        raise NotImplementedError
+
+    def _gantt_rows(self, element: Tag) -> list[GanttRow]:
+        raise NotImplementedError
+
+    def _inline_gantt_legend(self, element: Tag) -> Tag | None:
+        raise NotImplementedError
+
+    @staticmethod
+    def _inline_gantt_sibling(element: Tag, predicate: Callable[[Tag], bool]) -> Tag | None:
+        raise NotImplementedError
+
+    def _is_marker_legend_entry(self, entry: Tag) -> bool:
+        raise NotImplementedError
+
+    def _wrap_legend_entries(self, entries: list[Tag], width: float, style: TextStyle) -> list[list[Tag]]:
         raise NotImplementedError
