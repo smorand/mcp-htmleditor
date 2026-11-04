@@ -82,6 +82,8 @@ mcp-htmleditor skill                       # full skill content
   `~/.config/mcp-htmleditor/arch-checks/arch-diagram-checklist.md`, never in code.
 - `.mcp_state.json` is written next to the edited file. It is gitignored, never commit it.
 - JS has no build step: `node --check src/mcp_htmleditor/static/*.js`.
+- The editor is eleven classic scripts loaded in the order of `editor.html`; the PPTX exporter
+  is a composed `_SlideBuilder` of mixins (`export/pptx_*.py`). See `.agent_docs/architecture.md`.
 - `src/mcp_htmleditor/version.py` stays committed with `"dev"`; the build overwrites it
   from the git tag.
 

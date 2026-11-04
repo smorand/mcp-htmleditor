@@ -23,7 +23,7 @@ export or the editor silently degrades.
 * Slide counters: eyebrow `Catégorie · Slide 0N / TT` in every charter, plus
   `.slide-footer-right` ("Slide N / TT", Carbon) or `.slide-foot-page` ("N", EI and
   medical).
-  `renumberSlides()` in `editor.js` rewrites exactly those three, anything else goes stale.
+  `renumberSlides()` in `editor-slides.js` rewrites exactly those three, anything else goes stale.
 * `<html data-asset-chevrons="data:image/png;base64,...">` in the EI bootstrap is the
   fallback source for `{{CHEVRONS}}` in inserted slides (`resolveTemplateAssets`), needed
   because a fresh file has no `.slide-foot-logo img` to copy from. Same pattern is
@@ -36,7 +36,7 @@ export or the editor silently degrades.
 * **Explicit width class on every child of a flex row.** The `medical` charter states its
   side by side layouts with `w-25` to `w-70` (`flex:0 0 X%`) on each child of
   `.med-strip`, `.med-split`, `.med-cols`, `.med-compare`, `.med-steps`, `.med-stats`,
-  `.med-timeline`, `.med-section-figs`. This is not cosmetic: `to_pptx.py` only splits a
+  `.med-timeline`, `.med-section-figs`. This is not cosmetic: `pptx_flow.py` only splits a
   `display:flex` row into independent column regions when at least one child declares a
   width, so a bare `flex:1` everywhere exports as a vertical stack (and gets cropped).
   Same reason `.med-grid` is a vertical flex container of `.med-strip` rows, never a
@@ -127,7 +127,7 @@ arch-layout` / the `layout_arch_diagram` MCP tool compute and write the final
 percentages. A diagram with no `arch-row` is legacy (hand authored `data-x`/`data-y`)
 and is left untouched — both formats coexist in the same file.
 
-**Hard invariant, verified against `export/to_pptx.py::_render_arch`**: `arch-row` and
+**Hard invariant, verified against `export/pptx_arch.py::_render_arch`**: `arch-row` and
 `arch-lane` must never carry `position:relative`. `_render_arch` walks the diagram with
 `element.find_all(True)` (recursive) and always resolves every node/edge percentage
 against the top level `arch-diagram` box, never against an intermediate wrapper. Giving
@@ -142,7 +142,7 @@ therefore invisible to every exporter, consistent with the existing "lost at PPT
 export" bucket for CSS pseudo-elements — no extra DOM node needed, no risk of double
 rendering.
 
-A node flagged `data-layout="manual"` (set by `editor.js`'s `makeArchNodeDraggable` on
+A node flagged `data-layout="manual"` (set by `editor-drag.js`'s `makeArchNodeDraggable` on
 the first pointer drag) is never repositioned by a later `arch-layout` run: its box is
 read back from its own attributes instead of being recomputed, but it still reserves its
 column slot so siblings do not overlap it.
@@ -157,7 +157,7 @@ a numbered circle (`.arch-edge-badge`) at the edge's true on-segment midpoint, i
 of the optional text label's offset position; `data-color` on `arch-edge` overrides the
 bootstrap's single fixed accent colour on the segment, tip and label (needed the moment a
 diagram has more than one flow, each with its own colour, like a legend). `arch-col` and
-`arch-spacer` add no new `data-type` branch to `export/to_pptx.py` (stay inert to it exactly
+`arch-spacer` add no new `data-type` branch to `export/pptx_arch.py` (stay inert to it exactly
 like `arch-row`/`arch-lane`); `arch-col`'s CHILDREN do need one, see the invariant below.
 `.arch-edge-badge` (the `data-step` circle) has its own render branch
 (`_render_arch_children` -> `_render_arch_badge`): a filled `MSO_SHAPE.OVAL` with the
@@ -190,15 +190,15 @@ The browser injects helper nodes and attributes into the iframe DOM (`_mcp_forma
 `_mcp_drag_handle`, `_mcp_editable`, `contenteditable`, plus Google Translate and
 Grammarly attributes). `_strip_editor_artifacts` removes all of them before writing, so
 a saved file never carries editor state. Add a new artifact to `_EDITOR_ARTIFACTS` in
-`http_server.py` at the same time as you add it to `editor.js`, otherwise it leaks into
+`http_server.py` at the same time as you add it to the editor scripts (`editor-*.js`), otherwise it leaks into
 the file the next agent reads.
 
-2026-10-10 (SPEC-0004): the client side save (`saveContent` in `editor.js`) strips these
+2026-10-10 (SPEC-0004): the client side save (`saveContent` in `editor-save.js`) strips these
 artifacts on a detached clone of the document and never mutates the live DOM. Removing
 `contenteditable` from the focused zone moves focus to `<body>` and drops the keystrokes
 typed after the save. A new client artifact must be stripped on the clone too.
 
-## Undo / redo (structural mutations, `editor.js`)
+## Undo / redo (structural mutations, `editor-undo.js`)
 
 Ctrl+Z / Cmd+Z (undo) and Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y (redo) are active only in
 edit mode. Implementation: a pure in-memory JS stack of whole-document `outerHTML`

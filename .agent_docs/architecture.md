@@ -46,7 +46,16 @@ ignored: those files are meant to be copied, not edited. The write itself is tra
 
 | Module | Role |
 |--------|------|
-| `export/to_pptx.py` | HTML to PPTX. Slide detection (`data-type="slide"` on any tag, `article.slide` fallback), per charter chrome, vertical block flow, one renderer per component (text, grid, panel, table, gantt, arch diagram, annotated image, image, hbar, row). Gantt also has a class-free fallback, `_is_inline_gantt`: structural detection of a hand-authored, fully inline-styled Gantt (fixed-width label + `position:relative` track with absolutely positioned bars/markers), see `skill/types/gantt.md` § Variante. A generic `display:flex` row of 2+ sized columns (`_is_flex_row` / `_flex_row_block`, checked structurally, no marker attribute) is split into independent `_Region`s that each recurse through the normal `_flow`/`_collect_all`, so a column shrinks-to-fit on its own instead of the whole row overflowing uniformly; a column with no resolvable `flex`/`flex-basis`/`width` hint on any child falls back to the ordinary single-column flow (`_column_widths` returns `None`), and a column carrying its own `data-type` (table, arch-diagram, ...) keeps its own dedicated renderer instead of being unwrapped. Returns an `ExportReport` (slide count, charter, warnings); the CLI prints it and exits non zero when nothing was exported. Traced as `export.pptx` |
+| `export/to_pptx.py` | HTML to PPTX entry point. Keeps `ExportReport` (re-exported from `pptx_model.py`), `to_pptx`, `_build_pptx`, `find_slides` and the composed `_SlideBuilder` (`__init__`, `build`, `_slide_kind`), built from the mixins below. Slide detection (`data-type="slide"` on any tag, `article.slide` fallback). Returns an `ExportReport` (slide count, charter, warnings); the CLI prints it and exits non zero when nothing was exported. Traced as `export.pptx` |
+| `export/pptx_model.py` | Shared model: `ExportReport`, `_Context`, `_Block`, `_Column`, `_Region`, `_Para`, column width helpers and `_BuilderBase`, the base class of every mixin (declares the shared instance attributes and stubs for cross mixin calls) |
+| `export/pptx_text.py` | `TextMixin`: HTML elements to styled paragraphs and runs, text frames, rectangle and textbox primitives |
+| `export/pptx_images.py` | `ImagesMixin`: annotated images, plain images, picture primitives (source decoding, aspect probing, insertion) |
+| `export/pptx_arch.py` | `ArchMixin`: `_render_arch`, nodes as native shapes, edges as segments, arrow tips, step badges, labels |
+| `export/pptx_gantt.py` | `GanttMixin`: Gantt head, bars, legend, plus the class-free fallback `_is_inline_gantt`: structural detection of a hand-authored, fully inline-styled Gantt, see `skill/types/gantt.md` § Variante |
+| `export/pptx_blocks.py` | `BlocksMixin`: block measurement and renderers (grid, panel, table, rule, hbar) and the block dispatcher |
+| `export/pptx_flow.py` | `FlowMixin`: vertical block flow and flex rows. A generic `display:flex` row of 2+ sized columns (`_is_flex_row` / `_flex_row_block`, checked structurally, no marker attribute) is split into independent `_Region`s that each recurse through the normal flow, so a column shrinks-to-fit on its own; a column with no resolvable `flex`/`flex-basis`/`width` hint falls back to the ordinary single column flow (`_column_widths` returns `None`), and a column carrying its own `data-type` keeps its own renderer |
+| `export/pptx_chrome.py` | `ChromeMixin`: per charter chrome (EI, Carbon, medical with `_chrome_medical`, generic): backgrounds, frames, footers, content regions |
+| `export/charters.py` | `REGISTRY`, a tuple of `CharterSpec` (key, kind, template, description, detection tokens, DOCX key). Stdlib only. Read by `templates.py` (`TEMPLATES`), `pptx_style.detect_theme` and `reference_docx.charter_for`. The JavaScript detector in `static/slide-layouts.js` stays; parity is tested by `tests/test_charter_detection.py` |
 | `export/pptx_style.py` | `Box` geometry in inches on the 960x540 canvas (1 CSS px = 1 pt), CSS parsing (lengths, colours, custom properties), `Theme` charters (ei / carbon / medical / generic), `TextStyle` scale per class (`_CLASS_STYLES`) and per theme tag defaults (`_THEME_TAG_STYLES`, used by the medical charter whose body scale is stated on descendant selectors), `StyleResolver`. The resolver indexes three rule shapes: `.name`, `.name.variant` (applied only when the element carries every class of the compound) and `.a.b .name` (applied only when `active_scope`, set per slide from the article's classes, contains the ancestor classes). That is what makes `.slide.dark .med-caption` reach the right elements without leaking, and `.cds-notification.error` stop leaking onto plain notifications |
 | `export/pptx_components.py` | Pure helpers: `TableGrid` (colspan/rowspan occupancy, column widths), Gantt period maths, CSS transform composition, table cell borders, theme style removal (python-pptx has no API for those) |
 | `export/to_docx.py` | HTML to DOCX through pandoc `-f html`. Lifts `.doc-title` / `.doc-subtitle` into pandoc metadata so the title is emitted once, applies the charter with `--reference-doc`, reports SVG and pandoc warnings. Traced as `export.docx`, the pandoc run as `tool.pandoc` |
@@ -59,7 +68,15 @@ ignored: those files are meant to be copied, not edited. The write itself is tra
 | File | Role |
 |------|------|
 | `static/editor.html` | Iframe shell plus toolbar |
-| `static/editor.js` | Polling, rich text toolbar, slide insert, document block insert before/after, image embed as base64, drag reorder of document blocks, mouse move of arch nodes (`data-x`/`data-y` in %) |
+| `static/editor-undo.js` | Undo and redo: whole document snapshots, key handling, button state |
+| `static/editor-edit.js` | Edit mode: injection and removal of `contenteditable`, editor styles |
+| `static/editor-format.js` | Floating format bar, insert bar, image embed as base64, table and link insert |
+| `static/editor-menus.js` | Context menus, table row and column actions, arch node add, remove, rename, connect |
+| `static/editor-save.js` | Client side save (`saveContent`) |
+| `static/editor-slides.js` | Slide picker, insert, delete, `renumberSlides` |
+| `static/editor-blocks.js` | Document block picker and insert before or after |
+| `static/editor-drag.js` | Drag reorder of document blocks, mouse move of arch nodes (`data-x`/`data-y` in %) |
+| `static/editor.js` | State declarations, start up block, polling; loaded last |
 | `static/slide-layouts.js` | Per template slide layouts (`LAYOUT_SETS.carbon`, `.ei`) |
 | `static/doc-blocks.js` | Document block definitions (title, subtitle, h1 to h5, paragraph, table, list) |
 | `static/editor.css` | Toolbar, overlay and picker styles |
@@ -143,3 +160,14 @@ update_start() → write the HTML file → update_end()
 `update_start()` raises the overlay in the browser and suppresses mtime reloads,
 `update_end()` clears it and lets the next poll reload the content. Never write the file
 without those flanking calls.
+
+2026-11-03 (SPEC-0012, DEC-001, DEC-002): `_SlideBuilder` is composed from mixin classes
+(`TextMixin`, `ImagesMixin`, `ArchMixin`, `GanttMixin`, `BlocksMixin`, `FlowMixin`, `ChromeMixin`),
+each defined in its own `export/pptx_*.py` module and inheriting `_BuilderBase` from
+`pptx_model.py`, which declares the shared attributes and a stub for every method called across
+mixins (strict typing without `type: ignore`). The editor is split into classic scripts, not ES
+modules, so `file://` and the global function names keep working. Load order is fixed in
+`editor.html`: `slide-layouts.js`, `doc-blocks.js`, `editor-undo.js`, `editor-edit.js`,
+`editor-format.js`, `editor-menus.js`, `editor-save.js`, `editor-slides.js`, `editor-blocks.js`,
+`editor-drag.js`, `editor.js`. The top level `let` and `const` of `editor.js` are only touched
+inside functions by the other scripts, never at evaluation time.

@@ -365,7 +365,16 @@ src/mcp_htmleditor/
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/
-│   ├── to_pptx.py   HTML to PPTX: slide detection, charter chrome, block flow, renderers
+│   ├── charters.py  REGISTRY of CharterSpec: the eight charters (templates, detectors, DOCX keys)
+│   ├── to_pptx.py   HTML to PPTX entry: to_pptx, find_slides, ExportReport re-export, composed _SlideBuilder
+│   ├── pptx_model.py      shared model: ExportReport, block types, _BuilderBase (mixin base class)
+│   ├── pptx_text.py       text and paragraph rendering, rectangle and textbox primitives
+│   ├── pptx_images.py     annotated images, images and picture primitives
+│   ├── pptx_arch.py       arch diagram renderer (nodes, edges, tips, badges, labels)
+│   ├── pptx_gantt.py      Gantt renderer, inline Gantt detection
+│   ├── pptx_blocks.py     block measurement and renderers (grid, panel, rule, hbar, table)
+│   ├── pptx_flow.py       block flow and flex row logic
+│   ├── pptx_chrome.py     per charter chrome (EI, Carbon, medical, generic)
 │   ├── pptx_style.py      Box geometry, CSS/colour parsing, themes, typographic scale
 │   ├── pptx_components.py table grid (spans), Gantt maths, low level pptx helpers
 │   ├── to_docx.py   HTML to DOCX via pandoc (single title, charter, diagnostics)
@@ -374,7 +383,15 @@ src/mcp_htmleditor/
 │   └── docx_assets.py     base64 assets embedded in the reference documents
 └── static/
     ├── editor.html      iframe shell + toolbar
-    ├── editor.js        polling, rich-text, slide insert, doc-block insert, image embed, drag-reorder blocks + move arch-nodes
+    ├── editor-undo.js   undo and redo snapshots
+    ├── editor-edit.js   edit mode injection and removal
+    ├── editor-format.js format bar, insert bar, image embed, table and link insert
+    ├── editor-menus.js  context menus, table row and column actions, arch node actions
+    ├── editor-save.js   client side save
+    ├── editor-slides.js slide picker, insert, delete, renumbering
+    ├── editor-blocks.js document block picker and insert
+    ├── editor-drag.js   drag-reorder of document blocks, mouse move of arch nodes
+    ├── editor.js        state, start up, polling (loaded last)
     ├── slide-layouts.js per-template slide layouts (carbon / ei / medical)
     ├── doc-blocks.js    document block definitions (title, subtitle, h1-h5, paragraph, table, list)
     └── editor.css       toolbar, overlay, picker styles

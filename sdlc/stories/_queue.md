@@ -19,7 +19,7 @@
 | US-0016 | SPEC-0012 | extract format and edit scripts | US-0015 | 2 | landed | story/US-0016-extract-format-and-edit-scripts | story/US-0015-extract-save-and-menus-scripts |
 | US-0017 | SPEC-0012 | extract undo script, order and serving tests | US-0016 | 2 | landed | story/US-0017-extract-undo-script-order-and-serving | story/US-0016-extract-format-and-edit-scripts |
 | US-0018 | SPEC-0012 | fix skill documents naming moved methods | US-0012 | 2 | landed | story/US-0018-fix-skill-documents-naming-moved-methods | story/US-0017-extract-undo-script-order-and-serving |
-| US-0019 | SPEC-0012 | update readme, agents and agent docs | US-0017, US-0018 | 2 | todo | | |
+| US-0019 | SPEC-0012 | update readme, agents and agent docs | US-0017, US-0018 | 2 | landed | story/US-0019-update-readme-agents-and-agent-docs | story/US-0018-fix-skill-documents-naming-moved-methods |
 | US-0020 | SPEC-0012 | size caps, remaining mentions, full gate | US-0019 | 2 | todo | | |
 | US-0021 | SPEC-0006 | topic engine and `skill --type/--all` | US-0020 | 2 | todo | | |
 | US-0022 | SPEC-0006 | `get_skill` tool and checklist fallback | US-0021 | 2 | todo | | |
