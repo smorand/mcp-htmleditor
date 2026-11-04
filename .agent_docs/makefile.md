@@ -38,7 +38,7 @@ make run-dev ARGS='-v serve doc.html'
 | `format-check` | `ruff format --check .` |
 | `typecheck` | `mypy src/`, strict |
 | `security` | `bandit -q -r src/ -c pyproject.toml` |
-| `check` | lint, format-check, typecheck, security, test-cov. Run before every commit |
+| `check` | check-generated, lint, format-check, typecheck, security, test-cov. Run before every commit |
 
 ## Build and install
 
@@ -89,6 +89,8 @@ MAKE_DOCKER_PREFIX=ghcr.io/smorand/ DOCKER_TAG=v1.0.0 make docker
 | Target | What it does |
 |--------|--------------|
 | `bootstrap-ei` | Regenerates `templates/bootstrap/slides-ei-empty.html` from the EI reference |
+| `sync-medical-css` | Copies the medical charter CSS from its bootstrap into the two reference decks |
+| `check-generated` | Runs both generators with `--check` (always both), prints one `fresh`/`stale`/`missing` line per file, fails if either fails, writes nothing. First step of `check` |
 
 ## Cleanup and info
 

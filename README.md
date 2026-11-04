@@ -263,6 +263,11 @@ the title slide, and copies the EI chevrons data URI onto `<html data-asset-chev
 slide inserted into a brand new file still gets its footer logo. Edit the reference, then
 run `make bootstrap-ei`; never patch the bootstrap directly.
 
+`make check-generated` verifies that both generated families (the EI bootstrap and the two
+medical reference decks) are fresh. It runs `--check` on both tools, prints one
+`<path>: fresh` or `stale (first difference at line N); run: make <target>` line per file,
+fails when any is stale or missing, and writes nothing. It is the first step of `make check`.
+
 The `medical` charter works the other way round: `bootstrap/slides-medical-empty.html` is the
 single source of its CSS, and the two reference decks (`reference/slides/medical.html`,
 `reference/slides/example-medical-complete.html`) embed an exact copy so they open on their

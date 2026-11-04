@@ -12,13 +12,14 @@ Python 3.13+, uv, click, FastMCP, python-pptx, BeautifulSoup4, pandoc for DOCX.
 
 ```bash
 make sync        # uv sync (deps + dev group)
-make check       # GATE: lint + format-check + typecheck + security + test-cov (80 %)
+make check       # GATE: check-generated + lint + format-check + typecheck + security + test-cov (80 %)
 make test        # pytest -v            (ARGS='-k pptx' for a subset)
 make install     # uv tool install + templates + log dir + Pi skill
 make run ARGS='export pptx in.html out.pptx'
 make docker-build / run-up / run-down
 make bootstrap-ei  # regenerate the EI bootstrap from the EI reference
 make sync-medical-css  # propagate the medical charter CSS to the reference decks
+make check-generated  # verify both generated template families are fresh (writes nothing)
 make help        # every target
 ```
 

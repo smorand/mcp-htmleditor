@@ -3,7 +3,7 @@
 
 .PHONY: sync run run-dev test test-cov lint lint-fix format format-check typecheck \
         security check build install install-skill uninstall docker-build docker-push \
-        docker run-up run-down bootstrap-ei sync-medical-css clean clean-all info help
+        docker run-up run-down bootstrap-ei sync-medical-css check-generated clean clean-all info help
 
 PROJECT_NAME=$(shell grep -m1 '^name' pyproject.toml 2>/dev/null | sed 's/.*= *"\([^"]*\)".*/\1/')
 PACKAGE := mcp_htmleditor
@@ -135,8 +135,8 @@ security:
 	@uv run bandit -q -r $(SRC_DIR)/ -c pyproject.toml
 	@echo "Security scan complete!"
 
-## check: Full quality gate (lint, format, typecheck, security, tests+coverage)
-check: lint format-check typecheck security test-cov
+## check: Full quality gate (generated files freshness, lint, format, typecheck, security, tests+coverage)
+check: check-generated lint format-check typecheck security test-cov
 	@echo "All checks passed!"
 
 # ============================================================================
@@ -245,6 +245,10 @@ bootstrap-ei:
 sync-medical-css:
 	@uv run python tools/sync_medical_css.py
 
+## check-generated: Verify generated template files are fresh (writes nothing)
+check-generated:
+	@rc=0; uv run python tools/gen_ei_bootstrap.py --check || rc=1; uv run python tools/sync_medical_css.py --check || rc=1; exit $$rc
+
 # ============================================================================
 # CLEANUP
 # ============================================================================
@@ -311,7 +315,7 @@ help:
 	@echo "  format-check     - Check formatting without changes"
 	@echo "  typecheck        - Run mypy (strict)"
 	@echo "  security         - Run bandit security scanner"
-	@echo "  check            - Full gate: lint, format-check, typecheck, security, test-cov"
+	@echo "  check            - Full gate: check-generated, lint, format-check, typecheck, security, test-cov"
 	@echo ""
 	@echo "Build & Install:"
 	@echo "  build            - Build wheel and sdist (version from git tag)"
@@ -329,6 +333,7 @@ help:
 	@echo "Project specific:"
 	@echo "  bootstrap-ei     - Regenerate the EI bootstrap from the EI reference"
 	@echo "  sync-medical-css - Propagate the medical charter CSS to the reference decks"
+	@echo "  check-generated  - Verify the generated template files are fresh (writes nothing)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  clean            - Remove caches and build artifacts"

@@ -7,6 +7,8 @@ never the repository; every check also asserts that nothing was written.
 
 from __future__ import annotations
 
+import hashlib
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -35,6 +37,8 @@ def repo_copy(tmp_path: Path) -> Path:
     for tool in (EI_TOOL, MEDICAL_TOOL, "tools/freshness.py"):
         _copy(REPO_ROOT / tool, tmp_path / tool)
     for rel in TEMPLATE_FILES:
+        _copy(REPO_ROOT / rel, tmp_path / rel)
+    for rel in ("Makefile", "pyproject.toml"):
         _copy(REPO_ROOT / rel, tmp_path / rel)
     return tmp_path
 
@@ -205,3 +209,99 @@ def test_ei_normal_mode_still_writes_and_prints_ecrit(repo_copy: Path) -> None:
     assert result.stdout.startswith(f"ecrit {EI_OUT} (")
     assert result.returncode == 0
     assert (repo_copy / EI_OUT).read_bytes() == (REPO_ROOT / EI_OUT).read_bytes()
+
+
+def _run_make(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run make in the copy, reusing the repository virtual environment (DEC-004)."""
+    env = {**os.environ, "UV_NO_SYNC": "1", "UV_PROJECT_ENVIRONMENT": str(REPO_ROOT / ".venv")}
+    return subprocess.run(  # noqa: S603  # fixed argv: make with repo targets
+        ["make", *args],  # noqa: S607
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+        check=False,
+    )
+
+
+def _checksums(root: Path) -> dict[str, str]:
+    return {
+        str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for folder in ("templates", "tools")
+        for path in sorted((root / folder).rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts  # interpreter bytecode, not a tool output
+    }
+
+
+# SPEC-0011/E2E-003
+def test_make_check_generated_reports_three_fresh_lines(repo_copy: Path) -> None:
+    result = _run_make(repo_copy, "check-generated")
+
+    for line in (f"{EI_OUT}: fresh", f"{MEDICAL_CATALOGUE}: fresh", f"{MEDICAL_EXAMPLE}: fresh"):
+        assert line in result.stdout.splitlines()
+    assert result.returncode == 0
+
+
+# SPEC-0011/E2E-006
+def test_make_check_generated_runs_both_tools_when_both_medical_copies_are_stale(repo_copy: Path) -> None:
+    _make_medical_stale(repo_copy)
+    _edit_line(repo_copy / MEDICAL_EXAMPLE, MEDICAL_EDIT_LINE, "#0B0E11", "#0B0E12")
+    before = _checksums(repo_copy)
+
+    result = _run_make(repo_copy, "check-generated")
+
+    lines = result.stdout.splitlines()
+    stale = f"stale (first difference at line {MEDICAL_EDIT_LINE}); run: make sync-medical-css"
+    assert f"{EI_OUT}: fresh" in lines
+    assert f"{MEDICAL_CATALOGUE}: {stale}" in lines
+    assert f"{MEDICAL_EXAMPLE}: {stale}" in lines
+    assert result.returncode != 0
+    assert _checksums(repo_copy) == before
+
+
+# SPEC-0011/E2E-009
+def test_check_mode_never_writes_with_stale_and_missing_files(repo_copy: Path) -> None:
+    out = repo_copy / EI_OUT
+    word = _word_on_line(out, EI_EDIT_LINE)
+    _edit_line(out, EI_EDIT_LINE, word, word + "X")
+    _make_medical_stale(repo_copy)
+    (repo_copy / MEDICAL_EXAMPLE).unlink()
+    before = _checksums(repo_copy)
+
+    ei = _run(repo_copy, EI_TOOL, "--check")
+    medical = _run(repo_copy, MEDICAL_TOOL, "--check")
+
+    assert ei.returncode == 1
+    assert medical.returncode == 1
+    assert _checksums(repo_copy) == before
+
+
+# SPEC-0011/E2E-010
+def test_make_check_stops_at_check_generated_on_a_stale_bootstrap(repo_copy: Path) -> None:
+    out = repo_copy / EI_OUT
+    word = _word_on_line(out, EI_EDIT_LINE)
+    _edit_line(out, EI_EDIT_LINE, word, word + "X")
+
+    result = _run_make(repo_copy, "check")
+
+    assert f"{EI_OUT}: stale (first difference at line {EI_EDIT_LINE}); run: make bootstrap-ei" in result.stdout
+    assert result.returncode != 0
+    assert "Running tests with coverage" not in result.stdout
+
+
+def test_make_check_prints_the_fresh_lines_among_its_steps(repo_copy: Path) -> None:
+    """On fresh files `make check` runs check-generated; the heavy steps are taken as up to date (-o)."""
+    skipped = [flag for step in ("lint", "format-check", "typecheck", "security", "test-cov") for flag in ("-o", step)]
+
+    result = _run_make(repo_copy, *skipped, "check")
+
+    assert f"{EI_OUT}: fresh" in result.stdout
+    assert result.returncode == 0
+
+
+def test_make_check_lists_check_generated_before_lint(repo_copy: Path) -> None:
+    result = _run_make(repo_copy, "-n", "check")
+
+    assert result.returncode == 0
+    assert 0 <= result.stdout.index("gen_ei_bootstrap.py --check") < result.stdout.index("ruff check")
