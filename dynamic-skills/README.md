@@ -1,8 +1,9 @@
 # Dynamic skill routing (Pi)
 
 The dynamic Pi skill for `html-editor` lives in `dynamic-skills/html-editor/SKILL.md`.
-It is intentionally tiny: it tells the agent to run `mcp-htmleditor skill`, so the
-real skill content stays in the CLI and never drifts.
+It is intentionally tiny: it tells the agent to run `mcp-htmleditor skill` (the core), then
+`mcp-htmleditor skill --type <topic>` for the topics the task needs, so the real skill content
+stays in the CLI and never drifts.
 
 ## Install
 
