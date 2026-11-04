@@ -6,13 +6,18 @@ Decks are generated from the real ``templates/bootstrap`` files, never committed
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 from click.testing import CliRunner
+from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 from mcp_htmleditor import cli as cli_module
 from mcp_htmleditor.cli import main
@@ -176,3 +181,22 @@ def run_cli(*args: str, input: str | None = None) -> tuple[str, str, int]:  # no
     with mock.patch.object(cli_module, "configure_tracing", lambda settings=None: None):
         result = CliRunner().invoke(main, list(args), input=input)
     return result.stdout, result.stderr, result.exit_code
+
+
+def call_tool(name: str, **arguments: str) -> tuple[bool, Any]:
+    """Call a tool through an in process ``fastmcp.Client``: ``(True, data)`` or ``(False, ToolError text)``.
+
+    The session runs in its own thread: the e2e suite keeps an event loop alive in the caller's.
+    """
+    from mcp_htmleditor.mcp_server import mcp
+
+    async def session() -> tuple[bool, Any]:
+        async with Client(mcp) as client:
+            try:
+                result = await client.call_tool(name, arguments)
+            except ToolError as exc:
+                return False, str(exc)
+            return True, result.data
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, session()).result()

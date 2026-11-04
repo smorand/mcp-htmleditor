@@ -44,6 +44,8 @@ mcp-htmleditor new <template> <file> [--serve]
 - update_end: clear update_in_progress; the browser reloads the content
 - layout_arch_diagram: compute the layout of declarative architecture diagrams in a file
 - get_skill: return the skill core, or one topic with its type argument
+- outline: Read the structure of a file (charter, slides, headings) without any image data.
+- get_slide: Read the HTML of one slide, large images replaced by data:ref:img-N.
 
 ## Topics
 

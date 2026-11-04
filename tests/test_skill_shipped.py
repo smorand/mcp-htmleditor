@@ -33,6 +33,8 @@ LANDING_TOOLS = {
     "update_end",
     "layout_arch_diagram",
     "get_skill",
+    "outline",
+    "get_slide",
 }
 TEMPLATE_KEYS = ("ei", "carbon", "medical", "doc", "doc-perso", "doc-ei", "mail", "website")
 CORE_STRINGS = (

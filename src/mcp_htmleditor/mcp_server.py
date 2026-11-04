@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 8 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 10 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -17,6 +17,9 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from .arch_layout import layout_file
+from .deck import DeckError
+from .deck.read import get_slide as read_slide
+from .deck.read import outline as read_outline
 from .http_server import (
     is_server_running,
     start_http_server,
@@ -228,6 +231,45 @@ def get_skill(type: str | None = None) -> str:  # noqa: A002 - argument name "ty
             return library.core_output() if type is None else library.topic_output(type)
         except SkillError as exc:
             raise ToolError(exc.message) from exc
+
+
+@mcp.tool()
+def outline(file: str) -> dict[str, Any]:
+    """Read the structure of a file: charter, type, slides and headings, without any image data.
+
+    Same object as the JSON printed by ``mcp-htmleditor outline``.
+
+    Args:
+        file: Path to the HTML file.
+
+    Raises:
+        ToolError: the file is missing or unreadable (the command line error line without ``error: ``).
+    """
+    with trace_span("mcp.outline", {"file.path": file}):
+        try:
+            return read_outline(file)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def get_slide(file: str, id: str) -> str:  # noqa: A002 - argument name "id" is the contract
+    """Read the HTML of one slide; images with a data address over 1 000 characters become data:ref:img-N.
+
+    Same text as ``mcp-htmleditor get-slide``.
+
+    Args:
+        file: Path to the presentation.
+        id: Slide id, for example ``slide-3``.
+
+    Raises:
+        ToolError: the file is missing, is not a presentation, or the id is unknown.
+    """
+    with trace_span("mcp.get_slide", {"file.path": file, "slide.id": id}):
+        try:
+            return read_slide(file, id)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
 
 
 def registered_tool_names() -> list[str]:

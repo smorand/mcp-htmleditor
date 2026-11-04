@@ -154,6 +154,15 @@ mcp-htmleditor export pptx input.html output.pptx
 mcp-htmleditor export docx input.html output.docx
 ```
 
+### Read a file without its images
+
+```bash
+mcp-htmleditor outline input.html           # JSON: charter, type, slides, headings
+mcp-htmleditor get-slide input.html slide-3 # HTML of one slide, large images as data:ref:img-N
+```
+
+Both are also MCP tools (`outline`, `get_slide`) with the same results and the same error text.
+
 ### Architecture diagram layout
 
 ```bash
@@ -219,6 +228,8 @@ figures must be PNG, never SVG.
 | `update_end()` | Signal modification complete (browser reloads). |
 | `get_skill(type=None)` | Return the skill core, or one topic when `type` is given (same text as `mcp-htmleditor skill [--type <topic>]`). |
 | `layout_arch_diagram(file, diagram_id=None)` | Compute and write positions for every declarative architecture diagram in `file` (see [Architecture diagram layout](#architecture-diagram-layout)). |
+| `outline(file)` | Structure of a file (charter, type, slides, headings) as a JSON object, without any image data. Same object as `mcp-htmleditor outline`. |
+| `get_slide(file, id)` | HTML of one slide, every image with a data address over 1 000 characters replaced by `data:ref:img-N`. Same text as `mcp-htmleditor get-slide`. |
 
 ### Multiple presentations at once
 
@@ -375,7 +386,7 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 8 tools
+├── mcp_server.py    FastMCP server with 10 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/

@@ -38,7 +38,7 @@
 | US-0034 | SPEC-0006 | clean real audit, all 15 topics enforced, documentation | US-0026, US-0027, US-0028, US-0029, US-0030, US-0031, US-0032, US-0033 | 2 | landed | story/US-0034-clean-real-audit-and-documentation | story/US-0069-render-the-checklist-in-the-arch-qa-topic |
 | US-0035 | SPEC-0007 | `outline` on the command line | US-0034 | 2 | landed | story/US-0035-outline-on-the-command-line | main |
 | US-0036 | SPEC-0007 | `get-slide` on the command line and the scanner | US-0035 | 2 | landed | story/US-0036-get-slide-command-and-scanner | story/US-0035-outline-on-the-command-line |
-| US-0037 | SPEC-0007 | `outline` and `get_slide` tools | US-0036, US-0025 | 2 | todo | | |
+| US-0037 | SPEC-0007 | `outline` and `get_slide` tools | US-0036, US-0025 | 2 | landed | story/US-0037-outline-and-get-slide-tools | story/US-0036-get-slide-command-and-scanner |
 | US-0038 | SPEC-0007 | `patch` with `set_text`, atomic write, path guard | US-0036 | 2 | todo | | |
 | US-0039 | SPEC-0007 | `delete_slide`, renumbering, dry run | US-0038 | 2 | todo | | |
 | US-0040 | SPEC-0007 | `insert_slide`, `move_slide`, `replace_slide` | US-0039 | 2 | todo | | |
