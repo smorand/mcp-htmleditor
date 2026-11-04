@@ -175,6 +175,26 @@ def write_deck(path: Path, content: str) -> str:
     return str(path)
 
 
+def assert_only_region_changed(before: bytes, after: bytes, inner_marker: bytes) -> None:
+    """Assert the bytes that differ lie inside the inner content of the element ``inner_marker``.
+
+    ``inner_marker`` is the element as written in ``before`` (start tag, content, end tag), located by
+    plain substring search, independent of the scanner. The common prefix and suffix of the two byte
+    strings must leave the whole difference between the end of the start tag and the start of the end tag.
+    """
+    assert before != after
+    assert before.count(inner_marker) == 1, "the marker must locate exactly one element"
+    element = before.index(inner_marker)
+    inner_start = element + inner_marker.index(b">") + 1
+    inner_end = element + inner_marker.rindex(b"</")
+    prefix = len(os.path.commonprefix([before, after]))
+    suffix = min(len(os.path.commonprefix([before[::-1], after[::-1]])), min(len(before), len(after)) - prefix)
+    assert inner_start <= prefix, f"a byte before the element content changed (offset {prefix})"
+    assert len(before) - suffix <= inner_end, (
+        f"a byte after the element content changed (offset {len(before) - suffix})"
+    )
+
+
 def run_cli(*args: str, input: str | None = None) -> tuple[str, str, int]:  # noqa: A002 - mirrors CliRunner
     """Run the CLI and return ``(stdout, stderr, exit_code)`` with separate streams."""
     # the group callback would install the process wide tracer, which tests/test_tracing.py owns

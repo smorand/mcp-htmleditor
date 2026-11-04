@@ -12,6 +12,7 @@ import functools
 import json
 import logging
 import os
+import sys
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
@@ -308,6 +309,33 @@ def get_slide_cmd(file: str, slide_id: str) -> None:
     from .deck.read import get_slide
 
     click.echo(get_slide(file, slide_id))
+
+
+@main.command("patch")
+@click.argument("file", type=click.Path(dir_okay=False))
+@click.option("--ops", "ops_source", required=True, help="Operations JSON file, or - for standard input.")
+@click.option("--dry-run", is_flag=True, help="Check and report, write nothing.")
+@deck_command
+def patch_cmd(file: str, ops_source: str, dry_run: bool) -> None:
+    """Apply a JSON list of operations to FILE in one atomic write: every operation or none."""
+    from .deck.patch import apply_patch, check_target
+
+    check_target(file)  # before reading the operations, so a missing FILE is reported first
+    result = apply_patch(file, _read_operations(ops_source), dry_run=dry_run)
+    click.echo(json.dumps(result, separators=(",", ":"), ensure_ascii=False))
+
+
+def _read_operations(source: str) -> object:
+    from .deck import DeckError
+
+    try:
+        text = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise DeckError(f"Cannot read {source}: {getattr(exc, 'strerror', None) or exc}") from exc
+    try:
+        return json.loads(text)
+    except ValueError as exc:
+        raise DeckError(f"Invalid operations JSON: {exc}") from exc
 
 
 @main.command("export")
