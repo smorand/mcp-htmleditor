@@ -109,7 +109,7 @@ Authoring rules for slides and documents live in the skill: run `mcp-htmleditor 
 (sources in `skill/core.md`, `skill/topics/`, `skill/checks/`). `docs/skill-archive/` keeps the
 previous monolithic skill, reference only.
 
-The MCP server exposes ten tools, `get_skill`, `outline` and `get_slide` included. A story that registers a tool adds
+The MCP server exposes eleven tools, `get_skill`, `outline`, `get_slide` and `patch` included. A story that registers a tool adds
 one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
 story (`skill-audit` fails otherwise); see `.agent_docs/architecture.md`.
 

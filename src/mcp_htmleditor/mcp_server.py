@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 10 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 11 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -18,6 +18,7 @@ from fastmcp.exceptions import ToolError
 
 from .arch_layout import layout_file
 from .deck import DeckError
+from .deck.patch import apply_patch
 from .deck.read import get_slide as read_slide
 from .deck.read import outline as read_outline
 from .http_server import (
@@ -268,6 +269,34 @@ def get_slide(file: str, id: str) -> str:  # noqa: A002 - argument name "id" is 
     with trace_span("mcp.get_slide", {"file.path": file, "slide.id": id}):
         try:
             return read_slide(file, id)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def patch(file: str, ops: list[Any], dry_run: bool = False) -> dict[str, Any]:
+    """Apply a list of operations to a presentation in one atomic write: every operation or none.
+
+    Operations (objects with an ``op`` field): ``set_text`` (id, selector, text), ``replace_slide`` (id, html),
+    ``insert_slide`` (after, html), ``delete_slide`` (id), ``move_slide`` (id, after). Counters, ``TOTAL`` and
+    ``slideNames`` are renumbered after a structural patch. The editor flag ``update_in_progress`` is true only
+    around the write; a dry run or a patch that changes nothing writes nothing and leaves the flag alone.
+    Same result as ``mcp-htmleditor patch``.
+
+    Args:
+        file: Path to the presentation.
+        ops: The operations, validated all together before anything is written.
+        dry_run: Validate and report only; write nothing.
+
+    Returns:
+        Dict with keys: ok, changed, slides, problems, plus dry_run when it was requested.
+
+    Raises:
+        ToolError: an operation is invalid or the write fails (the command line error line without ``error: ``).
+    """
+    with trace_span("mcp.patch", {"file.path": file}):
+        try:
+            return apply_patch(file, ops, dry_run=dry_run, set_update_flag=get_state().set_update_flag)
         except DeckError as exc:
             raise ToolError(str(exc)) from exc
 

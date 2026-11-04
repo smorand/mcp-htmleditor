@@ -35,6 +35,7 @@ LANDING_TOOLS = {
     "get_skill",
     "outline",
     "get_slide",
+    "patch",
 }
 TEMPLATE_KEYS = ("ei", "carbon", "medical", "doc", "doc-perso", "doc-ei", "mail", "website")
 CORE_STRINGS = (

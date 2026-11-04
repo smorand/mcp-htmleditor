@@ -32,11 +32,15 @@ Names follow `category.operation`.
 | `mcp.get_status` | `mcp_server.get_status` | `server.running` |
 | `mcp.open_file` | `mcp_server.open_file` | `file.path` |
 | `mcp.update_start` / `mcp.update_end` | `mcp_server` | `file.path` |
+| `mcp.patch` | `mcp_server.patch` | `file.path` |
 | `export.pptx` | `export/to_pptx.to_pptx` | `file.path`, `slide.count`, `warning.count` |
 | `export.docx` | `export/to_docx.to_docx` | `file.path`, `export.charter`, `warning.count` |
 | `export.reference_docx` | `export/reference_docx` | `export.charter`, `file.path` |
 | `tool.pandoc` | DOCX export, reference generation, version probe | `tool.operation`, `file.path` or `file.size` |
-| `file.write` | editor save, `new` from a template, PPTX save | `file.path`, `file.size`, `export.format`, `template.key` |
+| `file.write` | editor save, `new` from a template, PPTX save, `fileio.atomic_write` (`patch`) | `file.path`, `file.size`, `export.format`, `template.key` |
+
+The deck service (`src/mcp_htmleditor/deck/`) opens no span of its own (no `deck.*` span exists yet); a `patch`
+shows up as `mcp.patch` around one `file.write` from `fileio.atomic_write`, absent for a dry run or a no change patch.
 
 Durations come for free (`duration_ms` in the JSONL record). An exception inside a span
 is recorded and the span status becomes `ERROR`; the exception is re-raised untouched.

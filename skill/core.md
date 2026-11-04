@@ -46,6 +46,7 @@ mcp-htmleditor new <template> <file> [--serve]
 - get_skill: return the skill core, or one topic with its type argument
 - outline: Read the structure of a file (charter, slides, headings) without any image data.
 - get_slide: Read the HTML of one slide, large images replaced by data:ref:img-N.
+- patch: Apply validated, atomic, self renumbering slide operations (set_text, replace_slide, insert_slide, delete_slide, move_slide) to a presentation; dry_run validates only.
 
 ## Topics
 

@@ -230,6 +230,7 @@ figures must be PNG, never SVG.
 | `layout_arch_diagram(file, diagram_id=None)` | Compute and write positions for every declarative architecture diagram in `file` (see [Architecture diagram layout](#architecture-diagram-layout)). |
 | `outline(file)` | Structure of a file (charter, type, slides, headings) as a JSON object, without any image data. Same object as `mcp-htmleditor outline`. |
 | `get_slide(file, id)` | HTML of one slide, every image with a data address over 1 000 characters replaced by `data:ref:img-N`. Same text as `mcp-htmleditor get-slide`. |
+| `patch(file, ops, dry_run=False)` | Apply validated, atomic, self renumbering slide operations (`set_text`, `replace_slide`, `insert_slide`, `delete_slide`, `move_slide`) in one write. `update_in_progress` is true only around the write; a dry run or a no change patch touches neither the flag nor the modification time. Same result as `mcp-htmleditor patch`; errors carry the command line error text without `error: `. |
 
 ### Multiple presentations at once
 
@@ -386,7 +387,7 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 10 tools
+├── mcp_server.py    FastMCP server with 11 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/
