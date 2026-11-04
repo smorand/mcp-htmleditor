@@ -83,7 +83,8 @@ mcp-htmleditor skill-audit [--json]        # sizes, tool list, stale statements;
   `mcp-htmleditor arch-checklist` before considering the diagram done (protocol:
   `skill/topics/arch-qa.md`). The checklist itself is user-editable at
   `~/.config/mcp-htmleditor/arch-checks/arch-diagram-checklist.md`, never in code.
-- `.mcp_state.json` is written next to the edited file. It is gitignored, never commit it.
+- Editor state (file history, server records) lives in the state directory (`HTMLEDITOR_STATE_DIR`, default
+  `~/.local/state/mcp-htmleditor`), never next to the edited file. `.mcp_state.json` is only a leftover of older versions; it stays gitignored.
 - JS has no build step: `node --check src/mcp_htmleditor/static/*.js`.
 - The editor is eleven classic scripts loaded in the order of `editor.html`; the PPTX exporter
   is a composed `_SlideBuilder` of mixins (`export/pptx_*.py`). See `.agent_docs/architecture.md`.
@@ -103,13 +104,13 @@ Load only what the task needs.
 | `.agent_docs/testing.md` | Test file map, coverage decisions, export regression set and validation procedure |
 | `.agent_docs/docker.md` | Image, compose, prod overlay, container checks |
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
-| `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 15 tool surface, scanner and renumbering rules, gotchas |
+| `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 17 tool surface, scanner and renumbering rules, gotchas |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`
 (sources in `skill/core.md`, `skill/topics/`, `skill/checks/`). `docs/skill-archive/` keeps the
 previous monolithic skill, reference only.
 
-The MCP server exposes fifteen tools, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file` and `export` included. A story that registers a tool adds
+The MCP server exposes seventeen tools, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`, `history` and `restore` included. A story that registers a tool adds
 one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
 story (`skill-audit` fails otherwise); see `.agent_docs/architecture.md`.
 

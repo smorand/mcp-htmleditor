@@ -21,7 +21,9 @@ services:
     volumes:
       - ./data:/data
       - htmleditor-cache:/var/cache/mcp-htmleditor
+      - htmleditor-state:/var/lib/mcp-htmleditor
     command: ["serve", "--no-browser", "/data/document.html"]
 
 volumes:
   htmleditor-cache:
+  htmleditor-state:

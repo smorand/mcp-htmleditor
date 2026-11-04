@@ -36,6 +36,8 @@ FINAL_TOOLS = {
     "list_templates",
     "new_file",
     "export",
+    "history",
+    "restore",
 }
 SPEC_IDS = range(1, 42)
 ID_PATTERN = re.compile(r"E2E[-_]0(\d\d)", re.IGNORECASE)
@@ -192,13 +194,13 @@ def _core_tool_names() -> set[str]:
     return set(re.findall(r"^- (\w+):", section, re.MULTILINE))
 
 
-def test_the_server_core_and_audit_agree_on_the_fifteen_tools() -> None:
+def test_the_server_core_and_audit_agree_on_the_final_tools() -> None:
     from mcp_htmleditor.mcp_server import registered_tool_names
 
     names = registered_tool_names()
     stdout, _, status = run_cli("skill-audit")
 
-    assert len(names) == 15
+    assert len(names) == 17
     assert set(names) == FINAL_TOOLS
     assert _core_tool_names() == FINAL_TOOLS
     assert status == 0, stdout

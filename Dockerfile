@@ -46,12 +46,15 @@ RUN apt-get update \
 
 RUN groupadd --gid 10001 appgroup \
     && useradd --uid 10001 --gid appgroup --shell /bin/false --no-create-home appuser \
-    && mkdir -p /data /var/cache/mcp-htmleditor/logs \
-    && chown -R appuser:appgroup /data /var/cache/mcp-htmleditor
+    && mkdir -p /data /var/cache/mcp-htmleditor/logs /var/lib/mcp-htmleditor \
+    && chown -R appuser:appgroup /data /var/cache/mcp-htmleditor /var/lib/mcp-htmleditor
 
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/templates /app/templates
 COPY --from=builder /app/skill /app/skill
+
+# The image has no home directory: the editor state (history, server records) needs a writable directory.
+ENV HTMLEDITOR_STATE_DIR=/var/lib/mcp-htmleditor
 
 USER appuser:appgroup
 

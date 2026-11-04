@@ -8,7 +8,7 @@ reloads. No build step, no framework, no database.
 LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_server ◀──HTTP──▶ browser
                                           │                                 │
                                           ▼                                 ▼
-                                    .mcp_state.json                  file.html (disk)
+                                  state dir (history)               file.html (disk)
                                                                             │
                                                              export/ ──▶ .pptx / .docx
 ```
@@ -21,9 +21,11 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 | `logging_config.py` | `setup_logging()`: rich console on stderr, rotating file in the log dir |
 | `tracing.py` | `configure_tracing()`, `trace_span()`, `JsonlSpanExporter` |
 | `version.py` | `__version__`, written at build time from the git tag |
-| `state.py` | `EditorState` singleton (current file, port, pid, poll interval, update flag) plus `.mcp_state.json` persistence next to the edited file |
+| `state.py` | `EditorState` singleton (current file, port, pid, poll interval, update flag) plus per file records in the state directory (`HTMLEDITOR_STATE_DIR`), the update flag expiring after 120 s |
+| `fileio.py` | `atomic_write(path, data, reason=, history=)`: temp file, fsync, rename; snapshots the previous content first when a `reason` is given; `WriteError` |
+| `history.py` | `HistoryStore` (20 versions per file under `<state>/files/<key>/history/`), `list_versions`, `restore_version`, `HistoryError`; used by the `history` / `restore` commands and tools |
 | `http_server.py` | `ThreadingHTTPServer`. Routes: `/`, `/static/*`, `/content` (GET raw, POST save), `/content-frame`, `/status` (polling), `/health` (status + version), `/export/pptx`, `/export/docx`, `POST /arch-layout`. Binds `HTMLEDITOR_HOST` (localhost by default, `0.0.0.0` in a container). Request gate (2026-10-10, SPEC-0005): every route but `/health` answers 403 unless the `Host` name is `localhost`, `127.0.0.1`, `[::1]` or the bind host (port ignored), and any `Origin` is exactly `http://<Host>`; no CORS headers are ever sent |
-| `mcp_server.py` | FastMCP, 15 tools (`start_server`, `stop_server`, `get_status`, `open_file`, `update_start`, `update_end`, `layout_arch_diagram`, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`), each traced as `mcp.<tool>`; `registered_tool_names()` lists them |
+| `mcp_server.py` | FastMCP, 17 tools (`start_server`, `stop_server`, `get_status`, `open_file`, `update_start`, `update_end`, `layout_arch_diagram`, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`, `history`, `restore`), each traced as `mcp.<tool>`; `registered_tool_names()` lists them |
 | `cli.py` | click group with `-v/-q` and `--version`; subcommands `templates`, `new`, `serve`, `skill`, `skill-audit`, `mcp`, `export`. Subcommand imports are lazy on purpose to keep startup fast |
 | `templates.py` | Template registry (key to bootstrap file) and search path resolution |
 | `skill_content.py` | `SkillLibrary`: core (`skill/core.md`, 7000 bytes max), 15 topics (`skill/topics/<t>.md`, 8000 max), `--all`; `arch-qa` appends the checklist (user one if any, else the shipped `skill/checks/`) |
@@ -40,8 +42,11 @@ browser injected (format bar, insert bar, style tag, context menu host, drag han
 drop indicator, `contenteditable`, `_mcp_*` classes, browser extension attributes) and
 clears the generated `#slide-select` options, so the file on disk stays clean for the
 next agent. A save targeting `templates/bootstrap/` or `templates/reference/` is
-ignored: those files are meant to be copied, not edited. The write itself is traced as
-`file.write` with the path and the size.
+ignored: those files are meant to be copied, not edited. The 409 check (`base_mtime`) and the write run in
+one process only; an agent or another process writing the file directly is not covered. The write
+is `fileio.atomic_write` with reason `browser-save` (`keep-mine` when forced), traced as `file.write`; the
+previous content goes to the history first (`history.snapshot`) and is discarded if the replace fails.
+`patch` and `restore` use the same writer (reasons `patch`, `restore`).
 
 ## Export pipeline
 
@@ -196,5 +201,4 @@ stale (backlog).
 | `deck/renumber.py` | Renumbering of ids, counters, `TOTAL`, `slideNames` after a structural patch |
 | `deck/lint.py` | `lint_deck`, `Problem`, rules L001 to L006, reports |
 | `deck/charter_rules.py` | Charter rules L007 to L011 |
-| `deck/tools.py` | Not present yet (US-0046 adds it) |
-| `fileio.py` | `atomic_write`: temp file then rename, the only writer of `patch` (`os.replace`) |
+| `deck/tools.py` | `create_file`, `export_file`, `template_listing` |

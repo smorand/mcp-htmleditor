@@ -46,6 +46,24 @@ def reset_settings() -> Iterator[None]:
     config_module.reset_settings_cache()
 
 
+REAL_STATE_DIR = Path.home() / ".local" / "state" / "mcp-htmleditor"
+
+
+def _listing(root: Path) -> dict[str, tuple[int, int]]:
+    """Every path under ``root`` with its mtime (ns) and size, empty when ``root`` does not exist."""
+    if not root.exists():
+        return {}
+    return {str(p): (p.stat().st_mtime_ns, p.stat().st_size) for p in sorted(root.rglob("*"))}
+
+
+@pytest.fixture(autouse=True, scope="session")
+def real_state_dir_untouched() -> Iterator[None]:
+    """Fail the session if any test wrote into the user's real ~/.local/state/mcp-htmleditor."""
+    before = _listing(REAL_STATE_DIR)
+    yield
+    assert _listing(REAL_STATE_DIR) == before, f"a test wrote into the real state dir {REAL_STATE_DIR}"
+
+
 @pytest.fixture(autouse=True)
 def isolate_state_dir(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point HTMLEDITOR_STATE_DIR at a per test directory, so no test touches the real ~/.local/state."""

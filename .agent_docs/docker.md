@@ -24,14 +24,15 @@ Baked environment: `HTMLEDITOR_HOST=0.0.0.0` (a container that binds localhost w
 never answer on the published port), `HTMLEDITOR_PORT=7842`,
 `HTMLEDITOR_TEMPLATES_DIR=/app/templates`,
 `HTMLEDITOR_CACHE_DIR=/var/cache/mcp-htmleditor` (logs, JSONL spans and the generated
-`reference.docx` live there).
+`reference.docx` live there), `HTMLEDITOR_STATE_DIR=/var/lib/mcp-htmleditor` (file history and
+server records; the image has no home directory, so without it every save answers 500).
 
 `--no-browser` matters: without it `serve` tries to open a browser inside the container.
 
 ## Compose
 
-`docker-compose.yml` publishes 7842, mounts `./data` on `/data` and keeps the cache in a
-named volume. Drop the document to edit in `./data/document.html`, or override the
+`docker-compose.yml` publishes 7842, mounts `./data` on `/data` and keeps the cache and the state
+directory (`htmleditor-state`) in named volumes. Drop the document to edit in `./data/document.html`, or override the
 command:
 
 ```yaml

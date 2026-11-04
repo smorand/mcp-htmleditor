@@ -33,6 +33,10 @@ Names follow `category.operation`.
 | `mcp.open_file` | `mcp_server.open_file` | `file.path` |
 | `mcp.update_start` / `mcp.update_end` | `mcp_server` | `file.path` |
 | `mcp.patch` | `mcp_server.patch` | `file.path` |
+| `mcp.history` | `mcp_server.history` | `file.path` |
+| `mcp.restore` | `mcp_server.restore` | `file.path`, `history.id` |
+| `history.snapshot` | `fileio.atomic_write` when a reason is given, before the replace | `file.path`, `file.size`, `history.reason` |
+| `history.restore` | `history.restore_version` | `file.path`, `history.id` |
 | `export.pptx` | `export/to_pptx.to_pptx` | `file.path`, `slide.count`, `warning.count` |
 | `export.docx` | `export/to_docx.to_docx` | `file.path`, `export.charter`, `warning.count` |
 | `export.reference_docx` | `export/reference_docx` | `export.charter`, `file.path` |

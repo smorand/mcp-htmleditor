@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 15 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 17 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -24,6 +24,7 @@ from .deck.read import get_slide as read_slide
 from .deck.read import outline as read_outline
 from .deck.tools import create_file, export_file
 from .deck.tools import template_listing as list_template_entries
+from .history import list_versions, restore_version
 from .http_server import (
     is_server_running,
     start_http_server,
@@ -376,6 +377,58 @@ def export(file: str, format: str, output: str) -> dict[str, Any]:  # noqa: A002
         except DeckError as exc:
             raise ToolError(str(exc)) from exc
         return {"ok": True, "output": outcome.output, "warnings": outcome.warnings}
+
+
+@mcp.tool()
+def history(file: str) -> dict[str, Any]:
+    """List the saved previous versions of a file, newest first.
+
+    A version is kept before a browser save, a ``patch`` or a ``restore`` changes the file. Same result as
+    ``mcp-htmleditor history``.
+
+    Args:
+        file: Path to the file.
+
+    Returns:
+        Dict with keys: file (absolute path), versions (list of ``{id, bytes, reason}``).
+
+    Raises:
+        ToolError: the file is missing (the command line error line without ``error: ``).
+    """
+    with trace_span("mcp.history", {"file.path": file}):
+        try:
+            target, versions = list_versions(file)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+        return {
+            "file": str(target),
+            "versions": [{"id": v.id, "bytes": v.bytes, "reason": v.reason} for v in versions],
+        }
+
+
+@mcp.tool()
+def restore(file: str, id: str) -> dict[str, Any]:  # noqa: A002 - argument name "id" is the contract
+    """Put a previous version of a file back by id; the replaced content is kept in the history.
+
+    Same result as ``mcp-htmleditor restore``.
+
+    Args:
+        file: Path to the file.
+        id: A version id from ``history``.
+
+    Returns:
+        Dict with keys: ok, file (absolute path), id.
+
+    Raises:
+        ToolError: unknown id, missing file, template, or failed write (the command line error line without
+            ``error: ``).
+    """
+    with trace_span("mcp.restore", {"file.path": file, "history.id": id}):
+        try:
+            target = restore_version(file, id)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+        return {"ok": True, "file": str(target), "id": id}
 
 
 def registered_tool_names() -> list[str]:

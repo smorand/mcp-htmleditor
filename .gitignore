@@ -47,7 +47,7 @@ venv/
 *.key
 *.pem
 
-# State file (written next to the current HTML file)
+# State file left next to the edited file by older versions (state now lives in HTMLEDITOR_STATE_DIR)
 .mcp_state.json
 **/.mcp_state.json
 

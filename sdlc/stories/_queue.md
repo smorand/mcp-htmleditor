@@ -52,7 +52,7 @@
 | US-0048 | SPEC-0009 | atomic, guarded, conflict aware browser save (server side) | US-0047, US-0038 | 2 | landed | story/US-0048-atomic-guarded-conflict-aware-save | story/US-0047-state-per-file-expiring-update-flag |
 | US-0049 | SPEC-0009 | conflict choice, save failures and server loss in the editor | US-0048, US-0017 | 2 | landed | story/US-0049-conflict-choice-and-save-failure-ui | story/US-0048-atomic-guarded-conflict-aware-save |
 | US-0050 | SPEC-0009 | history snapshots, `history` and `restore` commands | US-0048, US-0049 | 2 | landed | story/US-0050-history-snapshots-and-restore-command | story/US-0049-conflict-choice-and-save-failure-ui |
-| US-0051 | SPEC-0009 | `history` and `restore` tools, patch snapshots, docs and deployment | US-0050, US-0025, US-0041 | 2 | todo | | |
+| US-0051 | SPEC-0009 | `history` and `restore` tools, patch snapshots, docs and deployment | US-0050, US-0025, US-0041 | 2 | landed | story/US-0051-history-restore-tools-and-deploy-docs | story/US-0050-history-snapshots-and-restore-command |
 | US-0052 | SPEC-0010 | store, queue endpoints and the requests command | US-0051 | 2 | todo | | |
 | US-0053 | SPEC-0010 | agent lists and completes requests (tools) | US-0052 | 2 | todo | | |
 | US-0054 | SPEC-0010 | complete from the command line and the apply workflow | US-0053, US-0025, US-0028 | 2 | todo | | |

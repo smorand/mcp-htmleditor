@@ -33,6 +33,8 @@ from .version import __version__
 logger = logging.getLogger(__name__)
 
 # IDs/classes injected by the browser editor — must be stripped before saving.
+_MAX_CLEAN_PASSES = 5
+
 _EDITOR_ARTIFACTS = {
     "ids": {
         "_mcp_format_bar",
@@ -555,6 +557,22 @@ def health_payload() -> dict[str, Any]:
 
 
 def _strip_editor_artifacts(html: str) -> str:
+    """Clean ``html`` until a further pass changes nothing, so cleaning twice equals cleaning once.
+
+    One parse and serialise pass is not stable on markup the parser repairs (a stray closing tag moves
+    whitespace), so a save of the bytes the server wrote would differ from them and add a version.
+    The loop is bounded; each pass removes the same things as ``_strip_editor_artifacts_once``.
+    """
+    cleaned = _strip_editor_artifacts_once(html)
+    for _ in range(_MAX_CLEAN_PASSES):
+        again = _strip_editor_artifacts_once(cleaned)
+        if again == cleaned:
+            break
+        cleaned = again
+    return cleaned
+
+
+def _strip_editor_artifacts_once(html: str) -> str:
     """Remove ephemeral editor elements injected by the browser UI.
 
     The JS editor injects helper nodes (format bar, insert bar, style tag,

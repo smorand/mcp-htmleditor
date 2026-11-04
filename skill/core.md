@@ -51,6 +51,8 @@ mcp-htmleditor new <template> <file> [--serve]
 - list_templates: List the 8 template keys with their description.
 - new_file: Create a file from a template key; refuses an existing target.
 - export: Export a presentation to pptx or a document to docx.
+- history: list the saved previous versions of a file, newest first (id, bytes, reason).
+- restore: put a previous version of a file back by id; the replaced content is kept in the history.
 
 ## Topics
 

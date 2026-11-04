@@ -58,7 +58,10 @@ make run-down
 
 The image is multi stage (`python:3.13-slim`), installs from `uv.lock`, ships pandoc,
 runs as a non root user and exposes `GET /health`. Documents live in the `./data`
-volume mounted on `/data`. Details in `.agent_docs/docker.md`.
+volume mounted on `/data`. The image has no home directory, so it sets
+`HTMLEDITOR_STATE_DIR=/var/lib/mcp-htmleditor` (history and server records, a named volume in
+`docker-compose.yml`); without a writable state directory every save would fail.
+Details in `.agent_docs/docker.md`.
 
 ### Version
 
@@ -117,6 +120,33 @@ add/remove, slide insert/delete, document block insert/reorder) with a 50-deep
 undo/redo stack. Plain text edits inside a text zone keep using the browser's own
 native undo, untouched by this feature — see `.agent_docs/html-conventions.md` §
 Undo / redo for the exact scope and the native-vs-structural interaction.
+
+### Saving, conflicts and history
+
+The editor saves the whole document. Each save carries the modification time the browser last saw; if the
+file changed on disk since (an agent wrote it), the server answers 409 and the page offers **Reload** (show
+the disk version, drop the unsaved edits) or **Keep mine** (overwrite). Every write is atomic (temporary
+file, then rename): the file holds the complete old or the complete new content, and no other file is left
+next to it. The check and the replace are serialized per process only, not against an agent writing the file
+directly or against another process.
+
+Before a browser save, a `patch`, a **Keep mine** or a `restore` changes a file's bytes, the previous content
+is kept in the history (20 versions per file, oldest dropped first). Each version is `{id, bytes, reason}`,
+`reason` one of `browser-save`, `keep-mine`, `patch`, `restore`. A write that changes nothing keeps nothing.
+
+```bash
+mcp-htmleditor history deck.html            # <id>  <bytes> bytes  <reason>, newest first
+mcp-htmleditor restore deck.html <id>       # put it back; the replaced content is kept as a new version
+```
+
+The same operations are the MCP tools `history(file)` and `restore(file, id)`. Templates under `templates/`
+are never modified by a save or a restore.
+
+The "modification in progress" flag (`update_start`) expires by itself 120 seconds after the last
+`update_start`, so a crashed agent never leaves the overlay up. Flags, server records and the history live in
+the state directory (`HTMLEDITOR_STATE_DIR`, default `$XDG_STATE_HOME/mcp-htmleditor`, else
+`~/.local/state/mcp-htmleditor`), never next to the edited file; `.mcp_state.json` files left by older
+versions are ignored and can be deleted.
 
 ### MCP server (stdio)
 
@@ -254,6 +284,8 @@ figures must be PNG, never SVG.
 | `list_templates()` | The template keys with their description, `[{key, description}]`, in the order of `mcp-htmleditor templates`. |
 | `new_file(template, file)` | Create a file from a template key; refuses an existing target; does not serve it. Returns `{ok, file}`. |
 | `export(file, format, output)` | Export a presentation to `pptx` or a document to `docx`. Returns `{ok, output, warnings}`. |
+| `history(file)` | List the saved previous versions of a file, newest first: `{file, versions: [{id, bytes, reason}]}`. Same list as `mcp-htmleditor history`. |
+| `restore(file, id)` | Put a previous version back by id; the replaced content is kept in the history. Returns `{ok, file, id}`. Refuses templates. |
 
 ### Multiple presentations at once
 
@@ -356,6 +388,7 @@ Every variable is read through the `Settings` class (pydantic-settings,
 | `HTMLEDITOR_POLL_INTERVAL` | `1000` | Browser polling interval in ms |
 | `HTMLEDITOR_TEMPLATES_DIR` | `~/.config/mcp-htmleditor/templates` | Templates directory |
 | `HTMLEDITOR_ARCH_CHECKS_DIR` | `~/.config/mcp-htmleditor/arch-checks` | Arch-diagram QA checklist directory (edit in place to add/change a control, see `mcp-htmleditor arch-checklist`) |
+| `HTMLEDITOR_STATE_DIR` | `$XDG_STATE_HOME/mcp-htmleditor`, else `~/.local/state/mcp-htmleditor` | File history and server records (set to a writable path in a container) |
 | `HTMLEDITOR_CACHE_DIR` | `~/.cache/mcp-htmleditor` | Cache base (logs, generated `reference.docx`) |
 | `HTMLEDITOR_LOG_DIR` | `<cache>/logs` | Log directory (`HTMLEDITOR_LOGS` is an accepted alias) |
 | `HTMLEDITOR_BIN_DIR` | `~/.local/bin` | CLI install target |
@@ -410,9 +443,11 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 15 tools
+├── mcp_server.py    FastMCP server with 17 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
-├── state.py         singleton state + .mcp_state.json persistence
+├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)
+├── history.py       HistoryStore, list_versions, restore_version (history and restore)
+├── state.py         singleton state + records in the state directory
 ├── export/
 │   ├── charters.py  REGISTRY of CharterSpec: the eight charters (templates, detectors, DOCX keys)
 │   ├── to_pptx.py   HTML to PPTX entry: to_pptx, find_slides, ExportReport re-export, composed _SlideBuilder

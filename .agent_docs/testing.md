@@ -21,6 +21,10 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_deck_patch.py` | `patch` with `set_text`, atomic write, path guard, check order, documents (US-0038) |
 | `test_deck_patch_delete.py` | `delete_slide`, the one pass renumbering on the three fixtures, dry run (US-0039); counters checked with plain regexes |
 | `test_deck_patch_structure.py` | `insert_slide`, `move_slide`, `replace_slide` (US-0040): E2E-005, 007, 008, 014, 017, 018, 029, 030, check order, byte exact splice against a literal `hand()` builder (LF and CRLF, comment between slides, tab indentation), image restore, idempotence, original ids after move and replace |
+| `test_save_safety_e2e.py` | SPEC-0009: atomic save, 409 conflict check, no leftover file, update flag expiry (real server, `served_deck`, `FakeClock`) |
+| `test_save_ui_e2e.py` | SPEC-0009: conflict notice (Reload, Keep mine), save error notice, in real Chromium (`needs_chromium`) |
+| `test_history_e2e.py` | SPEC-0009: history snapshots, `history` / `restore` commands, limit of 20, concurrent ids |
+| `test_history_tools.py` | SPEC-0009: tools `history` / `restore` through `fastmcp.Client` (E2E-006), patch snapshot (E2E-026), tool errors equal the CLI lines, core lines, stdout clean |
 | `test_config.py` | Backward compatible accessors: XDG defaults, env overrides, invalid port |
 | `test_settings.py` | The `Settings` model: defaults, memoization per environment signature, `HTMLEDITOR_LOG_DIR` over `HTMLEDITOR_LOGS`, `~` expansion, blank value means unset, OTel fields, unknown prefixed variable ignored |
 | `test_logging_config.py` | Handler installation, stderr console, `omit_repeated_times=False` plus a rendering check that two consecutive lines both carry a timestamp, file output, idempotence, noisy loggers pinned, unwritable log dir degrades to console only |
@@ -39,6 +43,13 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_export_docx.py` | HTML preprocessing (single title), charter detection, `word/styles.xml` patching, header and footer parts, cache and fallbacks, end to end pandoc exports guarded by `skipif` when pandoc is absent |
 | `test_fullscreen_e2e.py` | SC-008 / FR-026-028 (see retrospective spec): fullscreen presentation mode via a real `ThreadingHTTPServer` + real headless Chromium (`pytest-playwright`). Toolbar/nav-arrow hiding, slide filling the screen, keyboard navigation independent of focus, the parent-side fallback CSS safety net, and exit-preserves-position. Guarded by `skipif` when Chromium is not installed |
 | `test_autosave_focus_e2e.py` | SPEC-0004 (2026-10-10): a background autosave never moves focus, caret or selection and never drops keystrokes; saved file still clean, no self reload, status dot back to saved. Same real server + Chromium harness, `skipif` without Chromium |
+
+Shared fixtures (SPEC-0009): `isolate_state_dir` (autouse, `conftest.py`) points `HTMLEDITOR_STATE_DIR` at a temporary
+folder so no test touches the real state; `served_deck` (`conftest.py`) is an 8 slide EI deck `deck.html` served by a
+real editor; `FakeClock` (`test_state.py`, `advance(seconds)`) drives history ids and the update flag expiry through
+`EditorState.clock`; `needs_chromium` (`conftest.py`) skips a browser test when Chromium is missing. The Chromium
+e2e tests `test_autosave_focus_e2e.py`, `test_undo_redo_e2e.py` and the browser test of `test_http_origin_e2e.py`
+can fail under load (BL-0024): rerun once.
 
 ### Browser E2E (`test_fullscreen_e2e.py`)
 

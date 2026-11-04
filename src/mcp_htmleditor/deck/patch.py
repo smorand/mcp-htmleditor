@@ -269,11 +269,11 @@ def _apply_operation(working: Working, deck: Deck, operation: Operation) -> None
 
 def _write(file: str, data: bytes, set_update_flag: Callable[[bool], None] | None) -> None:
     if set_update_flag is None:
-        atomic_write(file, data)
+        atomic_write(file, data, reason="patch")
         return
     set_update_flag(True)
     try:
-        atomic_write(file, data)
+        atomic_write(file, data, reason="patch")
     finally:
         set_update_flag(False)
 
