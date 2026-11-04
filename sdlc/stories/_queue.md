@@ -31,7 +31,7 @@
 | US-0028 | SPEC-0006 | topics create and export | US-0025 | 2 | landed | story/US-0028-topics-create-and-export | story/US-0027-topics-medical-and-medical-sources |
 | US-0029 | SPEC-0006 | topics document and mail | US-0025 | 2 | landed | story/US-0029-topics-document-and-mail | story/US-0028-topics-create-and-export |
 | US-0030 | SPEC-0006 | topics website and tables | US-0025 | 2 | landed | story/US-0030-topics-website-and-tables | story/US-0029-topics-document-and-mail |
-| US-0031 | SPEC-0006 | topics gantt and annotated-image | US-0025 | 2 | todo | | |
+| US-0031 | SPEC-0006 | topics gantt and annotated-image | US-0025 | 2 | landed | story/US-0031-topics-gantt-and-annotated-image | story/US-0030-topics-website-and-tables |
 | US-0032 | SPEC-0006 | topics arch-diagram and templates | US-0025 | 2 | todo | | |
 | US-0033 | SPEC-0006 | topic arch-qa and the cut shipped checklist | US-0025 | 2 | todo | | |
 | US-0034 | SPEC-0006 | clean real audit, all 15 topics enforced, documentation | US-0026, US-0027, US-0028, US-0029, US-0030, US-0031, US-0032, US-0033 | 2 | todo | | |

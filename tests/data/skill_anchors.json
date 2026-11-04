@@ -139,5 +139,29 @@
     "colspan",
     "rowspan",
     "data-style=\"striped\""
+  ],
+  "gantt": [
+    ".gantt-track",
+    "data-type=\"gantt-task\"",
+    "data-start",
+    "data-end",
+    "data-label",
+    "data-color",
+    "data-depends-on",
+    "YYYY-MM",
+    "left%  = (mois_debut - 1) / 12 * 100",
+    "width% = (mois_fin - mois_debut + 1) / 12 * 100",
+    "padding-left:180px",
+    "112 px"
+  ],
+  "annotated-image": [
+    "data-type=\"annotated-image\"",
+    "data-type=\"annotation\"",
+    "data-x",
+    "data-y",
+    "data-style=\"callout\"",
+    "position:relative",
+    "Garder `data-x`/`data-y` strictement égaux aux `left`/`top` du style inline",
+    "12 points"
   ]
 }
