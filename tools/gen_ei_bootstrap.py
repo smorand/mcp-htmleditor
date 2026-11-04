@@ -9,7 +9,7 @@ une seule slide titre, compteurs remis a 1.
 Le data URI des chevrons EI est en plus recopie sur `<html data-asset-chevrons>`,
 ce qui permet a l'editeur de resoudre `{{CHEVRONS}}` quand le document ne
 contient encore aucune slide a pied de page (voir resolveTemplateAssets dans
-static/editor.js).
+static/editor-slides.js).
 
 Usage: python3 tools/gen_ei_bootstrap.py           (ou `make bootstrap-ei`)
        python3 tools/gen_ei_bootstrap.py --check   (rapporte l'etat, n'ecrit rien)

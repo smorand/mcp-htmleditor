@@ -4,7 +4,7 @@
 > Nature: DEBT
 > Depth: M
 > Depth evidence: 4 modules plus one script touched, about 70 non source occurrences, no public contract change
-> Status: designed
+> Status: implemented
 > Generated on: 2026-11-03
 > Behavior change: none
 > From backlog: n/a
