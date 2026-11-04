@@ -1,0 +1,34 @@
+{
+  "carbon": {
+    "detectTemplate": "carbon",
+    "detect_theme": "carbon"
+  },
+  "doc": {
+    "detectTemplate": "carbon",
+    "detect_theme": "generic"
+  },
+  "doc-ei": {
+    "detectTemplate": "ei",
+    "detect_theme": "ei"
+  },
+  "doc-perso": {
+    "detectTemplate": "carbon",
+    "detect_theme": "generic"
+  },
+  "ei": {
+    "detectTemplate": "ei",
+    "detect_theme": "ei"
+  },
+  "mail": {
+    "detectTemplate": "carbon",
+    "detect_theme": "generic"
+  },
+  "medical": {
+    "detectTemplate": "medical",
+    "detect_theme": "medical"
+  },
+  "website": {
+    "detectTemplate": "carbon",
+    "detect_theme": "carbon"
+  }
+}

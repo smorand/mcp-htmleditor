@@ -1,0 +1,82 @@
+{
+  "templates/bootstrap/slides-ei-empty.html": {
+    "ppt/slides/slide1.xml": "b40dbf7cf77101935bff11869b617631faa96295d28961eefa3d1a152587d30d"
+  },
+  "templates/bootstrap/slides-empty.html": {
+    "ppt/slides/slide1.xml": "cbbb74522655368e220b604d79fba9789f7ca3faaa45a6b732e92aa8bb88f173"
+  },
+  "templates/bootstrap/slides-medical-empty.html": {
+    "ppt/slides/slide1.xml": "b319d235470c00cfd303e5efdf7c6a9cba2fdf5e2c68df94d02daf89a1f4a3be"
+  },
+  "templates/reference/slides/euro-information.html": {
+    "ppt/slides/slide1.xml": "b40dbf7cf77101935bff11869b617631faa96295d28961eefa3d1a152587d30d",
+    "ppt/slides/slide2.xml": "989af3be293b74e7a675d7a4e7756748a919f65f5cc3e8c3dba5df0e1bdaf7f8",
+    "ppt/slides/slide3.xml": "1d11926f497332cb2c7d9e10561b5601daeaeace3205d1eaeb57bccdfd954b26"
+  },
+  "templates/reference/slides/example-ei-complete.html": {
+    "ppt/slides/slide1.xml": "f72b4b331f93185cde4d9f249bf95ad825f07bed06fcdecb1ec0f915ca047251",
+    "ppt/slides/slide2.xml": "5be22b50dcc05c4c5eb8c93c186361dbc7aa584dfe09f0d109aaceb93422172e",
+    "ppt/slides/slide3.xml": "0244df6d27f4f74494d70fac73742361ce98f6dfa5dc3967c650cb882cf05198",
+    "ppt/slides/slide4.xml": "9eb5fbf29735a20e21736e7982544786a4c01753f5bcb924b23df388a37ae9da",
+    "ppt/slides/slide5.xml": "ca848cc4214f68a4f7a719f168440daa9a019333c312923c720539cf3a9db327",
+    "ppt/slides/slide6.xml": "3116d3dc95795a3ea66d60de3974c91df5677c1a99f483c8185ac6f1ea094dba",
+    "ppt/slides/slide7.xml": "a7793b34e5a13f70545dd2a2b143c6ce639792e16d5715fbaae19c756055f2c3",
+    "ppt/slides/slide8.xml": "943e3a54758e07002aecb075f8481c222584db026af595f77efe5bd99c6c76de",
+    "ppt/slides/slide9.xml": "7a160923362531c5ca7895052688647a1d3b609e72f625e8c2bfcb8373ec290b"
+  },
+  "templates/reference/slides/example-medical-complete.html": {
+    "ppt/slides/slide1.xml": "12ddf119239cea497841ab23d64aa89ccef7ce4b5490d34b9170de4686e79f7a",
+    "ppt/slides/slide10.xml": "155701f3918cd944d20810dd4d4aad752ee92cef144f1b9851df4756712e6e52",
+    "ppt/slides/slide11.xml": "aada3b34b64926b2f4b4ed15f4fac64ca6316860897b0afadf7bbd0b40404a98",
+    "ppt/slides/slide12.xml": "b1358ef9bb93352820a77b4e44571334b0e879f72c3db09d29ebc68c464f1320",
+    "ppt/slides/slide13.xml": "6437f1acd8dfe024ab728dead119b704cf677442a9855f702d402c44e5ba385d",
+    "ppt/slides/slide14.xml": "5aa53e78a331ce2227a792de878ef007eaf36dd3d4ffe263d04a3f2fc09f267e",
+    "ppt/slides/slide15.xml": "f19617f8f9f6d4ab8f0a15386cbd9a1630e5ec92db8b6a21d58086e73d058885",
+    "ppt/slides/slide2.xml": "44eebba23ed7639d093599718d5c49ba957d67d35879e174059a63b07d0f4fb9",
+    "ppt/slides/slide3.xml": "e67d0536bfc53b58cc6cbb8ade31d818919488e2089b2201c48c9ee98866e011",
+    "ppt/slides/slide4.xml": "de1c5811701440105e9dae6411bf9f4106a620201c24940dfd9d3ee876813c47",
+    "ppt/slides/slide5.xml": "2659595b07de50541f727a002217718fc2e527093d4aca4c276be7a8cd0f7c47",
+    "ppt/slides/slide6.xml": "7e43aa3bc756123b6614cae1fd7f812632bcc4fe697b3f1a495d16c45d72a9f0",
+    "ppt/slides/slide7.xml": "dcfeca9db5c8bfb6b7de30e79b0bc20d1cf6338fd73a6ce3242872187ac4058b",
+    "ppt/slides/slide8.xml": "e42afa8a01e38802e9d7999a9228dfbbcab30d30805d7f6a713a4352063befa8",
+    "ppt/slides/slide9.xml": "2e9fd7c0045b5813b4ffb085c205736bfde63d097b62576a7137605c5ee4225a"
+  },
+  "templates/reference/slides/ibm-carbon.html": {
+    "ppt/slides/slide1.xml": "e003c7bd60b5ddd4a4b387d436364a8a9b9cd6151a7d31e2a0d162584e9bce23",
+    "ppt/slides/slide2.xml": "ea4d6c185776cfc6859315e66d2071f914e1620c7f38b1ebca2ed6deb52dfdc0",
+    "ppt/slides/slide3.xml": "43b6a1c562cd937973891ee953899ba07ee5ad42078271923cb5777918a5327c",
+    "ppt/slides/slide4.xml": "c12012002434ebe1972774a55f23d650c319ee6bb4b70fddf6b050746067262b",
+    "ppt/slides/slide5.xml": "2cb520af309b484ec2076a59ade8451f02c48766db3c5eb3f2a680d5320805ef",
+    "ppt/slides/slide6.xml": "c4c372a5db265e1658aaf8d640161911c56c72752e43f70ab733b519e1694800",
+    "ppt/slides/slide7.xml": "2abeb975b67c68d3a0c80a3f453df764ae9dd5f5d3515fa3fe8b53a4095a413a",
+    "ppt/slides/slide8.xml": "e6846c757eed23aa8ff6c2fc3be06cc64eb4d0eff6e2befe0acafaf6b17f75ba",
+    "ppt/slides/slide9.xml": "a33e180eed0708865c983fcd348accb5e45c2043fc5eecc2c66859f7b9c719e6"
+  },
+  "templates/reference/slides/medical.html": {
+    "ppt/slides/slide1.xml": "ed493619a19f8c1b610fccc0ad9438c6e56aa901592bdbc01d97602119f5cf12",
+    "ppt/slides/slide10.xml": "6d47c4a5a30666a0223d9164fc6f9f8e2543b11038e0ae9848246979a1d0b55f",
+    "ppt/slides/slide11.xml": "c8f4a998db3306424e464e9f4b817eed07020951ed4fccbf70cffc69aeadca23",
+    "ppt/slides/slide12.xml": "e178b2f49e9269ab9cc5bd844683d13b5a50020e166ee35e6ecdc0df90fc4974",
+    "ppt/slides/slide13.xml": "8af3a9fa0a0bb35789606821002be7a44389a3748dcc631bcf062c0a97f25a4d",
+    "ppt/slides/slide14.xml": "9abba82a9741813979ade556dc05db7b40a59bb9c621db98d56c018bdc10df3a",
+    "ppt/slides/slide15.xml": "375ea19e44ee53583a9475fcef86b6264d6d80301076ff1b030ff661a8a5b6a3",
+    "ppt/slides/slide16.xml": "779c374f7c04368f7070d90adf7d0a0642aabe28bf4d95565079ace707493fa8",
+    "ppt/slides/slide2.xml": "9b0b449a3c515707f7e9edc621a3b97cd9ca242a8e3f74f7ccf394d284231600",
+    "ppt/slides/slide3.xml": "2bfe073d6472cc6cb1a72789c8ecb73c96b0460423969ad22b6399e401a13a93",
+    "ppt/slides/slide4.xml": "b5641e56ec4e01a29187fc642f01d4b368d21e399f7834087a235df7a8958bee",
+    "ppt/slides/slide5.xml": "af317d9bf602e9ec2b040d8423f6d4d292d78df72a72a6f933258edbd646113f",
+    "ppt/slides/slide6.xml": "5e1c598efa0da37877a53f78fb32e7854dea7e5507d20e211db7096a3b0ca6f3",
+    "ppt/slides/slide7.xml": "7028c4f692539076aaa1e1af7c189c43b8363cc783d93fc84d9d2947bd4fc9f8",
+    "ppt/slides/slide8.xml": "711d5222ea0bdf57bd3f59ed1612064447fe2c8a0134834ae1701f172f078c24",
+    "ppt/slides/slide9.xml": "4e57e85cd823123e54659892b4bd1bb22860c528651677d960400f4835241d67"
+  },
+  "templates/reference/slides/presentation-standard.html": {
+    "ppt/slides/slide1.xml": "4f7e5b40e3dc56839ad84d835ce7c1ee3bff2fee795cf6875e857909c2de69a8",
+    "ppt/slides/slide2.xml": "01960243eba540fddf62bbc1cdd0973c2f91a152794fe7bdc9dd8a18cd302c48",
+    "ppt/slides/slide3.xml": "610ae088dc5f7a18a22d1d0257c1710d4e7d199430860af2882190e8c2bf4b0b",
+    "ppt/slides/slide4.xml": "62bb451c3f8c4d46951172f8c4d7e64e78900971aba9191a3643114d23a1ee3f"
+  },
+  "templates/reference/slides/roadmap-one-pager.html": {
+    "ppt/slides/slide1.xml": "e87edb7fe7c24bc25372f222a977b14c437e169f59985e7d28377918d89f6108"
+  }
+}

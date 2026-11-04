@@ -6,7 +6,7 @@
 | US-0068 | SPEC-0011 | resync the euro-information reference deck with its generated bootstrap | main | 2 | landed | story/US-0068-resync-ei-reference-with-bootstrap | main |
 | US-0004 | SPEC-0011 | `--check` mode for both generators | main | 2 | landed | story/US-0004-check-mode-for-both-generators | story/US-0068-resync-ei-reference-with-bootstrap |
 | US-0005 | SPEC-0011 | `make check-generated` in the quality gate and docs | US-0004 | 2 | landed | story/US-0005-make-check-generated-in-the-gate | story/US-0004-check-mode-for-both-generators |
-| US-0006 | SPEC-0012 | record golden slide xml hashes and detector table | US-0005 | 2 | todo | | |
+| US-0006 | SPEC-0012 | record golden slide xml hashes and detector table | US-0005 | 2 | landed | story/US-0006-record-golden-slide-xml-hashes-and | story/US-0005-make-check-generated-in-the-gate |
 | US-0007 | SPEC-0012 | charter registry, templates and detectors read it | US-0006 | 2 | todo | | |
 | US-0008 | SPEC-0012 | pptx_model.py with types, constants, base class | US-0007 | 2 | todo | | |
 | US-0009 | SPEC-0012 | extract text and primitives mixin | US-0008 | 2 | todo | | |
