@@ -299,6 +299,17 @@ def outline_cmd(file: str) -> None:
     click.echo(json.dumps(outline(file), separators=(",", ":"), ensure_ascii=False))
 
 
+@main.command("get-slide")
+@click.argument("file", type=click.Path(dir_okay=False))
+@click.argument("slide_id")
+@deck_command
+def get_slide_cmd(file: str, slide_id: str) -> None:
+    """Print the raw HTML of slide SLIDE_ID of FILE, large images replaced by data:ref:img-N."""
+    from .deck.read import get_slide
+
+    click.echo(get_slide(file, slide_id))
+
+
 @main.command("export")
 @click.argument("format", type=click.Choice(["pptx", "docx"]))
 @click.argument("input_file", type=click.Path(exists=True, dir_okay=False))

@@ -1,4 +1,4 @@
-"""Read only views of a deck: the outline (SPEC-0007 FR-NEW-001)."""
+"""Read only views of a deck: the outline and one slide (SPEC-0007 FR-NEW-001, FR-NEW-002)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from typing import Any
 
 from bs4.element import Comment, NavigableString, Tag
 
-from . import Deck, document_article, load_deck, slide_id
+from . import Deck, DeckError, document_article, load_deck, slide_id
+from .scan import hide_images, scan, slide_range
 
 HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5")
 HIDDEN_TEXT_TAGS = frozenset({"script", "style", "svg"})
@@ -25,6 +26,21 @@ def outline(file: str) -> dict[str, Any]:
         "slides": _slide_facts(deck) if is_presentation else [],
         "headings": [] if is_presentation else _headings(deck),
     }
+
+
+def get_slide(file: str, slide_id_: str) -> str:
+    """Return the raw HTML of one slide, large image sources replaced by ``data:ref:img-N`` (DEC-019)."""
+    deck = load_deck(file)
+    if not deck.slides:
+        raise DeckError(f"get_slide needs a presentation: {file}")
+    ids = [slide_id(slide) or f"slide-{index}" for index, slide in enumerate(deck.slides)]
+    if slide_id_ not in ids:
+        raise DeckError(f'Unknown slide id "{slide_id_}". Valid ids: {", ".join(ids)}')
+    tag = deck.slides[ids.index(slide_id_)]
+    nodes = scan(deck.text)
+    node = next(n for n in nodes if (n.line, n.col) == (tag.sourceline, tag.sourcepos))
+    start, end = slide_range(nodes, node)
+    return hide_images(deck.text[start:end])
 
 
 def _slide_facts(deck: Deck) -> list[dict[str, Any]]:
