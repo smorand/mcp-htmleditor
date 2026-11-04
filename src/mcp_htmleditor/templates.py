@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import config
+from .export.charters import REGISTRY
 
 
 def _repo_templates_dir() -> Path:
@@ -36,40 +37,7 @@ def template_search_path() -> list[Path]:
 
 
 # key -> (relative path under a templates dir, human description)
-TEMPLATES: dict[str, tuple[str, str]] = {
-    "ei": (
-        "bootstrap/slides-ei-empty.html",
-        "Euro-Information presentation (Crédit Mutuel / CIC), 1 title slide",
-    ),
-    "carbon": (
-        "bootstrap/slides-empty.html",
-        "IBM Carbon presentation, 1 empty slide",
-    ),
-    "medical": (
-        "bootstrap/slides-medical-empty.html",
-        "Presentation medicale (congres/staff): teal+orange, images commentees, citations",
-    ),
-    "doc": (
-        "bootstrap/document-empty.html",
-        "Word-like document (single column)",
-    ),
-    "doc-perso": (
-        "bootstrap/document-perso-empty.html",
-        "Document charte Perso (Arial, headings colores)",
-    ),
-    "doc-ei": (
-        "bootstrap/document-ei-empty.html",
-        "Document Euro-Information (bleu EI, Segoe UI)",
-    ),
-    "mail": (
-        "bootstrap/mail-empty.html",
-        "Mail HTML Carbon leger (tables imbriquees, CSS inline, 640px)",
-    ),
-    "website": (
-        "bootstrap/website-empty.html",
-        "Site web Carbon (nav, hero, tabs, cartes, footer), pas d'export PPTX/DOCX",
-    ),
-}
+TEMPLATES: dict[str, tuple[str, str]] = {c.key: (c.template, c.description) for c in REGISTRY}
 
 
 def template_path(key: str) -> Path:

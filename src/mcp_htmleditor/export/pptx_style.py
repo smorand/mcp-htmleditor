@@ -22,6 +22,8 @@ from dataclasses import dataclass, field, replace
 from bs4 import BeautifulSoup, Tag
 from pptx.util import Emu, Inches
 
+from .charters import REGISTRY
+
 # ---------------------------------------------------------------------------
 # Canvas geometry
 # ---------------------------------------------------------------------------
@@ -374,15 +376,28 @@ THEME_GENERIC = Theme(
 )
 
 
+# Detection priority: a document carrying several charters' markers takes the first.
+_THEME_PRIORITY: tuple[tuple[str, Theme], ...] = (
+    ("medical", THEME_MEDICAL),
+    ("ei", THEME_EI),
+    ("carbon", THEME_CARBON),
+)
+
+
 def detect_theme(soup: BeautifulSoup) -> Theme:
-    """Pick the charter of a document from its CSS tokens and markup."""
+    """Pick the charter of a document from its CSS tokens and markup.
+
+    Reads the presentation charters of the registry in priority order; the
+    cost is O(markers) substring searches over the stylesheet text.
+    """
     css = stylesheet_text(soup)
-    if "--med-teal" in css or soup.find(class_="med-rule") is not None:
-        return THEME_MEDICAL
-    if "--ei-blue" in css or soup.find(class_="slide-inner") is not None:
-        return THEME_EI
-    if "--ibm-blue" in css or "--cds-" in css or soup.find(class_="slide-header") is not None:
-        return THEME_CARBON
+    specs = {spec.key: spec for spec in REGISTRY if spec.kind == "presentation"}
+    for key, theme in _THEME_PRIORITY:
+        spec = specs[key]
+        if any(token in css for token in spec.css_tokens):
+            return theme
+        if any(soup.find(class_=name) is not None for name in spec.css_classes):
+            return theme
     return THEME_GENERIC
 
 

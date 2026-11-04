@@ -41,6 +41,7 @@ from pathlib import Path
 from ..config import reference_dir
 from ..tracing import trace_span
 from . import docx_header_footer as hf
+from .charters import REGISTRY
 from .docx_assets import EI_LOGO_PNG_BASE64
 
 logger = logging.getLogger(__name__)
@@ -290,6 +291,9 @@ EI = Charter(
 
 CHARTERS: Mapping[str, Charter] = {PERSO.key: PERSO, EI.key: EI}
 
+# Keys the registry declares as DOCX charters (``docx_key`` of the document charters).
+_DOCX_KEYS = frozenset(spec.docx_key for spec in REGISTRY if spec.docx_key)
+
 
 def charter_keys() -> tuple[str, ...]:
     """Return the supported charter keys, in declaration order."""
@@ -308,7 +312,10 @@ def charter_for(key: str | None) -> Charter | None:
     """
     if not key:
         return None
-    return CHARTERS.get(key.strip().lower())
+    docx_key = key.strip().lower()
+    if docx_key not in _DOCX_KEYS:
+        return None
+    return CHARTERS.get(docx_key)
 
 
 def has_page_furniture(key: str | None) -> bool:
