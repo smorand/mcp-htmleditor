@@ -36,7 +36,10 @@ mcp-htmleditor export pptx in.html out.pptx
 mcp-htmleditor export docx in.html out.docx
 mcp-htmleditor arch-layout in.html         # compute arch-diagram positions from topology
 mcp-htmleditor arch-checklist               # print the editable arch-diagram QA checklist
-mcp-htmleditor skill                       # full skill content
+mcp-htmleditor skill                       # skill core (rules, tools, topic index)
+mcp-htmleditor skill --type <topic>        # one of the 15 topics
+mcp-htmleditor skill --all                 # core then every topic
+mcp-htmleditor skill-audit [--json]        # sizes, tool list, stale statements; exit 1 on a problem
 ```
 
 ## Essential conventions
@@ -58,7 +61,7 @@ mcp-htmleditor skill                       # full skill content
   `make sync-medical-css` to propagate the copy into the two reference decks.
 - A `medical` deck cites every third party image (non empty `.med-source` in the footer
   band) and anonymizes every patient image (no name, initials, MRN, care date, full date
-  of birth; DICOM header **and** burned in pixels cleaned): see `skill/types/medical.md`.
+  of birth; DICOM header **and** burned in pixels cleaned): see `skill/topics/medical.md`.
   Its flex rows (`.med-strip`, `.med-split`, `.med-cols`, `.med-compare`, `.med-steps`,
   `.med-stats`, `.med-timeline`, `.med-section-figs`) need an explicit width class
   (`w-25` to `w-70`) on every child, otherwise the PPTX export flattens the row into a
@@ -74,11 +77,11 @@ mcp-htmleditor skill                       # full skill content
   never write `data-x`/`data-y` by hand, author the declarative topology (`arch-row` /
   `arch-node` / `arch-col` / `arch-edge` / `arch-lane` / `arch-spacer`) and run
   `mcp-htmleditor arch-layout` (or the `layout_arch_diagram` MCP tool) to compute
-  positions. See `skill/types/arch-diagram.md` and `src/mcp_htmleditor/arch_layout.py`.
+  positions. See `skill/topics/arch-diagram.md` and `src/mcp_htmleditor/arch_layout.py`.
   The old manual `data-x`/`data-y` format stays valid for 2-3 node diagrams only.
 - After every `arch-layout` run, spawn a dedicated review sub-agent against
   `mcp-htmleditor arch-checklist` before considering the diagram done (protocol:
-  `skill/workflow-arch-qa.md`). The checklist itself is user-editable at
+  `skill/topics/arch-qa.md`). The checklist itself is user-editable at
   `~/.config/mcp-htmleditor/arch-checks/arch-diagram-checklist.md`, never in code.
 - `.mcp_state.json` is written next to the edited file. It is gitignored, never commit it.
 - JS has no build step: `node --check src/mcp_htmleditor/static/*.js`.
@@ -102,7 +105,12 @@ Load only what the task needs.
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`
-(sources in `skill/`, `skill/workflow-*.md`, `skill/types/*.md`).
+(sources in `skill/core.md`, `skill/topics/`, `skill/checks/`). `docs/skill-archive/` keeps the
+previous monolithic skill, reference only.
+
+The MCP server exposes eight tools, `get_skill` included. A story that registers a tool adds
+one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
+story (`skill-audit` fails otherwise); see `.agent_docs/architecture.md`.
 
 Specifications live in `specs/*.md` (never modify an existing one, only reference and
 flag inconsistencies). Deferred feature ideas not yet worth a full spec are tracked in

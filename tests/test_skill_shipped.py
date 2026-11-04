@@ -1,18 +1,19 @@
-"""Gates on the shipped skill tree: the core, the routing skill and every topic file that exists (SPEC-0006)."""
+"""Gates on the shipped skill tree: the core, the routing skill and all 15 topic files (SPEC-0006)."""
 
 from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
 
 from mcp_htmleditor import arch_checks
-from mcp_htmleditor.skill_content import SkillLibrary
+from mcp_htmleditor.skill_content import TOPIC_NAMES, SkillLibrary
 
 REPO = Path(__file__).resolve().parents[1]
 SKILL_DIR = REPO / "skill"
@@ -53,17 +54,28 @@ REFERENCES = {
     "mail": "templates/reference/documents/mail-carbon-example.html",
     "website": "templates/reference/websites/ibm-carbon.html",
 }
+ARCHIVE_FILES = (
+    "index.md",
+    "slides.md",
+    "medical.md",
+    "workflow-create.md",
+    "workflow-export.md",
+    "workflow-templates.md",
+    "workflow-arch-qa.md",
+    "document.md",
+    "mail.md",
+    "website.md",
+    "tables.md",
+    "gantt.md",
+    "annotated-image.md",
+    "arch-diagram.md",
+    "arch-diagram-checklist.md",
+)
 DASHES = ("\u2014", "\u2013")
 
 
 def _library() -> SkillLibrary:
     return SkillLibrary(SKILL_DIR, arch_checks.read_shipped_checklist)
-
-
-def _existing_topics() -> list[str]:
-    from mcp_htmleditor.skill_content import TOPIC_NAMES
-
-    return [name for name in TOPIC_NAMES if (SKILL_DIR / "topics" / f"{name}.md").is_file()]
 
 
 def _anchors() -> dict[str, list[str]]:
@@ -160,27 +172,136 @@ def test_install_skill_copies_routing_skill(tmp_path: Path) -> None:
     assert (target / "SKILL.md").read_bytes() == ROUTING_SKILL.read_bytes()
 
 
-def test_shipped_topics_gates() -> None:
-    """Topic gates, run on the topic files that exist (zero today is fine)."""
+def _topic_problems(skill_dir: Path, topic: str) -> list[str]:
+    """Every gate a shipped topic must satisfy; a missing file is a problem, never skipped."""
     from mcp_htmleditor.skill_audit import find_stale
 
+    if not (skill_dir / "topics" / f"{topic}.md").is_file():
+        return [f"{topic}: file missing"]
+    text = SkillLibrary(skill_dir, arch_checks.read_shipped_checklist).topic_output(topic)
+    lines = text.splitlines()
+    problems: list[str] = []
+    if len(text.encode("utf-8")) > TOPIC_BUDGET_BYTES:
+        problems.append(f"{topic}: over budget")
+    if lines[0] != f"# Skill topic: {topic}":
+        problems.append(f"{topic}: wrong title line")
+    if not text.endswith("\n") or text.endswith("\n\n"):
+        problems.append(f"{topic}: wrong final newline")
+    problems += [f"{topic}: stale {word}" for word in find_stale(text, include_counts=False)]
+    if any(dash in text for dash in DASHES):
+        problems.append(f"{topic}: dash")
+    references = [line for line in lines if line.startswith("Reference:")]
+    expected = [f"Reference: {REFERENCES[topic]}"] if topic in REFERENCES else []
+    if references != expected or (expected and lines[-1] != expected[0]):
+        problems.append(f"{topic}: Reference line {references}")
+    problems += [f"{topic}: anchor {anchor!r} missing" for anchor in _anchors().get(topic, []) if anchor not in text]
+    return problems
+
+
+def _copy_tree(tmp_path: Path) -> Path:
+    target = tmp_path / "skill"
+    shutil.copytree(SKILL_DIR, target)
+    return target
+
+
+def _run_audit(monkeypatch: pytest.MonkeyPatch, skill_dir: Path) -> Result:
+    """Run `skill-audit` on skill_dir with the source routing skill and no installed one."""
+    from mcp_htmleditor import cli as cli_module
+    from mcp_htmleditor import config as config_module
+    from mcp_htmleditor.cli import main
+
+    monkeypatch.setenv("HTMLEDITOR_SKILL_DIR", str(skill_dir))
+    monkeypatch.setenv("HTMLEDITOR_ROUTING_SKILL", str(ROUTING_SKILL))
+    monkeypatch.setattr(cli_module, "configure_tracing", lambda settings=None: None)
+    config_module.reset_settings_cache()
+    try:
+        return CliRunner().invoke(main, ["skill-audit"], input="")
+    finally:
+        config_module.reset_settings_cache()
+
+
+def test_every_topic_file_exists() -> None:
+    """All 15 topic files ship; a missing one is a failure, never skipped."""
+    assert len(TOPIC_NAMES) == 15
+    missing = [name for name in TOPIC_NAMES if not (SKILL_DIR / "topics" / f"{name}.md").is_file()]
+    assert missing == []
+
+
+@pytest.mark.parametrize("topic", TOPIC_NAMES)
+def test_shipped_topic_gates(topic: str) -> None:
+    assert _topic_problems(SKILL_DIR, topic) == []
+
+
+def test_topic_gate_catches_a_missing_file(tmp_path: Path) -> None:
+    tree = _copy_tree(tmp_path)
+    (tree / "topics" / "gantt.md").unlink()
+    assert _topic_problems(tree, "gantt") == ["gantt: file missing"]
+
+
+def test_topic_gate_catches_a_stale_word(tmp_path: Path) -> None:
+    tree = _copy_tree(tmp_path)
+    path = tree / "topics" / "mail.md"
+    path.write_text(path.read_text(encoding="utf-8").rstrip() + "\nGrapesJS\n", encoding="utf-8")
+    assert "mail: stale grapesjs" in _topic_problems(tree, "mail")
+
+
+def test_reference_line_only_on_reference_topics() -> None:
+    with_reference = {
+        t for t in TOPIC_NAMES if (SKILL_DIR / "topics" / f"{t}.md").read_text("utf-8").count("\nReference:")
+    }
+    assert with_reference == set(REFERENCES)
+    assert len(REFERENCES) == 6
+
+
+def test_anchors_cover_every_topic_but_arch_qa() -> None:
     anchors = _anchors()
+    assert set(anchors) == set(TOPIC_NAMES) - {"arch-qa"}
+    assert all(anchors[name] for name in anchors)
+
+
+def test_all_equals_core_plus_topics(real_tree: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """E2E-003 on the real tree: core then the 15 topics, one empty line between parts."""
+    from mcp_htmleditor import config as config_module
+    from mcp_htmleditor.cli import main
+
+    monkeypatch.setenv("HTMLEDITOR_ARCH_CHECKS_DIR", str(tmp_path / "no-user-checklist"))
+    config_module.reset_settings_cache()
     library = _library()
-    for topic in _existing_topics():
-        text = library.topic_output(topic)
-        lines = text.splitlines()
-        assert len(text.encode("utf-8")) <= TOPIC_BUDGET_BYTES, topic
-        assert lines[0] == f"# Skill topic: {topic}", topic
-        assert text.endswith("\n") and not text.endswith("\n\n"), topic
-        assert find_stale(text, include_counts=False) == [], topic
-        references = [line for line in lines if line.startswith("Reference:")]
-        if topic in REFERENCES:
-            assert references == [f"Reference: {REFERENCES[topic]}"], topic
-            assert lines[-1] == references[0], topic
-        else:
-            assert references == [], topic
-        for anchor in anchors.get(topic, []):
-            assert anchor in text, (topic, anchor)
+    expected = "\n".join([library.core_output(), *(library.topic_output(t) for t in TOPIC_NAMES)])
+    result = CliRunner().invoke(main, ["skill", "--all"])
+    assert result.exit_code == 0
+    assert result.stdout == expected
+    parts = [library.core_output(), *(library.topic_output(t) for t in TOPIC_NAMES)]
+    assert len(result.stdout_bytes) == sum(len(p.encode("utf-8")) for p in parts) + len(parts) - 1
+
+
+def test_legacy_files_gone_and_archive_present() -> None:
+    assert not (SKILL_DIR / "SKILL.md").exists()
+    assert not (SKILL_DIR / "types").exists()
+    assert list(SKILL_DIR.glob("workflow-*.md")) == []
+    archive = REPO / "docs" / "skill-archive"
+    for name in ARCHIVE_FILES:
+        assert (archive / name).is_file(), name
+
+
+def test_e2e_006_clean_audit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC-0006/E2E-006: the real tree audit prints 16 OK lines and a clean verdict."""
+    result = _run_audit(monkeypatch, SKILL_DIR)
+    out = result.stdout.splitlines()
+    assert result.exit_code == 0, result.stdout
+    assert out[-1] == "skill-audit: OK"
+    items = out[:-1]
+    assert [line.split(":")[0] for line in items] == ["core", *TOPIC_NAMES]
+    assert all(line.endswith(" OK") for line in items)
+    assert not any(line.startswith("PROBLEM") for line in out)
+
+
+def test_audit_fails_when_a_topic_is_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    tree = _copy_tree(tmp_path)
+    (tree / "topics" / "tables.md").unlink()
+    result = _run_audit(monkeypatch, tree)
+    assert result.exit_code == 1
+    assert result.stdout.splitlines()[-1].startswith("skill-audit: FAIL")
 
 
 def test_anchored_topics_have_a_topic_file() -> None:

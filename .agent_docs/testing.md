@@ -26,7 +26,11 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_http_assets.py` | `data-asset-*` preservation when rebuilding a document |
 | `test_http_health.py` | `/health` payload (status, version, file, port) |
 | `test_templates.py` | Registry and search path resolution |
-| `test_skill_content.py` | `mcp-htmleditor skill` assembly |
+| `test_skill_content.py` | `SkillLibrary` (rewritten for SPEC-0006): core, topic, `--all`, unknown topic, missing files, `arch-qa` checklist |
+| `test_skill_tool.py` | The `get_skill` MCP tool and `registered_tool_names()` |
+| `test_skill_audit.py` | `skill-audit` report: sizes, budgets, missing items, `--json`, exit status (on the `skill_tree` fixture) |
+| `test_skill_audit_checks.py` | `skill-audit` tool list check and stale statement check (core, topics, routing skill) |
+| `test_skill_shipped.py` | Gates on the real `skill/` tree (2026-11-04, US-0034): the 15 topic files must exist (no skipping), per topic budget, title, `Reference:` last line for the six reference topics, anchors; `--all` equals core plus topics; legacy files gone, `docs/skill-archive/` present; E2E-006 clean `skill-audit` (16 `OK` lines, `skill-audit: OK`). Mutation cases run the same gates on a tmp copy of `skill/` with a topic removed or a stale word added |
 | `test_export_pptx.py` | Slide detection on all templates, no `<script>` or shell text in the output, base64 and relative images, table spans and column widths, Gantt geometry, arch node shapes, annotation placement, geometry and style helpers |
 | `test_export_docx.py` | HTML preprocessing (single title), charter detection, `word/styles.xml` patching, header and footer parts, cache and fallbacks, end to end pandoc exports guarded by `skipif` when pandoc is absent |
 | `test_fullscreen_e2e.py` | SC-008 / FR-026-028 (see retrospective spec): fullscreen presentation mode via a real `ThreadingHTTPServer` + real headless Chromium (`pytest-playwright`). Toolbar/nav-arrow hiding, slide filling the screen, keyboard navigation independent of focus, the parent-side fallback CSS safety net, and exit-preserves-position. Guarded by `skipif` when Chromium is not installed |
@@ -120,3 +124,10 @@ between the two exports.
 Deck coherence (sequential ids, `TOTAL`, `slideNames` == `data-title`, a `.med-source` on
 every slide that shows an image, no CSS grid row) is asserted on both decks too: those are
 authoring invariants an agent breaks by editing HTML by hand.
+
+### Skill fixtures and data (2026-11-04)
+
+`skill_tree` (`tests/conftest.py`) builds a valid temporary skill tree (core, 15 topics, checklist),
+sets `HTMLEDITOR_SKILL_DIR` and isolates `HTMLEDITOR_ARCH_CHECKS_DIR`; tests mutate it through
+`SkillTree`. `tests/data/skill_anchors.json` lists, per topic, the strings that must stay in the
+shipped text (every topic but `arch-qa`, whose anchors live in `tests/test_arch_checks.py`).

@@ -107,7 +107,7 @@ reorder top-level document blocks with a left-side grip handle (DOM order = visu
 order, no attribute added), and move arch-diagram nodes with the mouse (position
 written as readable `data-x`/`data-y` percentages plus inline `left`/`top` in %).
 Declarative arch-diagrams (with at least one `arch-row`) also support add/remove
-node and add-edge via right-click (see `skill/types/arch-diagram.md` § Édition à
+node and add-edge via right-click (see `skill/topics/arch-diagram.md` § Édition à
 la souris): every structural change saves then calls the server's `arch-layout`
 engine, the browser never computes a position itself.
 
@@ -129,12 +129,22 @@ Connect your LLM agent via stdin/stdout (e.g. Claude Desktop, Cursor, pi).
 ### Skill content
 
 ```bash
-mcp-htmleditor skill      # prints the full skill (index + all sub-docs)
+mcp-htmleditor skill                 # the core: rules, workflow, tools and the topic index
+mcp-htmleditor skill --type <topic>  # one of the 15 topics (arch-qa also prints the resolved checklist)
+mcp-htmleditor skill --all           # the core then every topic
+mcp-htmleditor skill-audit [--json]  # sizes, budgets, tool list and stale statements; exit 0 when clean
 ```
 
+The skill is progressive: the core (`skill/core.md`, at most 7000 bytes) is read first,
+then the agent loads only the topics its task needs (`skill/topics/<topic>.md`, at most
+8000 bytes each). `skill-audit` prints one line per item (core, then the 15 topics in index
+order), one `PROBLEM` line per issue, and `skill-audit: OK` or `skill-audit: FAIL (N problems)`.
+The same content is available to agents through the `get_skill` MCP tool. The previous
+monolithic skill is kept for reference in `docs/skill-archive/`.
+
 The dynamic Pi skill triggers on "html powerpoint", "html edition", "html doc" and
-simply instructs the agent to run `mcp-htmleditor skill`, keeping the skill content
-in sync with the installed tool. Routing is disjoint from the native `pptx`/`docx`
+instructs the agent to run `mcp-htmleditor skill` and then `mcp-htmleditor skill --type <topic>`
+for what the task needs, keeping the skill content in sync with the installed tool. Routing is disjoint from the native `pptx`/`docx`
 skills (the word "html" is the exclusive discriminant). See `dynamic-skills/README.md`.
 
 ### Export
@@ -157,7 +167,7 @@ this command derives them deterministically — no collision between nodes, stra
 connectors on aligned columns, labels centered on their segment, lane boxes sized from
 the union of the rows they declare. Diagrams with no `arch-row` (legacy, hand authored
 `data-x`/`data-y`) are left untouched, so both formats coexist. See
-`skill/types/arch-diagram.md`.
+`skill/topics/arch-diagram.md`.
 
 The PPTX export writes one 16:9 slide (13.333 x 7.5 in) per element carrying
 `data-type="slide"`, with a fallback on `article.slide` for older templates. The
@@ -170,7 +180,7 @@ their connectors, annotated images with the annotations placed in the image fram
 Base64 images are embedded and relative paths resolve against the HTML file. The
 command prints the slide count, lists every skipped item and exits non zero when
 no slide could be written. Full breakdown of what is faithful, approximated or
-lost: `skill/workflow-export.md`.
+lost: `skill/topics/export.md`.
 
 ### Architecture diagram QA
 
@@ -181,10 +191,12 @@ mcp-htmleditor arch-checklist   # print the resolved checklist + where it lives
 After every `arch-layout` run, the agent workflow spawns a dedicated review
 sub-agent that checks the rendered diagram against this checklist (screenshot,
 compare, fix, re-layout, bounded to 2 passes) so the main conversation is not
-polluted by iteration — see `skill/workflow-arch-qa.md`. The checklist itself
+polluted by iteration: see `skill/topics/arch-qa.md`. The checklist itself
 lives at `~/.config/mcp-htmleditor/arch-checks/arch-diagram-checklist.md`
 (seeded once by `make install`, never overwritten on reinstall): add or change
-a control by editing that file directly, no code change or reinstall needed.
+a control by editing that file directly, no code change or reinstall needed. A checklist
+seeded by an earlier install keeps its size and content: `skill --type arch-qa` prints the
+topic followed by your checklist when one exists, the shipped one otherwise.
 
 The DOCX export carries the document charter into Word. The charter is read from
 `data-doc-template` on the document `<article>` (`perso`, `ei`), a matching
@@ -205,6 +217,7 @@ figures must be PNG, never SVG.
 | `open_file(file)` | Switch to a different HTML file. |
 | `update_start()` | Signal modification start (shows overlay in browser). |
 | `update_end()` | Signal modification complete (browser reloads). |
+| `get_skill(type=None)` | Return the skill core, or one topic when `type` is given (same text as `mcp-htmleditor skill [--type <topic>]`). |
 | `layout_arch_diagram(file, diagram_id=None)` | Compute and write positions for every declarative architecture diagram in `file` (see [Architecture diagram layout](#architecture-diagram-layout)). |
 
 ### Multiple presentations at once
@@ -277,7 +290,7 @@ medical presentations (congress, staff meeting, teaching, interventional pulmono
 under the title, bibliographic source band in the footer, dark surface for imaging slides,
 and 16 insertable slide layouts (the other slide charters expose 5). Every third party image
 must carry a source line and every patient image must be anonymized: see
-`skill/types/medical.md`.
+`skill/topics/medical.md`.
 
 ## HTML data-types
 
@@ -353,15 +366,16 @@ prompts and credentials are never traced. Details in `.agent_docs/observability.
 
 ```
 src/mcp_htmleditor/
-├── cli.py           CLI: templates, new, serve, skill, mcp, export (-v/-q, --version)
+├── cli.py           CLI: templates, new, serve, skill, skill-audit, mcp, export (-v/-q, --version)
 ├── config.py        Settings (pydantic-settings): XDG paths, ports, OTel
 ├── logging_config.py setup_logging(): rich console on stderr + rotating file
 ├── tracing.py       configure_tracing(), trace_span(), JSONL span exporter
 ├── version.py       __version__, written at build time from the git tag
 ├── templates.py     template registry + search-path resolution
-├── skill_content.py assembles `mcp-htmleditor skill` output
+├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
+├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 7 tools
+├── mcp_server.py    FastMCP server with 8 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── state.py         singleton state + .mcp_state.json persistence
 ├── export/
@@ -402,7 +416,8 @@ tools/              maintenance scripts
                     check_ei_insert.py   browser check of EI slide insertion (logo + numbering)
                     sync_medical_css.py  propagate the medical charter CSS to the reference decks
                     gen_medical_placeholders.py  synthetic placeholder images for the medical decks
-skill/              skill docs (served by `mcp-htmleditor skill`)
+skill/              core.md, topics/ (15), checks/ (served by `mcp-htmleditor skill`)
+docs/skill-archive/ previous monolithic skill, reference only
 dynamic-skills/     dynamic Pi skill + routing doc (installed to ~/.pi/agent/dynamic-skills)
 .agent_docs/        detailed docs for AI agents (python, makefile, architecture, ...)
 Dockerfile, docker-compose.yml, docker-compose.prod.yml
@@ -432,6 +447,6 @@ Makefile            single entry point for every operation
 
 ## Skill documentation
 
-Run `mcp-htmleditor skill` for the full skill (index + workflows + per-type rules).
-Source files live in `skill/`. The dynamic Pi skill in `.pi/skills/mcp-htmleditor/`
+Run `mcp-htmleditor skill` for the core, then `mcp-htmleditor skill --type <topic>` for a
+topic (`--all` prints everything). Source files live in `skill/core.md` and `skill/topics/`. The dynamic Pi skill in `.pi/skills/mcp-htmleditor/`
 triggers on "html powerpoint" / "html edition" / "html doc" and defers to the CLI.

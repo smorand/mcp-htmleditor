@@ -23,10 +23,11 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 | `version.py` | `__version__`, written at build time from the git tag |
 | `state.py` | `EditorState` singleton (current file, port, pid, poll interval, update flag) plus `.mcp_state.json` persistence next to the edited file |
 | `http_server.py` | `ThreadingHTTPServer`. Routes: `/`, `/static/*`, `/content` (GET raw, POST save), `/content-frame`, `/status` (polling), `/health` (status + version), `/export/pptx`, `/export/docx`, `POST /arch-layout`. Binds `HTMLEDITOR_HOST` (localhost by default, `0.0.0.0` in a container). Request gate (2026-10-10, SPEC-0005): every route but `/health` answers 403 unless the `Host` name is `localhost`, `127.0.0.1`, `[::1]` or the bind host (port ignored), and any `Origin` is exactly `http://<Host>`; no CORS headers are ever sent |
-| `mcp_server.py` | FastMCP, 6 tools, each traced as `mcp.<tool>` |
-| `cli.py` | click group with `-v/-q` and `--version`; subcommands `templates`, `new`, `serve`, `skill`, `mcp`, `export`. Subcommand imports are lazy on purpose to keep startup fast |
+| `mcp_server.py` | FastMCP, 8 tools (`start_server`, `stop_server`, `get_status`, `open_file`, `update_start`, `update_end`, `layout_arch_diagram`, `get_skill`), each traced as `mcp.<tool>`; `registered_tool_names()` lists them |
+| `cli.py` | click group with `-v/-q` and `--version`; subcommands `templates`, `new`, `serve`, `skill`, `skill-audit`, `mcp`, `export`. Subcommand imports are lazy on purpose to keep startup fast |
 | `templates.py` | Template registry (key to bootstrap file) and search path resolution |
-| `skill_content.py` | Assembles the `mcp-htmleditor skill` output from `skill/` |
+| `skill_content.py` | `SkillLibrary`: core (`skill/core.md`, 7000 bytes max), 15 topics (`skill/topics/<t>.md`, 8000 max), `--all`; `arch-qa` appends the checklist (user one if any, else the shipped `skill/checks/`) |
+| `skill_audit.py` | `run_audit`, `find_stale`, `listed_tools`: sizes, budgets, core `## Tools` lines versus `registered_tool_names()`, stale statements in core, topics and routing skill |
 
 `_EditorHandler` and the server lifecycle functions are the I/O boundary and are marked
 `# pragma: no cover`; the pure helpers next to them (`_strip_editor_artifacts`,
@@ -51,7 +52,7 @@ ignored: those files are meant to be copied, not edited. The write itself is tra
 | `export/pptx_text.py` | `TextMixin`: HTML elements to styled paragraphs and runs, text frames, rectangle and textbox primitives |
 | `export/pptx_images.py` | `ImagesMixin`: annotated images, plain images, picture primitives (source decoding, aspect probing, insertion) |
 | `export/pptx_arch.py` | `ArchMixin`: `_render_arch`, nodes as native shapes, edges as segments, arrow tips, step badges, labels |
-| `export/pptx_gantt.py` | `GanttMixin`: Gantt head, bars, legend, plus the class-free fallback `_is_inline_gantt`: structural detection of a hand-authored, fully inline-styled Gantt, see `skill/types/gantt.md` § Variante |
+| `export/pptx_gantt.py` | `GanttMixin`: Gantt head, bars, legend, plus the class-free fallback `_is_inline_gantt`: structural detection of a hand-authored, fully inline-styled Gantt, see `skill/topics/gantt.md` § Variante |
 | `export/pptx_blocks.py` | `BlocksMixin`: block measurement and renderers (grid, panel, table, rule, hbar) and the block dispatcher |
 | `export/pptx_flow.py` | `FlowMixin`: vertical block flow and flex rows. A generic `display:flex` row of 2+ sized columns (`_is_flex_row` / `_flex_row_block`, checked structurally, no marker attribute) is split into independent `_Region`s that each recurse through the normal flow, so a column shrinks-to-fit on its own; a column with no resolvable `flex`/`flex-basis`/`width` hint falls back to the ordinary single column flow (`_column_widths` returns `None`), and a column carrying its own `data-type` keeps its own renderer |
 | `export/pptx_chrome.py` | `ChromeMixin`: per charter chrome (EI, Carbon, medical with `_chrome_medical`, generic): backgrounds, frames, footers, content regions |
@@ -133,8 +134,8 @@ color/spacing that matters is inline `style=""` on the element itself, and layou
 `export/reference_docx.py` returns `None` (no reference.docx generated) since this template has
 no DOCX/PPTX export path by design; a mail is sent as-is. Generic blocks inserted via the
 `+ Bloc` picker land unstyled in a mail document (no class-based charter to inherit from) —
-documented as a known limitation in `skill/types/mail.md`, worked around by cloning an existing
-styled section instead of inserting a blank block. See `skill/types/mail.md` for the full
+documented as a known limitation in `skill/topics/mail.md`, worked around by cloning an existing
+styled section instead of inserting a blank block. See `skill/topics/mail.md` for the full
 mail-safe ruleset.
 
 **2026-08 — `website` template added.** Fourth `data-doc-type` value (`presentation`,
@@ -148,7 +149,7 @@ block-insert toolbar on `isDocument || isWebsite`, but the DOCX button stays gat
 `isDocument` alone. No export code path (`to_pptx.py`, `to_docx.py`) reads `data-doc-type`
 at all, so this is a pure UI-visibility distinction, not an export-format check; a CLI
 `export docx/pptx` invoked directly on a website file is not defended against (out of
-scope, no UI path can trigger it). See `skill/types/website.md` for the full ruleset,
+scope, no UI path can trigger it). See `skill/topics/website.md` for the full ruleset,
 including the click-target-vs-editable-text separation a working `.site-tab` needs.
 
 ## LLM workflow
@@ -171,3 +172,15 @@ modules, so `file://` and the global function names keep working. Load order is 
 `editor-format.js`, `editor-menus.js`, `editor-save.js`, `editor-slides.js`, `editor-blocks.js`,
 `editor-drag.js`, `editor.js`. The top level `let` and `const` of `editor.js` are only touched
 inside functions by the other scripts, never at evaluation time.
+
+2026-11-04 (SPEC-0006, US-0034): progressive skill. `mcp-htmleditor skill` prints the core, `--type <t>`
+one topic, `--all` the core then the 15 topics; `get_skill(type=None)` returns the same text over MCP,
+which makes the tool count eight. This supersedes SPEC-0001 FR-009 (seven operations) without editing
+it. Test seams: `HTMLEDITOR_SKILL_DIR` points at another skill tree, `HTMLEDITOR_ROUTING_SKILL` at
+another routing skill file (the installed `~/.pi/agent/dynamic-skills/html-editor/SKILL.md` wins when
+the variable is unset and the file exists, else the source tree one is checked). Tool line rule
+(DEC-010): a story that registers a tool adds one `- <name>: <description>` line to the `## Tools`
+section of `skill/core.md` in the same story, otherwise `skill-audit` reports it (only the names at the
+start of those lines are read). The skill text never states a tool count. The previous skill is frozen
+in `docs/skill-archive/`; code comments that still name `skill/types/*` or `skill/workflow-*` are
+stale (backlog).
