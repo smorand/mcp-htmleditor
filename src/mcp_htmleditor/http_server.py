@@ -37,6 +37,7 @@ from .request_service import (
     snapshot_to_dict,
 )
 from .state import get_state
+from .textcheck import UNENCODABLE_TEXT, is_utf8_encodable
 from .tracing import trace_span
 from .version import __version__
 
@@ -621,13 +622,7 @@ class SaveRequest:
 
 def _is_text(value: object) -> TypeGuard[str]:
     """A string the record can hold: a lone surrogate (valid in JSON) cannot be written as UTF-8."""
-    if not isinstance(value, str):
-        return False
-    try:
-        value.encode("utf-8")
-    except UnicodeEncodeError:
-        return False
-    return True
+    return isinstance(value, str) and is_utf8_encodable(value)
 
 
 def parse_content_length(raw: str | None) -> int:
@@ -660,6 +655,8 @@ def parse_save_body(body: bytes) -> SaveRequest:
         data = None
     if not isinstance(data, dict) or not isinstance(data.get("html"), str):
         raise SaveRefusal(400, {"error": "Invalid JSON body"})
+    if not is_utf8_encodable(data["html"]):
+        raise SaveRefusal(400, {"error": UNENCODABLE_TEXT})
     return SaveRequest(
         html=data["html"], base_mtime=_number_or_none(data.get("base_mtime")), force=data.get("force") is True
     )

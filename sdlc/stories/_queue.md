@@ -72,7 +72,7 @@
 | US-0067 | SPEC-0008 | large decks and documentation | US-0066 | 2 | landed | story/US-0067-large-decks-and-documentation | story/US-0066-json-output-and-the-render-tool |
 | US-0071 | SPEC-0013 | refuse ambiguous identity and framing headers | main | 2 | done | story/US-0071-refuse-ambiguous-headers | main |
 | US-0072 | SPEC-0013 | validate and cap the layout route length | US-0071 | 2 | done | story/US-0072-validate-and-cap-the-layout-length | story/US-0071-refuse-ambiguous-headers |
-| US-0073 | SPEC-0013 | shared encodability check and the save refusal | US-0072 | 2 | todo | | |
+| US-0073 | SPEC-0013 | shared encodability check and the save refusal | US-0072 | 2 | done | story/US-0073-encodability-check-and-save-refusal | story/US-0072-validate-and-cap-the-layout-length |
 | US-0074 | SPEC-0013 | patch and record writers refuse unencodable text | US-0073 | 2 | todo | | |
 | US-0075 | SPEC-0013 | tracing and logging never break on unencodable text | US-0073 | 2 | todo | | |
 | US-0076 | SPEC-0013 | deck services refuse unencodable path arguments | US-0075 | 2 | todo | | |

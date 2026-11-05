@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .deck import DeckError
+from .textcheck import UNENCODABLE_TEXT
 from .tracing import trace_span
 
 if TYPE_CHECKING:
@@ -54,7 +55,10 @@ def atomic_write(
     and kept only if the write succeeds; without one nothing is kept. Raises ``WriteError`` (a ``DeckError``)
     on failure, with the file and the history untouched and no temporary file left.
     """
-    payload = data.encode("utf-8") if isinstance(data, str) else data
+    try:
+        payload = data.encode("utf-8") if isinstance(data, str) else data
+    except UnicodeEncodeError as exc:
+        raise WriteError(path, UNENCODABLE_TEXT) from exc
     target = Path(path).resolve()
     with trace_span("file.write", {"file.path": str(target), "file.size": len(payload)}):
         try:
