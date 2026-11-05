@@ -11,6 +11,7 @@ declarative diagram in place, used by the browser after a structural edit),
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
@@ -22,11 +23,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, TypeGuard
-from urllib.parse import urlparse, urlsplit
+from typing import Any, TypeGuard, cast
+from urllib.parse import quote, urlparse, urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
+from . import http_deadline
 from .config import PORT_RANGE_END, PORT_RANGE_START, default_host, default_port
 from .fileio import WriteError, atomic_write, is_template_path
 from .request_service import (
@@ -94,6 +96,12 @@ def _static_dir() -> Path:
     return Path(__file__).parent / "static"
 
 
+def content_disposition(filename: str) -> str:
+    """An attachment header any file name fits in: an ASCII ``filename`` fallback plus the RFC 6266 UTF-8 form."""
+    fallback = filename.encode("ascii", "replace").decode("ascii").replace("?", "_").replace('"', "_")
+    return f"attachment; filename=\"{fallback.replace(chr(92), '_')}\"; filename*=UTF-8''{quote(filename, safe='')}"
+
+
 # ---------------------------------------------------------------------------
 # Request handler
 # ---------------------------------------------------------------------------
@@ -105,6 +113,60 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
     # Silence default request logging (MCP context logs are enough)
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         pass
+
+    # ------------------------------------------------------------------
+    # Connection bounds (SPEC-0013/BR-008, BR-009): every wait ends, no request ends with a traceback
+    # ------------------------------------------------------------------
+
+    def setup(self) -> None:
+        super().setup()
+        buffered = cast(io.BufferedReader, self.rfile)  # makefile("rb", rbufsize=-1) is a BufferedReader
+        self.rfile = http_deadline.DeadlineReader(buffered, self.connection)  # type: ignore[assignment]  # duck typed file
+        self.wfile = http_deadline.DeadlineWriter(self.connection)  # type: ignore[assignment]  # duck typed file
+
+    def handle_one_request(self) -> None:
+        """Run one request; a timeout, a client gone or an unexpected failure ends it with the DEC-015 answer."""
+        self._headers_flushed = False
+        try:
+            super().handle_one_request()
+        except http_deadline.RequestTimeout as timeout:
+            self.close_connection = True
+            if timeout.has_bytes:
+                self._answer_timeout()
+        except (http_deadline.ResponseTimeout, BrokenPipeError, ConnectionResetError) as gone:
+            self.close_connection = True
+            logger.debug("Connection closed while answering: %s", type(gone).__name__)
+        except Exception as exc:
+            self.close_connection = True
+            logger.error("Request failed: %s %s: %s", *self._request_names(), type(exc).__name__)
+            if not self._headers_flushed:  # headers only buffered never reached the wire: discard them, answer 500
+                self._answer_best_effort(500, str(exc))
+
+    def flush_headers(self) -> None:
+        self._headers_flushed = True  # set before the write: a partial write may already have put bytes on the wire
+        super().flush_headers()
+
+    def _answer_timeout(self) -> None:
+        logger.warning("Refused %s %s: Request timeout", *self._request_names())
+        self._answer_best_effort(408, "Request timeout")
+
+    def _answer_best_effort(self, status: int, error: str) -> None:
+        """Send ``{"error": error}``; a client already gone or not reading gets nothing more."""
+        if getattr(self, "request_version", self.default_request_version) == self.default_request_version:
+            self.request_version = "HTTP/1.0"  # HTTP/0.9, the default before the request line, has no status line
+        if not hasattr(self, "requestline"):
+            self.requestline = ""  # read by send_response's log_request
+        self._headers_buffer = list[bytes]()
+        try:
+            self._send_json({"error": error}, status=status)
+        except (OSError, http_deadline.ResponseTimeout) as exc:
+            logger.debug("Answer %d not sent: %s", status, type(exc).__name__)
+
+    def _request_names(self) -> tuple[str, str]:
+        """Method and path of the request, ``-`` for each one its line did not give."""
+        command = getattr(self, "command", None)
+        path = getattr(self, "path", None)
+        return (command or "-", urlparse(path).path if command and path else "-")
 
     # ------------------------------------------------------------------
     # Request gate: ambiguous headers (SPEC-0013), then own origin and loopback host names (SPEC-0005)
@@ -294,20 +356,15 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             with trace_span("export.pptx", {"file.path": str(src)}):
                 to_pptx(str(src), tmp_path)
             data = Path(tmp_path).read_bytes()
-            self.send_response(200)
-            self.send_header(
-                "Content-Type",
-                "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            )
-            self.send_header("Content-Disposition", f'attachment; filename="{stem}.pptx"')
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
         except Exception as exc:
             logger.error("PPTX export failed: %s", exc)
             self._send_json({"error": str(exc)}, status=500)
+            return
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+        self._send_attachment(
+            data, "application/vnd.openxmlformats-officedocument.presentationml.presentation", f"{stem}.pptx"
+        )
 
     def _export_docx(self) -> None:
         """Generate a DOCX from the current file and return it as a download."""
@@ -325,17 +382,24 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             with trace_span("export.docx", {"file.path": str(src)}):
                 to_docx(str(src), tmp_path)
             data = Path(tmp_path).read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            self.send_header("Content-Disposition", f'attachment; filename="{stem}.docx"')
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
         except Exception as exc:
             logger.error("DOCX export failed: %s", exc)
             self._send_json({"error": str(exc)}, status=500)
+            return
         finally:
             Path(tmp_path).unlink(missing_ok=True)
+        self._send_attachment(
+            data, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", f"{stem}.docx"
+        )
+
+    def _send_attachment(self, data: bytes, mime: str, filename: str) -> None:
+        """Send an export download; outside the export ``try`` so a client not reading reaches the DEC-015 close."""
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Content-Disposition", content_disposition(filename))
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def _serve_status(self) -> None:
         """Return JSON status for polling."""

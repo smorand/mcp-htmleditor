@@ -77,5 +77,5 @@
 | US-0075 | SPEC-0013 | tracing and logging never break on unencodable text | US-0073 | 2 | done | story/US-0075-tracing-never-breaks-on-unencodable | story/US-0074-patch-and-record-refuse-unencodable-text |
 | US-0076 | SPEC-0013 | deck services refuse unencodable path arguments | US-0075 | 2 | done | story/US-0076-deck-services-refuse-unencodable-paths | story/US-0075-tracing-never-breaks-on-unencodable |
 | US-0077 | SPEC-0013 | record, server and bind address arguments refused | US-0076 | 2 | done | story/US-0077-record-server-and-bind-arguments | story/US-0076-deck-services-refuse-unencodable-paths |
-| US-0078 | SPEC-0013 | wait bound, idle close and send side bound | US-0072 | 1 | todo | | |
+| US-0078 | SPEC-0013 | wait bound, idle close and send side bound | US-0072 | 1 | done | story/US-0078-wait-bound-idle-close-send-bound | story/US-0077-record-server-and-bind-arguments |
 | US-0079 | SPEC-0013 | total request bound, slow suite and documentation | US-0074, US-0077, US-0078 | 2 | todo | | |
