@@ -55,7 +55,7 @@
 | US-0051 | SPEC-0009 | `history` and `restore` tools, patch snapshots, docs and deployment | US-0050, US-0025, US-0041 | 2 | landed | story/US-0051-history-restore-tools-and-deploy-docs | story/US-0050-history-snapshots-and-restore-command |
 | US-0052 | SPEC-0010 | store, queue endpoints and the requests command | US-0051 | 2 | landed | story/US-0052-store-queue-endpoints-requests-command | main |
 | US-0053 | SPEC-0010 | agent lists and completes requests (tools) | US-0052 | 2 | landed | story/US-0053-agent-lists-and-completes-requests | story/US-0052-store-queue-endpoints-requests-command |
-| US-0054 | SPEC-0010 | complete from the command line and the apply workflow | US-0053, US-0025, US-0028 | 2 | todo | | |
+| US-0054 | SPEC-0010 | complete from the command line and the apply workflow | US-0053, US-0025, US-0028 | 2 | landed | story/US-0054-complete-from-the-command-line | story/US-0053-agent-lists-and-completes-requests |
 | US-0055 | SPEC-0010 | ask ai panel and the requests side list | US-0053, US-0017 | 2 | todo | | |
 | US-0056 | SPEC-0010 | live refresh of the side list | US-0055 | 2 | todo | | |
 | US-0057 | SPEC-0010 | write and read the ai review (tool and command) | US-0053 | 2 | todo | | |

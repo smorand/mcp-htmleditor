@@ -387,6 +387,33 @@ def requests_cmd(file: str) -> None:
         click.echo(f"No requests for {file}")
 
 
+@main.command("request-done")
+@click.argument("file")
+@click.argument("request_id")
+def request_done_cmd(file: str, request_id: str) -> None:
+    """Mark request REQUEST_ID of FILE done."""
+    _complete_request(file, request_id, "done", None)
+
+
+@main.command("request-skip")
+@click.argument("file")
+@click.argument("request_id")
+@click.option("--reason", default=None, help="Why the request is skipped (required).")
+def request_skip_cmd(file: str, request_id: str, reason: str | None) -> None:
+    """Mark request REQUEST_ID of FILE skipped, with a reason."""
+    _complete_request(file, request_id, "skipped", reason)
+
+
+def _complete_request(file: str, request_id: str, status: str, reason: str | None) -> None:
+    from .request_service import RequestError, build_request_service, require_file
+
+    try:
+        build_request_service().complete(require_file(file), request_id, status, reason)
+    except RequestError as exc:
+        _request_fail(exc.message)
+    click.echo(f"Request {request_id} marked {status}")
+
+
 def _request_fail(message: str) -> NoReturn:
     click.echo(f"error: {message}", err=True)
     raise SystemExit(1)
