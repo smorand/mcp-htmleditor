@@ -12,7 +12,6 @@ from typing import Final
 
 from ..deck import DeckError
 
-DEFAULT_SCALE: Final = 0.5
 CANVAS_WIDTH: Final = 960
 CANVAS_HEIGHT: Final = 540
 

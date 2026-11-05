@@ -291,12 +291,14 @@ def outline_cmd(file: str) -> None:
 
 @main.command("render")
 @click.argument("file", type=click.Path(dir_okay=False))
+@click.option("--slide", "slide", default=None, help="Id of the slide to render (default: the first).")
+@click.option("--scale", "scale", default=None, help="Scale of the picture, 0.1 to 1 (default: 0.5).")
 @deck_command
-def render_cmd(file: str) -> None:
-    """Write a PNG of the first slide of FILE under the system temporary directory and print where."""
+def render_cmd(file: str, slide: str | None, scale: str | None) -> None:
+    """Write a PNG of a slide of FILE under the system temporary directory and print where."""
     from .render.service import render_deck
 
-    result = render_deck(file)
+    result = render_deck(file, slide=slide, scale=scale)
     click.echo(f"Rendered {result.slide} to {result.path} ({result.width}x{result.height})")
 
 

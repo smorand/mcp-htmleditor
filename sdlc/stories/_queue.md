@@ -64,7 +64,7 @@
 | US-0070 | SPEC-0010 | write_review answers the product message for a non list on the tool | US-0059 | 2 | landed | story/US-0070-write-review-non-list-same-message-on-the-tool | story/US-0059-documentation-and-no-file-next-to-the |
 | US-0060 | SPEC-0008 | optional render extra, install-browser and fixtures | US-0059 | 2 | landed | story/US-0060-optional-render-extra-install-browser | main |
 | US-0061 | SPEC-0008 | render the first slide to a picture | US-0060, US-0035, US-0038 | 2 | landed | story/US-0061-render-the-first-slide-to-a-picture | story/US-0060-optional-render-extra-install-browser |
-| US-0062 | SPEC-0008 | choose a slide and a scale | US-0061 | 2 | todo | | |
+| US-0062 | SPEC-0008 | choose a slide and a scale | US-0061 | 2 | landed | story/US-0062-choose-a-slide-and-a-scale | story/US-0061-render-the-first-slide-to-a-picture |
 | US-0063 | SPEC-0008 | layout report for one slide | US-0062 | 2 | todo | | |
 | US-0064 | SPEC-0008 | report only across the deck | US-0063 | 2 | todo | | |
 | US-0065 | SPEC-0008 | font, script and image problems | US-0064 | 2 | todo | | |

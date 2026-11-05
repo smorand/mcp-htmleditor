@@ -7,8 +7,9 @@ imported inside the functions that need it, so a missing extra gives the install
 from __future__ import annotations
 
 import struct
+from collections.abc import Sequence
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -16,8 +17,9 @@ from bs4.element import Tag
 
 from ..deck import load_deck, slide_id
 from ..tracing import trace_span
-from . import CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_SCALE, RenderError, RenderResult
+from . import CANVAS_HEIGHT, CANVAS_WIDTH, RenderError, RenderResult
 from .files import picture_path, remove_stale, write_picture
+from .options import output_size, parse_scale
 
 if TYPE_CHECKING:
     from playwright.sync_api import Browser, FloatRect, Playwright, ViewportSize
@@ -56,29 +58,22 @@ class SlideRef:
     slide_id: str
 
 
-def render_deck(file: str) -> RenderResult:
-    """Write a PNG of the first slide of ``file`` at the default scale and clean up its stale pictures."""
+def render_deck(file: str, *, slide: str | None = None, scale: str | float | None = None) -> RenderResult:
+    """Write a PNG of ``slide`` (default the first) of ``file`` at ``scale`` and clean up its stale pictures.
+
+    Checks run in this order: scale, file, presentation, browser, slide id.
+    """
+    factor = parse_scale(scale)
+    size = output_size(factor)
     slides = _presentation_slides(file)
-    target = slides[0]
-    width, height = expected_size(str(DEFAULT_SCALE))
     with trace_span(
-        "render.session", {"render.mode": "picture", "render.slides": len(slides), "render.scale": str(DEFAULT_SCALE)}
+        "render.session", {"render.mode": "picture", "render.slides": len(slides), "render.scale": str(factor)}
     ):
-        data = _capture(file, target, (width, height))
+        target, data = _capture(file, slides, slide, factor)
         path = picture_path(file, target.slide_id)
         write_picture(path, data)
         remove_stale(file, [ref.slide_id for ref in slides], path)
-    return RenderResult(path, width, height, target.slide_id)
-
-
-def expected_size(scale_text: str) -> tuple[int, int]:
-    """``round(960 x scale)`` by ``round(540 x scale)``, half up, from the text of the scale."""
-    scale = Decimal(scale_text)
-    return _round_half_up(CANVAS_WIDTH * scale), _round_half_up(CANVAS_HEIGHT * scale)
-
-
-def _round_half_up(value: Decimal) -> int:
-    return int(value.quantize(Decimal(1), rounding=ROUND_HALF_UP))
+    return RenderResult(path, size[0], size[1], target.slide_id)
 
 
 def _presentation_slides(file: str) -> tuple[SlideRef, ...]:
@@ -89,7 +84,7 @@ def _presentation_slides(file: str) -> tuple[SlideRef, ...]:
     return tuple(SlideRef(i, slide_id(tag) or f"slide-{i}") for i, tag in enumerate(tags))
 
 
-def _capture(file: str, target: SlideRef, size: tuple[int, int]) -> bytes:
+def _capture(file: str, slides: Sequence[SlideRef], slide: str | None, scale: Decimal) -> tuple[SlideRef, bytes]:
     try:
         from playwright.sync_api import Error, sync_playwright
     except ImportError:
@@ -98,13 +93,24 @@ def _capture(file: str, target: SlideRef, size: tuple[int, int]) -> bytes:
         with sync_playwright() as driver:
             browser = _launch(driver, Error)
             try:
-                data = _shoot(browser, file, target)
+                target = _choose_slide(slides, slide)
+                data = _shoot(browser, file, target, scale)
             finally:
                 browser.close()
     except Error as exc:
         raise RenderError(f"Rendering failed: {_first_line(exc)}") from exc
-    _check_size(data, size)
-    return data
+    _check_size(data, output_size(scale))
+    return target, data
+
+
+def _choose_slide(slides: Sequence[SlideRef], slide: str | None) -> SlideRef:
+    if slide is None:
+        return slides[0]
+    for ref in slides:
+        if ref.slide_id == slide:
+            return ref
+    valid = ", ".join(ref.slide_id for ref in slides)
+    raise RenderError(f'Unknown slide id "{slide}". Valid ids: {valid}')
 
 
 def _launch(driver: Playwright, error_type: type[Exception]) -> Browser:
@@ -116,9 +122,9 @@ def _launch(driver: Playwright, error_type: type[Exception]) -> Browser:
         raise RenderError(f"Chromium could not start: {_first_line(exc)}") from exc
 
 
-def _shoot(browser: Browser, file: str, target: SlideRef) -> bytes:
+def _shoot(browser: Browser, file: str, target: SlideRef, scale: Decimal) -> bytes:
     viewport: ViewportSize = {"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT}
-    context = browser.new_context(viewport=viewport, device_scale_factor=DEFAULT_SCALE, color_scheme="light")
+    context = browser.new_context(viewport=viewport, device_scale_factor=float(scale), color_scheme="light")
     page = context.new_page()
     page.goto(Path(file).resolve().as_uri(), wait_until="load", timeout=LOAD_TIMEOUT_MS)
     page.evaluate(SHOW_SLIDE_SCRIPT, target.index)
