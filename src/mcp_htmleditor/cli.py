@@ -22,6 +22,7 @@ import click
 
 from .config import get_settings
 from .logging_config import setup_logging
+from .textcheck import UNENCODABLE_BIND_ADDRESS, UNENCODABLE_FILE_NAME, is_utf8_encodable
 from .tracing import configure_tracing
 from .version import __version__
 
@@ -185,6 +186,7 @@ def serve_cmd(file: str, port: int | None, host: str | None, poll: int | None, n
     auto-picked (preferred default, then 7840-7849) so several presentations
     can be served at once without colliding.
     """
+    _require_encodable_file(file)
     settings = get_settings()
     _serve_file(
         file,
@@ -195,6 +197,11 @@ def serve_cmd(file: str, port: int | None, host: str | None, poll: int | None, n
     )
 
 
+def _require_encodable_file(file: str) -> None:
+    if not is_utf8_encodable(file):
+        raise click.ClickException(UNENCODABLE_FILE_NAME)
+
+
 def _serve_file(file: str, port: int | None, poll: int | None, host: str, *, open_browser: bool = True) -> None:
     """Start the HTTP server on a file and block until Ctrl+C.
 
@@ -203,6 +210,9 @@ def _serve_file(file: str, port: int | None, poll: int | None, host: str, *, ope
     binding the same one, so several presentations can be served concurrently.
     """
     import time
+
+    if not is_utf8_encodable(host):
+        raise click.ClickException(UNENCODABLE_BIND_ADDRESS)
 
     from .http_server import start_http_server
     from .state import get_state
@@ -270,6 +280,7 @@ def arch_layout_cmd(file: str, diagram_id: str | None) -> None:
     """
     from .arch_layout import layout_file
 
+    _require_encodable_file(file)
     report = layout_file(file, diagram_id=diagram_id)
     for warning in report.warnings:
         click.echo(f"Attention: {warning}", err=True)

@@ -15,7 +15,7 @@ from typing import Any
 
 from .config import get_settings
 from .request_store import ErrorKind, Record, Request, RequestError, RequestStore, Suggestion
-from .textcheck import UNENCODABLE_TEXT, is_utf8_encodable
+from .textcheck import UNENCODABLE_FILE_NAME, UNENCODABLE_TEXT, is_utf8_encodable
 
 __all__ = [
     "BODY_MAX_BYTES",
@@ -246,7 +246,9 @@ def is_blank(text: str) -> bool:
 
 
 def require_file(file: str) -> Path:
-    """Resolve ``file``, which must exist; the error names it as typed."""
+    """Resolve ``file``, which must exist; the error names it as typed, and refuses a name UTF-8 cannot hold."""
+    if not is_utf8_encodable(file):
+        raise RequestError("invalid", UNENCODABLE_FILE_NAME)
     path = Path(file).resolve()
     if not path.is_file():
         raise RequestError("not_found", f"File not found: {file}")

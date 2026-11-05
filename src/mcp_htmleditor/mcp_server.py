@@ -17,6 +17,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from .arch_layout import layout_file
+from .config import default_host
 from .deck import DeckError
 from .deck.lint import lint_file
 from .deck.patch import apply_patch
@@ -36,6 +37,7 @@ from .render.service import render_deck
 from .request_service import RequestError, build_request_service, request_to_dict, require_file
 from .skill_content import SkillError, build_library
 from .state import get_state
+from .textcheck import UNENCODABLE_BIND_ADDRESS, UNENCODABLE_FILE_NAME, is_utf8_encodable
 from .tracing import trace_span
 
 logger = logging.getLogger(__name__)
@@ -66,10 +68,13 @@ def start_server(file: str, port: int | None = None) -> dict[str, Any]:
         port actually bound, which may differ from the requested one when
         it was auto-picked.
     """
-    abs_file = str(Path(file).resolve())
     state = get_state()
 
-    with trace_span("mcp.start_server", {"file.path": abs_file}) as span:
+    with trace_span("mcp.start_server", {"file.path": _span_path(file)}) as span:
+        _require_encodable_file(file)
+        if not is_utf8_encodable(default_host()):
+            raise ToolError(UNENCODABLE_BIND_ADDRESS)
+        abs_file = str(Path(file).resolve())
         already_running = is_server_running() and state.current_file == abs_file
 
         if already_running:
@@ -131,9 +136,10 @@ def open_file(file: str) -> dict[str, Any]:
     Returns:
         Dict with keys: ok, file.
     """
-    abs_file = str(Path(file).resolve())
     state = get_state()
-    with trace_span("mcp.open_file", {"file.path": abs_file}):
+    with trace_span("mcp.open_file", {"file.path": _span_path(file)}):
+        _require_encodable_file(file)
+        abs_file = str(Path(file).resolve())
         state.set_file(abs_file)
     logger.info("open_file %s", abs_file)
     return {"ok": True, "file": abs_file}
@@ -194,8 +200,9 @@ def layout_arch_diagram(file: str, diagram_id: str | None = None) -> dict[str, A
     Returns:
         Dict with keys: ok, file, diagrams_updated, warnings.
     """
-    abs_file = str(Path(file).resolve())
-    with trace_span("mcp.layout_arch_diagram", {"file.path": abs_file}) as span:
+    with trace_span("mcp.layout_arch_diagram", {"file.path": _span_path(file)}) as span:
+        _require_encodable_file(file)
+        abs_file = str(Path(file).resolve())
         report = layout_file(abs_file, diagram_id=diagram_id)
         span.set_attribute("arch_layout.diagrams_updated", report.diagrams_updated)
         span.set_attribute("arch_layout.warnings", len(report.warnings))
@@ -205,6 +212,16 @@ def layout_arch_diagram(file: str, diagram_id: str | None = None) -> dict[str, A
             "diagrams_updated": report.diagrams_updated,
             "warnings": list(report.warnings),
         }
+
+
+def _require_encodable_file(file: str) -> None:
+    if not is_utf8_encodable(file):
+        raise ToolError(UNENCODABLE_FILE_NAME)
+
+
+def _span_path(file: str) -> str:
+    """The ``file.path`` span attribute: the resolved path, or ``file`` as given when resolving would raise."""
+    return str(Path(file).resolve()) if is_utf8_encodable(file) else file
 
 
 def run_mcp_server() -> None:
@@ -451,7 +468,7 @@ def list_requests(file: str) -> dict[str, Any]:
     Raises:
         ToolError: the file is missing or its request record is unreadable.
     """
-    with trace_span("mcp.list_requests", {"file.path": str(Path(file).resolve())}):
+    with trace_span("mcp.list_requests", {"file.path": _span_path(file)}):
         try:
             path = require_file(file)
             requests = build_request_service().list_requests(path)
@@ -480,7 +497,7 @@ def complete_request(file: str, id: str, status: str, reason: str | None = None)
         ToolError: the file is missing, the id is unknown, the status or reason is invalid, or the request is
             already completed.
     """
-    with trace_span("mcp.complete_request", {"file.path": str(Path(file).resolve())}):
+    with trace_span("mcp.complete_request", {"file.path": _span_path(file)}):
         try:
             path = require_file(file)
             done = build_request_service().complete(path, id, status, reason)
@@ -508,7 +525,7 @@ def write_review(file: str, suggestions: Any) -> dict[str, Any]:
     Raises:
         ToolError: the file is missing, the list is longer than 6 or an item breaks a rule.
     """
-    with trace_span("mcp.write_review", {"file.path": str(Path(file).resolve())}):
+    with trace_span("mcp.write_review", {"file.path": _span_path(file)}):
         try:
             path = require_file(file)
             count = build_request_service().write_review(path, suggestions)
@@ -546,7 +563,7 @@ def render(
         ToolError: the file is missing or not a presentation, the options conflict, the slide id is unknown or
             Chromium is not installed (same messages as the command line).
     """
-    with trace_span("mcp.render", {"file.path": str(Path(file).resolve())}):
+    with trace_span("mcp.render", {"file.path": _span_path(file)}):
         try:
             result = render_deck(
                 file,
