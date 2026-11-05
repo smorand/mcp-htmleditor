@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 from ..export.charters import REGISTRY
+from ..textcheck import UNENCODABLE_FILE_NAME, is_utf8_encodable
 
 DOC_TYPES = ("presentation", "document", "website")
 MEDICAL_MARK = "--med-teal"
@@ -39,8 +40,15 @@ class Deck:
     doc_type: str
 
 
+def require_encodable_path(file: str) -> None:
+    """Raise ``DeckError`` when ``file`` holds text UTF-8 cannot encode (SPEC-0013 BR-018), before any resolving."""
+    if not is_utf8_encodable(file):
+        raise DeckError(UNENCODABLE_FILE_NAME)
+
+
 def load_deck(file: str) -> Deck:
-    """Read and parse ``file``; raise ``DeckError`` when it is missing or not UTF-8."""
+    """Read and parse ``file``; raise ``DeckError`` when it is missing, not UTF-8 or its name is unencodable."""
+    require_encodable_path(file)
     try:
         text = Path(file).read_bytes().decode("utf-8")
     except FileNotFoundError:

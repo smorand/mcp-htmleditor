@@ -20,6 +20,7 @@ from pathlib import Path
 from . import config
 from .deck import DeckError
 from .state import _file_dir, get_state
+from .textcheck import UNENCODABLE_FILE_NAME, is_utf8_encodable
 from .tracing import trace_span
 
 logger = logging.getLogger(__name__)
@@ -146,8 +147,15 @@ def default_store() -> HistoryStore:
     return HistoryStore(config.state_dir(), lambda: get_state().clock())
 
 
+def _require_encodable(file: str) -> None:
+    """Refuse a file name UTF-8 cannot encode before it is resolved (SPEC-0013 BR-018)."""
+    if not is_utf8_encodable(file):
+        raise HistoryError(UNENCODABLE_FILE_NAME)
+
+
 def list_versions(file: str, store: HistoryStore | None = None) -> tuple[Path, list[Version]]:
     """Resolve ``file`` (it must exist) and return it with its versions, newest first."""
+    _require_encodable(file)
     target = Path(file).resolve()
     if not target.is_file():
         raise HistoryError(f"File not found: {file}")
@@ -158,6 +166,7 @@ def restore_version(file: str, version_id: str, store: HistoryStore | None = Non
     """Put version ``version_id`` back (the current content is kept first); return the resolved path."""
     from .fileio import WriteError, atomic_write, is_template_path  # noqa: PLC0415 - fileio imports this module
 
+    _require_encodable(file)
     target = Path(file).resolve()
     if is_template_path(str(target)):
         raise HistoryError(f"Refusing to modify a template: {file}")

@@ -25,7 +25,7 @@ from bs4.element import Comment, NavigableString, Tag
 
 from ..fileio import atomic_write
 from ..textcheck import UNENCODABLE_TEXT, is_utf8_encodable
-from . import Deck, DeckError, deck_from_text, load_deck, slide_id
+from . import Deck, DeckError, deck_from_text, load_deck, require_encodable_path, slide_id
 from .lint import lint_deck
 from .renumber import apply_edits, renumber_edits
 from .scan import Node, large_images, scan
@@ -173,7 +173,8 @@ class Working:
 
 
 def check_target(file: str) -> None:
-    """Refuse a template path, then a missing file, in that order (DEC-014)."""
+    """Refuse an unencodable name, a template path, then a missing file, in that order (DEC-014)."""
+    require_encodable_path(file)
     resolved = tuple(part.casefold() for part in Path(file).resolve().parts)
     for folder in TEMPLATE_FOLDERS:
         if any(resolved[i : i + len(folder)] == folder for i in range(len(resolved))):

@@ -13,7 +13,7 @@ from pathlib import Path
 
 from ..templates import list_templates, template_path
 from ..tracing import trace_span
-from . import DeckError, load_deck
+from . import DeckError, load_deck, require_encodable_path
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ def create_file(template: str, file: str) -> Path:
     keys = [key for key, _ in list_templates()]
     if template not in keys:
         raise DeckError(f'Unknown template "{template}". Valid templates: {", ".join(keys)}')
+    require_encodable_path(file)
     try:
         content = template_path(template).read_bytes()
     except FileNotFoundError as exc:
@@ -74,6 +75,8 @@ def export_file(file: str, fmt: str, output: str) -> ExportOutcome:
     """Export ``file`` to ``fmt`` (``pptx`` or ``docx``, exact lower case) at ``output``."""
     if fmt not in EXPORT_FORMATS:
         raise DeckError(f'Unknown export format "{fmt}". Valid formats: {", ".join(EXPORT_FORMATS)}')
+    require_encodable_path(file)
+    require_encodable_path(output)
     if fmt == "pptx":
         return _export_pptx(file, output)
     return _export_docx(file, output)
