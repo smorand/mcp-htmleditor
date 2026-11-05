@@ -24,6 +24,7 @@
       <button id="btn-insert-block-before" title="Insérer un bloc avant le bloc courant">＋ Bloc avant</button>
       <button id="btn-insert-block-after" title="Insérer un bloc après le bloc courant">Bloc après ＋</button>
     </span>
+    <button id="ask-ai-btn" type="button" aria-expanded="false" aria-controls="ask-ai-panel" title="Queue a change request for the AI agent">Ask AI</button>
     <button id="edit-mode-btn" type="button" aria-pressed="false" title="Activer/désactiver le mode édition">
       <span class="edit-dot"></span>Édition
     </button>
@@ -60,6 +61,21 @@
     <div id="save-error" class="notice" hidden><span class="notice-text"></span></div>
     <div id="connection-lost" class="notice" hidden><span class="notice-text">Connection to the editor server lost</span></div>
   </div>
+
+  <!-- Ask AI panel (US-0055): opened by #ask-ai-btn, never focused by script -->
+  <div id="ask-ai-panel" role="dialog" aria-label="Ask AI" hidden>
+    <label for="ask-ai-text">Describe the change</label>
+    <textarea id="ask-ai-text" rows="5"></textarea>
+    <div id="ask-ai-slide">Slide: none</div>
+    <button type="button" id="ask-ai-queue">Queue request</button>
+    <div id="ask-ai-message" role="status"></div>
+  </div>
+
+  <!-- Requests side list (US-0055): always visible while a file is open -->
+  <aside id="requests-side" aria-label="Requests">
+    <h2 id="requests-heading">Requests (0)</h2>
+    <ul id="requests-list"></ul>
+  </aside>
 
   <!-- Slide-type picker modal -->
   <div id="slide-picker" style="display:none">
@@ -99,6 +115,7 @@
   <script src="/static/editor-slides.js"></script>
   <script src="/static/editor-blocks.js"></script>
   <script src="/static/editor-drag.js"></script>
+  <script src="/static/editor-requests.js"></script>
   <script src="/static/editor.js"></script>
 </body>
 </html>

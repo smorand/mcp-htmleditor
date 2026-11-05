@@ -208,7 +208,7 @@ html, body {
 /* ── Iframe: full remaining height ───────────────────────────── */
 #content-frame {
   display: block;
-  width: 100%;
+  width: calc(100% - 300px); /* the requests side list takes the right 300px */
   height: calc(100vh - 24px);
   border: none;
   background: #ffffff;
@@ -224,9 +224,12 @@ html, body {
    fallback still looks like a real presentation instead of a
    half-fullscreen page with the toolbar still showing. */
 #content-frame:fullscreen {
+  width: 100vw;
   height: 100vh;
 }
 body:has(#content-frame:fullscreen) #toolbar,
+body:has(#content-frame:fullscreen) #requests-side,
+body:has(#content-frame:fullscreen) #ask-ai-panel,
 body:has(#content-frame:fullscreen) #update-overlay {
   display: none !important;
 }
@@ -381,3 +384,90 @@ body:has(#content-frame:fullscreen) #update-overlay {
   font-size: 13px;
 }
 .picker-cancel:hover { background: #e8e8e8; }
+
+/* ── Ask AI button, panel and requests side list (US-0055) ───── */
+#ask-ai-btn {
+  margin-left: auto;
+  height: 20px;
+  padding: 0 10px;
+  background: #262626;
+  color: #c6c6c6;
+  border: 1px solid #393939;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+#ask-ai-btn:hover,
+#ask-ai-btn[aria-expanded="true"] { color: #f4f4f4; border-color: #6f6f6f; }
+#ask-ai-btn + #edit-mode-btn { margin-left: 0; }
+
+#ask-ai-panel[hidden],
+#requests-side[hidden] { display: none; }
+#ask-ai-panel {
+  position: fixed;
+  top: 28px; right: 12px;
+  z-index: 9990;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: #262626;
+  color: #f4f4f4;
+  border: 1px solid #525252;
+  font-size: 12px;
+}
+#ask-ai-panel textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 6px;
+  background: #161616;
+  color: #f4f4f4;
+  border: 1px solid #525252;
+  font-family: inherit;
+  font-size: 12px;
+}
+#ask-ai-slide { color: #c6c6c6; }
+#ask-ai-queue,
+#requests-list .request-delete {
+  height: 22px;
+  padding: 0 10px;
+  background: #393939;
+  color: #f4f4f4;
+  border: 1px solid #6f6f6f;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+#ask-ai-queue { align-self: flex-start; }
+#ask-ai-queue:hover:not(:disabled),
+#requests-list .request-delete:hover { background: #4c4c4c; }
+#ask-ai-queue:disabled { opacity: .5; cursor: not-allowed; }
+#ask-ai-message { min-height: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+/* the save notices sit left of the open panel instead of under it */
+body:has(#ask-ai-panel:not([hidden])) #notices { right: 344px; }
+
+#requests-side {
+  position: fixed;
+  top: var(--requests-top, 25px); right: 0; bottom: 0;
+  width: 300px;
+  overflow-y: auto;
+  padding: 10px;
+  background: #1c1c1c;
+  border-left: 1px solid #2a2a2a;
+  color: #c6c6c6;
+  font-size: 12px;
+}
+#requests-heading { margin-bottom: 8px; color: #f4f4f4; font-size: 12px; font-weight: 600; }
+#requests-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+#requests-list li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #262626;
+  border: 1px solid #393939;
+}
+#requests-list .request-text { line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }

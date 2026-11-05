@@ -31,6 +31,7 @@ EXPECTED_SCRIPT_ORDER = [
     "editor-slides.js",
     "editor-blocks.js",
     "editor-drag.js",
+    "editor-requests.js",
     "editor.js",
 ]
 EDITOR_SCRIPTS = [name for name in EXPECTED_SCRIPT_ORDER if name.startswith("editor")]
@@ -85,7 +86,7 @@ def test_editor_script_is_served_uncached(running_server: str, script: str) -> N
 
 
 def test_editor_html_lists_scripts_in_order(running_server: str) -> None:
-    """DT-012: the served editor page loads the eleven scripts in the DR-006 order."""
+    """DT-012: the served editor page loads the twelve scripts in the DR-006 order."""
     with urllib.request.urlopen(f"{running_server}/") as response:  # noqa: S310 - local test URL
         html = response.read().decode("utf-8")
     assert SCRIPT_TAG.findall(html) == EXPECTED_SCRIPT_ORDER
