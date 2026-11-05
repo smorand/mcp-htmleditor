@@ -493,6 +493,14 @@ Anything else answers `403 {"error": "forbidden host"}`, `403 {"error": "forbidd
 for health checks. Limitation: in a container bound to `0.0.0.0`, a client on the network that sets
 `Host: localhost` is not stopped; do not publish the port beyond the machine (tracked as BL-0019).
 
+The server also protects itself from malformed or stalled requests. A request with a duplicated or
+ambiguous `Host`, `Origin`, `Content-Length` or `Content-Type` header, a `Transfer-Encoding` header or a folded
+header answers `400`. A client that stays silent for 30 seconds while the server waits for the request line, a
+header or the body, or that takes more than 5 minutes to send one request, answers `408 {"error": "Request
+timeout"}` and is disconnected; a connection that never sends a byte is closed without an answer. A
+`/arch-layout` request above 1 MiB answers `413`. Text or file names that cannot be encoded are refused with one
+line instead of a traceback. Every refusal is logged as one `Refused <METHOD> <path>: <error>` warning.
+
 ## Logs and tracing
 
 | File | Content |

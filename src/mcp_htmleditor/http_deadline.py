@@ -1,7 +1,9 @@
 """Time bounds of an editor server connection (SPEC-0013/BR-008, BR-009, BR-022).
 
 Every wait on the connection is bounded: ``WAIT_SECONDS`` without a byte received, or without the client taking a
-chunk of the answer, ends the wait. The constants are read through the module object at each use
+chunk of the answer, ends the wait. Receiving a request is also bounded as a whole: ``TOTAL_SECONDS`` after the first
+byte of the connection the request is cut, however steadily bytes keep coming (the total never covers running the
+request nor sending the answer). The constants are read through the module object at each use
 (``http_deadline.WAIT_SECONDS``) so the test suite can shorten them; production code never reassigns them and they
 are not a setting.
 
@@ -18,7 +20,7 @@ import time
 from collections.abc import Callable
 
 WAIT_SECONDS: float = 30.0
-TOTAL_SECONDS: float = 300.0  # the total bound of a request, applied by US-0079
+TOTAL_SECONDS: float = 300.0
 WRITE_CHUNK_BYTES = 65_536
 
 
@@ -46,7 +48,8 @@ class DeadlineReader:
     ) -> None:
         self._stream = stream
         self._sock = sock
-        self._clock = clock  # the total bound of US-0079 measures time with it
+        self._clock = clock
+        self._started_at: float | None = None  # clock value at the first byte of the connection
         self._timed_out = False
         self.bytes_received = 0
 
@@ -83,7 +86,15 @@ class DeadlineReader:
         return bytes(out)
 
     def _arm(self) -> None:
-        self._sock.settimeout(WAIT_SECONDS)
+        """Bound the next wait by the wait bound and by what is left of the total bound; raise when none is left."""
+        timeout = WAIT_SECONDS
+        if self._started_at is not None:
+            remaining = self._started_at + TOTAL_SECONDS - self._clock()
+            if remaining <= 0:
+                self._timed_out = True
+                raise RequestTimeout(has_bytes=True)
+            timeout = min(timeout, remaining)
+        self._sock.settimeout(timeout)
 
     def _peek(self) -> bytes:
         """The buffered bytes, after at most one ``recv`` bounded by the wait; ``b""`` at end of stream."""
@@ -91,10 +102,13 @@ class DeadlineReader:
             raise RequestTimeout(has_bytes=self.bytes_received > 0)
         self._arm()
         try:
-            return self._stream.peek(1)
+            peeked = self._stream.peek(1)
         except TimeoutError:
             self._timed_out = True
             raise RequestTimeout(has_bytes=self.bytes_received > 0) from None
+        if peeked and self._started_at is None:
+            self._started_at = self._clock()
+        return peeked
 
     def _take(self, count: int) -> bytes:
         """Take ``count`` bytes already in the buffer: never blocks."""

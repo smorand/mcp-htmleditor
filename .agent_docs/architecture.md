@@ -49,6 +49,14 @@ host and origin checks (403). `OPTIONS` (405) and other methods (stdlib 501) sta
 bytes with `tests/http_support.py` (`exchange`, `RawReply`, `json_body`) because a standard client merges
 duplicated headers.
 
+## Time bounds
+
+2026-11-05, SPEC-0013: `http_deadline.py`. `DeadlineReader` waits at most `WAIT_SECONDS` (30 s) per byte and
+cuts the request `TOTAL_SECONDS` (300 s) after the connection's first byte (`_arm`: min of wait and total left;
+injected `clock`), receiving the request only, not running it nor the answer (`DeadlineWriter`: a wait per
+chunk). `RequestTimeout` with bytes answers `408` plus one `Refused` warning, without bytes it closes silently.
+The constants are a test seam, never a setting.
+
 ## Save path
 
 The editor posts the whole document. Before writing, the server strips everything the
@@ -174,10 +182,9 @@ it. Test seams: `HTMLEDITOR_SKILL_DIR` points at another skill tree, `HTMLEDITOR
 another routing skill file (the installed `~/.pi/agent/dynamic-skills/html-editor/SKILL.md` wins when
 the variable is unset and the file exists, else the source tree one is checked). Tool line rule
 (DEC-010): a story that registers a tool adds one `- <name>: <description>` line to the `## Tools`
-section of `skill/core.md` in the same story, otherwise `skill-audit` reports it (only the names at the
-start of those lines are read). The skill text never states a tool count. The previous skill is frozen
-in `docs/skill-archive/`; code comments that still name `skill/types/*` or `skill/workflow-*` are
-stale (backlog).
+section of `skill/core.md` in the same story, otherwise `skill-audit` reports it. The skill text never
+states a tool count. The old skill is frozen in `docs/skill-archive/`; code comments naming
+`skill/types/*` or `skill/workflow-*` are stale (backlog).
 
 ## Deck service layer (`deck/`, `fileio.py`)
 

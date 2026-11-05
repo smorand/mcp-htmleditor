@@ -4,7 +4,21 @@
 make test                 # pytest -v
 make test ARGS='-k pptx'  # subset
 make test-cov             # coverage, gate 80 %
+make test ARGS='-m slow'  # the slow marker, selected on request only
 ```
+
+### Slow marker and short time bounds (2026-11-05, SPEC-0013)
+
+`pyproject.toml` registers the marker `slow` and sets `addopts = "-m 'not slow'"`, so `make test`,
+`make test-cov` and `make check` deselect it; `ARGS='-m slow'` wins because the last `-m` is the one pytest keeps.
+No Makefile target exists for it. `tests/test_http_time_bounds_slow.py` (marked at module level) checks the real
+values: BT-003, BT-015, BT-023 (30 s), BT-022 (50 s), BT-040 (5 min); the whole module takes about 8 minutes.
+The default tests of `tests/test_http_time_bounds.py` shorten the bounds with
+`monkeypatch.setattr(http_deadline, "WAIT_SECONDS", 1.0)` and `"TOTAL_SECONDS"` (4.0): the constants are read
+through the module at each use, which is the only seam; they are not a setting and no user document names them.
+`DeadlineReader` takes a `clock` argument, tests pass a hand moved fake clock for the total bound.
+Raw socket helpers live in `tests/http_support.py` (`exchange`, `RawReply`, `json_body`); `tests/trace_support.py`
+holds the tracing capture helpers.
 
 `make sync` also runs `playwright install chromium` (no-op if already cached) so the
 browser E2E tests below can run without a manual step.
@@ -32,6 +46,8 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_state.py` | EditorState singleton, persistence, mtime |
 | `test_http_helpers.py` | `_strip_editor_artifacts`, `_rebuild_full_html` |
 | `test_http_assets.py` | `data-asset-*` preservation when rebuilding a document |
+| `test_http_time_bounds.py` | SPEC-0013 wait bound, idle close, send side bound, total bound (short bounds, fake clock) |
+| `test_http_time_bounds_slow.py` | `slow` marker: the real 30 s and 5 min bounds |
 | `test_http_health.py` | `/health` payload (status, version, file, port) |
 | `test_templates.py` | Registry and search path resolution |
 | `test_skill_content.py` | `SkillLibrary` (rewritten for SPEC-0006): core, topic, `--all`, unknown topic, missing files, `arch-qa` checklist |

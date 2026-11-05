@@ -14,6 +14,7 @@ Python 3.13+, uv, click, FastMCP, python-pptx, BeautifulSoup4, pandoc for DOCX.
 make sync        # uv sync (deps + dev group)
 make check       # GATE: check-generated + lint + format-check + typecheck + security + test-cov (80 %)
 make test        # pytest -v            (ARGS='-k pptx' for a subset)
+make test ARGS='-m slow'  # real 30 s and 5 min HTTP time bound tests (minutes, not run by make check)
 make install     # uv tool install (with the render extra) + templates + log dir + Pi skill
 make install-browser  # Chromium for `render` (needs the render extra)
 make run ARGS='export pptx in.html out.pptx'

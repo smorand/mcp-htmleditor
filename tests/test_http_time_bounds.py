@@ -9,6 +9,7 @@ the process stderr (where ``socketserver`` prints an unhandled handler error).
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import json
 import logging
@@ -16,6 +17,7 @@ import re
 import socket
 import threading
 import time
+import tomllib
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -242,6 +244,49 @@ def test_time_bounds_bt_046_client_not_reading_is_released(
     )
     assert health.reply().status == 200
     assert folder_state(big.path) == before
+    assert_no_traceback(caplog, capfd)
+
+
+def test_time_bounds_bt_044_trickling_request_is_cut_by_the_total_bound(
+    deck: ServedDeck, caplog: pytest.LogCaptureFixture, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """One byte every 0.6 seconds under a 1 second wait is never silent, yet the 4 second total ends it."""
+    caplog.set_level(logging.WARNING, logger=LOGGER)
+    time.sleep(WAIT + 0.5)  # let the readiness probe of serve_deck end before counting records
+    caplog.clear()
+    before = folder_state(deck.path)
+    head = (
+        f"POST /content HTTP/1.1\r\nHost: 127.0.0.1:{deck.port}\r\nContent-Type: application/json\r\n"
+        "Content-Length: 100\r\n\r\n"
+    ).encode("ascii")
+    conn = open_and_send(deck.port, head)
+    started = conn.last_sent
+    conn.sock.settimeout(0.05)
+    try:
+        while conn.first_byte is None and time.monotonic() - started < TOTAL + 2.5:
+            with contextlib.suppress(OSError):  # the server may already have answered and closed
+                conn.sock.sendall(b"{")
+            time.sleep(0.6)
+            try:
+                chunk = conn.sock.recv(65536)
+            except TimeoutError:
+                continue
+            if chunk:
+                conn.first_byte = time.monotonic()
+                conn.chunks.append(chunk)
+    finally:
+        conn.sock.settimeout(6.0)
+    read_to_end(conn)
+    reply = conn.reply()
+
+    assert reply.status == 408, reply.raw[:300]
+    assert json.loads(reply.body) == TIMEOUT_BODY
+    assert reply.closed
+    assert conn.first_byte is not None
+    assert TOTAL <= conn.first_byte - started <= TOTAL + 2.0
+    warnings = [r.getMessage() for r in caplog.records if r.name == LOGGER and r.levelno >= logging.WARNING]
+    assert warnings == ["Refused POST /content: Request timeout"]
+    assert folder_state(deck.path) == before
     assert_no_traceback(caplog, capfd)
 
 
@@ -582,3 +627,111 @@ def test_time_bounds_content_disposition_fits_any_file_name() -> None:
         "filename*=UTF-8''Pr%C3%A9sentation%20%22%C3%A9t%C3%A9%22%20%F0%9F%98%80.pptx"
     )
     assert content_disposition("deck.pptx") == "attachment; filename=\"deck.pptx\"; filename*=UTF-8''deck.pptx"
+
+
+class FakeClock:
+    """A clock the test moves by hand."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def test_time_bounds_unit_total_bound_cuts_a_request_that_keeps_progressing(
+    pair: tuple[socket.socket, socket.socket], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bytes keep arriving inside the wait, but once TOTAL_SECONDS passed since the first byte the next read ends."""
+    module = deadline_module()
+    monkeypatch.setattr(module, "WAIT_SECONDS", 30.0)
+    monkeypatch.setattr(module, "TOTAL_SECONDS", 300.0)
+    server, client = pair
+    clock = FakeClock()
+    reader = module.DeadlineReader(server.makefile("rb"), server, clock)
+    client.sendall(b"abc")
+    assert reader.read(1) == b"a"
+    clock.now = 299.9
+    assert reader.read(1) == b"b"
+    clock.now = 300.0
+    with pytest.raises(module.RequestTimeout) as cut:
+        reader.read(1)  # "c" is already buffered: the bound still applies
+    assert cut.value.has_bytes is True
+    with pytest.raises(module.RequestTimeout):
+        reader.readline()
+
+
+def test_time_bounds_unit_total_bound_shortens_the_wait(
+    pair: tuple[socket.socket, socket.socket], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With 0.3 seconds left of the total, a silent peer is cut after 0.3 seconds, not after the 30 second wait."""
+    module = deadline_module()
+    monkeypatch.setattr(module, "WAIT_SECONDS", 30.0)
+    monkeypatch.setattr(module, "TOTAL_SECONDS", 300.0)
+    server, client = pair
+    clock = FakeClock()
+    reader = module.DeadlineReader(server.makefile("rb"), server, clock)
+    client.sendall(b"x")
+    assert reader.read(1) == b"x"
+    clock.now = 299.7
+    started = time.monotonic()
+    with pytest.raises(module.RequestTimeout) as cut:
+        reader.read(1)
+    assert cut.value.has_bytes is True
+    assert time.monotonic() - started < 2.0
+
+
+def test_time_bounds_unit_total_bound_does_not_apply_before_the_first_byte(
+    pair: tuple[socket.socket, socket.socket], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The total is measured from the first byte: an idle connection is only ever cut by the wait."""
+    module = deadline_module()
+    monkeypatch.setattr(module, "WAIT_SECONDS", 0.2)
+    monkeypatch.setattr(module, "TOTAL_SECONDS", 1.0)
+    server, _client = pair
+    clock = FakeClock()
+    clock.now = 10_000.0
+    reader = module.DeadlineReader(server.makefile("rb"), server, clock)
+    with pytest.raises(module.RequestTimeout) as idle:
+        reader.readline()
+    assert idle.value.has_bytes is False
+
+
+def test_time_bounds_unit_total_bound_is_measured_from_the_first_byte_not_the_line(
+    pair: tuple[socket.socket, socket.socket], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The first byte starts the clock even when it is not yet a complete request line."""
+    module = deadline_module()
+    monkeypatch.setattr(module, "WAIT_SECONDS", 30.0)
+    monkeypatch.setattr(module, "TOTAL_SECONDS", 300.0)
+    server, client = pair
+    clock = FakeClock()
+    clock.now = 50.0
+    reader = module.DeadlineReader(server.makefile("rb"), server, clock)
+    client.sendall(b"GE")
+    assert reader.read(2) == b"GE"
+    clock.now = 350.0  # 300 seconds after the first byte
+    client.sendall(b"T / HTTP/1.1\r\n")
+    with pytest.raises(module.RequestTimeout):
+        reader.readline()
+
+
+def test_time_bounds_unit_writer_ignores_the_total_bound(
+    pair: tuple[socket.socket, socket.socket], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The total covers receiving the request: sending the answer is bounded by the wait per chunk only."""
+    module = deadline_module()
+    monkeypatch.setattr(module, "TOTAL_SECONDS", 0.0)
+    server, client = pair
+    assert module.DeadlineWriter(server).write(b"answer") == 6
+    assert client.recv(16) == b"answer"
+
+
+def test_time_bounds_slow_marker_is_registered_and_deselected_by_default() -> None:
+    """DEC-017: the real value tests are marked slow, the marker is registered and the default run deselects it."""
+    root = Path(__file__).resolve().parent.parent
+    options = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["pytest"]["ini_options"]
+    assert any(marker.startswith("slow:") for marker in options["markers"])
+    assert options["addopts"] == "-m 'not slow'"
+    slow = importlib.import_module("tests.test_http_time_bounds_slow")
+    assert slow.pytestmark.name == "slow"
