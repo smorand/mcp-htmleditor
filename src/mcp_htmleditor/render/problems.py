@@ -13,6 +13,8 @@ from . import CANVAS_HEIGHT, RenderProblem
 
 KIND_ORDER: Final = ("script", "image", "font", "overflow", "clipped")
 NO_SLIDE: Final = "-"
+DATA_PREFIX: Final = "data:"
+DATA_SOURCE_MAX_CHARS: Final = 40
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +41,13 @@ def build_problems(
     return sorted(found, key=lambda p: (_slide_rank(p.slide, rank), KIND_ORDER.index(p.kind)))
 
 
+def shorten_source(src: str) -> str:
+    """A data address longer than 40 characters gives its first 40 plus ``...``; anything else is kept."""
+    if src.startswith(DATA_PREFIX) and len(src) > DATA_SOURCE_MAX_CHARS:
+        return f"{src[:DATA_SOURCE_MAX_CHARS]}..."
+    return src
+
+
 def format_line(problem: RenderProblem) -> str:
     """``<kind> <slide>: <message>``."""
     return f"{problem.kind} {problem.slide}: {problem.message}"
@@ -52,7 +61,7 @@ def final_line(count: int) -> str:
 
 
 def _slide_problems(raw: RawSlide) -> list[RenderProblem]:
-    problems: list[RenderProblem] = []
+    problems = [RenderProblem("font", raw.slide, f'"{name}" is not available, fallback used') for name in raw.fonts]
     if raw.content > CANVAS_HEIGHT:
         message = f"content is {raw.content}px tall, the slide is {CANVAS_HEIGHT}px"
         problems.append(RenderProblem("overflow", raw.slide, message))

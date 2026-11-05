@@ -47,3 +47,27 @@ Unknown id: `Unknown slide id "slide-9". Valid ids: slide-0, slide-1, ...` (all 
   `error: ` and status 1. Check order: conflict, scale, file, presentation, browser, unknown slide id.
 - DECK-MED in `tests/render_support.py` adds a height class (`h-md`) to its figures: the medical stylesheet needs one,
   `deck_med()` has none and would report `overflow` on every slide.
+
+## 2026-11-05 US-0065: font, script and image problems
+
+- Order of every report: slide `-`, slide document order, kind `script`, `image`, `font`, `overflow`, `clipped`, then
+  collection order (`build_problems(slides, images, errors)` in `problems.py`; the sort is stable).
+- `font`: `MEASURE_SLIDE_JS` reads the computed `font-family` of the slide and of each descendant with a direct non
+  blank text node (script, style, noscript and template are skipped). Names are split with quotes removed;
+  `sans-serif`, `serif`, `monospace`, `system-ui` are ignored. A list is reported when none of its names is installed,
+  naming the first one; one line per name per slide. Installed = after `await document.fonts.load('72px "name"')`
+  the canvas width of `"name",base` differs from `base` alone for one of monospace, serif, sans-serif.
+  `document.fonts.check` is useless here: it answers true for a name that does not exist.
+  `fonts.load` rejects when the page declares an `@font-face` for that name whose source fails (missing file, invalid
+  data); the rejection is caught and the name counts as not installed, so it never aborts the run.
+- The EI stack ends with Arial and the medical stack with Arial or Helvetica, so DECK-EI and DECK-MED stay clean on a
+  machine without Segoe UI or Calibri (checked on macOS: `report: OK` for both).
+- `script`: `page.on("pageerror")` is registered before `goto`; `PageSignals.current` is `-` until a slide is shown and
+  the slide id from the start of each measure. Text is `Error.name: Error.message`. Identical (slide, text) pairs are
+  kept once. A late error is attributed to the slide still shown, so a test observer must throw only when its slide
+  is active (leaving a slide changes the class again).
+- `--report` keeps the errors of `-` and of the rendered slide, and only the images of the rendered slide.
+- `image`: `IMAGES_JS` runs once after `load`: an `img` inside a slide with a `src` attribute, `complete` and
+  `naturalWidth` 0. The `src` is printed as written; a data address longer than 40 characters is cut to 40 plus `...`
+  (`shorten_source`). `requestfailed` is not used. A viewBox only SVG has a non zero `naturalWidth`, but without
+  width and height it is drawn very large and gives an `overflow`, so give it a size in tests.
