@@ -73,6 +73,7 @@ _EXTENSION_ATTR_PREFIXES = ("_msthash", "_msttexthash", "_msthidden", "data-gr-"
 # A save body above 50 MiB is refused unread. A length of more than 10 significant digits is already above
 # the cap, so it never reaches ``int()``.
 MAX_SAVE_BYTES = 52_428_800
+LAYOUT_BODY_MAX_BYTES = BODY_MAX_BYTES
 MAX_LENGTH_DIGITS = 10
 
 # Headers read once to decide a request; a repeated line is refused, in this order (SPEC-0013/BR-001).
@@ -450,15 +451,19 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
     def _read_request_body(self) -> bytes:
         content_type = self.headers.get("Content-Type", "")
         try:
-            length = parse_content_length(self.headers.get("Content-Length"))
-            if length > BODY_MAX_BYTES:
-                raise SaveRefusal(413, {"error": "Request too large"})
+            body = self._read_declared_body(BODY_MAX_BYTES)
         except SaveRefusal:
             check_content_type(content_type)  # a wrong content type outranks a bad length
             raise
-        body = self.rfile.read(length)
         check_content_type(content_type)
         return body
+
+    def _read_declared_body(self, limit: int) -> bytes:
+        """Raise SaveRefusal 400 (not ASCII digits) or 413 (above ``limit``, before reading); else read the body."""
+        length = parse_content_length(self.headers.get("Content-Length"))
+        if length > limit:
+            raise SaveRefusal(413, {"error": "Request too large"})
+        return self.rfile.read(length)
 
     def _invalid_request_body(self) -> None:
         self._send_json({"ok": False, "error": "Invalid request body"}, status=400)
@@ -508,9 +513,11 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._send_json({"error": "No file loaded"}, status=404)
             return
 
-        length = int(self.headers.get("Content-Length", 0))
-        if length:
-            self.rfile.read(length)  # body is unused, drain it so the connection stays clean
+        try:
+            self._read_declared_body(LAYOUT_BODY_MAX_BYTES)  # body is unused, drain it so the connection stays clean
+        except SaveRefusal as refusal:
+            self._refuse_request(refusal.status, refusal.payload["error"])
+            return
 
         target = Path(state.current_file)
         with trace_span("mcp.layout_arch_diagram", {"file.path": str(target)}) as span:

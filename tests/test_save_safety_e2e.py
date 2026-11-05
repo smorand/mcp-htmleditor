@@ -267,7 +267,7 @@ def test_length_is_checked_before_the_content_type(served_deck: ServedDeck) -> N
 
 
 def test_length_checks_apply_to_the_save_endpoint_only(served_deck: ServedDeck) -> None:
-    """The arch-layout endpoint keeps its own reading of the body."""
+    """The arch-layout endpoint validates its own length (US-0072) and ignores the body and its content type."""
     assert served_deck.request("POST", "/arch-layout", b"{}").status == 200
 
 
