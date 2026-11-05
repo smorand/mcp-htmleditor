@@ -75,6 +75,9 @@ _EXTENSION_ATTR_PREFIXES = ("_msthash", "_msttexthash", "_msthidden", "data-gr-"
 MAX_SAVE_BYTES = 52_428_800
 MAX_LENGTH_DIGITS = 10
 
+# Headers read once to decide a request; a repeated line is refused, in this order (SPEC-0013/BR-001).
+_SINGLE_HEADERS = ("Host", "Origin", "Content-Length", "Content-Type")
+
 # RequestError.kind to HTTP status (SPEC-0010).
 REQUEST_STATUS = {"invalid": 400, "conflict": 409, "not_found": 404, "storage": 500}
 
@@ -102,8 +105,33 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         pass
 
     # ------------------------------------------------------------------
-    # Request gate (SPEC-0005): own origin, loopback host names only
+    # Request gate: ambiguous headers (SPEC-0013), then own origin and loopback host names (SPEC-0005)
     # ------------------------------------------------------------------
+
+    def _refuse_ambiguous_headers(self) -> bool:
+        """Answer 400 and return True when the header block can be read two ways (SPEC-0013/BR-001 to BR-005).
+
+        Checked in this order: a folded line, a repeated ``Host``, ``Origin``, ``Content-Length`` or
+        ``Content-Type``, any ``Transfer-Encoding``, a ``Host`` carrying userinfo. The body is never read here.
+        """
+        if any("\r" in value or "\n" in value for _, value in self.headers.items()):
+            self._refuse_request(400, "Invalid header folding")
+            return True
+        for name in _SINGLE_HEADERS:
+            if len(self.headers.get_all(name) or []) > 1:
+                self._refuse_request(400, f"Duplicate {name} header")
+                return True
+        if "Transfer-Encoding" in self.headers:
+            self._refuse_request(400, "Transfer-Encoding not supported")
+            return True
+        if "@" in self.headers.get("Host", ""):
+            self._refuse_request(400, "Invalid Host header")
+            return True
+        return False
+
+    def _refuse_request(self, status: int, error: str) -> None:
+        logger.warning("Refused %s %s: %s", self.command, urlparse(self.path).path, error)
+        self._send_json({"error": error}, status=status)
 
     def _refuse_untrusted_request(self) -> bool:
         """Answer 403 and return True when the request comes from elsewhere.
@@ -113,6 +141,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         through a trusted host name and, when they carry an Origin, coming
         from that same origin are allowed through.
         """
+        if self._refuse_ambiguous_headers():
+            return True
         host = self.headers.get("Host", "")
         host_name, host_port = _split_host(host)
         if host_name not in _trusted_host_names(getattr(self.server, "bind_host", "")):

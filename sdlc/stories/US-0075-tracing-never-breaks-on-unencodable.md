@@ -61,14 +61,19 @@ message passed through `replace_unencodable`, never `exc_info`.
 # tests/trace_support.py (new)
 @dataclass(frozen=True)
 class TracedRun:
-    ok: bool                 # tool outcome: True with data, False with the tool error text
+    ok: bool  # tool outcome: True with data, False with the tool error text
     data: Any
     stdout: str
     stderr: str
-    trace_lines: list[str]   # the local trace file read as strict UTF-8, split in lines ([] with OTLP)
+    trace_lines: list[str]  # the local trace file read as strict UTF-8, split in lines ([] with OTLP)
 
-def run_traced_tool(tmp_path: Path, tool: str, arguments: dict[str, Any], *, env: dict[str, str] | None = None) -> TracedRun: ...
-def run_traced_server(tmp_path: Path, served: Path, raw_requests: list[bytes]) -> TracedRun: ...  # starts the editor server in the subprocess (BT-048)
+
+def run_traced_tool(
+    tmp_path: Path, tool: str, arguments: dict[str, Any], *, env: dict[str, str] | None = None
+) -> TracedRun: ...
+def run_traced_server(
+    tmp_path: Path, served: Path, raw_requests: list[bytes]
+) -> TracedRun: ...  # starts the editor server in the subprocess (BT-048)
 ```
 Arguments holding lone surrogates are passed to the subprocess as JSON with `ensure_ascii=True` (escapes survive).
 

@@ -52,7 +52,7 @@ and no `PWNED` (red today: `200` and `PWNED` written).
 ### Contracts
 ```python
 # src/mcp_htmleditor/http_server.py, class _EditorHandler
-def _refuse_ambiguous_headers(self) -> bool: ...   # True when it answered
+def _refuse_ambiguous_headers(self) -> bool: ...  # True when it answered
 def _refuse_request(self, status: int, error: str) -> None:
     logger.warning("Refused %s %s: %s", self.command, urlparse(self.path).path, error)
     self._send_json({"error": error}, status=status)

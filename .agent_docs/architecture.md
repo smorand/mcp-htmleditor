@@ -37,6 +37,18 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 `# pragma: no cover`; the pure helpers next to them (`_strip_editor_artifacts`,
 `_rebuild_full_html`, `health_payload`) are fully tested.
 
+## Request gate
+
+2026-11-05, SPEC-0013 (US-0071): `_refuse_untrusted_request` runs on every `GET` except `/health` and every
+`POST`, unknown paths included, and starts with `_refuse_ambiguous_headers`. Its order is fixed: a folded header
+value (`\r` or `\n` inside, the stdlib keeps the continuation line), a repeated `Host`, `Origin`,
+`Content-Length` or `Content-Type` (first repeated name in that order, even when the lines are identical), any
+`Transfer-Encoding`, a `Host` holding `@`. Each answers `400` through `_refuse_request`, logs one warning
+`Refused <METHOD> <path>: <error>` (no header value, no body) and reads no body. Only then come the SPEC-0005
+host and origin checks (403). `OPTIONS` (405) and other methods (stdlib 501) stay outside the gate. Tests send raw
+bytes with `tests/http_support.py` (`exchange`, `RawReply`, `json_body`) because a standard client merges
+duplicated headers.
+
 ## Save path
 
 The editor posts the whole document. Before writing, the server strips everything the

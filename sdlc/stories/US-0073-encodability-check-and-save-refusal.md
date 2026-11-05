@@ -52,8 +52,10 @@ UNENCODABLE_FILE_NAME = "File name cannot be encoded"
 UNENCODABLE_BIND_ADDRESS = "Bind address cannot be encoded"
 REPLACEMENT_CHARACTER = "\ufffd"
 
+
 def is_utf8_encodable(text: str) -> bool:
     """True when text.encode("utf-8") (strict) succeeds; False for U+D800..U+DFFF, U+DC80..U+DCFF included."""
+
 
 def replace_unencodable(text: str) -> str:
     """Each code point U+D800..U+DFFF replaced by U+FFFD; encodable text returned unchanged."""

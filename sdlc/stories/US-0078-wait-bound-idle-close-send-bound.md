@@ -59,24 +59,32 @@ else receives, between 1 and 3 seconds after its last byte, `408 {"error": "Requ
 ```python
 # src/mcp_htmleditor/http_deadline.py (new; unit tested, no pragma: no cover)
 WAIT_SECONDS: float = 30.0
-TOTAL_SECONDS: float = 300.0          # used by US-0079
+TOTAL_SECONDS: float = 300.0  # used by US-0079
 WRITE_CHUNK_BYTES = 65_536
+
 
 class RequestTimeout(Exception):
     def __init__(self, *, has_bytes: bool) -> None: ...
+
     has_bytes: bool
+
 
 class ResponseTimeout(Exception): ...
 
+
 class DeadlineReader:
-    def __init__(self, stream: io.BufferedIOBase, sock: socket.socket,
-                 clock: Callable[[], float] = time.monotonic) -> None: ...
+    def __init__(
+        self, stream: io.BufferedIOBase, sock: socket.socket, clock: Callable[[], float] = time.monotonic
+    ) -> None: ...
+
     bytes_received: int
+
     def readline(self, limit: int = -1) -> bytes: ...
     def read(self, size: int = -1) -> bytes: ...
     def close(self) -> None: ...
     @property
     def closed(self) -> bool: ...
+
 
 class DeadlineWriter:
     def __init__(self, sock: socket.socket) -> None: ...

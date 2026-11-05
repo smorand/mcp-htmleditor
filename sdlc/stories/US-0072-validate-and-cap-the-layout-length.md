@@ -42,7 +42,8 @@ within 2 seconds `400 {"error": "Invalid Content-Length"}`, `deck.html` is uncha
 ### Contracts
 ```python
 # src/mcp_htmleditor/http_server.py
-LAYOUT_BODY_MAX_BYTES = BODY_MAX_BYTES   # 1_048_576, module constant next to MAX_SAVE_BYTES
+LAYOUT_BODY_MAX_BYTES = BODY_MAX_BYTES  # 1_048_576, module constant next to MAX_SAVE_BYTES
+
 
 class _EditorHandler:
     def _read_declared_body(self, limit: int) -> bytes:

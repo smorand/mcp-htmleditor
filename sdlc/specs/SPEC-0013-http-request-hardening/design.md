@@ -136,39 +136,51 @@ UNENCODABLE_FILE_NAME = "File name cannot be encoded"
 UNENCODABLE_BIND_ADDRESS = "Bind address cannot be encoded"
 REPLACEMENT_CHARACTER = "\ufffd"
 
-def is_utf8_encodable(text: str) -> bool: ...
+
+def is_utf8_encodable(text: str) -> bool:
+    ...
     # True when text.encode("utf-8") (strict) succeeds: False for any code point U+D800..U+DFFF,
     # U+DC80..U+DCFF (an undecodable command line byte) included.
-def replace_unencodable(text: str) -> str: ...
+
+
+def replace_unencodable(text: str) -> str:
+    ...
     # each code point U+D800..U+DFFF replaced by U+FFFD; any other text returned unchanged (same object when
     # encodable).
 ```
 
 ```python
 # src/mcp_htmleditor/http_deadline.py (new)
-WAIT_SECONDS: float = 30.0       # BR-008; read as http_deadline.WAIT_SECONDS at each use (test seam, BR-022)
-TOTAL_SECONDS: float = 300.0     # BR-020; same
+WAIT_SECONDS: float = 30.0  # BR-008; read as http_deadline.WAIT_SECONDS at each use (test seam, BR-022)
+TOTAL_SECONDS: float = 300.0  # BR-020; same
 WRITE_CHUNK_BYTES = 65_536
 
-class RequestTimeout(Exception):   # NOT a TimeoutError subclass: the stdlib swallows TimeoutError (http/server.py:464)
-    has_bytes: bool                # False when the connection never sent a byte (silent close, no log)
+
+class RequestTimeout(Exception):  # NOT a TimeoutError subclass: the stdlib swallows TimeoutError (http/server.py:464)
+    has_bytes: bool  # False when the connection never sent a byte (silent close, no log)
+
 
 class ResponseTimeout(Exception): ...
 
+
 class DeadlineReader:
-    def __init__(self, stream: io.BufferedIOBase, sock: socket.socket,
-                 clock: Callable[[], float] = time.monotonic) -> None: ...
+    def __init__(
+        self, stream: io.BufferedIOBase, sock: socket.socket, clock: Callable[[], float] = time.monotonic
+    ) -> None: ...
+
     bytes_received: int
-    def readline(self, limit: int = -1) -> bytes: ...   # used by the stdlib request line and parse_headers
-    def read(self, size: int = -1) -> bytes: ...        # used by the routes for the body; size >= 0 only
+
+    def readline(self, limit: int = -1) -> bytes: ...  # used by the stdlib request line and parse_headers
+    def read(self, size: int = -1) -> bytes: ...  # used by the routes for the body; size >= 0 only
     def close(self) -> None: ...
     @property
     def closed(self) -> bool: ...
 
+
 class DeadlineWriter:
     def __init__(self, sock: socket.socket) -> None: ...
-    def write(self, data: bytes) -> int: ...            # chunks of WRITE_CHUNK_BYTES, settimeout(WAIT_SECONDS) before each
-    def flush(self) -> None: ...                        # no op
+    def write(self, data: bytes) -> int: ...  # chunks of WRITE_CHUNK_BYTES, settimeout(WAIT_SECONDS) before each
+    def flush(self) -> None: ...  # no op
     def close(self) -> None: ...
     @property
     def closed(self) -> bool: ...
