@@ -293,13 +293,22 @@ def outline_cmd(file: str) -> None:
 @click.argument("file", type=click.Path(dir_okay=False))
 @click.option("--slide", "slide", default=None, help="Id of the slide to render (default: the first).")
 @click.option("--scale", "scale", default=None, help="Scale of the picture, 0.1 to 1 (default: 0.5).")
+@click.option("--report", "report", is_flag=True, help="Also print the layout problems of the slide; status 1 if any.")
 @deck_command
-def render_cmd(file: str, slide: str | None, scale: str | None) -> None:
+def render_cmd(file: str, slide: str | None, scale: str | None, report: bool) -> None:
     """Write a PNG of a slide of FILE under the system temporary directory and print where."""
+    from .render.problems import final_line, format_line
     from .render.service import render_deck
 
-    result = render_deck(file, slide=slide, scale=scale)
+    result = render_deck(file, slide=slide, scale=scale, report=report)
     click.echo(f"Rendered {result.slide} to {result.path} ({result.width}x{result.height})")
+    if not report:
+        return
+    for problem in result.problems:
+        click.echo(format_line(problem))
+    click.echo(final_line(len(result.problems)))
+    if result.problems:
+        raise SystemExit(1)
 
 
 @main.command("get-slide")

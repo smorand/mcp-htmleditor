@@ -20,9 +20,11 @@ from ..tracing import trace_span
 from . import CANVAS_HEIGHT, CANVAS_WIDTH, RenderError, RenderResult
 from .files import picture_path, remove_stale, write_picture
 from .options import output_size, parse_scale
+from .problems import RawSlide, build_problems
+from .scripts import MEASURE_SLIDE_JS, SHOW_SLIDE_JS
 
 if TYPE_CHECKING:
-    from playwright.sync_api import Browser, FloatRect, Playwright, ViewportSize
+    from playwright.sync_api import Browser, FloatRect, Page, Playwright, ViewportSize
 
 INSTALL_MESSAGE: Final = "Rendering needs Chromium. Install it with: make install-browser"
 MISSING_EXECUTABLE: Final = "Executable doesn't exist"
@@ -34,21 +36,6 @@ PNG_SIGNATURE: Final = b"\x89PNG\r\n\x1a\n"
 IHDR_SIZE_OFFSET: Final = 16
 SLIDE_SELECTOR: Final = '[data-type="slide"]'
 
-# Shows the slide at index ``idx`` alone, in the live page; the file is never written.
-SHOW_SLIDE_SCRIPT: Final = """async (idx) => {
-  const slides = Array.from(document.querySelectorAll('[data-type="slide"]'));
-  slides.forEach((slide, i) => {
-    slide.classList.toggle('active', i === idx);
-    if (i !== idx) slide.style.setProperty('display', 'none', 'important');
-  });
-  const target = slides[idx];
-  if (getComputedStyle(target).display === 'none') target.style.setProperty('display', 'block');
-  document.getAnimations().forEach((animation) => {
-    try { animation.finish(); } catch (error) { animation.cancel(); }
-  });
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-}"""
-
 
 @dataclass(frozen=True, slots=True)
 class SlideRef:
@@ -58,8 +45,12 @@ class SlideRef:
     slide_id: str
 
 
-def render_deck(file: str, *, slide: str | None = None, scale: str | float | None = None) -> RenderResult:
+def render_deck(
+    file: str, *, slide: str | None = None, scale: str | float | None = None, report: bool = False
+) -> RenderResult:
     """Write a PNG of ``slide`` (default the first) of ``file`` at ``scale`` and clean up its stale pictures.
+
+    With ``report`` the rendered slide is also measured and its layout problems are returned.
 
     Checks run in this order: scale, file, presentation, browser, slide id.
     """
@@ -67,13 +58,15 @@ def render_deck(file: str, *, slide: str | None = None, scale: str | float | Non
     size = output_size(factor)
     slides = _presentation_slides(file)
     with trace_span(
-        "render.session", {"render.mode": "picture", "render.slides": len(slides), "render.scale": str(factor)}
+        "render.session",
+        {"render.mode": "report" if report else "picture", "render.slides": len(slides), "render.scale": str(factor)},
     ):
-        target, data = _capture(file, slides, slide, factor)
+        target, data, raw = _capture(file, slides, slide, factor, report)
         path = picture_path(file, target.slide_id)
         write_picture(path, data)
         remove_stale(file, [ref.slide_id for ref in slides], path)
-    return RenderResult(path, size[0], size[1], target.slide_id)
+    problems = tuple(build_problems([raw])) if raw else ()
+    return RenderResult(path, size[0], size[1], target.slide_id, problems)
 
 
 def _presentation_slides(file: str) -> tuple[SlideRef, ...]:
@@ -84,7 +77,9 @@ def _presentation_slides(file: str) -> tuple[SlideRef, ...]:
     return tuple(SlideRef(i, slide_id(tag) or f"slide-{i}") for i, tag in enumerate(tags))
 
 
-def _capture(file: str, slides: Sequence[SlideRef], slide: str | None, scale: Decimal) -> tuple[SlideRef, bytes]:
+def _capture(
+    file: str, slides: Sequence[SlideRef], slide: str | None, scale: Decimal, report: bool
+) -> tuple[SlideRef, bytes, RawSlide | None]:
     try:
         from playwright.sync_api import Error, sync_playwright
     except ImportError:
@@ -94,13 +89,13 @@ def _capture(file: str, slides: Sequence[SlideRef], slide: str | None, scale: De
             browser = _launch(driver, Error)
             try:
                 target = _choose_slide(slides, slide)
-                data = _shoot(browser, file, target, scale)
+                data, raw = _shoot(browser, file, target, scale, report)
             finally:
                 browser.close()
     except Error as exc:
         raise RenderError(f"Rendering failed: {_first_line(exc)}") from exc
     _check_size(data, output_size(scale))
-    return target, data
+    return target, data, raw
 
 
 def _choose_slide(slides: Sequence[SlideRef], slide: str | None) -> SlideRef:
@@ -122,17 +117,28 @@ def _launch(driver: Playwright, error_type: type[Exception]) -> Browser:
         raise RenderError(f"Chromium could not start: {_first_line(exc)}") from exc
 
 
-def _shoot(browser: Browser, file: str, target: SlideRef, scale: Decimal) -> bytes:
+def _shoot(
+    browser: Browser, file: str, target: SlideRef, scale: Decimal, report: bool
+) -> tuple[bytes, RawSlide | None]:
     viewport: ViewportSize = {"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT}
     context = browser.new_context(viewport=viewport, device_scale_factor=float(scale), color_scheme="light")
     page = context.new_page()
     page.goto(Path(file).resolve().as_uri(), wait_until="load", timeout=LOAD_TIMEOUT_MS)
-    page.evaluate(SHOW_SLIDE_SCRIPT, target.index)
+    raw = _measure(page, target) if report else None
+    if raw is None:
+        page.evaluate(SHOW_SLIDE_JS, target.index)
     box = page.locator(SLIDE_SELECTOR).nth(target.index).bounding_box()
     if box is None:
         raise RenderError("Rendering failed: the slide has no box")
     clip: FloatRect = {"x": round(box["x"]), "y": round(box["y"]), "width": CANVAS_WIDTH, "height": CANVAS_HEIGHT}
-    return page.screenshot(clip=clip, animations="disabled")
+    return page.screenshot(clip=clip, animations="disabled"), raw
+
+
+def _measure(page: Page, target: SlideRef) -> RawSlide:
+    measured = page.evaluate(MEASURE_SLIDE_JS, target.index)
+    return RawSlide(
+        target.slide_id, target.index, int(measured["content"]), tuple(measured["clipped"]), tuple(measured["fonts"])
+    )
 
 
 def _check_size(data: bytes, expected: tuple[int, int]) -> None:

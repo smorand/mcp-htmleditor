@@ -9,7 +9,7 @@ Package `src/mcp_htmleditor/render/`: `__init__` (errors, result, canvas constan
 ### Picture rules
 - One PNG of one slide, the 960x540 canvas clipped from the live page; the file is only read.
 - Slide id is `slide_id(tag)`, else `slide-<index>`. Default slide is the first.
-- The browser shows only that slide (`SHOW_SLIDE_SCRIPT`); the HTML file is never written.
+- The browser shows only that slide (`SHOW_SLIDE_JS` in `render/scripts.py`); the HTML file is never written.
 
 ### Output directory and cleanup
 - `<tempfile.gettempdir()>/htmleditor-render/<file stem>-<slide id>.png`; `/`, `\` and NUL in the id become `_`.
