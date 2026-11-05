@@ -24,9 +24,11 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 | `state.py` | `EditorState` singleton (current file, port, pid, poll interval, update flag) plus per file records in the state directory (`HTMLEDITOR_STATE_DIR`), the update flag expiring after 120 s |
 | `fileio.py` | `atomic_write(path, data, reason=, history=)`: temp file, fsync, rename; snapshots the previous content first when a `reason` is given; `WriteError` |
 | `history.py` | `HistoryStore` (20 versions per file under `<state>/files/<key>/history/`), `list_versions`, `restore_version`, `HistoryError`; used by the `history` / `restore` commands and tools |
-| `http_server.py` | `ThreadingHTTPServer`. Routes: `/`, `/static/*`, `/content` (GET raw, POST save), `/content-frame`, `/status` (polling), `/health` (status + version), `/export/pptx`, `/export/docx`, `POST /arch-layout`. Binds `HTMLEDITOR_HOST` (localhost by default, `0.0.0.0` in a container). Request gate (2026-10-10, SPEC-0005): every route but `/health` answers 403 unless the `Host` name is `localhost`, `127.0.0.1`, `[::1]` or the bind host (port ignored), and any `Origin` is exactly `http://<Host>`; no CORS headers are ever sent |
+| `http_server.py` | `ThreadingHTTPServer`. Routes: `/`, `/static/*`, `/content` (GET raw, POST save), `/content-frame`, `/status` (polling), `/health` (status + version), `/export/pptx`, `/export/docx`, `POST /arch-layout`, `GET /requests`, `POST /requests`, `POST /requests/delete`, `POST /review/apply`; `/status` also carries `requests_revision` (0 when the record is absent or unreadable). Binds `HTMLEDITOR_HOST` (localhost by default, `0.0.0.0` in a container). Request gate (2026-10-10, SPEC-0005): every route but `/health` answers 403 unless the `Host` name is `localhost`, `127.0.0.1`, `[::1]` or the bind host (port ignored), and any `Origin` is exactly `http://<Host>`; no CORS headers are ever sent |
 | `mcp_server.py` | FastMCP, 20 tools (`start_server`, `stop_server`, `get_status`, `open_file`, `update_start`, `update_end`, `layout_arch_diagram`, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`, `history`, `restore`, `list_requests`, `complete_request`, `write_review`), each traced as `mcp.<tool>`; `registered_tool_names()` lists them |
 | `cli.py` | click group with `-v/-q` and `--version`; subcommands `templates`, `new`, `serve`, `skill`, `skill-audit`, `mcp`, `export`. Subcommand imports are lazy on purpose to keep startup fast |
+| `request_store.py` | `RequestStore`, `Record`, `Request`, `Suggestion`: one `record.json` per file in `<state>/files/<key>/requests/` (`<key>` = `sha256(realpath)[:32]`, the SPEC-0009 key). Layout: `version`, `file`, `revision`, `next_id`, `requests`, `review`. `update()` takes an exclusive `fcntl.flock` on the sibling `record.lock`, applies the change and writes with an atomic rename; reads take no lock; an invalid record raises and is never reset. `fcntl` only (macOS, Linux, Docker) |
+| `request_service.py` | `RequestService` and `RequestError(kind, message)`: queue, list, complete, delete, apply a suggestion, write and read the review. All rules and messages live here; the routes map `kind` to a status, the tools raise `ToolError(message)`, the commands print `error: <message>` (parity by construction). Nothing is created next to the user's file |
 | `templates.py` | Template registry (key to bootstrap file) and search path resolution |
 | `skill_content.py` | `SkillLibrary`: core (`skill/core.md`, 7000 bytes max), 15 topics (`skill/topics/<t>.md`, 8000 max), `--all`; `arch-qa` appends the checklist (user one if any, else the shipped `skill/checks/`) |
 | `skill_audit.py` | `run_audit`, `find_stale`, `listed_tools`: sizes, budgets, core `## Tools` lines versus `registered_tool_names()`, stale statements in core, topics and routing skill |
@@ -82,6 +84,7 @@ previous content goes to the history first (`history.snapshot`) and is discarded
 | `static/editor-slides.js` | Slide picker, insert, delete, `renumberSlides` |
 | `static/editor-blocks.js` | Document block picker and insert before or after |
 | `static/editor-drag.js` | Drag reorder of document blocks, mouse move of arch nodes (`data-x`/`data-y` in %) |
+| `static/editor-requests.js` | Ask AI panel (`#ask-ai-btn`, `#ask-ai-panel`), side list `#requests-side` (`Requests (n)`), suggestion Apply buttons; polls `requests_revision` from `/status` and refetches `GET /requests` when it moves |
 | `static/editor.js` | State declarations, start up block, polling; loaded last |
 | `static/slide-layouts.js` | Per template slide layouts (`LAYOUT_SETS.carbon`, `.ei`) |
 | `static/doc-blocks.js` | Document block definitions (title, subtitle, h1 to h5, paragraph, table, list) |
@@ -91,28 +94,16 @@ Validate JS with `node --check src/mcp_htmleditor/static/*.js`.
 
 ### Fullscreen presentation mode (gotcha)
 
-The present button fullscreens the *inner* document (`frame.contentDocument.
-documentElement`), not the `<iframe>` element, so the slide template's own
-`:fullscreen .toolbar/.nav-arrow/.slide` CSS (defined inside the served HTML,
-not in `editor.css`) is what hides the nav bar and resizes the slide to fill
-the screen. Two things are required for this to work, both easy to regress:
+The present button fullscreens the inner document (`frame.contentDocument.documentElement`), not the
+`<iframe>`, so the slide template's own `:fullscreen` CSS (inside the served HTML) hides the nav bar and
+resizes the slide. Two things must hold:
 
-- The `<iframe>` in `editor.html` needs `sandbox="... allow-fullscreen"`
-  (plus `allow="fullscreen"` / `allowfullscreen` for older engines). A
-  sandboxed iframe without `allow-fullscreen` silently denies
-  `requestFullscreen()` on its content; `editor.js` then falls back to
-  fullscreening the `<iframe>` element itself in the *parent* document,
-  where the slide template's `:fullscreen` CSS never matches anything
-  (wrong document) — the toolbar stays visible and the slide keeps its
-  normal padded size.
-- Entering fullscreen does not move keyboard focus into the iframe, so the
-  slide template's own arrow-key `keydown` listener (`navigate()`) never
-  fires if focus stays on the outer `#present-btn`. `editor.js` calls
-  `frame.focus()` after fullscreen is granted, and additionally forwards
-  arrow/space/escape keydowns from the *parent* document straight into the
-  iframe's `navigate()`/`goToSlide()` globals whenever `document.
-  fullscreenElement` is set, so navigation works regardless of which
-  document actually holds focus in a given browser.
+- The `<iframe>` in `editor.html` needs `sandbox="... allow-fullscreen"` (plus `allow="fullscreen"`).
+  Without it `requestFullscreen()` is silently denied and `editor.js` falls back to fullscreening the
+  `<iframe>` itself, where the template CSS never matches.
+- Fullscreen does not move focus into the iframe, so `editor.js` calls `frame.focus()` once granted and
+  forwards arrow, space and escape keydowns from the parent into the iframe's `navigate()` / `goToSlide()`
+  while `document.fullscreenElement` is set.
 
 ## Templates and tools
 
@@ -131,31 +122,17 @@ insertion (footer logo, `.logo-disc`, renumbering) and writes PNG captures. It s
 out of `make check` on purpose. Run it after touching the EI bootstrap,
 `slide-layouts.js` or `renumberSlides` / `resolveTemplateAssets`.
 
-**2026-08 — `mail` template added.** Third document-family charter (`data-doc-template="mail"`),
-alongside `perso`/`ei`. Deliberately does not follow the class-based charter pattern of
-`doc-perso`/`doc-ei`: HTML email clients do not reliably honor `<head><style>`, so every
-color/spacing that matters is inline `style=""` on the element itself, and layout is nested
-`<table>` (no flexbox/grid, no `position:absolute`). `charter_for("mail")` in
-`export/reference_docx.py` returns `None` (no reference.docx generated) since this template has
-no DOCX/PPTX export path by design; a mail is sent as-is. Generic blocks inserted via the
-`+ Bloc` picker land unstyled in a mail document (no class-based charter to inherit from) —
-documented as a known limitation in `skill/topics/mail.md`, worked around by cloning an existing
-styled section instead of inserting a blank block. See `skill/topics/mail.md` for the full
-mail-safe ruleset.
+**2026-08, `mail` template.** Document family charter (`data-doc-template="mail"`). Email clients
+ignore `<head><style>`, so every colour and spacing that matters is inline `style=""` and the layout is
+nested `<table>` (no flexbox, grid or `position:absolute`). `charter_for("mail")` returns `None`: no
+`reference.docx`, a mail is sent as is. Blocks from the `+ Bloc` picker land unstyled; clone a styled
+section instead (`skill/topics/mail.md`).
 
-**2026-08 — `website` template added.** Fourth `data-doc-type` value (`presentation`,
-`document`, `mail`'s own `document`+`data-doc-template="mail"`, now `website`), tracked via
-a dedicated `isWebsite` flag in `editor.js` rather than reusing `isDocument`: it needs the
-SAME document block-insert/drag machinery (`getDocumentArticle()` only looks for
-`article[data-type="document"]`, which the website bootstrap also uses) but must show
-NEITHER export button, unlike `mail` which keeps the DOCX button visible even though
-`charter_for("mail")` returns no reference. `updateDocActionsVisibility()` now gates the
-block-insert toolbar on `isDocument || isWebsite`, but the DOCX button stays gated on
-`isDocument` alone. No export code path (`to_pptx.py`, `to_docx.py`) reads `data-doc-type`
-at all, so this is a pure UI-visibility distinction, not an export-format check; a CLI
-`export docx/pptx` invoked directly on a website file is not defended against (out of
-scope, no UI path can trigger it). See `skill/topics/website.md` for the full ruleset,
-including the click-target-vs-editable-text separation a working `.site-tab` needs.
+**2026-08, `website` template.** `data-doc-type="website"` is tracked by an `isWebsite` flag in `editor.js`:
+it reuses the document block insert and drag machinery (`article[data-type="document"]`) but shows
+neither export button (`updateDocActionsVisibility()` gates the block toolbar on `isDocument || isWebsite`
+and the DOCX button on `isDocument`). No exporter reads `data-doc-type`; a CLI export of a website file is
+not defended against. See `skill/topics/website.md`.
 
 ## LLM workflow
 
@@ -175,7 +152,7 @@ mixins (strict typing without `type: ignore`). The editor is split into classic 
 modules, so `file://` and the global function names keep working. Load order is fixed in
 `editor.html`: `slide-layouts.js`, `doc-blocks.js`, `editor-undo.js`, `editor-edit.js`,
 `editor-format.js`, `editor-menus.js`, `editor-save.js`, `editor-slides.js`, `editor-blocks.js`,
-`editor-drag.js`, `editor.js`. The top level `let` and `const` of `editor.js` are only touched
+`editor-drag.js`, `editor-requests.js`, `editor.js`. The top level `let` and `const` of `editor.js` are only touched
 inside functions by the other scripts, never at evaluation time.
 
 2026-11-04 (SPEC-0006, US-0034): progressive skill. `mcp-htmleditor skill` prints the core, `--type <t>`

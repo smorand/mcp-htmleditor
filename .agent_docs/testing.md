@@ -43,6 +43,14 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_export_docx.py` | HTML preprocessing (single title), charter detection, `word/styles.xml` patching, header and footer parts, cache and fallbacks, end to end pandoc exports guarded by `skipif` when pandoc is absent |
 | `test_fullscreen_e2e.py` | SC-008 / FR-026-028 (see retrospective spec): fullscreen presentation mode via a real `ThreadingHTTPServer` + real headless Chromium (`pytest-playwright`). Toolbar/nav-arrow hiding, slide filling the screen, keyboard navigation independent of focus, the parent-side fallback CSS safety net, and exit-preserves-position. Guarded by `skipif` when Chromium is not installed |
 | `test_autosave_focus_e2e.py` | SPEC-0004 (2026-10-10): a background autosave never moves focus, caret or selection and never drops keystrokes; saved file still clean, no self reload, status dot back to saved. Same real server + Chromium harness, `skipif` without Chromium |
+| `test_requests_core.py` | SPEC-0010: `RequestStore` and `RequestService` (record shape, lock across threads and processes with the UT-A02 subprocess pattern, unreadable record never reset), HTTP queue and list, `requests` command; exports `make_deck`, `expected_key`, `queue_over_http` |
+| `test_requests_tools.py` | SPEC-0010: tools `list_requests` and `complete_request` through `call_tool`, tool errors equal the command line text without `error: `, stdout clean |
+| `test_requests_cli.py` | SPEC-0010: `request-done` and `request-skip`, the `create` topic workflow, skill audit gate (UT-C04) |
+| `test_requests_editor_e2e.py` | SPEC-0010: Ask AI panel and `Requests (n)` side list in Chromium (queue, empty, too long, too many pending, storage failure, script order) |
+| `test_requests_refresh_e2e.py` | SPEC-0010: the side list follows the agent through the `/status` poll and `requests_revision`; the list is refetched only when the revision moves |
+| `test_review_write.py` | SPEC-0010: `write_review` tool and `review` command (`--write`), review rules (at most 6, unique ids, 60 character titles) |
+| `test_review_apply_e2e.py` | SPEC-0010: Apply button and `POST /review/apply` in Chromium, apply twice, stale page |
+| `test_request_loop_acceptance.py` | SPEC-0010 closing story (2026-11-05): E2E-028 (the folder holds only `deck.html`, the state directory holds `record.json` and `record.lock`), UT-H01 full loop, UT-H02 state directory owns the data, UT-H03 skill audit and topic bounds (`topic_output('create')` at most 8000, file at most 7900; the story's 3800 is stale since SPEC-0006, BL-0028), UT-H04 docs name the interfaces, UT-H05 tool process stdout is `b""` |
 
 Shared fixtures (SPEC-0009): `isolate_state_dir` (autouse, `conftest.py`) points `HTMLEDITOR_STATE_DIR` at a temporary
 folder so no test touches the real state; `served_deck` (`conftest.py`) is an 8 slide EI deck `deck.html` served by a
@@ -50,6 +58,10 @@ real editor; `FakeClock` (`test_state.py`, `advance(seconds)`) drives history id
 `EditorState.clock`; `needs_chromium` (`conftest.py`) skips a browser test when Chromium is missing. The Chromium
 e2e tests `test_autosave_focus_e2e.py`, `test_undo_redo_e2e.py` and the browser test of `test_http_origin_e2e.py`
 can fail under load (BL-0024): rerun once.
+
+Storage failure seam (SPEC-0010, DEC-010, 2026-11-05): to make a request write fail, create a regular file at
+`RequestStore.record_dir(file)`. `mkdir` of that directory then raises `OSError` for every user, root included.
+`chmod` is not used because the suite also runs as root in the container, where permission bits do not stop a write.
 
 ### Browser E2E (`test_fullscreen_e2e.py`)
 

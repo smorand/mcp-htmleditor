@@ -148,6 +148,32 @@ the state directory (`HTMLEDITOR_STATE_DIR`, default `$XDG_STATE_HOME/mcp-htmled
 `~/.local/state/mcp-htmleditor`), never next to the edited file; `.mcp_state.json` files left by older
 versions are ignored and can be deleted.
 
+### Request loop
+
+The person asks the agent for a change from the editor, and the agent reads, does and closes it.
+
+- **Ask AI** (toolbar button) opens a panel: describe the change, the current slide is attached, **Queue request**
+  stores it. Up to 50 requests can be pending, 4 000 characters each.
+- The side list **Requests (n)** shows every request of the open file with its status (`pending`, `done`,
+  `skipped`); a request can be deleted from the list. `n` counts the pending ones.
+- The agent works with the tools `list_requests(file)`, `complete_request(file, id, status, reason=None)` and
+  `write_review(file, suggestions)`, or the same operations by command:
+
+```bash
+mcp-htmleditor requests deck.html                          # <id>  <status>  <slide>  <title>, oldest first
+mcp-htmleditor request-done deck.html R-0001               # mark done
+mcp-htmleditor request-skip deck.html R-0002 --reason "Out of scope"   # a reason is required
+mcp-htmleditor review deck.html                            # <id>  <slide>  <title> of each suggestion
+mcp-htmleditor review deck.html --write review.json        # replace the review (- reads stdin, at most 6)
+```
+
+A tool error carries the text of the command line `error:` line without its prefix.
+
+Where the state lives: `<state_dir>/files/<key>/requests/record.json` (plus `record.lock`), where `<state_dir>` is
+`HTMLEDITOR_STATE_DIR` (see Environment variables) and `<key>` identifies the file by its real path. Nothing is
+created next to the edited file, and two files never share requests. Removing the state directory removes the
+requests and the review.
+
 ### MCP server (stdio)
 
 ```bash
@@ -286,6 +312,9 @@ figures must be PNG, never SVG.
 | `export(file, format, output)` | Export a presentation to `pptx` or a document to `docx`. Returns `{ok, output, warnings}`. |
 | `history(file)` | List the saved previous versions of a file, newest first: `{file, versions: [{id, bytes, reason}]}`. Same list as `mcp-htmleditor history`. |
 | `restore(file, id)` | Put a previous version back by id; the replaced content is kept in the history. Returns `{ok, file, id}`. Refuses templates. |
+| `list_requests(file)` | The requests the person queued in the editor, oldest first: `{file, requests: [{id, slide, title, queued, instruction, status, reason}]}`. Same list as `mcp-htmleditor requests`. |
+| `complete_request(file, id, status, reason=None)` | Mark a request `done`, or `skipped` with a reason. Returns `{ok, id, status}`. |
+| `write_review(file, suggestions)` | Replace the AI suggestions shown in the editor (at most 6). Returns `{ok, count}`. |
 
 ### Multiple presentations at once
 

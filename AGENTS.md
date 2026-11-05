@@ -39,6 +39,10 @@ mcp-htmleditor arch-checklist               # print the editable arch-diagram QA
 mcp-htmleditor skill                       # skill core (rules, tools, topic index)
 mcp-htmleditor skill --type <topic>        # one of the 15 topics
 mcp-htmleditor skill --all                 # core then every topic
+mcp-htmleditor requests file.html          # requests queued from the editor, oldest first
+mcp-htmleditor request-done file.html R-0001
+mcp-htmleditor request-skip file.html R-0002 --reason "why"
+mcp-htmleditor review file.html [--write list.json]   # AI suggestions; --write replaces them
 mcp-htmleditor skill-audit [--json]        # sizes, tool list, stale statements; exit 1 on a problem
 ```
 
@@ -86,7 +90,7 @@ mcp-htmleditor skill-audit [--json]        # sizes, tool list, stale statements;
 - Editor state (file history, server records) lives in the state directory (`HTMLEDITOR_STATE_DIR`, default
   `~/.local/state/mcp-htmleditor`), never next to the edited file. `.mcp_state.json` is only a leftover of older versions; it stays gitignored.
 - JS has no build step: `node --check src/mcp_htmleditor/static/*.js`.
-- The editor is eleven classic scripts loaded in the order of `editor.html`; the PPTX exporter
+- The editor is twelve classic scripts loaded in the order of `editor.html`; the PPTX exporter
   is a composed `_SlideBuilder` of mixins (`export/pptx_*.py`). See `.agent_docs/architecture.md`.
 - `src/mcp_htmleditor/version.py` stays committed with `"dev"`; the build overwrites it
   from the git tag.
@@ -99,7 +103,7 @@ Load only what the task needs.
 |------|---------|
 | `.agent_docs/python.md` | Python standards applied here, tooling, config/logging/tracing patterns, documented deviations (sync I/O, click, pptx typing, bandit skips) |
 | `.agent_docs/makefile.md` | Every make target, install path overrides, why `install` uses a uv tool |
-| `.agent_docs/architecture.md` | Module map, save path, export pipeline, browser side, templates and tools |
+| `.agent_docs/architecture.md` | Module map, save path, export pipeline, browser side, templates and tools, request loop (`request_store.py`, `request_service.py`, `/requests` routes, `editor-requests.js`) |
 | `.agent_docs/observability.md` | Log files, console rules, span inventory, OTLP export, JSONL recipes |
 | `.agent_docs/testing.md` | Test file map, coverage decisions, export regression set and validation procedure |
 | `.agent_docs/docker.md` | Image, compose, prod overlay, container checks |
