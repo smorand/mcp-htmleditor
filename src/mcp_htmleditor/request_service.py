@@ -71,10 +71,16 @@ class RequestService:
         """Store a pending request: blank, then length, then (under the lock) the pending limit."""
         if is_blank(instruction):
             raise RequestError("invalid", "Write a request first")
-        if len(instruction) > INSTRUCTION_MAX:
-            raise RequestError("invalid", f"Request too long (max {INSTRUCTION_MAX} characters)")
+        _check_length(instruction)
         try:
             return self._store.update(file, "queue", lambda record: self._append(record, instruction, slide))
+        except OSError as exc:
+            raise RequestError("storage", f"Could not queue the request: {exc}") from exc
+
+    def apply_suggestion(self, file: Path, suggestion_id: str) -> Request:
+        """Queue the request of a suggestion and mark it applied in one record write (FR-NEW-007)."""
+        try:
+            return self._store.update(file, "apply_suggestion", lambda record: self._apply(record, suggestion_id))
         except OSError as exc:
             raise RequestError("storage", f"Could not queue the request: {exc}") from exc
 
@@ -144,6 +150,20 @@ class RequestService:
         record.requests[index] = updated
         return updated
 
+    def _apply(self, record: Record, suggestion_id: str) -> Request:
+        """Checks in order: unknown id, already applied, length, pending limit; nothing changes on a refusal."""
+        index = next((i for i, item in enumerate(record.review or []) if item.id == suggestion_id), None)
+        if index is None or record.review is None:
+            raise RequestError("not_found", f"Suggestion {suggestion_id} no longer exists")
+        current = record.review[index]
+        if current.applied:
+            raise RequestError("conflict", f"Suggestion {suggestion_id} was already applied")
+        instruction = f"{current.title}. {current.change}"
+        _check_length(instruction)
+        request = self._append(record, instruction, current.slide)
+        record.review[index] = replace(current, applied=True)
+        return request
+
     def _append(self, record: Record, instruction: str, slide: str | None) -> Request:
         if sum(1 for request in record.requests if request.status == "pending") >= PENDING_MAX:
             raise RequestError("conflict", f"Too many pending requests (max {PENDING_MAX})")
@@ -159,6 +179,11 @@ class RequestService:
         record.next_id += 1
         record.requests.append(request)
         return request
+
+
+def _check_length(instruction: str) -> None:
+    if len(instruction) > INSTRUCTION_MAX:
+        raise RequestError("invalid", f"Request too long (max {INSTRUCTION_MAX} characters)")
 
 
 def _check_review(raw: object) -> list[Suggestion]:

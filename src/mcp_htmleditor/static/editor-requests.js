@@ -19,6 +19,8 @@
   const askAiMessage = document.getElementById('ask-ai-message');
   const requestsHeading = document.getElementById('requests-heading');
   const requestsList    = document.getElementById('requests-list');
+  const suggestionsHeading = document.createElement('h2');
+  const suggestionsList    = document.createElement('ul');
 
   const DELETE_FAILURE = 'Could not delete the request: ';
 
@@ -167,9 +169,43 @@
     return item;
   }
 
+  /* ---------- the AI suggestions (US-0058) ---------- */
+
+  async function suggestionsApply(id) {
+    try {
+      const data = await requestsPostJson('/review/apply', { id: id });
+      requestsShowMessage('Request ' + data.request.id + ' queued');
+    } catch (error) {
+      requestsShowMessage(error.message);
+    }
+    await requestsRefresh();
+  }
+
+  function suggestionsRenderLine(suggestion) {
+    const item = document.createElement('li');
+    item.setAttribute('data-suggestion-id', suggestion.id);
+    const title = document.createElement('div');
+    title.className = 'suggestion-title';
+    title.textContent = suggestion.title;
+    const why = document.createElement('div');
+    why.className = 'suggestion-why';
+    why.textContent = suggestion.why;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'suggestion-apply';
+    button.textContent = suggestion.applied ? 'Applied' : 'Apply';
+    button.disabled = suggestion.applied;
+    button.addEventListener('click', () => suggestionsApply(suggestion.id));
+    item.append(title, why, button);
+    return item;
+  }
+
   function requestsRender(snapshot) {
     requestsHeading.textContent = 'Requests (' + snapshot.pending + ')';
     requestsList.replaceChildren(...snapshot.requests.map(requestsRenderLine));
+    const suggestions = Array.isArray(snapshot.suggestions) ? snapshot.suggestions : [];
+    suggestionsHeading.textContent = 'AI suggestions (' + suggestions.length + ')';
+    suggestionsList.replaceChildren(...suggestions.map(suggestionsRenderLine));
   }
 
   async function requestsRefresh() {
@@ -207,6 +243,10 @@
 
   /* ---------- wiring ---------- */
 
+  suggestionsHeading.id = 'suggestions-heading';
+  suggestionsList.id = 'suggestions-list';
+  suggestionsHeading.textContent = 'AI suggestions (0)';
+  document.getElementById('requests-side').append(suggestionsHeading, suggestionsList);
   if (window.ResizeObserver) new ResizeObserver(requestsPlaceSide).observe(askAiPanel);
   askAiBtn.addEventListener('click', () => askAiSetOpen(askAiPanel.hidden));
   askAiQueue.addEventListener('click', askAiSubmit);

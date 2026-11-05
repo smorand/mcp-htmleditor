@@ -5,7 +5,8 @@ file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
 ``/content-frame``, ``/status`` (polling), ``/health`` (status + version),
 ``/export/pptx``, ``/export/docx`` and ``POST /arch-layout`` (recompute every
 declarative diagram in place, used by the browser after a structural edit),
-``GET /requests``, ``POST /requests`` and ``POST /requests/delete`` (the request queue of the loaded file).
+``GET /requests``, ``POST /requests``, ``POST /requests/delete`` (the request queue of the loaded file) and
+``POST /review/apply`` (a suggestion of the review becomes a pending request).
 """
 
 from __future__ import annotations
@@ -187,6 +188,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._queue_request()
         elif path == "/requests/delete":
             self._delete_request()
+        elif path == "/review/apply":
+            self._apply_suggestion()
         else:
             self._not_found()
 
@@ -360,6 +363,23 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             return {"ok": True}
 
         self._answer_request(delete)
+
+    def _apply_suggestion(self) -> None:
+        """Turn a suggestion of the review into a pending request (SPEC-0010/FR-NEW-007)."""
+        file = self._loaded_file()
+        body = self._read_json_object() if file is not None else None
+        if file is None or body is None:
+            return
+        suggestion_id = body.get("id")
+        if not _is_text(suggestion_id):
+            self._invalid_request_body()
+            return
+        self._answer_request(
+            lambda: {
+                "ok": True,
+                "request": request_to_dict(build_request_service().apply_suggestion(file, suggestion_id)),
+            }
+        )
 
     def _answer_request(self, action: Callable[[], dict[str, Any]]) -> None:
         """Run a request operation: its payload with 200, or the ``RequestError`` text with its status."""
