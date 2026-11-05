@@ -4,7 +4,8 @@ Serves the editor shell and proxies HTML content reads/writes to the current
 file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
 ``/content-frame``, ``/status`` (polling), ``/health`` (status + version),
 ``/export/pptx``, ``/export/docx`` and ``POST /arch-layout`` (recompute every
-declarative diagram in place, used by the browser after a structural edit).
+declarative diagram in place, used by the browser after a structural edit),
+``GET /requests``, ``POST /requests`` and ``POST /requests/delete`` (the request queue of the loaded file).
 """
 
 from __future__ import annotations
@@ -16,16 +17,24 @@ import re
 import socket
 import tempfile
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 from urllib.parse import urlparse, urlsplit
 
 from bs4 import BeautifulSoup, Tag
 
 from .config import PORT_RANGE_END, PORT_RANGE_START, default_host, default_port
 from .fileio import WriteError, atomic_write, is_template_path
+from .request_service import (
+    BODY_MAX_BYTES,
+    RequestError,
+    build_request_service,
+    request_to_dict,
+    snapshot_to_dict,
+)
 from .state import get_state
 from .tracing import trace_span
 from .version import __version__
@@ -64,6 +73,9 @@ _EXTENSION_ATTR_PREFIXES = ("_msthash", "_msttexthash", "_msthidden", "data-gr-"
 # the cap, so it never reaches ``int()``.
 MAX_SAVE_BYTES = 52_428_800
 MAX_LENGTH_DIGITS = 10
+
+# RequestError.kind to HTTP status (SPEC-0010).
+REQUEST_STATUS = {"invalid": 400, "conflict": 409, "not_found": 404, "storage": 500}
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +163,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._export_pptx()
         elif path == "/export/docx":
             self._export_docx()
+        elif path == "/requests":
+            self._list_requests()
         else:
             self._not_found()
 
@@ -169,6 +183,10 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._receive_content()
         elif path == "/arch-layout":
             self._run_arch_layout()
+        elif path == "/requests":
+            self._queue_request()
+        elif path == "/requests/delete":
+            self._delete_request()
         else:
             self._not_found()
 
@@ -294,8 +312,106 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             "filename": state.current_file,
             "poll_interval": state.poll_interval,
             "port": state.port,
+            "requests_revision": build_request_service().revision(Path(state.current_file))
+            if state.current_file
+            else 0,
         }
         self._send_json(payload)
+
+    def _list_requests(self) -> None:
+        """Return the request record of the loaded file: revision, pending count, requests, suggestions."""
+        file = self._loaded_file()
+        if file is None:
+            return
+        try:
+            snapshot = build_request_service().snapshot(file)
+        except RequestError as exc:
+            self._send_json({"error": exc.message}, status=REQUEST_STATUS[exc.kind])
+            return
+        self._send_json(snapshot_to_dict(snapshot))
+
+    def _queue_request(self) -> None:
+        """Queue a pending request for the loaded file (SPEC-0010/FR-NEW-001)."""
+        file = self._loaded_file()
+        body = self._read_json_object() if file is not None else None
+        if file is None or body is None:
+            return
+        instruction, slide = body.get("instruction"), body.get("slide")
+        if not _is_text(instruction) or not (slide is None or _is_text(slide)):
+            self._invalid_request_body()
+            return
+        self._answer_request(
+            lambda: {"ok": True, "request": request_to_dict(build_request_service().queue(file, instruction, slide))}
+        )
+
+    def _delete_request(self) -> None:
+        """Delete a request of the loaded file; an unknown id is a no op."""
+        file = self._loaded_file()
+        body = self._read_json_object() if file is not None else None
+        if file is None or body is None:
+            return
+        request_id = body.get("id")
+        if not _is_text(request_id):
+            self._invalid_request_body()
+            return
+
+        def delete() -> dict[str, Any]:
+            build_request_service().delete(file, request_id)
+            return {"ok": True}
+
+        self._answer_request(delete)
+
+    def _answer_request(self, action: Callable[[], dict[str, Any]]) -> None:
+        """Run a request operation: its payload with 200, or the ``RequestError`` text with its status."""
+        try:
+            payload = action()
+        except RequestError as exc:
+            self._send_json({"ok": False, "error": exc.message}, status=REQUEST_STATUS[exc.kind])
+            return
+        self._send_json(payload)
+
+    def _loaded_file(self) -> Path | None:
+        """The file this server serves, else answer 404 and return None."""
+        current = get_state().current_file
+        if not current:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return None
+        return Path(current)
+
+    def _read_json_object(self) -> dict[str, Any] | None:
+        """Read the body of a request route as a JSON object, answering the refusal and returning None if not.
+
+        Content type first (415), then the length (400, 413 above 1 MiB, before reading), then the JSON (400);
+        a body that is not an object is ``Invalid request body``.
+        """
+        try:
+            data = json.loads(self._read_request_body())
+        except SaveRefusal as refusal:
+            self._send_json(refusal.payload, status=refusal.status)
+            return None
+        except (ValueError, RecursionError):
+            self._send_json({"error": "Invalid JSON body"}, status=400)
+            return None
+        if not isinstance(data, dict):
+            self._invalid_request_body()
+            return None
+        return data
+
+    def _read_request_body(self) -> bytes:
+        content_type = self.headers.get("Content-Type", "")
+        try:
+            length = parse_content_length(self.headers.get("Content-Length"))
+            if length > BODY_MAX_BYTES:
+                raise SaveRefusal(413, {"error": "Request too large"})
+        except SaveRefusal:
+            check_content_type(content_type)  # a wrong content type outranks a bad length
+            raise
+        body = self.rfile.read(length)
+        check_content_type(content_type)
+        return body
+
+    def _invalid_request_body(self) -> None:
+        self._send_json({"ok": False, "error": "Invalid request body"}, status=400)
 
     def _receive_content(self) -> None:
         """Receive updated HTML from the editor and write it to disk (SPEC-0009 save pipeline)."""
@@ -444,6 +560,17 @@ class SaveRequest:
     html: str
     base_mtime: float | None
     force: bool
+
+
+def _is_text(value: object) -> TypeGuard[str]:
+    """A string the record can hold: a lone surrogate (valid in JSON) cannot be written as UTF-8."""
+    if not isinstance(value, str):
+        return False
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def parse_content_length(raw: str | None) -> int:

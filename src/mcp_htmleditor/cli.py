@@ -16,7 +16,7 @@ import sys
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 import click
 
@@ -369,6 +369,27 @@ def restore_cmd(file: str, version_id: str) -> None:
 
     restore_version(file, version_id)
     click.echo(f"Restored {file} to {version_id}")
+
+
+@main.command("requests")
+@click.argument("file")
+def requests_cmd(file: str) -> None:
+    """List the requests queued for FILE, oldest first."""
+    from .request_service import RequestError, build_request_service, require_file
+
+    try:
+        found = build_request_service().list_requests(require_file(file))
+    except RequestError as exc:
+        _request_fail(exc.message)
+    for request in found:
+        click.echo(f"{request.id}  {request.status}  {request.slide or '-'}  {request.title}")
+    if not found:
+        click.echo(f"No requests for {file}")
+
+
+def _request_fail(message: str) -> NoReturn:
+    click.echo(f"error: {message}", err=True)
+    raise SystemExit(1)
 
 
 @main.command("export")
