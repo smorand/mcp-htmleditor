@@ -255,3 +255,16 @@ def test_ut_f07_skill_audit_lists_write_review() -> None:
     stdout, _, status = run_cli("skill-audit")
     assert status == 0, stdout
     assert "write_review" in listed_tools(CORE.read_text(encoding="utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# US-0070: a non list argument gets the product message on the tool too (FR-NEW-004, BL-0029)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", [{}, "x", 5, None])
+def test_us_0070_tool_non_list_gets_the_product_message(deck: Path, service: RequestService, bad: Any) -> None:
+    service.write_review(deck, two())
+    ok, message = call_tool("write_review", file=str(deck), suggestions=bad)
+    assert (ok, message) == (False, "Review must be a list of suggestions")
+    assert run_cli("review", "deck.html") == (S1_LINE + S2_LINE, "", 0)

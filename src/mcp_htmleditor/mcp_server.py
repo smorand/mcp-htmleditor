@@ -487,16 +487,17 @@ def complete_request(file: str, id: str, status: str, reason: str | None = None)
 
 
 @mcp.tool()
-def write_review(file: str, suggestions: list[Any]) -> dict[str, Any]:
+def write_review(file: str, suggestions: Any) -> dict[str, Any]:
     """Replace the AI suggestions shown in the editor for a file (at most 6).
 
-    ``suggestions`` is a plain list so the product message answers a malformed item. Each item is an object with
-    ``id`` (unique), ``slide`` (a slide id or null), ``title`` (at most 60 characters), ``why`` and ``change``.
+    ``suggestions`` is untyped on purpose: the service answers a non list or a malformed item with its own
+    message. Each item is an object with ``id`` (unique), ``slide`` (a slide id or null), ``title`` (at most 60
+    characters), ``why`` and ``change``.
     Other keys are dropped and every suggestion starts not applied.
 
     Args:
         file: Path to the file.
-        suggestions: The new review; it replaces the previous one.
+        suggestions: Array of at most 6 objects {id, slide, title, why, change}; it replaces the previous review.
 
     Returns:
         Dict with keys: ok, count.
