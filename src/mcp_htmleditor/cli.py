@@ -289,6 +289,17 @@ def outline_cmd(file: str) -> None:
     click.echo(json.dumps(outline(file), separators=(",", ":"), ensure_ascii=False))
 
 
+@main.command("render")
+@click.argument("file", type=click.Path(dir_okay=False))
+@deck_command
+def render_cmd(file: str) -> None:
+    """Write a PNG of the first slide of FILE under the system temporary directory and print where."""
+    from .render.service import render_deck
+
+    result = render_deck(file)
+    click.echo(f"Rendered {result.slide} to {result.path} ({result.width}x{result.height})")
+
+
 @main.command("get-slide")
 @click.argument("file", type=click.Path(dir_okay=False))
 @click.argument("slide_id")

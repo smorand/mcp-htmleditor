@@ -63,7 +63,7 @@
 | US-0059 | SPEC-0010 | documentation and no file next to the user's file | US-0058 | 2 | landed | story/US-0059-documentation-and-no-file-next-to-the | story/US-0058-show-the-ai-suggestions-and-apply-one |
 | US-0070 | SPEC-0010 | write_review answers the product message for a non list on the tool | US-0059 | 2 | landed | story/US-0070-write-review-non-list-same-message-on-the-tool | story/US-0059-documentation-and-no-file-next-to-the |
 | US-0060 | SPEC-0008 | optional render extra, install-browser and fixtures | US-0059 | 2 | landed | story/US-0060-optional-render-extra-install-browser | main |
-| US-0061 | SPEC-0008 | render the first slide to a picture | US-0060, US-0035, US-0038 | 2 | todo | | |
+| US-0061 | SPEC-0008 | render the first slide to a picture | US-0060, US-0035, US-0038 | 2 | landed | story/US-0061-render-the-first-slide-to-a-picture | story/US-0060-optional-render-extra-install-browser |
 | US-0062 | SPEC-0008 | choose a slide and a scale | US-0061 | 2 | todo | | |
 | US-0063 | SPEC-0008 | layout report for one slide | US-0062 | 2 | todo | | |
 | US-0064 | SPEC-0008 | report only across the deck | US-0063 | 2 | todo | | |
