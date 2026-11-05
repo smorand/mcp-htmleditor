@@ -15,7 +15,7 @@ No Makefile target exists for it. `tests/test_http_time_bounds_slow.py` (marked 
 values: BT-003, BT-015, BT-023 (30 s), BT-022 (50 s), BT-040 (5 min); the whole module takes about 8 minutes.
 The default tests of `tests/test_http_time_bounds.py` shorten the bounds with
 `monkeypatch.setattr(http_deadline, "WAIT_SECONDS", 1.0)` and `"TOTAL_SECONDS"` (4.0): the constants are read
-through the module at each use, which is the only seam; they are not a setting and no user document names them.
+through the module at each use, which is the only seam; they are not a setting and no setting, option or help text names them.
 `DeadlineReader` takes a `clock` argument, tests pass a hand moved fake clock for the total bound.
 Raw socket helpers live in `tests/http_support.py` (`exchange`, `RawReply`, `json_body`); `tests/trace_support.py`
 holds the tracing capture helpers.

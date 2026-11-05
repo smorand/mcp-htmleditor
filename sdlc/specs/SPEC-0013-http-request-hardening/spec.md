@@ -5,7 +5,7 @@
 > Nature: BUG
 > Depth: M
 > Depth evidence: 3 surfaces (editor HTTP server, command line, agent tools), one module family (request handling, the record writers, path and bind address arguments and trace export); 22 requirements; public HTTP contract changes (new 400, 408 and 413 answers); no data model change
-> Status: designed
+> Status: implemented
 > Verdict: authority exists
 > Defect class: n/a (code violates a clear authority)
 > Severity: Low
