@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 17 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 19 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -30,6 +30,7 @@ from .http_server import (
     start_http_server,
     stop_http_server,
 )
+from .request_service import RequestError, build_request_service, request_to_dict, require_file
 from .skill_content import SkillError, build_library
 from .state import get_state
 from .tracing import trace_span
@@ -429,6 +430,60 @@ def restore(file: str, id: str) -> dict[str, Any]:  # noqa: A002 - argument name
         except DeckError as exc:
             raise ToolError(str(exc)) from exc
         return {"ok": True, "file": str(target), "id": id}
+
+
+@mcp.tool()
+def list_requests(file: str) -> dict[str, Any]:
+    """List the requests the person queued in the editor for a file, oldest first.
+
+    Every status is listed (pending, done, skipped); deleted requests are gone.
+
+    Args:
+        file: Path to the file.
+
+    Returns:
+        Dict with keys: file (absolute path), requests (list of ``{id, slide, title, queued, instruction,
+        status, reason}``).
+
+    Raises:
+        ToolError: the file is missing or its request record is unreadable.
+    """
+    with trace_span("mcp.list_requests", {"file.path": str(Path(file).resolve())}):
+        try:
+            path = require_file(file)
+            requests = build_request_service().list_requests(path)
+        except RequestError as exc:
+            raise ToolError(exc.message) from exc
+        return {"file": str(path), "requests": [request_to_dict(request) for request in requests]}
+
+
+@mcp.tool()
+def complete_request(file: str, id: str, status: str, reason: str | None = None) -> dict[str, Any]:  # noqa: A002 - argument name "id" is the contract
+    """Mark a request done, or skipped with a reason.
+
+    ``status`` is a plain string so the product message answers a wrong value. A reason is required for
+    ``skipped`` and ignored for ``done``.
+
+    Args:
+        file: Path to the file.
+        id: A request id from ``list_requests``.
+        status: ``done`` or ``skipped``.
+        reason: Why the request is skipped.
+
+    Returns:
+        Dict with keys: ok, id, status.
+
+    Raises:
+        ToolError: the file is missing, the id is unknown, the status or reason is invalid, or the request is
+            already completed.
+    """
+    with trace_span("mcp.complete_request", {"file.path": str(Path(file).resolve())}):
+        try:
+            path = require_file(file)
+            done = build_request_service().complete(path, id, status, reason)
+        except RequestError as exc:
+            raise ToolError(exc.message) from exc
+        return {"ok": True, "id": done.id, "status": done.status}
 
 
 def registered_tool_names() -> list[str]:
