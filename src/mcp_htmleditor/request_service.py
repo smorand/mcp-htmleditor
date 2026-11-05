@@ -38,6 +38,7 @@ REVIEW_MAX = 6
 BODY_MAX_BYTES = 1_048_576
 QUEUED_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 COMPLETE_STATUSES = ("done", "skipped")
+SUGGESTION_FIELDS = ("id", "slide", "title", "why", "change")
 
 # The Unicode White_Space set: \t \n \v \f \r, space, U+0085, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029,
 # U+202F, U+205F, U+3000. ``str.strip`` would also drop U+001C to U+001F, which are not White_Space.
@@ -99,6 +100,23 @@ class RequestService:
         except OSError as exc:
             raise RequestError("storage", f"Could not delete the request: {exc}") from exc
 
+    def write_review(self, file: Path, raw: object) -> int:
+        """Replace the review of ``file`` by ``raw`` and return the count; the rules run before any write."""
+        suggestions = _check_review(raw)
+
+        def replace_review(record: Record) -> None:
+            record.review = suggestions
+
+        try:
+            self._store.update(file, "write_review", replace_review)
+        except OSError as exc:
+            raise RequestError("storage", f"Could not write the review: {exc}") from exc
+        return len(suggestions)
+
+    def read_review(self, file: Path) -> list[Suggestion]:
+        """The stored suggestions of ``file``; ``[]`` when the review was never written or is empty."""
+        return list(self._store.read(file).review or [])
+
     def snapshot(self, file: Path) -> Snapshot:
         """The record as one consistent read (an atomic rename makes a lock free read consistent)."""
         record = self._store.read(file)
@@ -141,6 +159,47 @@ class RequestService:
         record.next_id += 1
         record.requests.append(request)
         return request
+
+
+def _check_review(raw: object) -> list[Suggestion]:
+    """Count first, then each position in turn: the first faulty suggestion decides the message."""
+    if not isinstance(raw, list):
+        raise RequestError("invalid", "Review must be a list of suggestions")
+    if len(raw) > REVIEW_MAX:
+        raise RequestError("invalid", f"At most {REVIEW_MAX} suggestions")
+    seen: set[str] = set()
+    suggestions: list[Suggestion] = []
+    for position, item in enumerate(raw, start=1):
+        suggestion = _check_suggestion(position, item, seen)
+        seen.add(suggestion.id)
+        suggestions.append(suggestion)
+    return suggestions
+
+
+def _check_suggestion(position: int, item: object, seen: set[str]) -> Suggestion:
+    """Missing or invalid field (in field order), then the title length, then a repeated id."""
+    fields = item if isinstance(item, dict) else {}
+    for name in SUGGESTION_FIELDS:
+        if name not in fields or not _has_text(fields[name], is_nullable=name == "slide"):
+            raise RequestError("invalid", f'Suggestion {position}: missing field "{name}"')
+    if len(fields["title"]) > TITLE_MAX:
+        raise RequestError("invalid", f"Suggestion {position}: title is longer than {TITLE_MAX} characters")
+    if fields["id"] in seen:
+        raise RequestError("invalid", f'Suggestion {position}: duplicate id "{fields["id"]}"')
+    return Suggestion(
+        id=fields["id"],
+        slide=fields["slide"],
+        title=fields["title"],
+        why=fields["why"],
+        change=fields["change"],
+        applied=False,
+    )
+
+
+def _has_text(value: object, *, is_nullable: bool) -> bool:
+    if value is None:
+        return is_nullable
+    return isinstance(value, str) and not is_blank(value)
 
 
 def is_blank(text: str) -> bool:

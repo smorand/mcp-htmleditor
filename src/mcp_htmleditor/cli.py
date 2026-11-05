@@ -404,6 +404,45 @@ def request_skip_cmd(file: str, request_id: str, reason: str | None) -> None:
     _complete_request(file, request_id, "skipped", reason)
 
 
+@main.command("review")
+@click.argument("file")
+@click.option(
+    "--write", "write_source", default=None, help="Replace the review by the JSON list in this file (- for stdin)."
+)
+def review_cmd(file: str, write_source: str | None) -> None:
+    """Show the AI suggestions of FILE, or replace them with --write."""
+    from .request_service import RequestError, build_request_service, require_file
+
+    service = build_request_service()
+    try:
+        path = require_file(file)
+        if write_source is not None:
+            count = service.write_review(path, _read_json(write_source))
+            click.echo(f"Review written: {count} suggestions")
+            return
+        found = service.read_review(path)
+    except RequestError as exc:
+        _request_fail(exc.message)
+    for item in found:
+        click.echo(f"{item.id}  {item.slide or '-'}  {item.title}")
+    if not found:
+        click.echo(f"No review for {file}")
+
+
+def _read_json(source: str) -> object:
+    """The JSON document at ``source`` (``-`` is standard input); failures are ``RequestError`` lines."""
+    from .request_service import RequestError
+
+    try:
+        text = click.get_text_stream("stdin").read() if source == "-" else Path(source).read_text(encoding="utf-8")
+    except (OSError, ValueError) as exc:
+        raise RequestError("invalid", f"Cannot read {source}: {getattr(exc, 'strerror', None) or exc}") from exc
+    try:
+        return json.loads(text)
+    except ValueError as exc:
+        raise RequestError("invalid", f"Invalid JSON: {exc}") from exc
+
+
 def _complete_request(file: str, request_id: str, status: str, reason: str | None) -> None:
     from .request_service import RequestError, build_request_service, require_file
 

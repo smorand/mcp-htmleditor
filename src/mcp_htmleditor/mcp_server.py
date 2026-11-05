@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 19 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 20 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -484,6 +484,33 @@ def complete_request(file: str, id: str, status: str, reason: str | None = None)
         except RequestError as exc:
             raise ToolError(exc.message) from exc
         return {"ok": True, "id": done.id, "status": done.status}
+
+
+@mcp.tool()
+def write_review(file: str, suggestions: list[Any]) -> dict[str, Any]:
+    """Replace the AI suggestions shown in the editor for a file (at most 6).
+
+    ``suggestions`` is a plain list so the product message answers a malformed item. Each item is an object with
+    ``id`` (unique), ``slide`` (a slide id or null), ``title`` (at most 60 characters), ``why`` and ``change``.
+    Other keys are dropped and every suggestion starts not applied.
+
+    Args:
+        file: Path to the file.
+        suggestions: The new review; it replaces the previous one.
+
+    Returns:
+        Dict with keys: ok, count.
+
+    Raises:
+        ToolError: the file is missing, the list is longer than 6 or an item breaks a rule.
+    """
+    with trace_span("mcp.write_review", {"file.path": str(Path(file).resolve())}):
+        try:
+            path = require_file(file)
+            count = build_request_service().write_review(path, suggestions)
+        except RequestError as exc:
+            raise ToolError(exc.message) from exc
+        return {"ok": True, "count": count}
 
 
 def registered_tool_names() -> list[str]:

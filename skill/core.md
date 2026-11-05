@@ -55,6 +55,7 @@ mcp-htmleditor new <template> <file> [--serve]
 - restore: put a previous version of a file back by id; the replaced content is kept in the history.
 - list_requests: List the requests the person queued in the editor for a file, oldest first
 - complete_request: Mark a request done, or skipped with a reason
+- write_review: Replace the AI suggestions shown in the editor (at most 6)
 
 ## Topics
 

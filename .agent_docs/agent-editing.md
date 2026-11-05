@@ -166,7 +166,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
   alive): `call_tool` uses its own thread.
 - Nothing may reach the process stdout in the MCP process: it carries the protocol frames. Log to stderr only.
 
-## Tool surface (19 tools, US-0037, US-0041, US-0046, US-0051, US-0053)
+## Tool surface (20 tools, US-0037, US-0041, US-0046, US-0051, US-0053, US-0057)
 
 | Tool | Service call | Result |
 |---|---|---|
@@ -181,17 +181,19 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
 | `restore(file, id)` | `history.restore_version` | `{"ok":true,"file":<abs>,"id"}`; the replaced content is kept first |
 | `list_requests(file)` | `RequestService.list_requests` | `{"file":<abs>,"requests":[...]}`, oldest first, all statuses |
 | `complete_request(file, id, status, reason=None)` | `RequestService.complete` | `{"ok":true,"id","status"}`; `status` is a plain `str` (DEC-006); errors are `ToolError(exc.message)` |
+| `write_review(file, suggestions)` | `RequestService.write_review` | `{"ok":true,"count"}`; `suggestions` is a plain `list[Any]` (DEC-006); rules and messages in `request_service._check_review`; replaces the review, `applied` false |
 
 - The set is start_server, stop_server, get_status, open_file, update_start, update_end, layout_arch_diagram,
-  get_skill plus the eleven above. Each body runs in `trace_span("mcp.<tool>")`. A new tool needs its
+  get_skill plus the twelve above. Each body runs in `trace_span("mcp.<tool>")`. A new tool needs its
   `- <name>: <description>` line in `## Tools` of `skill/core.md` (core budget 7 000 bytes, `skill-audit`).
+- US-0057 command: `review <file>` prints `<id>  <slide or ->  <title>` or `No review for <file>`; `review <file> --write <path|->` checks file, read (`Cannot read <path>: <reason>`), JSON (`Invalid JSON: <reason>`), then the service rules, and prints `Review written: <n> suggestions`. The service keeps `[]` distinct from null in the record, the command does not.
 - `export` and `get_skill`/`get_slide` parameters shadow builtins (`format`, `type`, `id`): `noqa: A002`.
 - `deck/tools.py` (US-0045): `export_file` checks the format first (`Unknown export format "x". Valid formats:
   pptx, docx`, exact lower case), `create_file` checks the template key before the target and writes with
   exclusive creation (`File already exists: <file>`, never overwrites even when the file appears late). The
   exporters are imported lazily. `new` and `export` errors are the English `error: ...` lines since US-0045.
 - Tests: `tests/deck_support.py` `call_tool` (in process `fastmcp.Client`, own thread) and `run_cli`;
-  `tests/test_deck_tools_surface.py` holds E2E-010, 011, 028, tool vs CLI equality, the 19 name equality between
+  `tests/test_deck_tools_surface.py` holds E2E-010, 011, 028, tool vs CLI equality, the 20 name equality between
   server and core, stdout cleanliness of a real `mcp-htmleditor mcp` process, and the spec closure test.
 - Closure test: acceptance ids E2E-001 to E2E-041 are read by `ast` from `tests/test_deck_*.py`, in the test
   function name, its docstring or the comment lines right above it (the older tests carry the id in a docstring or

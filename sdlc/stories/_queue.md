@@ -58,7 +58,7 @@
 | US-0054 | SPEC-0010 | complete from the command line and the apply workflow | US-0053, US-0025, US-0028 | 2 | landed | story/US-0054-complete-from-the-command-line | story/US-0053-agent-lists-and-completes-requests |
 | US-0055 | SPEC-0010 | ask ai panel and the requests side list | US-0053, US-0017 | 2 | landed | story/US-0055-ask-ai-panel-and-requests-side-list | story/US-0054-complete-from-the-command-line |
 | US-0056 | SPEC-0010 | live refresh of the side list | US-0055 | 2 | landed | story/US-0056-live-refresh-of-the-side-list | story/US-0055-ask-ai-panel-and-requests-side-list |
-| US-0057 | SPEC-0010 | write and read the ai review (tool and command) | US-0053 | 2 | todo | | |
+| US-0057 | SPEC-0010 | write and read the ai review (tool and command) | US-0053 | 2 | landed | story/US-0057-write-and-read-the-ai-review | story/US-0056-live-refresh-of-the-side-list |
 | US-0058 | SPEC-0010 | show the ai suggestions and apply one | US-0056, US-0057 | 2 | todo | | |
 | US-0059 | SPEC-0010 | documentation and no file next to the user's file | US-0058 | 2 | todo | | |
 | US-0060 | SPEC-0008 | optional render extra, install-browser and fixtures | US-0059 | 2 | todo | | |
