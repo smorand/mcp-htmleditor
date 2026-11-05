@@ -472,7 +472,7 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 20 tools
+├── mcp_server.py    FastMCP server with 21 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)
 ├── history.py       HistoryStore, list_versions, restore_version (history and restore)

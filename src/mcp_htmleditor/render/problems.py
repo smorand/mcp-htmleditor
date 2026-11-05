@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
-from . import CANVAS_HEIGHT, RenderProblem
+from . import CANVAS_HEIGHT, RenderProblem, RenderResult
 
 KIND_ORDER: Final = ("script", "image", "font", "overflow", "clipped")
 NO_SLIDE: Final = "-"
@@ -58,6 +58,20 @@ def final_line(count: int) -> str:
     if count == 0:
         return "report: OK"
     return f"report: {count} problem{'' if count == 1 else 's'}"
+
+
+def result_to_dict(result: RenderResult) -> dict[str, Any]:
+    """The one JSON object of a render, for ``--json`` and the tool (DEC-019); keys in this order.
+
+    ``path``, ``width`` and ``height`` are null for a report only run; the problems are the ones the run collected.
+    """
+    return {
+        "ok": True,
+        "path": None if result.path is None else str(result.path),
+        "width": result.width,
+        "height": result.height,
+        "problems": [{"kind": p.kind, "slide": p.slide, "message": p.message} for p in result.problems],
+    }
 
 
 def _slide_problems(raw: RawSlide) -> list[RenderProblem]:

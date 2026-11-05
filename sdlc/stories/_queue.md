@@ -68,5 +68,5 @@
 | US-0063 | SPEC-0008 | layout report for one slide | US-0062 | 2 | landed | story/US-0063-layout-report-for-one-slide | story/US-0062-choose-a-slide-and-a-scale |
 | US-0064 | SPEC-0008 | report only across the deck | US-0063 | 2 | landed | story/US-0064-report-only-across-the-deck | story/US-0063-layout-report-for-one-slide |
 | US-0065 | SPEC-0008 | font, script and image problems | US-0064 | 2 | landed | story/US-0065-font-script-and-image-problems | story/US-0064-report-only-across-the-deck |
-| US-0066 | SPEC-0008 | json output and the render tool | US-0065, US-0024, US-0025, US-0037, US-0047 | 2 | todo | | |
+| US-0066 | SPEC-0008 | json output and the render tool | US-0065, US-0024, US-0025, US-0037, US-0047 | 2 | landed | story/US-0066-json-output-and-the-render-tool | story/US-0065-font-script-and-image-problems |
 | US-0067 | SPEC-0008 | large decks and documentation | US-0066 | 2 | todo | | |

@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 20 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 21 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -30,6 +30,9 @@ from .http_server import (
     start_http_server,
     stop_http_server,
 )
+from .render.options import DEFAULT_SCALE
+from .render.problems import result_to_dict
+from .render.service import render_deck
 from .request_service import RequestError, build_request_service, request_to_dict, require_file
 from .skill_content import SkillError, build_library
 from .state import get_state
@@ -512,6 +515,49 @@ def write_review(file: str, suggestions: Any) -> dict[str, Any]:
         except RequestError as exc:
             raise ToolError(exc.message) from exc
         return {"ok": True, "count": count}
+
+
+@mcp.tool()
+def render(
+    file: str,
+    slide: str | None = None,
+    scale: float = 0.5,
+    report: bool = False,
+    report_only: bool = False,
+) -> dict[str, Any]:
+    """Render one slide of a presentation to a PNG picture and, on request, report its layout problems.
+
+    Needs Chromium (``make install-browser``). Never modifies the file nor the state of a running editor. A plain
+    function on purpose: fastmcp runs it in a worker thread without an event loop, which Playwright's sync API needs.
+
+    Args:
+        file: Path to the presentation.
+        slide: Id of the slide to render (default: the first).
+        scale: Scale of the picture, 0.1 to 1 (default 0.5, a 480x270 picture).
+        report: Also measure the rendered slide and return its layout problems.
+        report_only: Measure every slide and write no picture; cannot be combined with slide, a scale other than
+            the default, or report.
+
+    Returns:
+        Dict with keys: ok, path, width, height, problems (a list of {kind, slide, message}). path, width and
+        height are null for report_only; problems is empty unless report or report_only is set.
+
+    Raises:
+        ToolError: the file is missing or not a presentation, the options conflict, the slide id is unknown or
+            Chromium is not installed (same messages as the command line).
+    """
+    with trace_span("mcp.render", {"file.path": str(Path(file).resolve())}):
+        try:
+            result = render_deck(
+                file,
+                slide=slide,
+                scale=None if scale == DEFAULT_SCALE else scale,
+                report=report,
+                report_only=report_only,
+            )
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+        return result_to_dict(result)
 
 
 def registered_tool_names() -> list[str]:

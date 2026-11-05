@@ -297,11 +297,14 @@ def outline_cmd(file: str) -> None:
 @click.option(
     "--report-only", "report_only", is_flag=True, help="Print the layout problems of every slide, no picture."
 )
+@click.option("--json", "as_json", is_flag=True, help="Print the result as one compact JSON object only.")
 @deck_command
-def render_cmd(file: str, slide: str | None, scale: str | None, report: bool, report_only: bool) -> None:
+def render_cmd(  # noqa: PLR0913, PLR0917 - one parameter per CLI flag, click passes them by name
+    file: str, slide: str | None, scale: str | None, report: bool, report_only: bool, as_json: bool
+) -> None:
     """Write a PNG of a slide of FILE under the system temporary directory and print where."""
     from .render import RenderUsageError
-    from .render.problems import final_line, format_line
+    from .render.problems import final_line, format_line, result_to_dict
     from .render.service import render_deck
 
     try:
@@ -309,6 +312,11 @@ def render_cmd(file: str, slide: str | None, scale: str | None, report: bool, re
     except RenderUsageError as exc:
         click.echo(f"Error: {exc}", err=True)
         raise SystemExit(2) from exc
+    if as_json:
+        click.echo(json.dumps(result_to_dict(result), separators=(",", ":"), ensure_ascii=False))
+        if result.problems:
+            raise SystemExit(1)
+        return
     if not report_only:
         click.echo(f"Rendered {result.slide} to {result.path} ({result.width}x{result.height})")
     if not (report or report_only):
