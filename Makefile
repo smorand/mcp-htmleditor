@@ -2,7 +2,7 @@
 # Single entry point for every operation: never call uv/ruff/mypy/pytest directly.
 
 .PHONY: sync run run-dev test test-cov lint lint-fix format format-check typecheck \
-        security check build install install-skill uninstall docker-build docker-push \
+        security check build install install-browser install-skill uninstall docker-build docker-push \
         docker run-up run-down bootstrap-ei sync-medical-css check-generated clean clean-all info help
 
 PROJECT_NAME=$(shell grep -m1 '^name' pyproject.toml 2>/dev/null | sed 's/.*= *"\([^"]*\)".*/\1/')
@@ -166,7 +166,7 @@ ifeq ($(HAS_UV),yes)
 	@# can ever shadow the sources, unlike a plain non-editable user install.
 	@# The installed snapshot carries the git version, like build and docker-build.
 	@$(call write_version,$(VERSION))
-	@UV_TOOL_BIN_DIR=$(BIN_DIR) uv tool install . --reinstall --force || ($(call write_version,dev); exit 1)
+	@UV_TOOL_BIN_DIR=$(BIN_DIR) uv tool install ".[render]" --reinstall --force || ($(call write_version,dev); exit 1)
 	@$(call write_version,dev)
 	@echo "==> Installing templates into $(TEMPLATES_DIR)"
 	@mkdir -p $(TEMPLATES_DIR)
@@ -178,6 +178,17 @@ ifeq ($(HAS_UV),yes)
 	@mkdir -p $(LOG_DIR)
 	@$(MAKE) install-skill
 	@echo "==> Done. Ensure $(BIN_DIR) is on your PATH."
+else
+	@echo "Error: uv not found. Install it from https://docs.astral.sh/uv/"
+	@exit 1
+endif
+
+## install-browser: Install the Chromium that `render` uses (needs the render extra)
+install-browser:
+ifeq ($(HAS_UV),yes)
+	@TOOL_PY="$$(uv tool dir)/$(PROJECT_NAME)/bin/python"; \
+	  if [ -x "$$TOOL_PY" ]; then echo "==> Installing Chromium for the installed tool"; "$$TOOL_PY" -m playwright install chromium; \
+	  else echo "==> Installing Chromium for the project environment"; uv run --extra render python -m playwright install chromium; fi
 else
 	@echo "Error: uv not found. Install it from https://docs.astral.sh/uv/"
 	@exit 1
@@ -320,6 +331,7 @@ help:
 	@echo "Build & Install:"
 	@echo "  build            - Build wheel and sdist (version from git tag)"
 	@echo "  install          - Install CLI as uv tool + templates, logs, Pi skill"
+	@echo "  install-browser  - Install the Chromium used by render (needs the render extra)"
 	@echo "  install-skill    - Install the dynamic Pi skill only"
 	@echo "  uninstall        - Remove tool, templates, logs, Pi skill"
 	@echo ""

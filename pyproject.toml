@@ -22,6 +22,10 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.29",
 ]
 
+[project.optional-dependencies]
+# Chromium picture of a slide (`render`); install the browser with `make install-browser`.
+render = ["playwright>=1.62,<2"]
+
 [project.scripts]
 mcp-htmleditor = "mcp_htmleditor.cli:main"
 
@@ -116,6 +120,7 @@ ignore = [
 "src/mcp_htmleditor/export/reference_docx.py" = ["S314"]
 "src/mcp_htmleditor/export/docx_header_footer.py" = ["S314"]
 "src/mcp_htmleditor/tracing.py" = ["PLC0415"] # OTLP exporter imported on demand
+"src/mcp_htmleditor/render/service.py" = ["PLC0415"] # the optional render extra is imported on demand
 "tests/**" = [
     "ANN001",  # fixtures are typed by pytest itself where it matters
     "ANN201",  # test functions return None implicitly
