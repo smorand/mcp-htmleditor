@@ -26,7 +26,7 @@ from __future__ import annotations
 import atexit
 import json
 import logging
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -35,7 +35,7 @@ from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace import Event, ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
     SimpleSpanProcessor,
@@ -45,6 +45,7 @@ from opentelemetry.sdk.trace.export import (
 from opentelemetry.trace import Span, Status, StatusCode
 
 from .config import APP_NAME, Settings, get_settings
+from .textcheck import replace_unencodable
 from .version import __version__
 
 logger = logging.getLogger(__name__)
@@ -68,16 +69,19 @@ class JsonlSpanExporter(SpanExporter):
         Args:
             spans: Sequence of finished :class:`ReadableSpan` objects.
 
+        A code point UTF-8 cannot hold (a lone surrogate) is written as its JSON escape (``\\ud800``); every
+        other character stays as is.
+
         Returns:
-            SUCCESS, or FAILURE when the file cannot be written.
+            SUCCESS, or FAILURE (one warning, no traceback) when the spans cannot be serialized or written.
         """
-        readable: tuple[ReadableSpan, ...] = tuple(spans)  # type: ignore[arg-type] # SDK passes a Sequence
-        lines = "".join(f"{json.dumps(span_to_dict(span), ensure_ascii=False)}\n" for span in readable)
         try:
-            with self._path.open("a", encoding="utf-8") as stream:
-                stream.write(lines)
-        except OSError as exc:
-            logger.warning("Span export failed (%s): %s", self._path, exc)
+            readable: tuple[ReadableSpan, ...] = tuple(spans)  # type: ignore[arg-type] # SDK passes a Sequence
+            lines = "".join(f"{json.dumps(span_to_dict(span), ensure_ascii=False)}\n" for span in readable)
+            with self._path.open("ab") as stream:
+                stream.write(lines.encode("utf-8", "backslashreplace"))
+        except Exception as exc:
+            _warn_export_failed(self._path, exc)
             return SpanExportResult.FAILURE
         return SpanExportResult.SUCCESS
 
@@ -87,6 +91,40 @@ class JsonlSpanExporter(SpanExporter):
 
     def shutdown(self) -> None:
         """No resource is held open between exports."""
+
+
+class EncodableSpanExporter(SpanExporter):
+    """Hand spans to a delegate with every unencodable code point replaced by U+FFFD.
+
+    The OTLP encoder raises on a lone surrogate and drops the attribute; the copy it receives holds text it can
+    encode. A failure of the delegate is one warning, never a traceback.
+    """
+
+    __slots__ = ("_delegate",)
+
+    def __init__(self, delegate: SpanExporter) -> None:
+        """Wrap ``delegate``."""
+        self._delegate = delegate
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        """Export encodable copies of ``spans`` through the delegate.
+
+        Returns:
+            The delegate's result, or FAILURE when anything raised.
+        """
+        try:
+            return self._delegate.export([_encodable_copy(span) for span in spans])
+        except Exception as exc:
+            _warn_export_failed(type(self._delegate).__name__, exc)
+            return SpanExportResult.FAILURE
+
+    def force_flush(self, timeout_millis: int = 30_000) -> bool:
+        """Flush the delegate."""
+        return self._delegate.force_flush(timeout_millis)
+
+    def shutdown(self) -> None:
+        """Shut the delegate down."""
+        self._delegate.shutdown()
 
 
 def span_to_dict(span: ReadableSpan) -> dict[str, Any]:
@@ -172,7 +210,50 @@ def _otlp_exporter(destination: str, api_key: str | None) -> SpanExporter:
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
-    return OTLPSpanExporter(endpoint=destination, headers=headers)
+    return EncodableSpanExporter(OTLPSpanExporter(endpoint=destination, headers=headers))
+
+
+def _warn_export_failed(destination: object, exc: Exception) -> None:
+    """Log one warning line for a failed export: no traceback, message made encodable."""
+    logger.warning("Span export failed (%s): %s: %s", destination, type(exc).__name__, replace_unencodable(str(exc)))
+
+
+def _encodable_copy(span: ReadableSpan) -> ReadableSpan:
+    """Return a copy of ``span`` whose text fields pass through :func:`replace_unencodable`."""
+    status = span.status
+    return ReadableSpan(
+        name=replace_unencodable(span.name),
+        context=span.get_span_context(),
+        parent=span.parent,
+        resource=span.resource,
+        attributes=_encodable_attributes(span.attributes),
+        events=[
+            Event(replace_unencodable(event.name), _encodable_attributes(event.attributes), event.timestamp)
+            for event in span.events
+        ],
+        links=span.links,
+        kind=span.kind,
+        instrumentation_info=span.instrumentation_info,
+        status=Status(
+            status.status_code, replace_unencodable(status.description) if status.description else status.description
+        ),
+        start_time=span.start_time,
+        end_time=span.end_time,
+        instrumentation_scope=span.instrumentation_scope,
+    )
+
+
+def _encodable_attributes(attributes: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Return ``attributes`` with every string, and every string in a sequence, made encodable."""
+    return {replace_unencodable(key): _encodable_value(value) for key, value in (attributes or {}).items()}
+
+
+def _encodable_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return replace_unencodable(value)
+    if isinstance(value, tuple | list):
+        return tuple(_encodable_value(item) for item in value)
+    return value
 
 
 def _isoformat(timestamp_ns: int) -> str:

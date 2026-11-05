@@ -68,6 +68,20 @@ a `SimpleSpanProcessor` writes the JSONL file immediately, which is what makes a
 export inspectable right after it ran. Both variables are read through `Settings`, typed
 `str | None`, default `None`.
 
+## Text UTF-8 cannot hold (SPEC-0013, BR-019)
+
+A tool argument can carry a lone surrogate (`get_slide(id="\ud800")`) and becomes a span attribute. Tracing
+never changes the answer, drops the span or prints a traceback:
+
+- JSONL: the line is encoded with `backslashreplace`, so the code point is the JSON escape `\ud800`; valid
+  non ASCII text (a path with `é` or an emoji) stays unescaped. Never use `ensure_ascii=True` there.
+- OTLP: `EncodableSpanExporter` wraps the OTLP exporter and sends a copy of each span (name, attributes, event
+  names and attributes, status description) with each such code point replaced by U+FFFD.
+- Any export failure is one WARNING `Span export failed (<destination>): <ExcType>: <message>`, no `exc_info`.
+- The log file handler uses `errors="backslashreplace"`, so a log line holding the code point is written
+  escaped instead of raising `--- Logging error ---`.
+- Tests run in a child interpreter (`tests/trace_support.py`) because the tracer provider is set once per process.
+
 ## Reading the JSONL quickly
 
 ```bash

@@ -114,6 +114,7 @@ def _install_file_handler(root: logging.Logger, log_file: Path) -> Path | None:
             maxBytes=FILE_MAX_BYTES,
             backupCount=FILE_BACKUP_COUNT,
             encoding="utf-8",
+            errors="backslashreplace",
         )
     except OSError as exc:
         logger.warning("Log file unavailable (%s): %s", log_file, exc)
