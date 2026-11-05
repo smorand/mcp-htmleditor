@@ -23,6 +23,7 @@ EI_TITLES: Final[tuple[str, ...]] = _EI_TITLES
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _IHDR_SIZE_OFFSET = 16
+_FIGURE_HEIGHT = "h-md"
 _ARTICLE_END = "</article>"
 _BODY_OPEN = re.compile(r'<div class="slide-body"[^>]*>')
 
@@ -47,8 +48,13 @@ def ei_deck_html() -> str:
 
 
 def med_deck_html(dark_slide: str = "slide-2") -> str:
-    """DECK-MED with class ``slide dark`` on ``dark_slide``."""
-    return set_slide_class(deck_med(), dark_slide, "dark")
+    """DECK-MED with class ``slide dark`` on ``dark_slide``, its figures given a height class.
+
+    The medical stylesheet needs ``h-sm|h-md|h-lg|h-xl`` on a figure (a bare ``height:auto`` image fills the
+    budget and overflows); ``deck_med()`` of SPEC-0007 omits it, so it is added here, the measure untouched.
+    """
+    html = deck_med().replace('class="med-figure w-50"', f'class="med-figure w-50 {_FIGURE_HEIGHT}"')
+    return set_slide_class(html, dark_slide, "dark")
 
 
 def _article_bounds(html: str, slide_id: str) -> tuple[int, int, int]:

@@ -294,15 +294,24 @@ def outline_cmd(file: str) -> None:
 @click.option("--slide", "slide", default=None, help="Id of the slide to render (default: the first).")
 @click.option("--scale", "scale", default=None, help="Scale of the picture, 0.1 to 1 (default: 0.5).")
 @click.option("--report", "report", is_flag=True, help="Also print the layout problems of the slide; status 1 if any.")
+@click.option(
+    "--report-only", "report_only", is_flag=True, help="Print the layout problems of every slide, no picture."
+)
 @deck_command
-def render_cmd(file: str, slide: str | None, scale: str | None, report: bool) -> None:
+def render_cmd(file: str, slide: str | None, scale: str | None, report: bool, report_only: bool) -> None:
     """Write a PNG of a slide of FILE under the system temporary directory and print where."""
+    from .render import RenderUsageError
     from .render.problems import final_line, format_line
     from .render.service import render_deck
 
-    result = render_deck(file, slide=slide, scale=scale, report=report)
-    click.echo(f"Rendered {result.slide} to {result.path} ({result.width}x{result.height})")
-    if not report:
+    try:
+        result = render_deck(file, slide=slide, scale=scale, report=report, report_only=report_only)
+    except RenderUsageError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(2) from exc
+    if not report_only:
+        click.echo(f"Rendered {result.slide} to {result.path} ({result.width}x{result.height})")
+    if not (report or report_only):
         return
     for problem in result.problems:
         click.echo(format_line(problem))

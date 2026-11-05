@@ -21,7 +21,7 @@ class RenderError(DeckError):
 
 
 class RenderUsageError(RenderError):
-    """A render option is wrong (raised from US-0064 on)."""
+    """A render option is wrong (``--report-only`` with another option)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,10 +35,10 @@ class RenderProblem:
 
 @dataclass(frozen=True, slots=True)
 class RenderResult:
-    """The picture written for ``slide`` and the problems found on it."""
+    """The picture written for ``slide`` and the problems found; a report only run has no picture."""
 
-    path: Path
-    width: int
-    height: int
-    slide: str
+    path: Path | None
+    width: int | None
+    height: int | None
+    slide: str | None
     problems: tuple[RenderProblem, ...] = ()

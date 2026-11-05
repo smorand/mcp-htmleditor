@@ -8,12 +8,19 @@ from __future__ import annotations
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Final
 
-from . import CANVAS_HEIGHT, CANVAS_WIDTH, RenderError
+from . import CANVAS_HEIGHT, CANVAS_WIDTH, RenderError, RenderUsageError
 
 DEFAULT_SCALE: Final = Decimal("0.5")
 MIN_SCALE: Final = Decimal("0.1")
 MAX_SCALE: Final = Decimal(1)
 SCALE_MESSAGE: Final = "Scale must be between 0.1 and 1"
+CONFLICT_MESSAGE: Final = "--report-only cannot be used with --slide, --scale or --report"
+
+
+def check_options(*, slide: str | None, scale: str | float | None, report: bool, report_only: bool) -> None:
+    """Refuse ``--report-only`` together with ``--slide``, ``--scale`` or ``--report`` (even ``--scale 0.5``)."""
+    if report_only and (slide is not None or scale is not None or report):
+        raise RenderUsageError(CONFLICT_MESSAGE)
 
 
 def parse_scale(raw: str | float | None) -> Decimal:

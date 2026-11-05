@@ -36,3 +36,14 @@ Unknown id: `Unknown slide id "slide-9". Valid ids: slide-0, slide-1, ...` (all 
 - Browser tests carry `@needs_chromium` (skipped without `make install-browser`). CLI runs go through a thread
   because the Playwright sync API refuses to start inside a running event loop.
 - The DECK-MED dark slide pixel (2, 300) at scale 1 is exactly `#0B0E11` (`--med-dark`).
+
+## 2026-11-05 US-0064: report only
+
+- `--report-only`: one page load, every slide shown and measured in document order (`_measure_all`), no screenshot,
+  no output directory access (no mkdir, no cleanup). Output: problem lines then the final line, no `Rendered` line.
+  `RenderResult(path=None, width=None, height=None, slide=None, problems=...)`; span `render.mode` is `report_only`.
+- `check_options` is the first call of `render_deck`. With `--slide`, `--scale` (even `0.5`) or `--report` it raises
+  `RenderUsageError`; the command prints `Error: <message>` on stderr (no usage block) and exits 2. Other errors keep
+  `error: ` and status 1. Check order: conflict, scale, file, presentation, browser, unknown slide id.
+- DECK-MED in `tests/render_support.py` adds a height class (`h-md`) to its figures: the medical stylesheet needs one,
+  `deck_med()` has none and would report `overflow` on every slide.

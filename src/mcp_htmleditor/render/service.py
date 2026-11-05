@@ -7,7 +7,7 @@ imported inside the functions that need it, so a missing extra gives the install
 from __future__ import annotations
 
 import struct
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -19,7 +19,7 @@ from ..deck import load_deck, slide_id
 from ..tracing import trace_span
 from . import CANVAS_HEIGHT, CANVAS_WIDTH, RenderError, RenderResult
 from .files import picture_path, remove_stale, write_picture
-from .options import output_size, parse_scale
+from .options import check_options, output_size, parse_scale
 from .problems import RawSlide, build_problems
 from .scripts import MEASURE_SLIDE_JS, SHOW_SLIDE_JS
 
@@ -46,17 +46,26 @@ class SlideRef:
 
 
 def render_deck(
-    file: str, *, slide: str | None = None, scale: str | float | None = None, report: bool = False
+    file: str,
+    *,
+    slide: str | None = None,
+    scale: str | float | None = None,
+    report: bool = False,
+    report_only: bool = False,
 ) -> RenderResult:
     """Write a PNG of ``slide`` (default the first) of ``file`` at ``scale`` and clean up its stale pictures.
 
-    With ``report`` the rendered slide is also measured and its layout problems are returned.
+    With ``report`` the rendered slide is also measured and its layout problems are returned. With
+    ``report_only`` every slide is measured, no picture is written and the output directory is not touched.
 
-    Checks run in this order: scale, file, presentation, browser, slide id.
+    Checks run in this order: option conflict, scale, file, presentation, browser, slide id.
     """
+    check_options(slide=slide, scale=scale, report=report, report_only=report_only)
     factor = parse_scale(scale)
     size = output_size(factor)
     slides = _presentation_slides(file)
+    if report_only:
+        return _report_only(file, slides)
     with trace_span(
         "render.session",
         {"render.mode": "report" if report else "picture", "render.slides": len(slides), "render.scale": str(factor)},
@@ -67,6 +76,12 @@ def render_deck(
         remove_stale(file, [ref.slide_id for ref in slides], path)
     problems = tuple(build_problems([raw])) if raw else ()
     return RenderResult(path, size[0], size[1], target.slide_id, problems)
+
+
+def _report_only(file: str, slides: Sequence[SlideRef]) -> RenderResult:
+    with trace_span("render.session", {"render.mode": "report_only", "render.slides": len(slides)}):
+        raws = _in_browser(lambda browser: _measure_all(browser, file, slides))
+    return RenderResult(None, None, None, None, tuple(build_problems(raws)))
 
 
 def _presentation_slides(file: str) -> tuple[SlideRef, ...]:
@@ -80,6 +95,18 @@ def _presentation_slides(file: str) -> tuple[SlideRef, ...]:
 def _capture(
     file: str, slides: Sequence[SlideRef], slide: str | None, scale: Decimal, report: bool
 ) -> tuple[SlideRef, bytes, RawSlide | None]:
+    def work(browser: Browser) -> tuple[SlideRef, bytes, RawSlide | None]:
+        target = _choose_slide(slides, slide)
+        data, raw = _shoot(browser, file, target, scale, report)
+        return target, data, raw
+
+    target, data, raw = _in_browser(work)
+    _check_size(data, output_size(scale))
+    return target, data, raw
+
+
+def _in_browser[T](work: Callable[[Browser], T]) -> T:
+    """Run ``work`` with a launched Chromium, closed afterwards; Playwright errors become ``RenderError``."""
     try:
         from playwright.sync_api import Error, sync_playwright
     except ImportError:
@@ -88,14 +115,11 @@ def _capture(
         with sync_playwright() as driver:
             browser = _launch(driver, Error)
             try:
-                target = _choose_slide(slides, slide)
-                data, raw = _shoot(browser, file, target, scale, report)
+                return work(browser)
             finally:
                 browser.close()
     except Error as exc:
         raise RenderError(f"Rendering failed: {_first_line(exc)}") from exc
-    _check_size(data, output_size(scale))
-    return target, data, raw
 
 
 def _choose_slide(slides: Sequence[SlideRef], slide: str | None) -> SlideRef:
@@ -120,10 +144,7 @@ def _launch(driver: Playwright, error_type: type[Exception]) -> Browser:
 def _shoot(
     browser: Browser, file: str, target: SlideRef, scale: Decimal, report: bool
 ) -> tuple[bytes, RawSlide | None]:
-    viewport: ViewportSize = {"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT}
-    context = browser.new_context(viewport=viewport, device_scale_factor=float(scale), color_scheme="light")
-    page = context.new_page()
-    page.goto(Path(file).resolve().as_uri(), wait_until="load", timeout=LOAD_TIMEOUT_MS)
+    page = _open_page(browser, file, float(scale))
     raw = _measure(page, target) if report else None
     if raw is None:
         page.evaluate(SHOW_SLIDE_JS, target.index)
@@ -132,6 +153,19 @@ def _shoot(
         raise RenderError("Rendering failed: the slide has no box")
     clip: FloatRect = {"x": round(box["x"]), "y": round(box["y"]), "width": CANVAS_WIDTH, "height": CANVAS_HEIGHT}
     return page.screenshot(clip=clip, animations="disabled"), raw
+
+
+def _open_page(browser: Browser, file: str, device_scale: float) -> Page:
+    viewport: ViewportSize = {"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT}
+    context = browser.new_context(viewport=viewport, device_scale_factor=device_scale, color_scheme="light")
+    page = context.new_page()
+    page.goto(Path(file).resolve().as_uri(), wait_until="load", timeout=LOAD_TIMEOUT_MS)
+    return page
+
+
+def _measure_all(browser: Browser, file: str, slides: Sequence[SlideRef]) -> list[RawSlide]:
+    page = _open_page(browser, file, 1.0)
+    return [_measure(page, ref) for ref in slides]
 
 
 def _measure(page: Page, target: SlideRef) -> RawSlide:
