@@ -14,3 +14,7 @@ The two spec sentences conflict for a slide that styles its own border.
 
 Decide by amending FR-NEW-001: either "the slide as styled" (keep the border, drop "no border") or hide the border and shadow of the target slide
 for the capture (inline style on the target in the show script, DEC-007). Then one story with a pixel test on a Carbon deck.
+
+## Resolution
+
+SPEC-0008 FR-NEW-001 amended on 2026-11-05: the picture shows the slide as styled; the Carbon border stays. No code change: the behavior already matched. A pixel test on a Carbon deck (corner pixel is the border colour) is optional.
