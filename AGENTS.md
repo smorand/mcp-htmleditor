@@ -14,7 +14,8 @@ Python 3.13+, uv, click, FastMCP, python-pptx, BeautifulSoup4, pandoc for DOCX.
 make sync        # uv sync (deps + dev group)
 make check       # GATE: check-generated + lint + format-check + typecheck + security + test-cov (80 %)
 make test        # pytest -v            (ARGS='-k pptx' for a subset)
-make install     # uv tool install + templates + log dir + Pi skill
+make install     # uv tool install (with the render extra) + templates + log dir + Pi skill
+make install-browser  # Chromium for `render` (needs the render extra)
 make run ARGS='export pptx in.html out.pptx'
 make docker-build / run-up / run-down
 make bootstrap-ei  # regenerate the EI bootstrap from the EI reference
@@ -44,6 +45,8 @@ mcp-htmleditor request-done file.html R-0001
 mcp-htmleditor request-skip file.html R-0002 --reason "why"
 mcp-htmleditor review file.html [--write list.json]   # AI suggestions; --write replaces them
 mcp-htmleditor skill-audit [--json]        # sizes, tool list, stale statements; exit 1 on a problem
+mcp-htmleditor render file.html [--slide ID] [--scale 0.5] [--report] [--json]  # PNG of a slide in <tmp>/htmleditor-render
+mcp-htmleditor render file.html --report-only [--json]  # layout problems of every slide, no picture; exit 1 on a problem
 ```
 
 ## Essential conventions

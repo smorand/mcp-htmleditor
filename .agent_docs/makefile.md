@@ -45,7 +45,8 @@ make run-dev ARGS='-v serve doc.html'
 | Target | What it does |
 |--------|--------------|
 | `build` | Writes `VERSION` into `src/mcp_htmleditor/version.py`, runs `uv build`, restores the file to `dev` |
-| `install` | Injects `VERSION` the same way, installs the CLI as a uv tool, plus templates, log dir and the Pi skill, then restores the file |
+| `install` | Injects `VERSION` the same way, installs the CLI as a uv tool with the `render` extra (`.[render]`), plus templates, log dir and the Pi skill, then restores the file |
+| `install-browser` | Downloads the Chromium that `render` uses, with `playwright install chromium`, into the installed tool if there is one, else into the project environment (`uv run --extra render`). Run it after `install` or `sync --extra render` |
 | `install-skill` | Only the dynamic Pi skill |
 | `uninstall` | Removes the uv tool, the templates, the log dir and the Pi skill |
 

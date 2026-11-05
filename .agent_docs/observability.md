@@ -41,6 +41,9 @@ Names follow `category.operation`.
 | `export.docx` | `export/to_docx.to_docx` | `file.path`, `export.charter`, `warning.count` |
 | `export.reference_docx` | `export/reference_docx` | `export.charter`, `file.path` |
 | `tool.pandoc` | DOCX export, reference generation, version probe | `tool.operation`, `file.path` or `file.size` |
+| `render.session` | `render/service.render_deck`, one per Chromium session | `render.mode` (`picture`, `report` or `report_only`), `render.slides` (count), `render.scale` (text; absent for `report_only`) |
+| `render.cleanup` | `render/files.remove_stale`, after a successful picture | `file.count` (pictures removed) |
+| `mcp.render` | `mcp_server.render` | `file.path` |
 | `file.write` | editor save, `new` from a template, PPTX save, `fileio.atomic_write` (`patch`) | `file.path`, `file.size`, `export.format`, `template.key` |
 
 The deck service (`src/mcp_htmleditor/deck/`) opens no span of its own (no `deck.*` span exists yet); a `patch`

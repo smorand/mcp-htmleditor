@@ -210,6 +210,52 @@ mcp-htmleditor export pptx input.html output.pptx
 mcp-htmleditor export docx input.html output.docx
 ```
 
+### Visual render
+
+See a slide as a picture and find layout problems without opening the editor. It needs Chromium,
+which is an optional extra: `make install` installs the `render` extra (`uv sync --extra render`
+does the same in a checkout), then `make install-browser` downloads the browser. Without it the
+command stops with `Rendering needs Chromium. Install it with: make install-browser`. The Docker
+image has no browser, so `render` is not available in the container.
+
+```bash
+mcp-htmleditor render pres.html                          # first slide, 480x270 PNG
+mcp-htmleditor render pres.html --slide slide-3 --scale 1   # 960x540
+mcp-htmleditor render pres.html --slide slide-3 --report    # picture plus its layout problems
+mcp-htmleditor render pres.html --report-only               # every slide, no picture
+mcp-htmleditor render pres.html --report-only --json        # one compact JSON object
+```
+
+| Option | Effect |
+|--------|--------|
+| `--slide TEXT` | Id of the slide to render (default: the first). An unknown id lists the valid ids. |
+| `--scale TEXT` | Scale of the picture, 0.1 to 1 (default 0.5). |
+| `--report` | Also print the layout problems of the rendered slide. |
+| `--report-only` | Print the layout problems of every slide and write no picture. Cannot be combined with `--slide`, `--scale` or `--report`. |
+| `--json` | Print the result as one compact JSON object only. |
+
+The picture is written to `<temporary directory>/htmleditor-render/<file stem>-<slide id>.png` and
+the command prints `Rendered <slide id> to <path> (<width>x<height>)`. After a successful render,
+older pictures of the same presentation's other slides are removed; pictures of other files stay.
+The HTML file is never modified. A `--report-only` run of a 40 slide presentation finishes in under 30 seconds.
+
+With `--report` or `--report-only` each problem prints as `<kind> <slide>: <message>`, in slide
+order, then a final line `report: OK`, `report: 1 problem` or `report: N problems`.
+
+| Kind | Message |
+|------|---------|
+| `overflow` | `content is <n>px tall, the slide is 540px` |
+| `clipped` | `<selector> is outside the slide frame` |
+| `font` | `"<name>" is not available, fallback used` |
+| `script` | `<Error name>: <message>`, a script error raised while the slide was shown (slide `-` before any slide is shown) |
+| `image` | `<source> did not load` (a long data address is cut to 40 characters plus `...`) |
+
+Exit statuses: `0` nothing to report, `1` at least one problem found or an error (`error: <message>`
+on stderr), `2` conflicting options (`Error: --report-only cannot be used with --slide, --scale or --report`).
+
+The MCP tool `render(file, slide=None, scale=0.5, report=False, report_only=False)` does the same
+and returns `{ok, path, width, height, problems}` with `problems` as a list of `{kind, slide, message}`.
+
 ### Read, check and edit a file without touching its images
 
 ```bash
@@ -315,6 +361,7 @@ figures must be PNG, never SVG.
 | `list_requests(file)` | The requests the person queued in the editor, oldest first: `{file, requests: [{id, slide, title, queued, instruction, status, reason}]}`. Same list as `mcp-htmleditor requests`. |
 | `complete_request(file, id, status, reason=None)` | Mark a request `done`, or `skipped` with a reason. Returns `{ok, id, status}`. |
 | `write_review(file, suggestions)` | Replace the AI suggestions shown in the editor (at most 6). Returns `{ok, count}`. |
+| `render(file, slide=None, scale=0.5, report=False, report_only=False)` | PNG of one slide plus, on request, its layout problems (see [Visual render](#visual-render)). Needs Chromium. Returns `{ok, path, width, height, problems}`. |
 
 ### Multiple presentations at once
 

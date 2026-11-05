@@ -49,6 +49,8 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_render_options.py` | SPEC-0008: `--slide`, `--scale`, size rounding, check order |
 | `test_render_report.py` | SPEC-0008: `--report` for one slide, problem ordering and wording |
 | `test_render_report_only.py` | SPEC-0008: `--report-only` over the deck, option conflict (status 2), no file written, DECK-EI and DECK-MED clean |
+| `test_render_content.py` | SPEC-0008: picture holds the slide after its entrance animation and nothing else (no header bar, no neighbour slide), pixel checks |
+| `test_render_scale.py` | SPEC-0008: 40 slide decks (`big_deck`) analysed in under 30 s (`time.monotonic`), and the doc checks for README, AGENTS.md, observability.md and the core `render` line |
 | `test_requests_core.py` | SPEC-0010: `RequestStore` and `RequestService` (record shape, lock across threads and processes with the UT-A02 subprocess pattern, unreadable record never reset), HTTP queue and list, `requests` command; exports `make_deck`, `expected_key`, `queue_over_http` |
 | `test_requests_tools.py` | SPEC-0010: tools `list_requests` and `complete_request` through `call_tool`, tool errors equal the command line text without `error: `, stdout clean |
 | `test_requests_cli.py` | SPEC-0010: `request-done` and `request-skip`, the `create` topic workflow, skill audit gate (UT-C04) |
