@@ -346,6 +346,7 @@ async function pollStatus() {
     }
   }
   lastMtime = status.mtime; // baseMtime stays: unsaved edits are still based on the version they started from
+  requestsOnStatus(status);
 }
 
 function reloadFrame() {

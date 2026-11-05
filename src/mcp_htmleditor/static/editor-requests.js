@@ -5,7 +5,8 @@
  * request for the current slide, and the always visible "Requests (n)" side
  * list with a Delete button per request.
  *
- * An IIFE: it reads no top level binding of editor.js and exposes no global.
+ * An IIFE: it reads no top level binding of editor.js. Its one global is
+ * requestsOnStatus, which the status poll of editor.js calls (US-0056).
  * Every string that comes from the record goes in through textContent, never
  * innerHTML (DEC-012): the agent's text is data, not markup.
  */
@@ -23,6 +24,8 @@
 
   let askAiRememberedSlide = null;   // data-id of the slide of the last click or selection (DEC-013)
   let requestsFetchCount   = 0;      // a late answer of an older fetch is dropped
+  let requestsInFlight     = 0;      // fetches of GET /requests not yet answered
+  let requestsHeld         = null;   // the record revision the list shows (an integer, or none yet)
   const requestsAttached   = new WeakSet();
 
   /* ---------- the current slide (DEC-013) ---------- */
@@ -171,15 +174,36 @@
 
   async function requestsRefresh() {
     const ticket = ++requestsFetchCount;
+    requestsInFlight++;
     try {
       const response = await fetch('/requests', { cache: 'no-store' });
       if (!response.ok) return;
       const snapshot = await response.json();
-      if (ticket === requestsFetchCount && Array.isArray(snapshot.requests)) requestsRender(snapshot);
+      if (ticket === requestsFetchCount && Array.isArray(snapshot.requests)) {
+        requestsRender(snapshot);
+        if (Number.isInteger(snapshot.revision)) requestsHeld = snapshot.revision;
+      }
     } catch (e) {
       /* the connection notice of editor.js reports a lost server; the list keeps its last state */
+    } finally {
+      requestsInFlight--;
     }
   }
+
+  /**
+   * Called by the status poll of editor.js once per successful poll (DEC-004). The list is fetched only when
+   * the record revision differs from the one held, whether higher or lower: open_file or a wiped state
+   * directory serve another record while this page survives. A poll that raced with our own refetch is
+   * dropped by the in-flight counter and the ticket in requestsRefresh. A failed fetch holds nothing, so
+   * the next differing poll tries again.
+   */
+  function requestsOnStatus(status) {
+    const revision = status && status.requests_revision;
+    if (!Number.isInteger(revision) || requestsInFlight > 0) return;
+    if (revision === requestsHeld) return;
+    requestsRefresh();
+  }
+  window.requestsOnStatus = requestsOnStatus;
 
   /* ---------- wiring ---------- */
 
