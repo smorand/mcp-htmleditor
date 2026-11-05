@@ -24,6 +24,7 @@ from bs4 import BeautifulSoup
 from bs4.element import Comment, NavigableString, Tag
 
 from ..fileio import atomic_write
+from ..textcheck import UNENCODABLE_TEXT, is_utf8_encodable
 from . import Deck, DeckError, deck_from_text, load_deck, slide_id
 from .lint import lint_deck
 from .renumber import apply_edits, renumber_edits
@@ -203,6 +204,8 @@ def apply_patch(
     text = working.text()
     if working.is_structural:
         text = apply_edits(text, renumber_edits(text))
+    if not is_utf8_encodable(text):
+        raise DeckError(UNENCODABLE_TEXT)
     data = text.encode("utf-8")
     is_changed = text != deck.text
     if is_changed and not dry_run:

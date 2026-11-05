@@ -15,6 +15,7 @@ from typing import Any
 
 from .config import get_settings
 from .request_store import ErrorKind, Record, Request, RequestError, RequestStore, Suggestion
+from .textcheck import UNENCODABLE_TEXT, is_utf8_encodable
 
 __all__ = [
     "BODY_MAX_BYTES",
@@ -90,6 +91,8 @@ class RequestService:
 
     def complete(self, file: Path, request_id: str, status: str, reason: str | None) -> Request:
         """Mark a request ``done`` or ``skipped``; the checks and the write share one store update."""
+        if reason is not None and not is_utf8_encodable(reason):
+            raise RequestError("invalid", UNENCODABLE_TEXT)
         try:
             return self._store.update(file, "complete", lambda record: self._finish(record, request_id, status, reason))
         except OSError as exc:
@@ -198,7 +201,16 @@ def _check_review(raw: object) -> list[Suggestion]:
         suggestion = _check_suggestion(position, item, seen)
         seen.add(suggestion.id)
         suggestions.append(suggestion)
+    for suggestion in suggestions:
+        for name in SUGGESTION_FIELDS:
+            if (value := getattr(suggestion, name)) is not None:
+                _require_encodable(value)
     return suggestions
+
+
+def _require_encodable(text: str) -> None:
+    if not is_utf8_encodable(text):
+        raise RequestError("invalid", UNENCODABLE_TEXT)
 
 
 def _check_suggestion(position: int, item: object, seen: set[str]) -> Suggestion:
@@ -210,6 +222,7 @@ def _check_suggestion(position: int, item: object, seen: set[str]) -> Suggestion
     if len(fields["title"]) > TITLE_MAX:
         raise RequestError("invalid", f"Suggestion {position}: title is longer than {TITLE_MAX} characters")
     if fields["id"] in seen:
+        _require_encodable(fields["id"])  # the message below quotes the id
         raise RequestError("invalid", f'Suggestion {position}: duplicate id "{fields["id"]}"')
     return Suggestion(
         id=fields["id"],
