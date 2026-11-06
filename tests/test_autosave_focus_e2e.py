@@ -23,15 +23,38 @@ from playwright.sync_api import Page, Route
 from mcp_htmleditor import config as config_module
 from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
+from tests.browser_wait import (
+    LATE_SAVE_MS,
+    OBSERVE_BOUND_SECONDS,
+    answer_saves_late,
+    settle,
+    wait_for_file,
+    wait_for_js,
+    wait_until,
+)
 from tests.conftest import needs_chromium
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TITLE = "Titre du document"
 HEADING = "Introduction"
-SAVE_WAIT_MS = 1500  # > the 800 ms typing debounce plus the POST round trip
 TITLE_SELECTOR = 'h1[data-editable~="text"]'
 HEADING_SELECTOR = 'h2[data-editable~="text"]'
 SAVED_DOT_COLOR = "rgb(66, 190, 101)"
+DOT_COLOR_EXPRESSION = "() => getComputedStyle(document.getElementById('toolbar-status')).color"
+TITLE_EDITABLE_EXPRESSION = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    f" const h = d && d.querySelector('{TITLE_SELECTOR}'); return !!h && h.isContentEditable; }}"
+)
+
+
+@pytest.fixture(params=[0, LATE_SAVE_MS], ids=["prompt", "late"])
+def save_delay(request: pytest.FixtureRequest, page: Page) -> Iterator[int]:
+    """Answer every ``POST /content`` at once (0) or ``LATE_SAVE_MS`` late (BR-011)."""
+    delay = int(request.param)
+    if delay:
+        answer_saves_late(page, delay)
+    yield delay
+    page.unroute_all(behavior="ignoreErrors")
 
 
 @dataclass(frozen=True)
@@ -76,7 +99,7 @@ def _open_in_edit_mode(page: Page, served: ServedDoc) -> None:
         " return d && d.querySelector('h1'); }"
     )
     page.click("#edit-mode-btn")
-    page.wait_for_timeout(150)
+    wait_for_js(page, TITLE_EDITABLE_EXPRESSION, True, what="the title zone editable")
 
 
 def _frame_eval(page: Page, body: str) -> object:
@@ -105,12 +128,12 @@ def _click_end(page: Page, selector: str) -> None:
 
 
 @needs_chromium
-def test_typing_after_autosave_stays_in_the_zone(page: Page, served: ServedDoc) -> None:
+def test_typing_after_autosave_stays_in_the_zone(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-001: reproduction of BUG-001."""
     _open_in_edit_mode(page, served)
     _click_end(page, TITLE_SELECTOR)
     page.keyboard.type("AAA")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, f"{TITLE}AAA")
     page.keyboard.type("BBB")
 
     assert f"{TITLE}AAA" in served.path.read_text(encoding="utf-8")
@@ -119,7 +142,7 @@ def test_typing_after_autosave_stays_in_the_zone(page: Page, served: ServedDoc) 
 
 
 @needs_chromium
-def test_caret_offset_survives_a_save(page: Page, served: ServedDoc) -> None:
+def test_caret_offset_survives_a_save(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-010."""
     _open_in_edit_mode(page, served)
     page.frame_locator("#content-frame").locator(TITLE_SELECTOR).click()
@@ -127,14 +150,14 @@ def test_caret_offset_survives_a_save(page: Page, served: ServedDoc) -> None:
     for _ in range(5):
         page.keyboard.press("ArrowRight")
     page.keyboard.type("X")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, "TitreX du document")
     page.keyboard.type("Y")
 
     assert _zone_text(page, TITLE_SELECTOR) == "TitreXY du document"
 
 
 @needs_chromium
-def test_selection_survives_a_save(page: Page, served: ServedDoc) -> None:
+def test_selection_survives_a_save(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-011."""
     _open_in_edit_mode(page, served)
     _click_end(page, TITLE_SELECTOR)
@@ -142,14 +165,14 @@ def test_selection_survives_a_save(page: Page, served: ServedDoc) -> None:
         page.keyboard.press("Shift+ArrowLeft")
     page.keyboard.type("Z")
     page.keyboard.press("Shift+ArrowLeft")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, "Titre du Z")
     page.keyboard.type("W")
 
     assert _zone_text(page, TITLE_SELECTOR) == "Titre du W"
 
 
 @needs_chromium
-def test_leaving_a_zone_keeps_focus_in_the_next_zone(page: Page, served: ServedDoc) -> None:
+def test_leaving_a_zone_keeps_focus_in_the_next_zone(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-012."""
     _open_in_edit_mode(page, served)
     _click_end(page, TITLE_SELECTOR)
@@ -159,28 +182,28 @@ def test_leaving_a_zone_keeps_focus_in_the_next_zone(page: Page, served: ServedD
 
     assert _zone_text(page, HEADING_SELECTOR) == f"{HEADING}B1"
     assert _is_focused(page, HEADING_SELECTOR)
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, f"{TITLE}A1")
     assert f"{TITLE}A1" in served.path.read_text(encoding="utf-8")
 
 
 @needs_chromium
-def test_several_saves_lose_nothing(page: Page, served: ServedDoc) -> None:
+def test_several_saves_lose_nothing(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-013."""
     _open_in_edit_mode(page, served)
     _click_end(page, TITLE_SELECTOR)
     page.keyboard.type("1")
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(1000)  # pacing: spaces the three keystrokes so each one is saved on its own
     page.keyboard.type("2")
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(1000)  # pacing: same spacing, no result is asserted after it
     page.keyboard.type("3")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, f"{TITLE}123")
 
     assert _zone_text(page, TITLE_SELECTOR) == f"{TITLE}123"
     assert f"{TITLE}123" in served.path.read_text(encoding="utf-8")
 
 
 @needs_chromium
-def test_failed_save_keeps_focus(page: Page, served: ServedDoc) -> None:
+def test_failed_save_keeps_focus(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-014."""
 
     def abort_saves(route: Route) -> None:
@@ -189,11 +212,13 @@ def test_failed_save_keeps_focus(page: Page, served: ServedDoc) -> None:
         else:
             route.continue_()
 
+    failed_saves: list[str] = []
+    page.on("requestfailed", lambda request: failed_saves.append(request.url))
     page.route("**/content", abort_saves)
     _open_in_edit_mode(page, served)
     _click_end(page, TITLE_SELECTOR)
     page.keyboard.type("Q")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_until(page, lambda: len(failed_saves), lambda count: count >= 1, what="the aborted save attempt")
     page.keyboard.type("R")
 
     assert _zone_text(page, TITLE_SELECTOR) == f"{TITLE}QR"
@@ -201,12 +226,28 @@ def test_failed_save_keeps_focus(page: Page, served: ServedDoc) -> None:
 
 
 @needs_chromium
-def test_saved_file_has_no_editing_markers(page: Page, served: ServedDoc) -> None:
+def test_bounded_observation_reports_the_last_value(page: Page, served: ServedDoc) -> None:
+    """BT-014 (SPEC-0014): an awaited save that never lands fails after the bound, with the file content."""
+    page.route("**/content", lambda route: route.abort() if route.request.method == "POST" else route.continue_())
+    _open_in_edit_mode(page, served)
+    _click_end(page, TITLE_SELECTOR)
+    page.keyboard.type("Q")
+    started = time.monotonic()
+
+    with pytest.raises(AssertionError) as raised:
+        wait_for_file(page, served.path, f"{TITLE}Q")
+
+    assert OBSERVE_BOUND_SECONDS <= time.monotonic() - started <= OBSERVE_BOUND_SECONDS + 2
+    assert f">{TITLE}</h1>" in str(raised.value)
+
+
+@needs_chromium
+def test_saved_file_has_no_editing_markers(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-020: non regression of SPEC-0001/FR-005."""
     _open_in_edit_mode(page, served)
     _click_end(page, TITLE_SELECTOR)
     page.keyboard.type("AAA")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, f"{TITLE}AAA")
     page.keyboard.type("BBB")
 
     saved = served.path.read_text(encoding="utf-8")
@@ -216,26 +257,27 @@ def test_saved_file_has_no_editing_markers(page: Page, served: ServedDoc) -> Non
 
 
 @needs_chromium
-def test_self_save_does_not_reload_the_preview(page: Page, served: ServedDoc) -> None:
+def test_self_save_does_not_reload_the_preview(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-021: non regression of SPEC-0002/FR-008."""
     _open_in_edit_mode(page, served)
     page.evaluate("() => { document.getElementById('content-frame').contentWindow.__probe = 1; }")
     _click_end(page, TITLE_SELECTOR)
     page.keyboard.type("AAA")
-    page.wait_for_timeout(2500)
+    wait_for_file(page, served.path, f"{TITLE}AAA")
+    wait_for_js(page, DOT_COLOR_EXPRESSION, SAVED_DOT_COLOR, what="the status dot saved (the save answered)")
+    settle(page)
 
     assert page.evaluate("() => document.getElementById('content-frame').contentWindow.__probe") == 1
 
 
 @needs_chromium
-def test_status_dot_returns_to_saved(page: Page, served: ServedDoc) -> None:
+def test_status_dot_returns_to_saved(page: Page, served: ServedDoc, save_delay: int) -> None:
     """BT-022: non regression of SPEC-0002/FR-007."""
     _open_in_edit_mode(page, served)
     _click_end(page, TITLE_SELECTOR)
     page.keyboard.type("AAA")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, f"{TITLE}AAA")
     page.keyboard.type("BBB")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served.path, f"{TITLE}AAABBB")
 
-    color = page.evaluate("() => getComputedStyle(document.getElementById('toolbar-status')).color")
-    assert color == SAVED_DOT_COLOR
+    assert wait_for_js(page, DOT_COLOR_EXPRESSION, SAVED_DOT_COLOR, what="the status dot saved") == SAVED_DOT_COLOR

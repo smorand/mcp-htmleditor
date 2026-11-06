@@ -39,6 +39,28 @@ the child's wall time. The literal 60 / 900 check (BT-016) is `slow`:
 `make test ARGS='-m slow -k suite_time_limit'`. The dependency is `pytest-timeout>=2.4.0`: 2.5.0 is yanked on PyPI
 (accidental breaking change), so uv cannot lock it; move to a later release once one is not yanked.
 
+### Browser waits (2026-11, SPEC-0014 BR-008 to BR-011, DEC-011 to DEC-014)
+
+A browser test never asserts an asynchronous result (file after an autosave, status dot, DOM after an insert, a reload)
+after a fixed delay. It uses `tests/browser_wait.py`: `wait_until(page, observe, holds, what=...)` observes first, then
+pauses `page.wait_for_timeout(100)` between observations (`OBSERVE_INTERVAL_SECONDS`), up to 10 s
+(`OBSERVE_BOUND_SECONDS`) from the call, and fails with `AssertionError("<what> not reached within 10 s, last value:
+<repr>")`. `wait_for_file(page, path, needle)` and `wait_for_js(page, expression, expected, what=...)` are the two shapes
+used by the files. Never `time.sleep` in an observation: in the sync Playwright API route handlers and events run only
+inside a Playwright call. An absence ("the preview was not reloaded") is asserted after `wait_until` on the step that
+could cause it, then `settle(page)` (1 s, `SETTLE_SECONDS`), then the assertion. A `wait_for_timeout(` that stays in a
+browser test carries a trailing `# pacing: <reason>` (a spacing between two user actions, no result asserted after it).
+
+Late saves: `answer_saves_late(page, 2000)` (`LATE_SAVE_MS`) is an init script that holds every `POST /content` for
+2 s before it leaves, so the file and the answer both come 2 s late; call it before `page.goto`.
+`test_autosave_focus_e2e.py` has a `save_delay` fixture (`prompt`, `late`) on every test. Do NOT build it with a route
+handler (measured 2026-11-06): in the sync API a handler that waits (`time.sleep` or a nested
+`page.wait_for_timeout`) blocks the dispatcher, so each `wait_for_timeout` of the test returns only after the handler,
+the test timeline stretches by the delay and the old fixed waits pass; and a handler that does `route.fetch()` first has
+already written the file. The editor runs saves one after the other (`saveChain`), so a late answer delays the next
+save: the old `SAVE_WAIT_MS` tests fail in the `late` variant (4 of 9). `tests/test_browser_wait.py` tests the loop with
+a stub page (no browser).
+
 ### Bounded stdio reads (2026-11-06, SPEC-0014 BR-014, DEC-010)
 
 A test that talks to a child process over stdio uses `tests/stdio_support.py` (`StdioSession`, `run_session`), never a
@@ -60,6 +82,8 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | File | Covers |
 |------|--------|
 | `conftest.py` | `reset_settings` (autouse, drops the memoized `Settings`), `reset_state` / `fresh_state` (EditorState singleton), `html_file` |
+| `browser_wait.py` | Bounded observation for browser tests: `wait_until`, `wait_for_file`, `wait_for_js`, `settle`, `answer_saves_late` and the constants (US-0084) |
+| `test_browser_wait.py` | the observation loop with a stub page: first value that holds, last value in the failure, every wait at most 100 ms, settle delay (US-0084) |
 | `stdio_support.py` | `StdioSession` and `run_session`: JSON lines over a child's stdio, every line read bounded by `LINE_TIMEOUT_SECONDS`; `SILENT_CHILD`, `mcp_command()` (US-0081) |
 | `test_stdio_support.py` | BR-014: short bound, closed stdout, partial line, real session, source check; `slow` BT-003 and BT-017 at the literal 30 s (US-0081) |
 | `deck_support.py` | Deck fixtures (US-0035 to US-0040): `deck_ei`, `deck_carbon`, `deck_med`, `doc_perso` built from the real `templates/bootstrap` files (never committed); `slide_html(charter, title, ...)` returns one valid `ei` or `carbon` slide as an agent would send it; `write_deck` forces the modification time with `os.utime(path, (1_000_000_000, 1_000_000_000))` (no clock in tests); `assert_only_region_changed(before, after, marker)` proves byte identity outside an element found by plain substring search; `run_cli` and `call_tool` |
@@ -89,7 +113,7 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_export_pptx.py` | Slide detection on all templates, no `<script>` or shell text in the output, base64 and relative images, table spans and column widths, Gantt geometry, arch node shapes, annotation placement, geometry and style helpers |
 | `test_export_docx.py` | HTML preprocessing (single title), charter detection, `word/styles.xml` patching, header and footer parts, cache and fallbacks, end to end pandoc exports guarded by `skipif` when pandoc is absent |
 | `test_fullscreen_e2e.py` | SC-008 / FR-026-028 (see retrospective spec): fullscreen presentation mode via a real `ThreadingHTTPServer` + real headless Chromium (`pytest-playwright`). Toolbar/nav-arrow hiding, slide filling the screen, keyboard navigation independent of focus, the parent-side fallback CSS safety net, and exit-preserves-position. Guarded by `skipif` when Chromium is not installed |
-| `test_autosave_focus_e2e.py` | SPEC-0004 (2026-10-10): a background autosave never moves focus, caret or selection and never drops keystrokes; saved file still clean, no self reload, status dot back to saved. Same real server + Chromium harness, `skipif` without Chromium |
+| `test_autosave_focus_e2e.py` | SPEC-0004 (2026-10-10): a background autosave never moves focus, caret or selection and never drops keystrokes; saved file still clean, no self reload, status dot back to saved. Same real server + Chromium harness, `skipif` without Chromium. Results awaited with `browser_wait`, each test run with prompt and 2 s late saves (US-0084), BT-014 (bound and last value) |
 | `render_support.py` | Render fixtures (SPEC-0008): `ei_deck_html`, `med_deck_html` (adds `h-md` to the figures), string injectors (`inject_in_body`, `append_to_slide`, `set_slide_class`, `add_script`), `big_deck`, PNG helpers, `needs_chromium` (skips a browser test without Chromium) |
 | `test_render_install.py` | SPEC-0008: Chromium install and missing browser message |
 | `test_render_picture.py` | SPEC-0008: one slide PNG, output path, stale cleanup |
