@@ -36,7 +36,8 @@ guard's checking function report that file and line (red before this story: the 
 # tests/test_no_fixed_waits.py (new)
 PACING_COMMENT = re.compile(r"#\s*pacing:\s*\S")
 
-def unjustified_waits(path: Path) -> list[int]: ...   # line numbers of wait_for_timeout( without PACING_COMMENT
+
+def unjustified_waits(path: Path) -> list[int]: ...  # line numbers of wait_for_timeout( without PACING_COMMENT
 ```
 The guard parametrizes over `sorted((REPO / "tests").glob("test_*_e2e.py"))` and asserts
 `unjustified_waits(path) == []`, the message naming the file and the lines.

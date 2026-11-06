@@ -41,23 +41,39 @@ before: the module does not exist; with today's inline loop the read blocks unti
 LINE_TIMEOUT_SECONDS: float = 30.0
 SILENT_CHILD = [sys.executable, "-c", "import time; time.sleep(3600)"]
 
-def mcp_command() -> list[str]: ...        # [sys.executable, "-m", "mcp_htmleditor", "mcp"]
-def silence_message() -> str: ...          # f"the server did not answer within {LINE_TIMEOUT_SECONDS:g} s"
 
-class StdioSession:                        # context manager; __exit__ kills the child and wait(timeout=10)
-    def __init__(self, command: Sequence[str], *, cwd: Path, env: Mapping[str, str] | None = None) -> None: ...
+def mcp_command() -> list[str]: ...  # [sys.executable, "-m", "mcp_htmleditor", "mcp"]
+def silence_message() -> str: ...  # f"the server did not answer within {LINE_TIMEOUT_SECONDS:g} s"
+
+
+class StdioSession:  # context manager; __exit__ kills the child and wait(timeout=10)
+    def __init__(self, command: Sequence[str], *, cwd: Path, env: Mapping[str, str] | None = None) -> None:
+        ...
         # Popen(stdin=PIPE, stdout=PIPE, stderr=DEVNULL, text=True); env None means os.environ
-    def send(self, message: dict[str, Any]) -> None: ...           # json.dumps + "\n", flush
-    def read_message(self) -> dict[str, Any]: ...                   # one bounded line, json.loads
+
+    def send(self, message: dict[str, Any]) -> None: ...  # json.dumps + "\n", flush
+    def read_message(self) -> dict[str, Any]:
+        ...  # one bounded line, json.loads
         # empty line (stdout closed): assert fails with "the server closed stdout before answering" (today's text)
         # no line within the bound: kill, wait, pytest.fail(silence_message())
-    def initialize(self) -> None: ...      # initialize id 1 (protocolVersion "2024-11-05"), notifications/initialized
-    def call_tool(self, request_id: int, name: str, arguments: dict[str, Any]) -> dict[str, Any]: ...  # reads until the id, returns "result"
+
+    def initialize(self) -> None: ...  # initialize id 1 (protocolVersion "2024-11-05"), notifications/initialized
+    def call_tool(
+        self, request_id: int, name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]: ...  # reads until the id, returns "result"
     @property
     def messages(self) -> list[dict[str, Any]]: ...
 
-def run_session(requests: Sequence[dict[str, Any]], wanted_ids: set[int], *, command: Sequence[str] | None = None,
-                cwd: Path, env: Mapping[str, str] | None = None) -> list[dict[str, Any]]: ...
+
+def run_session(
+    requests: Sequence[dict[str, Any]],
+    wanted_ids: set[int],
+    *,
+    command: Sequence[str] | None = None,
+    cwd: Path,
+    env: Mapping[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    ...
     # sends every request at once (as the three tests do today), reads until every wanted id was seen
 ```
 

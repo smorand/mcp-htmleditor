@@ -40,6 +40,7 @@ dev = [
     "bandit>=1.7",
     "pre-commit>=4.0",
     "types-beautifulsoup4",
+    "pytest-timeout>=2.4.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -177,6 +178,10 @@ pythonpath = ["src"]
 markers = ["slow: real 30 second and 5 minute time bounds, not run by make check"]
 # The real value tests take minutes: run them with make test ARGS='-m slow' (the last -m wins).
 addopts = "-m 'not slow'"
+# Every test is bounded (SPEC-0014 BR-012): 60 s, 900 s for `slow` (hook in tests/conftest.py). The signal method
+# fails the one test with `Timeout` and the run goes on; the thread method would end the whole process.
+timeout = 60
+timeout_method = "signal"
 
 [tool.coverage.run]
 source = ["src/mcp_htmleditor"]

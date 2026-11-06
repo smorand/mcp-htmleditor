@@ -23,7 +23,7 @@ Project state: existing (`ls src/mcp_htmleditor` lists the package modules; `git
 | HTTP server | stdlib `ThreadingHTTPServer` (`daemon_threads = True`, `allow_reuse_address = True`, stdlib `http/server.py:143`, `:155`) subclassed as `_EditorServer` (`src/mcp_htmleditor/http_server.py:927`) | stdlib | existing, DEC-001 to DEC-004 |
 | Tool protocol | FastMCP (`src/mcp_htmleditor/mcp_server.py:102` `stop_server`) | locked 3.4.6 | existing |
 | Tests | pytest 9.1.1 (`uv.lock:1646`), pytest-asyncio, pytest-cov, pytest-playwright (`pyproject.toml:36` to `:39`) | as locked | existing |
-| Per test time limit | `pytest-timeout`, `signal` method | 2.5.0 (context7 `/pytest-dev/pytest-timeout`, `setup.cfg` `version = 2.5.0`, requires `pytest>=8.4.0`, Python 3.10 to 3.15) | DEC-007 |
+| Per test time limit | `pytest-timeout`, `signal` method | 2.4.0, locked (corrected from 2.5.0: 2.5.0 is yanked on PyPI, reason "accidental breaking change (probably)"; 2.4.0 requires `pytest>=7.0.0`) | DEC-007 |
 
 Skills loaded: `python` (via `load_dynamic_context`, injected for this run). Effect: `make check` is the gate
 (lint, format-check, typecheck strict, bandit, coverage 80 %); dependencies added with uv and locked
@@ -193,19 +193,28 @@ OBSERVE_BOUND_SECONDS = 10.0
 SETTLE_SECONDS = 1.0
 LATE_SAVE_MS = 2000
 
-def wait_until(page: Page, observe: Callable[[], T], holds: Callable[[T], bool], *, what: str,
-               bound: float = OBSERVE_BOUND_SECONDS) -> T: ...
+
+def wait_until(
+    page: Page, observe: Callable[[], T], holds: Callable[[T], bool], *, what: str, bound: float = OBSERVE_BOUND_SECONDS
+) -> T:
+    ...
     # failure: AssertionError(f"{what} not reached within {bound:g} s, last value: {value!r}")
-def wait_for_file(page: Page, path: Path, needle: str) -> str: ...      # wait_until on path.read_text(encoding="utf-8")
-def wait_for_js(page: Page, expression: str, expected: object, *, what: str) -> object: ...  # page.evaluate(expression) == expected
-def settle(page: Page) -> None: ...                                     # page.wait_for_timeout(SETTLE_SECONDS * 1000)
-def answer_saves_late(page: Page, delay_ms: int = LATE_SAVE_MS) -> None: ...  # route "**/content": POST -> fetch, sleep, fulfill
+
+
+def wait_for_file(page: Page, path: Path, needle: str) -> str: ...  # wait_until on path.read_text(encoding="utf-8")
+def wait_for_js(
+    page: Page, expression: str, expected: object, *, what: str
+) -> object: ...  # page.evaluate(expression) == expected
+def settle(page: Page) -> None: ...  # page.wait_for_timeout(SETTLE_SECONDS * 1000)
+def answer_saves_late(
+    page: Page, delay_ms: int = LATE_SAVE_MS
+) -> None: ...  # route "**/content": POST -> fetch, sleep, fulfill
 ```
 
 ### 5.3 Test configuration
 
 `pyproject.toml` `[tool.pytest.ini_options]` gains `timeout = 60` and `timeout_method = "signal"`; the dev group
-gains `"pytest-timeout>=2.5.0"`. `tests/conftest.py` gains `SLOW_TEST_TIMEOUT_SECONDS = 900` and a
+gains `"pytest-timeout>=2.4.0"`. `tests/conftest.py` gains `SLOW_TEST_TIMEOUT_SECONDS = 900` and a
 `pytest_collection_modifyitems` hook adding `pytest.mark.timeout(SLOW_TEST_TIMEOUT_SECONDS)` to every item marked
 `slow`. A timed out test fails with `Failed: Timeout (>60.0s) from pytest-timeout.` (pytest-timeout
 `PYTEST_FAILURE_MESSAGE`), the run continues, and `make test` and `make check` exit non zero (BR-013).
@@ -215,7 +224,7 @@ gains `"pytest-timeout>=2.5.0"`. `tests/conftest.py` gains `SLOW_TEST_TIMEOUT_SE
 | Path | Action | Caused by | Story |
 |---|---|---|---|
 | `pyproject.toml` | modify: dev dependency, `timeout`, `timeout_method` | BR-012, BR-013 | US-0080 |
-| `uv.lock` | modify: `pytest-timeout` 2.5.0 | BR-012 | US-0080 |
+| `uv.lock` | modify: `pytest-timeout` 2.4.0 | BR-012 | US-0080 |
 | `tests/conftest.py` | modify: slow limit hook | BR-012 | US-0080 |
 | `tests/test_suite_time_limit.py` | create: BT-016 (slow) and its short counterparts | BR-012, BR-013 | US-0080 |
 | `tests/stdio_support.py` | create | BR-014 | US-0081 |
@@ -264,7 +273,7 @@ Affected documentation: `README.md`, `AGENTS.md`, `.agent_docs/testing.md`, `.ag
 - Ordering: US-0080 before US-0081 (BT-003 needs both bounds); US-0081 before US-0082 (the stdio lifecycle tests
   use `StdioSession`); US-0084 before US-0085 to US-0087 (helper).
 - Rollback: `git revert` of the story commits; nothing persisted changes.
-- Dependencies added: `pytest-timeout` 2.5.0 (dev only). Removed: none.
+- Dependencies added: `pytest-timeout` 2.4.0 (dev only). Removed: none.
 
 ## 8. Security design
 
@@ -345,15 +354,15 @@ Test data: generated in each test (the `doc` bootstrap copy of Spec section 4, t
   unchanged in both readings. **Alternatives considered:** shut busy connections that have not read their whole
   body (contradicts BR-004 as written). **Source:** spec constraint (BR-004 wording). **Evidence:** spec BR-003,
   BR-004, section 3.
-- **DEC-007:** Per test limit by `pytest-timeout` 2.5.0, dev dependency `"pytest-timeout>=2.5.0"` added with uv and
+- **DEC-007:** Per test limit by `pytest-timeout` 2.4.0, dev dependency `"pytest-timeout>=2.4.0"` added with uv and
   locked; `[tool.pytest.ini_options]` gains `timeout = 60` and `timeout_method = "signal"`. **Obliged by:** BR-012,
   BR-013. **Rationale:** the signal method fails the test with `Timeout (>60.0s) from pytest-timeout.` (an
   `AssertionError`) and the run continues, which BR-013 requires; the thread method ends the process. The plugin is
-  the maintained standard (pytest-dev), requires `pytest>=8.4.0` (locked 9.1.1) and supports Python 3.13 and 3.14.
+  the maintained standard (pytest-dev), requires `pytest>=7.0.0` (locked 9.1.1) and supports Python 3.13 and 3.14.
   **Alternatives considered:** the thread method (section 2); a home made `SIGALRM` fixture (reimplements the
   plugin, no ini key); `session_timeout` (bounds the run, not the test). **Source:** spec constraint (BR-012),
-  design. **Evidence:** context7 `/pytest-dev/pytest-timeout`: `setup.cfg` `version = 2.5.0`,
-  `install_requires = pytest>=8.4.0`, `timeout_sigalrm` raises `pytest.fail(PYTEST_FAILURE_MESSAGE % timeout)`.
+  design. **Evidence:** PyPI JSON: 2.5.0 is yanked on PyPI, reason "accidental breaking change (probably)" (2026-08-16), 2.4.0 is the latest
+  release, `Requires-Dist: pytest>=7.0.0`; context7 `/pytest-dev/pytest-timeout`: `timeout_sigalrm` raises `pytest.fail(PYTEST_FAILURE_MESSAGE % timeout)`.
 - **DEC-008:** The 900 second limit of `slow` tests is applied by a `pytest_collection_modifyitems` hook in
   `tests/conftest.py` that adds `pytest.mark.timeout(SLOW_TEST_TIMEOUT_SECONDS)` to each item carrying the `slow`
   marker (an explicit `timeout` marker on a test is left as is). Child runner tests load the hook with

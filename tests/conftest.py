@@ -27,11 +27,20 @@ def _chromium_cache_dir() -> Path:
     return home / ".cache" / "ms-playwright"
 
 
+SLOW_TEST_TIMEOUT_SECONDS = 900
+
 HAS_CHROMIUM = any(_chromium_cache_dir().glob("chromium-*"))
 needs_chromium = pytest.mark.skipif(
     not HAS_CHROMIUM,
     reason="Playwright Chromium is not installed; run `make sync`",
 )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Give every test marked slow its own 900 second limit (SPEC-0014/BR-012)."""
+    for item in items:
+        if item.get_closest_marker("slow") is not None and item.get_closest_marker("timeout") is None:
+            item.add_marker(pytest.mark.timeout(SLOW_TEST_TIMEOUT_SECONDS))
 
 
 @pytest.fixture(autouse=True)

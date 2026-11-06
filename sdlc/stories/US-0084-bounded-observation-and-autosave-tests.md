@@ -52,20 +52,29 @@ SETTLE_SECONDS = 1.0
 LATE_SAVE_MS = 2000
 T = TypeVar("T")
 
-def wait_until(page: Page, observe: Callable[[], T], holds: Callable[[T], bool], *, what: str,
-               bound: float = OBSERVE_BOUND_SECONDS) -> T: ...
+
+def wait_until(
+    page: Page, observe: Callable[[], T], holds: Callable[[T], bool], *, what: str, bound: float = OBSERVE_BOUND_SECONDS
+) -> T:
+    ...
     # observes first, then page.wait_for_timeout(OBSERVE_INTERVAL_SECONDS * 1000) between observations,
     # deadline time.monotonic() + bound taken at the call; on expiry, one last observation, then
     # AssertionError(f"{what} not reached within {bound:g} s, last value: {value!r}")
-def wait_for_file(page: Page, path: Path, needle: str) -> str: ...   # holds: needle in path.read_text(encoding="utf-8"); what: f"{path.name} containing {needle!r}"
-def wait_for_js(page: Page, expression: str, expected: object, *, what: str) -> object: ...  # holds: page.evaluate(expression) == expected
-def settle(page: Page) -> None: ...                                  # page.wait_for_timeout(SETTLE_SECONDS * 1000)
+
+
+def wait_for_file(
+    page: Page, path: Path, needle: str
+) -> str: ...  # holds: needle in path.read_text(encoding="utf-8"); what: f"{path.name} containing {needle!r}"
+def wait_for_js(
+    page: Page, expression: str, expected: object, *, what: str
+) -> object: ...  # holds: page.evaluate(expression) == expected
+def settle(page: Page) -> None: ...  # page.wait_for_timeout(SETTLE_SECONDS * 1000)
 def answer_saves_late(page: Page, delay_ms: int = LATE_SAVE_MS) -> None: ...
 ```
 ```python
 # tests/test_autosave_focus_e2e.py
 @pytest.fixture(params=[0, LATE_SAVE_MS], ids=["prompt", "late"])
-def save_delay(request: pytest.FixtureRequest, page: Page) -> int: ...   # answer_saves_late(page, ms) when ms
+def save_delay(request: pytest.FixtureRequest, page: Page) -> int: ...  # answer_saves_late(page, ms) when ms
 ```
 
 ### Paths

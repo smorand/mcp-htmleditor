@@ -29,7 +29,7 @@ and exits 0).
 ## Design excerpt
 
 ### Decisions
-- DEC-007 (SPEC-0014): "Per test limit by `pytest-timeout` 2.5.0, dev dependency `"pytest-timeout>=2.5.0"` added with uv and locked; `[tool.pytest.ini_options]` gains `timeout = 60` and `timeout_method = "signal"`." The signal method fails the test with `Timeout (>60.0s) from pytest-timeout.` and the run continues; the thread method would end the process. Version from context7 `/pytest-dev/pytest-timeout` (`version = 2.5.0`, requires `pytest>=8.4.0`; locked pytest is 9.1.1).
+- DEC-007 (SPEC-0014): "Per test limit by `pytest-timeout` 2.4.0, dev dependency `"pytest-timeout>=2.4.0"` added with uv and locked; `[tool.pytest.ini_options]` gains `timeout = 60` and `timeout_method = "signal"`." The signal method fails the test with `Timeout (>60.0s) from pytest-timeout.` and the run continues; the thread method would end the process. Version corrected from 2.5.0 to 2.4.0: PyPI marks 2.5.0 yanked, reason "accidental breaking change (probably)"; 2.4.0 requires `pytest>=7.0.0`; locked pytest is 9.1.1.
 - DEC-008 (SPEC-0014): "The 900 second limit of `slow` tests is applied by a `pytest_collection_modifyitems` hook in `tests/conftest.py` that adds `pytest.mark.timeout(SLOW_TEST_TIMEOUT_SECONDS)` to each item carrying the `slow` marker (an explicit `timeout` marker on a test is left as is). Child runner tests load the hook with `-p tests.conftest`, cwd at the repository root and `-c pyproject.toml`."
 - DEC-009 (SPEC-0014): the literal value check BT-016 carries `@pytest.mark.slow`; the default run carries short counterparts: "a child run with `-o timeout=2` (sleeper of 10 s reported `Timeout`, one other test passing, exit 1; a `slow` test sleeping 3 s under `-m slow -o timeout=1` passing, which proves the 900 marker outranks the ini value)".
 
@@ -37,7 +37,7 @@ and exits 0).
 ```toml
 # pyproject.toml
 [dependency-groups]
-dev = [ ..., "pytest-timeout>=2.5.0" ]      # through uv (make sync after editing), uv.lock updated
+dev = [ ..., "pytest-timeout>=2.4.0" ]      # through uv (make sync after editing), uv.lock updated
 
 [tool.pytest.ini_options]
 timeout = 60
@@ -46,6 +46,7 @@ timeout_method = "signal"
 ```python
 # tests/conftest.py
 SLOW_TEST_TIMEOUT_SECONDS = 900
+
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Give every test marked slow its own 900 second limit (SPEC-0014/BR-012)."""

@@ -79,7 +79,7 @@
 | US-0077 | SPEC-0013 | record, server and bind address arguments refused | US-0076 | 2 | landed | story/US-0077-record-server-and-bind-arguments | story/US-0076-deck-services-refuse-unencodable-paths |
 | US-0078 | SPEC-0013 | wait bound, idle close and send side bound | US-0072 | 1 | landed | story/US-0078-wait-bound-idle-close-send-bound | story/US-0077-record-server-and-bind-arguments |
 | US-0079 | SPEC-0013 | total request bound, slow suite and documentation | US-0074, US-0077, US-0078 | 2 | landed | story/US-0079-total-bound-slow-suite-and-docs | story/US-0078-wait-bound-idle-close-send-bound |
-| US-0080 | SPEC-0014 | per test time limit | main | 2 | todo | | |
+| US-0080 | SPEC-0014 | per test time limit | main | 2 | done | story/US-0080-per-test-time-limit | main |
 | US-0081 | SPEC-0014 | bounded stdio reads in tests | US-0080 | 2 | todo | | |
 | US-0082 | SPEC-0014 | a stop releases the port | US-0081 | 1 | todo | | |
 | US-0083 | SPEC-0014 | port range tests independent of the machine | main | 2 | todo | | |

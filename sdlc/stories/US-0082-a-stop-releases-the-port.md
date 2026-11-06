@@ -63,12 +63,13 @@ raises `OSError` while the idle connection lives).
 # src/mcp_htmleditor/http_connections.py (new; no internal import)
 class ConnectionRegistry:
     __slots__ = ("_busy", "_closing", "_lock")
+
     def __init__(self) -> None: ...
-    def add(self, sock: socket.socket) -> None: ...            # idle; when closing: shutdown(SHUT_RDWR) at once
-    def remove(self, sock: socket.socket) -> None: ...         # missing is fine
+    def add(self, sock: socket.socket) -> None: ...  # idle; when closing: shutdown(SHUT_RDWR) at once
+    def remove(self, sock: socket.socket) -> None: ...  # missing is fine
     def begin_request(self, sock: socket.socket) -> bool: ...  # False when closing, else busy
-    def end_request(self, sock: socket.socket) -> bool: ...    # idle again; True when closing
-    def close_idle(self) -> int: ...                           # closing = True; shut every idle socket; return the count
+    def end_request(self, sock: socket.socket) -> bool: ...  # idle again; True when closing
+    def close_idle(self) -> int: ...  # closing = True; shut every idle socket; return the count
     @property
     def closing(self) -> bool: ...
 ```
@@ -77,13 +78,17 @@ class ConnectionRegistry:
 ```python
 # src/mcp_htmleditor/http_server.py
 class _EditorServer(ThreadingHTTPServer):
-    def __init__(self, bind_host: str, port: int) -> None: ...   # + self.connections = ConnectionRegistry()
+    def __init__(self, bind_host: str, port: int) -> None: ...  # + self.connections = ConnectionRegistry()
+
+
 class _EditorHandler(BaseHTTPRequestHandler):
-    def setup(self) -> None: ...                 # existing wrappers, then self.server.connections.add(self.connection)
-    def parse_request(self) -> bool: ...         # new override (DEC-003)
-    def handle_one_request(self) -> None: ...    # existing SPEC-0013 policy + finally end_request (DEC-003)
-    def finish(self) -> None: ...                # new override: try super().finish() finally connections.remove(...)
-def stop_http_server() -> None: ...              # DEC-001; pragma removed
+    def setup(self) -> None: ...  # existing wrappers, then self.server.connections.add(self.connection)
+    def parse_request(self) -> bool: ...  # new override (DEC-003)
+    def handle_one_request(self) -> None: ...  # existing SPEC-0013 policy + finally end_request (DEC-003)
+    def finish(self) -> None: ...  # new override: try super().finish() finally connections.remove(...)
+
+
+def stop_http_server() -> None: ...  # DEC-001; pragma removed
 ```
 Agent answers unchanged: `stop_server()` returns `{"ok": true}`; `get_status()` returns `"running": false` after a
 stop; `start_server` returns `{"ok": true, "url": ..., "file": ..., "port": P, "started": true}`; the explicit port

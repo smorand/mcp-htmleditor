@@ -20,6 +20,25 @@ through the module at each use, which is the only seam; they are not a setting a
 Raw socket helpers live in `tests/http_support.py` (`exchange`, `RawReply`, `json_body`); `tests/trace_support.py`
 holds the tracing capture helpers.
 
+### Per test time limit (2026-11, SPEC-0014)
+
+Every test is bounded by `pytest-timeout`: `timeout = 60` and `timeout_method = "signal"` in
+`[tool.pytest.ini_options]`. A test over its limit fails alone with `Timeout (>60.0s) from pytest-timeout.` and its node
+id, the run goes on and `make test` / `make check` exit non zero. The signal method is required: the thread method
+would end the whole process and name nothing. `tests/conftest.py` holds `SLOW_TEST_TIMEOUT_SECONDS = 900` and a
+`pytest_collection_modifyitems` hook that adds `pytest.mark.timeout(900)` to each test carrying `slow` (an explicit
+`timeout` marker is left as is), so slow tests are never marked one by one.
+`tests/test_suite_time_limit.py` checks it with child pytest runs on throwaway files under `tmp_path`. A child run
+needs `-c pyproject.toml --rootdir <repo> -p tests.conftest -p no:cacheprovider`, cwd at the repository root, and a
+`timeout=` on `subprocess.run`, plus `--confcutdir` at the throwaway folder and its own `--basetemp` under it.
+Without `--confcutdir` pytest collects every ancestor of a file outside the rootdir, and `$TMPDIR` held 75k entries
+(5 to 12 s of collection); without `--basetemp` the child shares `$TMPDIR/pytest-of-<user>/` and deletes any stale
+`pytest-N` (a finished full run is about 80k files). Together they made a child with a 2 s limit run 7 to 35 s while
+its alarm fired on time (measured 2026-11-06). Judge a timed out test on its JUnit call time (`--junitxml`), never on
+the child's wall time. The literal 60 / 900 check (BT-016) is `slow`:
+`make test ARGS='-m slow -k suite_time_limit'`. The dependency is `pytest-timeout>=2.4.0`: 2.5.0 is yanked on PyPI
+(accidental breaking change), so uv cannot lock it; move to a later release once one is not yanked.
+
 `make sync` also runs `playwright install chromium` (no-op if already cached) so the
 browser E2E tests below can run without a manual step.
 
