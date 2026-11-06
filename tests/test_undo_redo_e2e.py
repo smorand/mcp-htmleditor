@@ -51,7 +51,18 @@ needs_chromium = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(params=[0, LATE_SAVE_MS], ids=["prompt", "late"])
+# Late saves do not affect undo/redo (.implement/US-0085-red.log): two representatives run late (BT-002).
+LATE_SAVE_TESTS = frozenset({"test_undo_redo_arch_node_reposition", "test_undo_redo_document_block_reorder"})
+
+
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "save_delay" in metafunc.fixturenames:
+        late = metafunc.function.__name__ in LATE_SAVE_TESTS
+        delays, ids = ([0, LATE_SAVE_MS], ["prompt", "late"]) if late else ([0], ["prompt"])
+        metafunc.parametrize("save_delay", delays, ids=ids, indirect=True)
+
+
+@pytest.fixture
 def save_delay(request: pytest.FixtureRequest, page: Page) -> int:
     """Answer every ``POST /content`` at once (0) or ``LATE_SAVE_MS`` late (BR-011)."""
     delay = int(request.param)

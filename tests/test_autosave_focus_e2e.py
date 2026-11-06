@@ -39,6 +39,7 @@ TITLE = "Titre du document"
 HEADING = "Introduction"
 TITLE_SELECTOR = 'h1[data-editable~="text"]'
 HEADING_SELECTOR = 'h2[data-editable~="text"]'
+SHORT_BOUND_SECONDS = 2.0
 SAVED_DOT_COLOR = "rgb(66, 190, 101)"
 DOT_COLOR_EXPRESSION = "() => getComputedStyle(document.getElementById('toolbar-status')).color"
 TITLE_EDITABLE_EXPRESSION = (
@@ -47,7 +48,25 @@ TITLE_EDITABLE_EXPRESSION = (
 )
 
 
-@pytest.fixture(params=[0, LATE_SAVE_MS], ids=["prompt", "late"])
+# Only these tests failed RED with a late save (.implement/US-0084-red.log); the others run prompt only.
+LATE_SAVE_TESTS = frozenset(
+    {
+        "test_typing_after_autosave_stays_in_the_zone",
+        "test_leaving_a_zone_keeps_focus_in_the_next_zone",
+        "test_several_saves_lose_nothing",
+        "test_saved_file_has_no_editing_markers",
+    }
+)
+
+
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "save_delay" in metafunc.fixturenames:
+        late = metafunc.function.__name__ in LATE_SAVE_TESTS
+        delays, ids = ([0, LATE_SAVE_MS], ["prompt", "late"]) if late else ([0], ["prompt"])
+        metafunc.parametrize("save_delay", delays, ids=ids, indirect=True)
+
+
+@pytest.fixture
 def save_delay(request: pytest.FixtureRequest, page: Page) -> Iterator[int]:
     """Answer every ``POST /content`` at once (0) or ``LATE_SAVE_MS`` late (BR-011)."""
     delay = int(request.param)
@@ -234,9 +253,10 @@ def test_bounded_observation_reports_the_last_value(page: Page, served: ServedDo
     started = time.monotonic()
 
     with pytest.raises(AssertionError) as raised:
-        wait_for_file(page, served.path, f"{TITLE}Q")
+        wait_for_file(page, served.path, f"{TITLE}Q", bound=SHORT_BOUND_SECONDS)
 
-    assert OBSERVE_BOUND_SECONDS <= time.monotonic() - started <= OBSERVE_BOUND_SECONDS + 2
+    assert OBSERVE_BOUND_SECONDS == 10.0  # the default bound; a short one keeps this test fast
+    assert SHORT_BOUND_SECONDS <= time.monotonic() - started <= SHORT_BOUND_SECONDS + 2
     assert f">{TITLE}</h1>" in str(raised.value)
 
 

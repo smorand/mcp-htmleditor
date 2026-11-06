@@ -4,72 +4,66 @@
 make test                 # pytest -v
 make test ARGS='-k pptx'  # subset
 make test-cov             # coverage, gate 80 %
-make test ARGS='-m slow'  # the slow marker, selected on request only
+make test ARGS='-m slow'  # the slow marker, selected on request only (about 8 minutes)
 ```
 
-### Slow marker and short time bounds (2026-11-05, SPEC-0013)
+### Time limits and the slow marker (2026-11, SPEC-0013, SPEC-0014)
 
-`pyproject.toml` registers the marker `slow` and sets `addopts = "-m 'not slow'"`, so `make test`,
-`make test-cov` and `make check` deselect it; `ARGS='-m slow'` wins because the last `-m` is the one pytest keeps.
-No Makefile target exists for it. `tests/test_http_time_bounds_slow.py` (marked at module level) checks the real
-values: BT-003, BT-015, BT-023 (30 s), BT-022 (50 s), BT-040 (5 min); the whole module takes about 8 minutes.
-The default tests of `tests/test_http_time_bounds.py` shorten the bounds with
-`monkeypatch.setattr(http_deadline, "WAIT_SECONDS", 1.0)` and `"TOTAL_SECONDS"` (4.0): the constants are read
-through the module at each use, which is the only seam; they are not a setting and no setting, option or help text names them.
-`DeadlineReader` takes a `clock` argument, tests pass a hand moved fake clock for the total bound.
-Raw socket helpers live in `tests/http_support.py` (`exchange`, `RawReply`, `json_body`); `tests/trace_support.py`
-holds the tracing capture helpers.
+`pyproject.toml` registers `slow` and sets `addopts = "-m 'not slow'"`: `make test`, `make test-cov` and `make check`
+deselect it, `ARGS='-m slow'` wins (the last `-m` is kept). No Makefile target. Slow tests check the literal values:
+`test_http_time_bounds_slow.py` (30 s, 50 s, 5 min HTTP bounds), `test_suite_time_limit.py` (BT-016, 60 s / 900 s) and
+`test_stdio_support.py` (BT-003, BT-017, 30 s): `make test ARGS='-m slow -k "suite_time_limit or stdio_support"'`.
+The default tests carry short counterparts so the gate stays under 330 s (DEC-009): `test_http_time_bounds.py`
+shortens `http_deadline.WAIT_SECONDS` (1.0) and `TOTAL_SECONDS` (4.0) with `monkeypatch.setattr` (read through the module
+at each use, a test seam, not a setting); `DeadlineReader` takes a fake `clock`. Under load such a test needs a margin
+relative to the shortened bound, not an absolute one (`CLOSE_MARGIN`, 10 s: a 27 MB export took 5.5 s at load average 22).
+Raw socket helpers: `http_support.py`; tracing capture helpers: `trace_support.py`.
 
-### Per test time limit (2026-11, SPEC-0014)
+Every test is bounded by `pytest-timeout`: `timeout = 60`, `timeout_method = "signal"` (the thread method would end the
+whole process and name nothing). An overrun fails alone with `Timeout (>60.0s) from pytest-timeout.` and its node id.
+`tests/conftest.py` adds `pytest.mark.timeout(900)` (`SLOW_TEST_TIMEOUT_SECONDS`) to each `slow` test through
+`pytest_collection_modifyitems`. `test_suite_time_limit.py` runs child pytests on throwaway files: they need
+`-c pyproject.toml --rootdir <repo> -p tests.conftest -p no:cacheprovider`, cwd at the repository root, a `timeout=`,
+`--confcutdir` at the throwaway folder and an own `--basetemp` (without them collection walks `$TMPDIR`, 5 to 35 s).
+Judge a timed out child on its JUnit call time, never on wall time. `pytest-timeout>=2.4.0`: 2.5.0 is yanked on PyPI.
 
-Every test is bounded by `pytest-timeout`: `timeout = 60` and `timeout_method = "signal"` in
-`[tool.pytest.ini_options]`. A test over its limit fails alone with `Timeout (>60.0s) from pytest-timeout.` and its node
-id, the run goes on and `make test` / `make check` exit non zero. The signal method is required: the thread method
-would end the whole process and name nothing. `tests/conftest.py` holds `SLOW_TEST_TIMEOUT_SECONDS = 900` and a
-`pytest_collection_modifyitems` hook that adds `pytest.mark.timeout(900)` to each test carrying `slow` (an explicit
-`timeout` marker is left as is), so slow tests are never marked one by one.
-`tests/test_suite_time_limit.py` checks it with child pytest runs on throwaway files under `tmp_path`. A child run
-needs `-c pyproject.toml --rootdir <repo> -p tests.conftest -p no:cacheprovider`, cwd at the repository root, and a
-`timeout=` on `subprocess.run`, plus `--confcutdir` at the throwaway folder and its own `--basetemp` under it.
-Without `--confcutdir` pytest collects every ancestor of a file outside the rootdir, and `$TMPDIR` held 75k entries
-(5 to 12 s of collection); without `--basetemp` the child shares `$TMPDIR/pytest-of-<user>/` and deletes any stale
-`pytest-N` (a finished full run is about 80k files). Together they made a child with a 2 s limit run 7 to 35 s while
-its alarm fired on time (measured 2026-11-06). Judge a timed out test on its JUnit call time (`--junitxml`), never on
-the child's wall time. The literal 60 / 900 check (BT-016) is `slow`:
-`make test ARGS='-m slow -k suite_time_limit'`. The dependency is `pytest-timeout>=2.4.0`: 2.5.0 is yanked on PyPI
-(accidental breaking change), so uv cannot lock it; move to a later release once one is not yanked.
-
-### Browser waits (2026-11, SPEC-0014 BR-008 to BR-011, DEC-011 to DEC-014)
+### Browser waits and the pacing rule (2026-11, SPEC-0014 BR-008 to BR-011, BR-014, DEC-010 to DEC-014)
 
 A browser test never asserts an asynchronous result (file after an autosave, status dot, DOM after an insert, a reload)
-after a fixed delay. It uses `tests/browser_wait.py`: `wait_until(page, observe, holds, what=...)` observes first, then
-pauses `page.wait_for_timeout(100)` between observations (`OBSERVE_INTERVAL_SECONDS`), up to 10 s
-(`OBSERVE_BOUND_SECONDS`) from the call, and fails with `AssertionError("<what> not reached within 10 s, last value:
-<repr>")`. `wait_for_file(page, path, needle)` and `wait_for_js(page, expression, expected, what=...)` are the two shapes
-used by the files. Never `time.sleep` in an observation: in the sync Playwright API route handlers and events run only
-inside a Playwright call. An absence ("the preview was not reloaded") is asserted after `wait_until` on the step that
-could cause it, then `settle(page)` (1 s, `SETTLE_SECONDS`), then the assertion. A `wait_for_timeout(` that stays in a
-browser test carries a trailing `# pacing: <reason>` (a spacing between two user actions, no result asserted after it).
+after a fixed delay. `tests/browser_wait.py`: `wait_until(page, observe, holds, what=...)` observes first, pauses
+`page.wait_for_timeout(100)` between observations, up to 10 s from the call, and fails with `<what> not reached within
+10 s, last value: <repr>`; `wait_for_file` and `wait_for_js` are the two shapes in use. Never `time.sleep` in it: in the
+sync Playwright API route handlers and events run only inside a Playwright call. An absence is asserted after
+`wait_until` on the step that could cause it, then `settle(page)` (1 s), then the assertion.
 
-Late saves: `answer_saves_late(page, 2000)` (`LATE_SAVE_MS`) is an init script that holds every `POST /content` for
-2 s before it leaves, so the file and the answer both come 2 s late; call it before `page.goto`.
-`test_autosave_focus_e2e.py` has a `save_delay` fixture (`prompt`, `late`) on every test. Do NOT build it with a route
-handler (measured 2026-11-06): in the sync API a handler that waits (`time.sleep` or a nested
-`page.wait_for_timeout`) blocks the dispatcher, so each `wait_for_timeout` of the test returns only after the handler,
-the test timeline stretches by the delay and the old fixed waits pass; and a handler that does `route.fetch()` first has
-already written the file. The editor runs saves one after the other (`saveChain`), so a late answer delays the next
-save: the old `SAVE_WAIT_MS` tests fail in the `late` variant (4 of 9). `tests/test_browser_wait.py` tests the loop with
-a stub page (no browser).
+Pacing rule: a `wait_for_timeout(` left in a `tests/test_*_e2e.py` carries a trailing `# pacing: <reason>` (a spacing
+between two user actions, no result asserted after it). `tests/test_no_fixed_waits.py` enforces it
+(`unjustified_waits(path)` returns the line numbers, one parametrized case per browser file, no allow list); the settle
+delay lives only in `browser_wait.py`. Check: `rg -n 'wait_for_timeout\(' tests | rg -v '# pacing:' | rg -v browser_wait.py`.
 
-### Bounded stdio reads (2026-11-06, SPEC-0014 BR-014, DEC-010)
+Late saves: `answer_saves_late(page, 2000)` is an init script holding every `POST /content` 2 s before it leaves; call it
+before `page.goto`. `test_autosave_focus_e2e.py` has a `save_delay` fixture (`prompt`, `late`). Do NOT use a route
+handler (measured 2026-11-06): a handler that waits blocks the sync dispatcher and stretches every `wait_for_timeout`
+of the test, and one that does `route.fetch()` first has already written the file. Saves run one after the other
+(`saveChain`), so a late answer delays the next save. `test_browser_wait.py` tests the loop with a stub page.
 
-A test that talks to a child process over stdio uses `tests/stdio_support.py` (`StdioSession`, `run_session`), never a
-`readline()` on the child's stdout. A daemon reader thread feeds a queue and each line read waits at most
-`stdio_support.LINE_TIMEOUT_SECONDS` (30 s). A silent child is killed and reaped, and the test fails with
-`the server did not answer within 30 s`. The constant is read through the module at each call: tests shorten it with
-`monkeypatch.setattr(stdio_support, "LINE_TIMEOUT_SECONDS", 1.0)` (never `from ... import LINE_TIMEOUT_SECONDS`).
-`select` is not used: a text mode pipe buffers ahead and can hide a buffered line. The literal 30 s cases (BT-003,
-BT-017) are `slow`: `make test ARGS='-m slow -k stdio_support'`.
+### Stdio sessions (2026-11-06, SPEC-0014 BR-014, DEC-010)
+
+A test that talks to a child over stdio uses `tests/stdio_support.py` (`StdioSession`, `run_session`), never a
+`readline()` on its stdout. A daemon reader thread feeds a queue; each line waits at most
+`stdio_support.LINE_TIMEOUT_SECONDS` (30 s). A silent child is killed and reaped, the test fails with `the server did
+not answer within 30 s`. Tests shorten it with `monkeypatch.setattr(stdio_support, "LINE_TIMEOUT_SECONDS", 1.0)`
+(never `from ... import`). No `select`: a text pipe buffers ahead and can hide a line.
+
+### Port range and lifecycle (2026-11-06, SPEC-0014 BR-001 to BR-007, BR-015, BR-016)
+
+`test_port_range.py` binds the real ports 7839 to 7849 and counts a refused bind as taken, so another process holding
+a port does not change its verdict. `test_port_range_foreign.py` proves it: a holder child listens (no `SO_REUSEADDR`)
+on those ports, then `test_port_range.py` runs in a child pytest and must report `4 passed`. The stop sequence and the
+connection registry are in `architecture.md` § Stop sequence; `test_server_lifecycle.py` (in process) and
+`test_server_lifecycle_stdio.py` (real `mcp-htmleditor mcp` over stdio) test them. A test that needs a connection
+accepted before the stop opens a later request first: connections are accepted in arrival order, and one still in the
+listen backlog at the stop is reset by the kernel.
 
 `make sync` also runs `playwright install chromium` (no-op if already cached) so the
 browser E2E tests below can run without a manual step.
@@ -84,6 +78,10 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `conftest.py` | `reset_settings` (autouse, drops the memoized `Settings`), `reset_state` / `fresh_state` (EditorState singleton), `html_file` |
 | `browser_wait.py` | Bounded observation for browser tests: `wait_until`, `wait_for_file`, `wait_for_js`, `settle`, `answer_saves_late` and the constants (US-0084) |
 | `test_browser_wait.py` | the observation loop with a stub page: first value that holds, last value in the failure, every wait at most 100 ms, settle delay (US-0084) |
+| `test_no_fixed_waits.py` | Guard: every `wait_for_timeout(` of `tests/test_*_e2e.py` carries `# pacing: <reason>`; `unjustified_waits(path)`, parametrized per file, plus a throwaway file case (US-0088) |
+| `test_suite_time_limit.py` | BR-012: the per test limit through child pytest runs; `slow` BT-016 at the literal 60 s / 900 s (US-0080) |
+| `test_server_lifecycle.py`, `test_server_lifecycle_stdio.py` | stop releases the port, connection registry, `serve` on Ctrl+C; agent tools across a stop over real stdio (US-0082) |
+| `test_port_range.py`, `test_port_range_foreign.py` | `find_free_port` over 7839 to 7849 independent of other processes; the holder child proof (US-0083) |
 | `stdio_support.py` | `StdioSession` and `run_session`: JSON lines over a child's stdio, every line read bounded by `LINE_TIMEOUT_SECONDS`; `SILENT_CHILD`, `mcp_command()` (US-0081) |
 | `test_stdio_support.py` | BR-014: short bound, closed stdout, partial line, real session, source check; `slow` BT-003 and BT-017 at the literal 30 s (US-0081) |
 | `deck_support.py` | Deck fixtures (US-0035 to US-0040): `deck_ei`, `deck_carbon`, `deck_med`, `doc_perso` built from the real `templates/bootstrap` files (never committed); `slide_html(charter, title, ...)` returns one valid `ei` or `carbon` slide as an agent would send it; `write_deck` forces the modification time with `os.utime(path, (1_000_000_000, 1_000_000_000))` (no clock in tests); `assert_only_region_changed(before, after, marker)` proves byte identity outside an element found by plain substring search; `run_cli` and `call_tool` |
@@ -144,37 +142,19 @@ Storage failure seam (SPEC-0010, DEC-010, 2026-11-05): to make a request write f
 
 ### Browser E2E (`test_fullscreen_e2e.py`)
 
-Uses `pytest-playwright`'s `page` fixture (headless by default) against a real
-`start_http_server()`/`stop_http_server()` instance on a free port, serving a 3-slide
-deck built from the real `templates/bootstrap/slides-ei-empty.html` (never the
-`~/.config` installed copy: the fixture forces `HTMLEDITOR_TEMPLATES_DIR`). Reaches into
-the content iframe's own document via `document.getElementById('content-frame').
-contentDocument` since the slide template's `:fullscreen` CSS and `navigate()`/
-`goToSlide()` globals live there, not in the parent shell.
-
-One known Playwright/CDP limitation: headless Chromium under automation does not
-reliably enforce a `sandbox` iframe missing `allow-fullscreen` the way a real,
-interactively-driven browser does (verified empirically), so the exact permission
-denial that caused the original bug cannot be forced end to end in this suite. The test
-instead exercises the deterministic part of the contract: the parent-side CSS safety net
-(`body:has(#content-frame:fullscreen) #toolbar` in `editor.css`) that must hide the shell
-toolbar if the fallback (fullscreening the `<iframe>` element itself) is ever taken, for
-whatever reason.
-
-This differs from `tools/check_ei_insert.py`, which stays a manual, screenshot-based
-visual check (its own docstring explains why it is not a unit test): the fullscreen
-contract is fully assertable (computed styles, `fullscreenElement`, counters), so it
-belongs in the automated suite and in `make check` instead.
-
-`trace.set_tracer_provider()` accepts one call per process, so `test_tracing.py` shares a
-single session scoped configuration for the tests that need the global tracer and uses a
-local `TracerProvider` for the exporter internals.
+`pytest-playwright`'s `page` fixture (headless) against a real `start_http_server()` / `stop_http_server()` on a free
+port, serving a 3-slide deck built from the real `templates/bootstrap/slides-ei-empty.html` (the fixture forces
+`HTMLEDITOR_TEMPLATES_DIR`, never the installed copy). Slide globals (`navigate()`, `goToSlide()`, `:fullscreen` CSS)
+live in the content iframe: reach it through `document.getElementById('content-frame').contentDocument`.
+Headless Chromium does not enforce a `sandbox` iframe lacking `allow-fullscreen`, so the original denial cannot be
+forced; the test checks the parent-side safety net (`body:has(#content-frame:fullscreen) #toolbar` in `editor.css`).
+`tools/check_ei_insert.py` stays a manual screenshot check. `test_tracing.py` shares one session scoped
+`set_tracer_provider()` (one call per process) and uses a local `TracerProvider` for the exporter internals.
 
 ## Coverage
 
-Gate 80 %, actual around 95 %. Omitted: `cli.py`, `mcp_server.py`, `__main__.py` (thin
-wrappers). `# pragma: no cover` marks the `_EditorHandler` network class and the server
-lifecycle functions in `http_server.py`.
+Gate 80 %, actual around 95 %. Omitted: `cli.py`, `mcp_server.py`, `__main__.py` (thin wrappers); `# pragma: no cover`
+marks `_EditorHandler` and the server lifecycle functions of `http_server.py`.
 
 ## Validating an export change
 
@@ -186,29 +166,13 @@ soffice --headless --convert-to pdf /tmp/out.pptx --outdir /tmp/
 pdftoppm -jpeg -r 72 /tmp/out.pdf /tmp/slide   # then read /tmp/slide-N.jpg
 ```
 
-Regression set (expected slide counts):
+Regression set (slide counts, files under `templates/reference/slides/`): `euro-information` 3, `example-ei-complete` 9,
+`ibm-carbon` 9 (no `data-type`), `example-carbon-complete` 9, `presentation-standard` 4 (legacy `<section>`),
+`roadmap-one-pager` 1 (gantt with `margin-left`).
 
-| File | Slides |
-|------|--------|
-| `templates/reference/slides/euro-information.html` | 3 |
-| `templates/reference/slides/example-ei-complete.html` | 9 |
-| `templates/reference/slides/ibm-carbon.html` | 9 (no `data-type`) |
-| `templates/reference/slides/example-carbon-complete.html` | 9 |
-| `templates/reference/slides/presentation-standard.html` | 4 (legacy `<section>`) |
-| `templates/reference/slides/roadmap-one-pager.html` | 1 (gantt with `margin-left`) |
-
-To prove an internal refactor did not move a single shape, export with the previous
-revision in a throwaway worktree and compare the shape fingerprints:
-
-```bash
-git worktree add /tmp/ht-baseline HEAD
-# export with /tmp/ht-baseline/src on sys.path, then compare
-# (name, shape_type, left, top, width, height, text) tuples slide by slide
-git worktree remove /tmp/ht-baseline --force
-```
-
-For DOCX, compare the `<w:t>` runs and the `w:pStyle` sequence of `word/document.xml`
-between the two exports.
+To prove a refactor did not move a shape, export with the previous revision from a throwaway `git worktree` and compare
+`(name, shape_type, left, top, width, height, text)` tuples per slide; for DOCX compare the `<w:t>` runs and the
+`w:pStyle` sequence of `word/document.xml`.
 
 ### 2026-08-21, medical charter tests
 
@@ -237,3 +201,15 @@ authoring invariants an agent breaks by editing HTML by hand.
 sets `HTMLEDITOR_SKILL_DIR` and isolates `HTMLEDITOR_ARCH_CHECKS_DIR`; tests mutate it through
 `SkillTree`. `tests/data/skill_anchors.json` lists, per topic, the strings that must stay in the
 shipped text (every topic but `arch-qa`, whose anchors live in `tests/test_arch_checks.py`).
+
+### Test step budget trims (2026-11-06, SPEC-0014 BT-022, <= 330 s)
+
+* `save_delay` (autosave and undo/redo e2e files) is parametrized per test by `pytest_generate_tests`:
+  the 2000 ms late variant runs only where the delay mattered (autosave: the four tests that failed
+  RED late in `.implement/US-0084-red.log`; undo/redo: `arch_node_reposition` and `document_block_reorder`,
+  late saves do not affect them per `US-0085-red.log`). Every other test runs prompt only. BT-002 keeps
+  at least one late test per file. Saves about 22 s (42 to 24 tests).
+* `test_bounded_observation_reports_the_last_value` waits with an explicit 2 s bound instead of the 10 s
+  default (a default argument is fixed at import, so patching the module constant would not reach it);
+  it still asserts the default is 10 s. Saves about 8 s.
+* `test_restart_loop_on_the_same_port` stays at 20 restarts: BT-012 says 20.

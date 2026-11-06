@@ -14,7 +14,7 @@ Python 3.13+, uv, click, FastMCP, python-pptx, BeautifulSoup4, pandoc for DOCX.
 make sync        # uv sync (deps + dev group)
 make check       # GATE: check-generated + lint + format-check + typecheck + security + test-cov (80 %)
 make test        # pytest -v            (ARGS='-k pptx' for a subset)
-make test ARGS='-m slow'  # real 30 s and 5 min HTTP time bound tests (minutes, not run by make check)
+make test ARGS='-m slow'  # real 30 s and 5 min HTTP bounds, literal 60 s / 900 s test limits, 30 s stdio bound (minutes, not run by make check)
 make install     # uv tool install (with the render extra) + templates + log dir + Pi skill
 make install-browser  # Chromium for `render` (needs the render extra)
 make run ARGS='export pptx in.html out.pptx'
@@ -93,6 +93,9 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   `~/.config/mcp-htmleditor/arch-checks/arch-diagram-checklist.md`, never in code.
 - Editor state (file history, server records) lives in the state directory (`HTMLEDITOR_STATE_DIR`, default
   `~/.local/state/mcp-htmleditor`), never next to the edited file. `.mcp_state.json` is only a leftover of older versions; it stays gitignored.
+- Browser tests (`tests/test_*_e2e.py`) observe asynchronous results with `tests/browser_wait.py` (`wait_until`, at most 100 ms
+  apart, 10 s bound), never after a fixed delay. A `wait_for_timeout(` that stays carries a trailing `# pacing: <reason>`;
+  `tests/test_no_fixed_waits.py` fails the gate otherwise. Child processes over stdio go through `tests/stdio_support.py`.
 - JS has no build step: `node --check src/mcp_htmleditor/static/*.js`.
 - The editor is twelve classic scripts loaded in the order of `editor.html`; the PPTX exporter
   is a composed `_SlideBuilder` of mixins (`export/pptx_*.py`). See `.agent_docs/architecture.md`.
@@ -107,9 +110,9 @@ Load only what the task needs.
 |------|---------|
 | `.agent_docs/python.md` | Python standards applied here, tooling, config/logging/tracing patterns, documented deviations (sync I/O, click, pptx typing, bandit skips) |
 | `.agent_docs/makefile.md` | Every make target, install path overrides, why `install` uses a uv tool |
-| `.agent_docs/architecture.md` | Module map, save path, export pipeline, browser side, templates and tools, request loop (`request_store.py`, `request_service.py`, `/requests` routes, `editor-requests.js`) |
+| `.agent_docs/architecture.md` | Module map, stop sequence and connection registry, save path, export pipeline, browser side, templates and tools, request loop (`request_store.py`, `request_service.py`, `/requests` routes, `editor-requests.js`) |
 | `.agent_docs/observability.md` | Log files, console rules, span inventory, OTLP export, JSONL recipes |
-| `.agent_docs/testing.md` | Test file map, coverage decisions, export regression set and validation procedure |
+| `.agent_docs/testing.md` | Test file map, time limits and slow marker, browser waits and pacing rule, stdio sessions, port range and lifecycle tests, coverage decisions, export regression set |
 | `.agent_docs/docker.md` | Image, compose, prod overlay, container checks |
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
 | `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 21 tool surface, scanner and renumbering rules, gotchas |
