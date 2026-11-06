@@ -17,6 +17,7 @@ from mcp_htmleditor import config
 from mcp_htmleditor.request_service import RequestError, RequestService
 from mcp_htmleditor.request_store import RequestStore
 from mcp_htmleditor.state import get_state
+from tests.browser_wait import settle, wait_until
 from tests.conftest import ServedDeck, needs_chromium
 from tests.deck_support import call_tool, run_cli
 from tests.test_requests_core import EVIL_ORIGIN, call, make_deck, post
@@ -141,7 +142,13 @@ def test_ut_g05_suggestion_text_is_data(page: Page, served_deck: ServedDeck) -> 
     _open(page, served_deck, "AI suggestions (1)")
 
     expect(_row(page, "s1").locator(".suggestion-why")).to_have_text(XSS_TEXT)
-    page.wait_for_timeout(300)
+    wait_until(
+        page,
+        lambda: page.locator("#suggestions-list li").count(),
+        lambda count: count == 1,
+        what="one rendered suggestion row",
+    )
+    settle(page)
     assert page.evaluate("() => window.__xss") is None
     assert page.locator("#suggestions-list img").count() == 0
 

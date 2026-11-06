@@ -38,6 +38,7 @@ from playwright.sync_api import Page
 from mcp_htmleditor import config as config_module
 from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
+from tests.browser_wait import wait_for_js, wait_until
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -129,6 +130,25 @@ def _progress(page: Page) -> str:
     return str(_inner(page, "doc.getElementById('progress-tag').textContent"))
 
 
+def _wait_inner(page: Page, js_expression: str, expected: object, *, what: str) -> object:
+    """Observe `_inner(page, js_expression)` until it equals `expected` (BR-008)."""
+    return wait_until(page, lambda: _inner(page, js_expression), lambda value: value == expected, what=what)
+
+
+def _wait_slide_fullscreen(page: Page) -> None:
+    """Wait until the slide document itself (its <html>) is the fullscreen element."""
+    _wait_inner(
+        page,
+        "doc.fullscreenElement ? doc.fullscreenElement.tagName : null",
+        "HTML",
+        what="the slide document in fullscreen",
+    )
+
+
+def _wait_progress(page: Page, expected: str) -> None:
+    _wait_inner(page, "doc.getElementById('progress-tag').textContent", expected, what=f"progress {expected}")
+
+
 def _visual_rect(page: Page, selector: str = ".slide.active") -> list[float]:
     """Return [width, height] of `selector`'s getBoundingClientRect (reflects CSS transforms)."""
     return list(
@@ -158,7 +178,13 @@ def test_fullscreen_hides_toolbar_and_fills_the_screen(page: Page, deck_server: 
     assert _visual_rect(page) == [960, 540]
 
     page.click("#present-btn")
-    page.wait_for_timeout(300)
+    _wait_slide_fullscreen(page)
+    wait_until(
+        page,
+        lambda: _inner(page, "getComputedStyle(doc.documentElement).getPropertyValue('--fs-scale')"),
+        lambda value: abs(float(str(value) or 0) - 1600 / 960) < 1e-6,
+        what="--fs-scale fitted to the 1600x900 screen",
+    )
 
     assert _inner(page, "doc.fullscreenElement ? doc.fullscreenElement.tagName : null") == "HTML"
     assert _inner(page, "getComputedStyle(doc.querySelector('.toolbar')).display") == "none"
@@ -202,7 +228,12 @@ def test_fallback_shell_hides_toolbar_if_inner_fullscreen_is_unavailable(page: P
     # <iframe> element itself (not its inner document) in the PARENT
     # document, exactly what happens when the inner request is denied.
     page.evaluate("() => document.getElementById('content-frame').requestFullscreen()")
-    page.wait_for_timeout(300)
+    wait_for_js(
+        page,
+        "() => document.fullscreenElement ? document.fullscreenElement.id : null",
+        "content-frame",
+        what="the content iframe element in fullscreen",
+    )
 
     assert page.evaluate("() => document.fullscreenElement ? document.fullscreenElement.id : null") == "content-frame"
     assert page.evaluate("() => getComputedStyle(document.getElementById('toolbar')).display") == "none"
@@ -218,7 +249,7 @@ def test_navigation_keys_work_even_if_focus_never_reaches_the_iframe(page: Page,
     """
     page.goto(deck_server, wait_until="networkidle")
     page.click("#present-btn")
-    page.wait_for_timeout(300)
+    _wait_slide_fullscreen(page)
 
     # Force focus back onto the parent document, simulating a browser where
     # focus never follows fullscreen into the iframe.
@@ -226,13 +257,13 @@ def test_navigation_keys_work_even_if_focus_never_reaches_the_iframe(page: Page,
 
     assert _progress(page) == "1 / 3"
     page.keyboard.press("ArrowRight")
-    page.wait_for_timeout(150)
+    _wait_progress(page, "2 / 3")
     assert _progress(page) == "2 / 3"
     page.keyboard.press("ArrowRight")
-    page.wait_for_timeout(150)
+    _wait_progress(page, "3 / 3")
     assert _progress(page) == "3 / 3"
     page.keyboard.press("ArrowLeft")
-    page.wait_for_timeout(150)
+    _wait_progress(page, "2 / 3")
     assert _progress(page) == "2 / 3"
 
 
@@ -241,15 +272,15 @@ def test_exiting_fullscreen_keeps_the_current_slide_and_restores_the_ui(page: Pa
     """E2E-041: leaving fullscreen (Escape) restores the UI without resetting navigation."""
     page.goto(deck_server, wait_until="networkidle")
     page.click("#present-btn")
-    page.wait_for_timeout(300)
+    _wait_slide_fullscreen(page)
 
     page.keyboard.press("ArrowRight")
     page.keyboard.press("ArrowRight")
-    page.wait_for_timeout(150)
+    _wait_progress(page, "3 / 3")
     assert _progress(page) == "3 / 3"
 
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
+    wait_for_js(page, "() => document.fullscreenElement", None, what="fullscreen left")
 
     assert page.evaluate("() => document.fullscreenElement") is None
     assert _inner(page, "doc.fullscreenElement") is None

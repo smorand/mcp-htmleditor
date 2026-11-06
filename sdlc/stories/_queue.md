@@ -85,6 +85,6 @@
 | US-0083 | SPEC-0014 | port range tests independent of the machine | main | 2 | done | story/US-0083-port-range-tests-machine-independent | story/US-0082-a-stop-releases-the-port |
 | US-0084 | SPEC-0014 | bounded observation and the autosave tests | main | 2 | done | story/US-0084-bounded-observation-and-autosave-tests | story/US-0083-port-range-tests-machine-independent |
 | US-0085 | SPEC-0014 | undo and redo tests observe and pass with late saves | US-0084 | 2 | done | story/US-0085-undo-redo-tests-observe-late-saves | story/US-0084-bounded-observation-and-autosave-tests |
-| US-0086 | SPEC-0014 | fullscreen, website, review and request editor waits | US-0084 | 2 | todo | | |
+| US-0086 | SPEC-0014 | fullscreen, website, review and request editor waits | US-0084 | 2 | done | story/US-0086-fullscreen-website-review-editor-waits | story/US-0085-undo-redo-tests-observe-late-saves |
 | US-0087 | SPEC-0014 | save ui, refresh, origin and header gate waits | US-0084 | 2 | todo | | |
 | US-0088 | SPEC-0014 | fixed wait guard, run time and documentation | US-0082, US-0083, US-0085, US-0086, US-0087 | 2 | todo | | |

@@ -20,6 +20,7 @@ from playwright.sync_api import Page
 from mcp_htmleditor import config as config_module
 from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
+from tests.browser_wait import wait_for_js
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -82,6 +83,23 @@ def _inner(page: Page, js_expression: str) -> object:
     )
 
 
+def _wait_edit_mode(page: Page) -> None:
+    """Wait until edit mode is applied: the block actions are shown and the tab labels are editable."""
+    wait_for_js(
+        page,
+        "() => getComputedStyle(document.getElementById('toolbar-doc-actions')).display !== 'none'",
+        True,
+        what="the document block actions shown by edit mode",
+    )
+    wait_for_js(
+        page,
+        "() => { const d = document.getElementById('content-frame').contentDocument;"
+        " const s = d.querySelector('.site-tab [data-editable]'); return !!s && s.isContentEditable; }",
+        True,
+        what="the tab labels editable",
+    )
+
+
 @needs_chromium
 def test_website_has_no_export_buttons_but_keeps_doc_block_ui(page: Page, website_server: str) -> None:
     """A website gets the document block/drag UI but neither PPTX nor DOCX export."""
@@ -92,7 +110,7 @@ def test_website_has_no_export_buttons_but_keeps_doc_block_ui(page: Page, websit
     assert page.eval_on_selector("#export-docx-btn", "el => getComputedStyle(el).display") == "none"
 
     page.click("#edit-mode-btn")
-    page.wait_for_timeout(200)
+    _wait_edit_mode(page)
 
     assert page.eval_on_selector("#export-pptx-btn", "el => getComputedStyle(el).display") == "none"
     assert page.eval_on_selector("#export-docx-btn", "el => getComputedStyle(el).display") == "none"
@@ -122,6 +140,6 @@ def test_website_tabs_switch_on_click_in_and_out_of_edit_mode(page: Page, websit
     assert active_panel() == "tab-2"
 
     page.click("#edit-mode-btn")
-    page.wait_for_timeout(200)
+    _wait_edit_mode(page)
     frame.locator(".site-tab").nth(2).click()
     assert active_panel() == "tab-3"

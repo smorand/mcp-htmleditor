@@ -19,6 +19,7 @@ from playwright.sync_api import Page
 from mcp_htmleditor import config
 from mcp_htmleditor.request_service import RequestService
 from mcp_htmleditor.request_store import RequestStore
+from tests.browser_wait import wait_until
 from tests.conftest import ServedDeck, needs_chromium
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "src" / "mcp_htmleditor" / "static"
@@ -289,10 +290,12 @@ def test_side_list_is_hidden_in_fullscreen_and_iframe_is_narrowed(page: Page, se
     assert page.is_visible("#requests-side")
     assert page.evaluate("() => document.getElementById('content-frame').getBoundingClientRect().width") == 1300
     page.click("#present-btn")
-    page.wait_for_timeout(300)
+    wait_until(
+        page, lambda: page.is_visible("#requests-side"), lambda visible: not visible, what="#requests-side hidden"
+    )
     assert not page.is_visible("#requests-side")
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
+    wait_until(page, lambda: page.is_visible("#requests-side"), lambda visible: visible, what="#requests-side visible")
     assert page.is_visible("#requests-side")
 
 
