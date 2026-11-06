@@ -90,3 +90,9 @@ def answer_saves_late(page: Page, delay_ms: int = LATE_SAVE_MS) -> None:
     that answers after ``route.fetch()`` has already written the file (see ``.agent_docs/testing.md``).
     """
     page.add_init_script(LATE_SAVE_SCRIPT % delay_ms)
+
+
+def apply_save_delay(page: Page, delay_ms: int) -> None:
+    """Apply the ``save_delay`` parameter of a browser test file: 0 answers saves at once, else ``delay_ms`` late."""
+    if delay_ms:
+        answer_saves_late(page, delay_ms)

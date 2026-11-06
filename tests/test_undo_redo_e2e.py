@@ -20,7 +20,7 @@ import platform
 import re
 import socket
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -29,6 +29,7 @@ from playwright.sync_api import Page
 from mcp_htmleditor import config as config_module
 from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
+from tests.browser_wait import LATE_SAVE_MS, apply_save_delay, settle, wait_until
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,6 +49,14 @@ needs_chromium = pytest.mark.skipif(
     not HAS_CHROMIUM,
     reason="Playwright Chromium is not installed; run `make sync`",
 )
+
+
+@pytest.fixture(params=[0, LATE_SAVE_MS], ids=["prompt", "late"])
+def save_delay(request: pytest.FixtureRequest, page: Page) -> int:
+    """Answer every ``POST /content`` at once (0) or ``LATE_SAVE_MS`` late (BR-011)."""
+    delay = int(request.param)
+    apply_save_delay(page, delay)
+    return delay
 
 
 def _free_port() -> int:
@@ -156,13 +165,51 @@ def _inner(page: Page, js_expression: str) -> object:
     )
 
 
+SLIDE_COUNT = "doc.querySelectorAll('article[data-type=slide]').length"
+IMAGE_COUNT = "doc.querySelectorAll('img').length"
+ROW_COUNT = "doc.querySelectorAll('table tbody tr').length"
+BLOCK_COUNT = "doc.querySelector('article').children.length"
+BLOCK_ORDER = "[...doc.querySelector('article').children].map(c => c.tagName)"
+
+
+def _await_inner(page: Page, js_expression: str, holds: Callable[[object], bool], *, what: str) -> object:
+    """Observe `_inner(js_expression)` until `holds` is true (BR-008); return the value that held."""
+    return wait_until(page, lambda: _inner(page, js_expression), holds, what=what)
+
+
+def _await_count(page: Page, js_expression: str, expected: int, *, what: str) -> object:
+    """Observe a count until it equals `expected`; the caller's assertion then reads the value that held."""
+    return _await_inner(page, js_expression, lambda value: value == expected, what=what)
+
+
+def _press_undo_redo(page: Page, keys: str) -> None:
+    """Press an undo or redo shortcut, then wait until the restored document is rewired.
+
+    The DOM is rewritten at once but `onFrameLoad` re-registers the keydown handler on the new document
+    only when its `load` event fires (`restoringFromUndo` goes back to false then): a shortcut pressed
+    before that is lost, as it would be for a user acting within the same few milliseconds.
+    """
+    page.keyboard.press(keys)
+    wait_until(
+        page,
+        lambda: page.evaluate("() => restoringFromUndo"),
+        lambda restoring: restoring is False,
+        what="restored document rewired",
+    )
+
+
 def _enable_edit_mode(page: Page) -> None:
     page.click("#edit-mode-btn")
-    page.wait_for_timeout(150)
+    wait_until(
+        page,
+        lambda: page.evaluate("() => getComputedStyle(document.getElementById('undo-btn')).display"),
+        lambda display: display != "none",
+        what="undo button displayed",
+    )
 
 
 @needs_chromium
-def test_undo_redo_buttons_hidden_outside_edit_mode(page: Page, arch_deck_server: str) -> None:
+def test_undo_redo_buttons_hidden_outside_edit_mode(page: Page, arch_deck_server: str, save_delay: int) -> None:
     page.goto(arch_deck_server, wait_until="networkidle")
     assert page.evaluate("() => getComputedStyle(document.getElementById('undo-btn')).display") == "none"
     _enable_edit_mode(page)
@@ -171,7 +218,7 @@ def test_undo_redo_buttons_hidden_outside_edit_mode(page: Page, arch_deck_server
 
 
 @needs_chromium
-def test_undo_redo_arch_node_reposition(page: Page, arch_deck_server: str) -> None:
+def test_undo_redo_arch_node_reposition(page: Page, arch_deck_server: str, save_delay: int) -> None:
     """Drag an arch-node, then Ctrl+Z restores its original data-x/data-y, Ctrl+Shift+Z redoes it."""
     page.goto(arch_deck_server, wait_until="networkidle")
     _enable_edit_mode(page)
@@ -194,51 +241,46 @@ def test_undo_redo_arch_node_reposition(page: Page, arch_deck_server: str) -> No
     page.mouse.down()
     page.mouse.move(start_x + 120, start_y + 60, steps=5)
     page.mouse.up()
-    page.wait_for_timeout(300)
 
-    moved_x = _inner(page, f"doc.querySelector('{node_sel}').dataset.x")
+    node_x = f"doc.querySelector('{node_sel}').dataset.x"
+    moved_x = _await_inner(page, node_x, lambda x: x != original_x, what="node x after the drag")
     assert moved_x != original_x, "drag did not move the node"
 
     page.click("#content-frame")  # focus the iframe so Playwright's key events land there
-    page.keyboard.press(f"{MOD}+z")
-    page.wait_for_timeout(300)
+    _press_undo_redo(page, f"{MOD}+z")
 
-    restored_x = _inner(page, f"doc.querySelector('{node_sel}').dataset.x")
+    restored_x = _await_inner(page, node_x, lambda x: x == original_x, what="node x after undo")
     restored_y = _inner(page, f"doc.querySelector('{node_sel}').dataset.y")
     assert restored_x == original_x
     assert restored_y == original_y
 
-    page.keyboard.press(f"{MOD}+Shift+z")
-    page.wait_for_timeout(300)
-    redone_x = _inner(page, f"doc.querySelector('{node_sel}').dataset.x")
+    _press_undo_redo(page, f"{MOD}+Shift+z")
+    redone_x = _await_inner(page, node_x, lambda x: x == moved_x, what="node x after redo")
     assert redone_x == moved_x
 
 
 @needs_chromium
-def test_undo_redo_slide_insert_and_delete(page: Page, arch_deck_server: str) -> None:
+def test_undo_redo_slide_insert_and_delete(page: Page, arch_deck_server: str, save_delay: int) -> None:
     page.goto(arch_deck_server, wait_until="networkidle")
     _enable_edit_mode(page)
 
-    assert _inner(page, "doc.querySelectorAll('article[data-type=\"slide\"]').length") == 1
+    assert _inner(page, SLIDE_COUNT) == 1
 
     page.click("#btn-insert-after")
     page.wait_for_selector("#slide-picker .picker-card")
     page.click("#slide-picker .picker-card")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('article[data-type=\"slide\"]').length") == 2
+    assert _await_count(page, SLIDE_COUNT, 2, what="slides after insert") == 2
 
     page.click("#content-frame")
-    page.keyboard.press(f"{MOD}+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('article[data-type=\"slide\"]').length") == 1
+    _press_undo_redo(page, f"{MOD}+z")
+    assert _await_count(page, SLIDE_COUNT, 1, what="slides after undo") == 1
 
-    page.keyboard.press(f"{MOD}+Shift+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('article[data-type=\"slide\"]').length") == 2
+    _press_undo_redo(page, f"{MOD}+Shift+z")
+    assert _await_count(page, SLIDE_COUNT, 2, what="slides after redo") == 2
 
 
 @needs_chromium
-def test_undo_does_not_fire_inside_active_text_editing(page: Page, doc_server: str) -> None:
+def test_undo_does_not_fire_inside_active_text_editing(page: Page, doc_server: str, save_delay: int) -> None:
     """Typing then Ctrl+Z inside a contenteditable zone must NOT touch our
     structural stack: it must be a no-op from our side (native browser undo
     handles it, or does nothing if disabled under automation), never restore
@@ -246,52 +288,52 @@ def test_undo_does_not_fire_inside_active_text_editing(page: Page, doc_server: s
     page.goto(doc_server, wait_until="networkidle")
     _enable_edit_mode(page)
 
+    block_count_before = _inner(page, BLOCK_COUNT)
+
     # Do ONE structural op first, so the stack is non-empty.
     page.click("#btn-insert-block-after")
     page.wait_for_selector("#block-picker .picker-card")
     page.click("#block-picker .picker-card")
-    page.wait_for_timeout(300)
-    block_count_after_insert = _inner(page, "doc.querySelector('article').children.length")
+    block_count_after_insert = _await_inner(
+        page, BLOCK_COUNT, lambda count: count != block_count_before, what="blocks after insert"
+    )
 
     # Now focus the title (contenteditable) and type.
     _inner(page, "doc.querySelector('h1').focus()")
     page.keyboard.type(" extra")
-    page.wait_for_timeout(200)
+    _await_inner(page, "doc.querySelector('h1').textContent", lambda text: "extra" in str(text), what="typed title")
 
-    page.keyboard.press(f"{MOD}+z")
-    page.wait_for_timeout(300)
+    page.keyboard.press(f"{MOD}+z")  # nothing to rewire: the shortcut must be left to the browser
+    settle(page)  # BR-010: an undo that would wrongly fire has had its time before the absence is asserted
 
     # The structural snapshot must still be there (undo stack untouched by a
     # keystroke fired while focus is inside a live contenteditable region).
-    assert _inner(page, "doc.querySelector('article').children.length") == block_count_after_insert
+    assert _inner(page, BLOCK_COUNT) == block_count_after_insert
 
 
 @needs_chromium
-def test_undo_redo_document_block_insert(page: Page, doc_server: str) -> None:
+def test_undo_redo_document_block_insert(page: Page, doc_server: str, save_delay: int) -> None:
     page.goto(doc_server, wait_until="networkidle")
     _enable_edit_mode(page)
 
-    before = _inner(page, "doc.querySelector('article').children.length")
+    before = _inner(page, BLOCK_COUNT)
 
     page.click("#btn-insert-block-after")
     page.wait_for_selector("#block-picker .picker-card")
     page.click("#block-picker .picker-card")
-    page.wait_for_timeout(300)
-    after_insert = _inner(page, "doc.querySelector('article').children.length")
+    after_insert = _await_count(page, BLOCK_COUNT, before + 1, what="blocks after insert")
     assert after_insert == before + 1
 
     page.click("#content-frame")
-    page.keyboard.press(f"{MOD}+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelector('article').children.length") == before
+    _press_undo_redo(page, f"{MOD}+z")
+    assert _await_count(page, BLOCK_COUNT, before, what="blocks after undo") == before
 
-    page.keyboard.press(f"{MOD}+Shift+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelector('article').children.length") == after_insert
+    _press_undo_redo(page, f"{MOD}+Shift+z")
+    assert _await_count(page, BLOCK_COUNT, after_insert, what="blocks after redo") == after_insert
 
 
 @needs_chromium
-def test_undo_redo_image_insert_via_drop(page: Page, doc_server: str) -> None:
+def test_undo_redo_image_insert_via_drop(page: Page, doc_server: str, save_delay: int) -> None:
     """Image insert onto a specific editable (the drag-drop path in
     embedImageFile) uses insertAdjacentHTML, NOT execCommand: unlike the
     file-picker path, it does not push a step onto the browser's native
@@ -300,7 +342,7 @@ def test_undo_redo_image_insert_via_drop(page: Page, doc_server: str) -> None:
     page.goto(doc_server, wait_until="networkidle")
     _enable_edit_mode(page)
 
-    before = _inner(page, "doc.querySelectorAll('img').length")
+    before = _inner(page, IMAGE_COUNT)
     assert before == 0
 
     # Exercise the exact code path drag-and-drop uses (embedImageFile with a
@@ -314,49 +356,43 @@ def test_undo_redo_image_insert_via_drop(page: Page, doc_server: str) -> None:
             window.embedImageFile(doc, file, targetEl);
         }"""
     )
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('img').length") == 1
+    assert _await_count(page, IMAGE_COUNT, 1, what="images after insert") == 1
 
     page.click("#content-frame")
-    page.keyboard.press(f"{MOD}+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('img').length") == 0
+    _press_undo_redo(page, f"{MOD}+z")
+    assert _await_count(page, IMAGE_COUNT, 0, what="images after undo") == 0
 
-    page.keyboard.press(f"{MOD}+Shift+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('img').length") == 1
+    _press_undo_redo(page, f"{MOD}+Shift+z")
+    assert _await_count(page, IMAGE_COUNT, 1, what="images after redo") == 1
 
 
 @needs_chromium
-def test_undo_redo_table_row_add_via_context_menu(page: Page, table_doc_server: str) -> None:
+def test_undo_redo_table_row_add_via_context_menu(page: Page, table_doc_server: str, save_delay: int) -> None:
     page.goto(table_doc_server, wait_until="networkidle")
     _enable_edit_mode(page)
 
-    assert _inner(page, "doc.querySelectorAll('table tbody tr').length") == 1
+    assert _inner(page, ROW_COUNT) == 1
 
     frame_el = page.frame_locator("#content-frame")
     frame_el.locator("table").first.click(button="right")
-    page.wait_for_timeout(150)
+    page.wait_for_selector("text=\uff0b Ajouter ligne", timeout=10_000)
     page.click("text=\uff0b Ajouter ligne")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('table tbody tr').length") == 2
+    assert _await_count(page, ROW_COUNT, 2, what="rows after add") == 2
 
     page.click("#content-frame")
-    page.keyboard.press(f"{MOD}+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('table tbody tr').length") == 1
+    _press_undo_redo(page, f"{MOD}+z")
+    assert _await_count(page, ROW_COUNT, 1, what="rows after undo") == 1
 
-    page.keyboard.press(f"{MOD}+Shift+z")
-    page.wait_for_timeout(300)
-    assert _inner(page, "doc.querySelectorAll('table tbody tr').length") == 2
+    _press_undo_redo(page, f"{MOD}+Shift+z")
+    assert _await_count(page, ROW_COUNT, 2, what="rows after redo") == 2
 
 
 @needs_chromium
-def test_undo_redo_document_block_reorder(page: Page, doc_server: str) -> None:
+def test_undo_redo_document_block_reorder(page: Page, doc_server: str, save_delay: int) -> None:
     page.goto(doc_server, wait_until="networkidle")
     _enable_edit_mode(page)
 
-    order_before = _inner(page, "[...doc.querySelector('article').children].map(c => c.tagName)")
+    order_before = _inner(page, BLOCK_ORDER)
     assert isinstance(order_before, list)
     assert len(order_before) >= 2
 
@@ -385,18 +421,15 @@ def test_undo_redo_document_block_reorder(page: Page, doc_server: str) -> None:
     page.mouse.down()
     page.mouse.move(first_rect[0], first_rect[1] - 5, steps=5)
     page.mouse.up()
-    page.wait_for_timeout(300)
 
-    order_after = _inner(page, "[...doc.querySelector('article').children].map(c => c.tagName)")
+    order_after = _await_inner(page, BLOCK_ORDER, lambda order: order != order_before, what="block order after drag")
     assert order_after != order_before, "drag-drop did not reorder the blocks"
 
     page.click("#content-frame")
-    page.keyboard.press(f"{MOD}+z")
-    page.wait_for_timeout(300)
-    order_undone = _inner(page, "[...doc.querySelector('article').children].map(c => c.tagName)")
+    _press_undo_redo(page, f"{MOD}+z")
+    order_undone = _await_inner(page, BLOCK_ORDER, lambda order: order == order_before, what="block order after undo")
     assert order_undone == order_before
 
-    page.keyboard.press(f"{MOD}+Shift+z")
-    page.wait_for_timeout(300)
-    order_redone = _inner(page, "[...doc.querySelector('article').children].map(c => c.tagName)")
+    _press_undo_redo(page, f"{MOD}+Shift+z")
+    order_redone = _await_inner(page, BLOCK_ORDER, lambda order: order == order_after, what="block order after redo")
     assert order_redone == order_after

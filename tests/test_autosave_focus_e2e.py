@@ -26,7 +26,7 @@ from mcp_htmleditor.http_server import start_http_server, stop_http_server
 from tests.browser_wait import (
     LATE_SAVE_MS,
     OBSERVE_BOUND_SECONDS,
-    answer_saves_late,
+    apply_save_delay,
     settle,
     wait_for_file,
     wait_for_js,
@@ -51,8 +51,7 @@ TITLE_EDITABLE_EXPRESSION = (
 def save_delay(request: pytest.FixtureRequest, page: Page) -> Iterator[int]:
     """Answer every ``POST /content`` at once (0) or ``LATE_SAVE_MS`` late (BR-011)."""
     delay = int(request.param)
-    if delay:
-        answer_saves_late(page, delay)
+    apply_save_delay(page, delay)
     yield delay
     page.unroute_all(behavior="ignoreErrors")
 
