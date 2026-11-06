@@ -57,6 +57,17 @@ injected `clock`), receiving the request only, not running it nor the answer (`D
 chunk). `RequestTimeout` with bytes answers `408` plus one `Refused` warning, without bytes it closes silently.
 The constants are a test seam, never a setting.
 
+## Stop sequence
+
+2026-11-06, SPEC-0014 (US-0082): `stop_http_server` clears the globals under `_server_lock`, then
+`shutdown()` (ends the loop only), `server_close()` (closes the listener: connect refused, port rebindable at once
+thanks to the stdlib `allow_reuse_address`; daemon handler threads, nothing joined), `connections.close_idle()`.
+`http_connections.ConnectionRegistry` (one per `_EditorServer`, one lock): `setup` adds the socket (shut at once
+when already closing), `parse_request` marks it busy once line and headers are complete (refused unanswered when
+closing), `handle_one_request` ends it in a `finally`, `finish` removes it. Idle sockets get `shutdown(SHUT_RDWR)`:
+the blocked `recv` returns `b""` (a `close()` from another thread does not wake it, checked on macOS). Busy ones
+answer, then close. Gotcha: a connection still in the listen backlog at the stop is reset by the kernel.
+
 ## Save path
 
 The editor posts the whole document. Before writing, the server strips everything the

@@ -31,6 +31,7 @@ from bs4 import BeautifulSoup, Tag
 from . import http_deadline
 from .config import PORT_RANGE_END, PORT_RANGE_START, default_host, default_port
 from .fileio import WriteError, atomic_write, is_template_path
+from .http_connections import ConnectionRegistry
 from .request_service import (
     BODY_MAX_BYTES,
     RequestError,
@@ -123,10 +124,43 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         buffered = cast(io.BufferedReader, self.rfile)  # makefile("rb", rbufsize=-1) is a BufferedReader
         self.rfile = http_deadline.DeadlineReader(buffered, self.connection)  # type: ignore[assignment]  # duck typed file
         self.wfile = http_deadline.DeadlineWriter(self.connection)  # type: ignore[assignment]  # duck typed file
+        self._connections().add(self.connection)  # closing already: shut at once (SPEC-0014 DEC-002)
+
+    def finish(self) -> None:
+        try:
+            super().finish()
+        finally:
+            self._connections().remove(self.connection)
+
+    def _connections(self) -> ConnectionRegistry:
+        return cast(_EditorServer, self.server).connections
+
+    def parse_request(self) -> bool:
+        """Parse the line and headers; once complete the request is busy, or refused unanswered if a stop began.
+
+        A stop shuts idle connections, so what was read here may be cut short: the closing check comes first so a
+        cut request line gets no error answer either (SPEC-0014/BR-003).
+        """
+        if self._connections().closing or not super().parse_request():
+            self.close_connection = True
+            return False
+        if not self._connections().begin_request(self.connection):
+            self.close_connection = True
+            return False
+        self._request_began = True
+        return True
 
     def handle_one_request(self) -> None:
         """Run one request; a timeout, a client gone or an unexpected failure ends it with the DEC-015 answer."""
         self._headers_flushed = False
+        self._request_began = False
+        try:
+            self._handle_with_deadlines()
+        finally:
+            if self._request_began and self._connections().end_request(self.connection):
+                self.close_connection = True  # a stop began while this request ran (SPEC-0014/BR-004)
+
+    def _handle_with_deadlines(self) -> None:
         try:
             super().handle_one_request()
         except http_deadline.RequestTimeout as timeout:
@@ -925,9 +959,10 @@ _WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})  # noqa: S104  # nosec B104
 
 
 class _EditorServer(ThreadingHTTPServer):
-    """HTTP server that remembers the host it was asked to bind (SPEC-0005 host gate)."""
+    """HTTP server that remembers the host it was asked to bind (SPEC-0005 host gate) and its open connections."""
 
     def __init__(self, bind_host: str, port: int) -> None:
+        self.connections = ConnectionRegistry()  # before the bind: a handler may look it up as soon as one exists
         super().__init__((bind_host, port), _EditorHandler)
         self.bind_host = bind_host
 
@@ -959,7 +994,7 @@ def _is_same_origin(origin: str, host_name: str, host_port: int | None) -> bool:
     return parts.scheme == "http" and (parts.hostname or "") == host_name and (origin_port or 80) == (host_port or 80)
 
 
-_server_instance: ThreadingHTTPServer | None = None
+_server_instance: _EditorServer | None = None
 _server_thread: threading.Thread | None = None
 _server_lock = threading.Lock()
 
@@ -1070,15 +1105,23 @@ def start_http_server(
     return True, resolved_port
 
 
-def stop_http_server() -> None:  # pragma: no cover - stops a real server thread
-    """Stop the running HTTP server if any."""
+def stop_http_server() -> None:
+    """Stop the running HTTP server if any, and release its port (SPEC-0014 DEC-001).
+
+    ``shutdown`` only ends the serving loop; ``server_close`` closes the listening socket, so a new connect is
+    refused and the port can be bound again at once; handler threads are daemons, so it joins none. Idle
+    connections are then shut; a request already received finishes its answer on its own thread.
+    """
     global _server_instance, _server_thread
 
     with _server_lock:
-        if _server_instance is not None:
-            _server_instance.shutdown()
-            _server_instance = None
-            _server_thread = None
+        server = _server_instance
+        _server_instance = None
+        _server_thread = None
+        if server is not None:
+            server.shutdown()
+            server.server_close()
+            server.connections.close_idle()
             logger.info("HTTP server stopped")
 
     state = get_state()

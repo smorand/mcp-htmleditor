@@ -342,7 +342,7 @@ figures must be PNG, never SVG.
 | Tool | Description |
 |------|-------------|
 | `start_server(file, port=None)` | Start HTTP server + open browser. Idempotent. Without `port`, a free one is auto-picked (7842 first, then 7840-7849) — always read the `port` field of the response, never assume 7842. |
-| `stop_server()` | Stop the HTTP server. |
+| `stop_server()` | Stop the HTTP server: its port is released at once, idle connections are closed, a request already received is answered. |
 | `get_status()` | Current state: file, port, pid, mtime, running. |
 | `open_file(file)` | Switch to a different HTML file. |
 | `update_start()` | Signal modification start (shows overlay in browser). |

@@ -26,3 +26,15 @@ not the intended one.
 - Needed: confirm that BR-015 and BT-018 govern over the 4.4 row.
 - Recommendation: BR-015 governs (DEC-015): the test runs on a block of free ports found at run time, with its
   assertions unchanged (US-0083).
+
+## 2026-11-06 15:44: BT-021 expected text omits the FastMCP prefix (non blocking)
+- Spec: SPEC-0014, Requirement(s): BT-021 (SPEC-0001/FR-032)
+- Problem: BT-021 says the tool error "starts with `Port P is already in use (pass no --port ...`". Over stdio the
+  error text the client receives starts with `Error calling tool 'start_server': `, a prefix FastMCP adds to every
+  tool error; the server's own message follows it. Read literally, BT-021 cannot pass.
+- Evidence: `tests/test_server_lifecycle_stdio.py` (`FASTMCP_PREFIX`, BT-021 test): the test asserts the prefix, then
+  that the rest starts with the spec text.
+- Needed: confirm that BT-021 governs the server's message after the transport prefix, or amend BT-021 to quote it.
+- Recommendation: the message after the FastMCP prefix (the prefix is the MCP library's, outside the server's
+  control); amend BT-021 to say "the tool error text, after the FastMCP `Error calling tool 'start_server': ` prefix,
+  starts with ...".
