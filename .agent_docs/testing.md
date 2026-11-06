@@ -39,6 +39,16 @@ the child's wall time. The literal 60 / 900 check (BT-016) is `slow`:
 `make test ARGS='-m slow -k suite_time_limit'`. The dependency is `pytest-timeout>=2.4.0`: 2.5.0 is yanked on PyPI
 (accidental breaking change), so uv cannot lock it; move to a later release once one is not yanked.
 
+### Bounded stdio reads (2026-11-06, SPEC-0014 BR-014, DEC-010)
+
+A test that talks to a child process over stdio uses `tests/stdio_support.py` (`StdioSession`, `run_session`), never a
+`readline()` on the child's stdout. A daemon reader thread feeds a queue and each line read waits at most
+`stdio_support.LINE_TIMEOUT_SECONDS` (30 s). A silent child is killed and reaped, and the test fails with
+`the server did not answer within 30 s`. The constant is read through the module at each call: tests shorten it with
+`monkeypatch.setattr(stdio_support, "LINE_TIMEOUT_SECONDS", 1.0)` (never `from ... import LINE_TIMEOUT_SECONDS`).
+`select` is not used: a text mode pipe buffers ahead and can hide a buffered line. The literal 30 s cases (BT-003,
+BT-017) are `slow`: `make test ARGS='-m slow -k stdio_support'`.
+
 `make sync` also runs `playwright install chromium` (no-op if already cached) so the
 browser E2E tests below can run without a manual step.
 
@@ -50,6 +60,8 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | File | Covers |
 |------|--------|
 | `conftest.py` | `reset_settings` (autouse, drops the memoized `Settings`), `reset_state` / `fresh_state` (EditorState singleton), `html_file` |
+| `stdio_support.py` | `StdioSession` and `run_session`: JSON lines over a child's stdio, every line read bounded by `LINE_TIMEOUT_SECONDS`; `SILENT_CHILD`, `mcp_command()` (US-0081) |
+| `test_stdio_support.py` | BR-014: short bound, closed stdout, partial line, real session, source check; `slow` BT-003 and BT-017 at the literal 30 s (US-0081) |
 | `deck_support.py` | Deck fixtures (US-0035 to US-0040): `deck_ei`, `deck_carbon`, `deck_med`, `doc_perso` built from the real `templates/bootstrap` files (never committed); `slide_html(charter, title, ...)` returns one valid `ei` or `carbon` slide as an agent would send it; `write_deck` forces the modification time with `os.utime(path, (1_000_000_000, 1_000_000_000))` (no clock in tests); `assert_only_region_changed(before, after, marker)` proves byte identity outside an element found by plain substring search; `run_cli` and `call_tool` |
 | `test_deck_patch.py` | `patch` with `set_text`, atomic write, path guard, check order, documents (US-0038) |
 | `test_deck_patch_delete.py` | `delete_slide`, the one pass renumbering on the three fixtures, dry run (US-0039); counters checked with plain regexes |

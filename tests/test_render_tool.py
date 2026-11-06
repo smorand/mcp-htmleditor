@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -18,8 +17,10 @@ from typing import Any
 import pytest
 
 from tests import render_support as rs
+from tests import stdio_support
 from tests.deck_support import call_tool, doc_perso, write_deck
 from tests.deck_support import run_cli as _run_cli
+from tests.stdio_support import run_session
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / "skill" / "core.md"
@@ -58,38 +59,11 @@ def empty_browsers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _stdio_call(name: str, arguments: dict[str, Any], tmpdir: Path) -> dict[str, Any]:
     """Call one tool of a real ``mcp-htmleditor mcp`` process over stdio and return its structured result."""
-    init = {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {},
-        "clientInfo": {"name": "t", "version": "0"},
-    }
     requests = [
-        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": init},
-        {"jsonrpc": "2.0", "method": "notifications/initialized"},
-        {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": name, "arguments": arguments}},
+        *stdio_support.initialize_requests(),
+        stdio_support.tool_request(2, name, arguments),
     ]
-    process = subprocess.Popen(
-        [sys.executable, "-m", "mcp_htmleditor", "mcp"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-        cwd=ROOT,
-        env={**os.environ, "TMPDIR": str(tmpdir)},
-    )
-    assert process.stdin is not None
-    assert process.stdout is not None
-    messages: list[dict[str, Any]] = []
-    try:
-        process.stdin.write("".join(json.dumps(r) + "\n" for r in requests))
-        process.stdin.flush()
-        while not {1, 2} <= {m.get("id") for m in messages}:
-            line = process.stdout.readline()
-            assert line, "the server closed stdout before answering"
-            messages.append(json.loads(line))  # a stray text line fails here
-    finally:
-        process.kill()
-        process.wait(timeout=10)
+    messages = run_session(requests, {1, 2}, cwd=ROOT, env={**os.environ, "TMPDIR": str(tmpdir)})
     result = messages[-1]["result"]
     assert not result.get("isError")
     structured: dict[str, Any] = result.get("structuredContent") or json.loads(result["content"][0]["text"])

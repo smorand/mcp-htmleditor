@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
+from . import stdio_support
 from .deck_support import call_tool, deck_carbon, deck_ei, doc_perso, run_cli, write_deck
+from .stdio_support import run_session
 
 REPO = Path(__file__).resolve().parents[1]
 CORE = REPO / "skill" / "core.md"
@@ -106,46 +106,8 @@ def test_core_lists_both_tools_and_the_audit_passes() -> None:
 
 
 def test_mcp_process_writes_only_protocol_lines_on_stdout(ei_file: str) -> None:
-    requests = [
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "t", "version": "0"},
-            },
-        },
-        {"jsonrpc": "2.0", "method": "notifications/initialized"},
-        {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {"name": "outline", "arguments": {"file": ei_file}},
-        },
-    ]
-    process = subprocess.Popen(
-        [sys.executable, "-m", "mcp_htmleditor", "mcp"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        text=True,
-        cwd=REPO,
-    )
-    assert process.stdin is not None
-    assert process.stdout is not None
-    messages = []
-    try:
-        process.stdin.write("".join(json.dumps(r) + "\n" for r in requests))
-        process.stdin.flush()
-        while not {1, 2} <= {m.get("id") for m in messages}:
-            line = process.stdout.readline()
-            assert line, "the server closed stdout before answering"
-            messages.append(json.loads(line))  # a stray text line fails here
-    finally:
-        process.kill()
-        process.wait(timeout=10)
+    requests = [*stdio_support.initialize_requests(), stdio_support.tool_request(2, "outline", {"file": ei_file})]
+    messages = run_session(requests, {1, 2}, cwd=REPO)
 
     assert all(m.get("jsonrpc") == "2.0" for m in messages)
     assert "isError" not in messages[-1]["result"] or not messages[-1]["result"]["isError"]
