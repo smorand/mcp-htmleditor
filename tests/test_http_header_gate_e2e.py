@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 from playwright.sync_api import Page
 
+from tests.browser_wait import wait_for_js
 from tests.conftest import ServedDeck, needs_chromium
 from tests.deck_support import BOOTSTRAP, run_cli
 from tests.http_support import RawReply, exchange, json_body
@@ -34,6 +35,12 @@ DIAGRAM = (
     '<div data-type="arch-node" data-id="b" data-label="B"></div></div></div>'
 )
 JSON_TYPE = "Content-Type: application/json"
+FIRST_ZONE_EDITABLE_EXPRESSION = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    " const h = d && d.querySelector('[data-editable~=\"text\"]'); return !!h && h.isContentEditable; }"
+)
+SAVED_DOT_EXPRESSION = "() => getComputedStyle(document.getElementById('toolbar-status')).color"
+SAVED_DOT_COLOR = "rgb(66, 190, 101)"
 Serve = Callable[[Path], ServedDeck]
 
 
@@ -397,10 +404,12 @@ def test_bt_031_browser_editor_keeps_saving(page: Page, served_deck: ServedDeck)
         " return d && d.querySelector('[data-editable~=\"text\"]'); }"
     )
     page.click("#edit-mode-btn")
-    page.wait_for_timeout(150)
+    wait_for_js(page, FIRST_ZONE_EDITABLE_EXPRESSION, True, what="the first text zone editable")
     page.frame_locator("#content-frame").locator('[data-editable~="text"]').first.click()
     page.keyboard.press("End")
     page.keyboard.type("AAA")
-    page.wait_for_timeout(1500)
+    # The Euro-Information deck already carries "AAA" in a base64 asset, so the file cannot show the save:
+    # the status dot, pending from the keystroke, turns saved once the POST answered.
+    wait_for_js(page, SAVED_DOT_EXPRESSION, SAVED_DOT_COLOR, what="the status dot saved")
 
     assert "AAA" in served_deck.path.read_text(encoding="utf-8")

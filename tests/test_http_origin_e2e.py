@@ -30,9 +30,16 @@ from playwright.sync_api import Page
 
 from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
+from tests.browser_wait import settle, wait_for_file, wait_for_js, wait_until
 
 MARKER = "ORIGINAL-MARKER"
 PAYLOAD = "<p>PWNED</p>"
+SAVED_DOT_EXPRESSION = "() => getComputedStyle(document.getElementById('toolbar-status')).color"
+SAVED_DOT_COLOR = "rgb(66, 190, 101)"
+FIRST_ZONE_EDITABLE_EXPRESSION = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    " const h = d && d.querySelector('[data-editable~=\"text\"]'); return !!h && h.isContentEditable; }"
+)
 EVIL_ORIGIN = "https://evil.example"
 DOC = f'<!DOCTYPE html><html data-doc-type="document"><body><p>{MARKER}</p></body></html>'
 DIAGRAM_DOC = (
@@ -184,7 +191,7 @@ def test_foreign_page_cannot_overwrite_the_document(page: Page, served: Served, 
         f"""() => fetch("http://127.0.0.1:{served.port}/content", {{method: "POST", body: "{PAYLOAD}"}})
                  .catch(() => null)"""
     )
-    page.wait_for_timeout(500)
+    settle(page)  # the fetch above is answered, a late write would land now
 
     saved = served.path.read_text(encoding="utf-8")
     assert MARKER in saved
@@ -230,7 +237,9 @@ def test_foreign_page_cannot_read_the_document(page: Page, served: Served, attac
         f"""() => fetch("http://127.0.0.1:{served.port}/content").then(r => r.text())
                  .then(t => {{ window.__result = t; }}, e => {{ window.__result = e.name; }})"""
     )
-    page.wait_for_timeout(500)
+    wait_until(
+        page, lambda: page.evaluate("() => window.__result"), lambda r: r is not None, what="the foreign read result"
+    )
 
     assert MARKER not in str(page.evaluate("() => window.__result"))
     _assert_refused(_request(served, "GET", "/content", {"Origin": EVIL_ORIGIN}), "forbidden origin")
@@ -390,13 +399,14 @@ def test_browser_editor_still_saves_polls_exports(page: Page, served_deck: Serve
         " return d && d.querySelector('[data-editable~=\"text\"]'); }"
     )
     page.click("#edit-mode-btn")
-    page.wait_for_timeout(150)
+    wait_for_js(page, FIRST_ZONE_EDITABLE_EXPRESSION, True, what="the first text zone editable")
     page.frame_locator("#content-frame").locator('[data-editable~="text"]').first.click()
     page.keyboard.press("End")
     page.keyboard.type("AAA")
-    page.wait_for_timeout(1500)
+    wait_for_file(page, served_deck.path, "AAA")
+    wait_for_js(page, SAVED_DOT_EXPRESSION, SAVED_DOT_COLOR, what="the status dot saved")  # the dot fades in 120 ms
 
     assert "AAA" in served_deck.path.read_text(encoding="utf-8")
-    color = page.evaluate("() => getComputedStyle(document.getElementById('toolbar-status')).color")
-    assert color == "rgb(66, 190, 101)"
+    color = page.evaluate(SAVED_DOT_EXPRESSION)
+    assert color == SAVED_DOT_COLOR
     assert page.evaluate("() => fetch('/export/pptx').then(r => r.status)") == 200

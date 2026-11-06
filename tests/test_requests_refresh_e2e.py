@@ -15,6 +15,7 @@ from mcp_htmleditor import config
 from mcp_htmleditor.request_service import RequestService
 from mcp_htmleditor.request_store import RequestStore
 from mcp_htmleditor.state import get_state
+from tests.browser_wait import settle, wait_until
 from tests.conftest import ServedDeck, needs_chromium
 from tests.deck_support import call_tool, deck_ei, write_deck
 
@@ -41,6 +42,11 @@ def _open(page: Page, deck: ServedDeck, expected_heading: str) -> list[str]:
     page.goto(f"http://127.0.0.1:{deck.port}/")
     expect(page.locator("#requests-heading")).to_have_text(expected_heading, timeout=5000)
     return log
+
+
+def _await_first_poll(page: Page, log: list[str]) -> None:
+    """Wait until the editor has polled ``GET /status`` at least once."""
+    wait_until(page, lambda: log.count("GET /status"), lambda count: count >= 1, what="the first GET /status")
 
 
 def _complete(deck: ServedDeck, status: str, reason: str | None = None) -> None:
@@ -94,11 +100,11 @@ def test_e2e_027_editor_refresh_without_reload(page: Page, served_deck: ServedDe
 def test_ut_e01_no_fetch_while_nothing_changes(page: Page, served_deck: ServedDeck) -> None:
     _queue(served_deck)
     log = _open(page, served_deck, "Requests (1)")
-    page.wait_for_timeout(300)
+    _await_first_poll(page, log)
     status_before = log.count("GET /status")
     requests_before = log.count("GET /requests")
 
-    page.wait_for_timeout(2600)
+    page.wait_for_timeout(2600)  # pacing: measurement window, the polling period is what is counted
 
     assert log.count("GET /status") - status_before >= 10
     assert log.count("GET /requests") == requests_before
@@ -107,14 +113,14 @@ def test_ut_e01_no_fetch_while_nothing_changes(page: Page, served_deck: ServedDe
 @needs_chromium
 def test_ut_e02_no_extra_fetch_after_the_users_own_action(page: Page, served_deck: ServedDeck) -> None:
     log = _open(page, served_deck, "Requests (0)")
-    page.wait_for_timeout(600)
+    _await_first_poll(page, log)
     page.click("#ask-ai-btn")
     page.fill("#ask-ai-text", TITLE)
     mark = len(log)
 
     page.click("#ask-ai-queue")
     expect(page.locator("#requests-heading")).to_have_text("Requests (1)", timeout=2000)
-    page.wait_for_timeout(3 * POLL_MS + 400)
+    page.wait_for_timeout(3 * POLL_MS + 400)  # pacing: measurement window, three polling periods
 
     since = log[mark:]
     assert since.count("POST /requests") == 1
@@ -129,12 +135,13 @@ def test_agent_change_while_the_page_holds_an_older_revision_is_picked_up_once(
     """After the agent completes, exactly one extra GET /requests, then silence again."""
     _queue(served_deck)
     log = _open(page, served_deck, "Requests (1)")
-    page.wait_for_timeout(400)
+    _await_first_poll(page, log)
     mark = len(log)
 
     _complete(served_deck, "done")
     expect(page.locator("#requests-heading")).to_have_text("Requests (0)", timeout=2000)
-    page.wait_for_timeout(1000)
+    wait_until(page, lambda: log[mark:].count("GET /requests"), lambda count: count >= 1, what="the GET /requests")
+    settle(page)
 
     assert log[mark:].count("GET /requests") == 1
 

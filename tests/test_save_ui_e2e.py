@@ -18,6 +18,7 @@ import pytest
 from playwright.sync_api import Page, Route, expect
 
 from mcp_htmleditor import config as config_module
+from tests.browser_wait import settle, wait_for_file, wait_for_js, wait_until
 from tests.conftest import ServedDeck, needs_chromium
 
 COVER = ".slide-cover-title"
@@ -26,7 +27,14 @@ CONFLICT_TEXT = "The file changed on disk. Reload to see the changes, or keep yo
 LOST_TEXT = "Connection to the editor server lost"
 SAVED_DOT_COLOR = "rgb(66, 190, 101)"
 PENDING_DOT_COLOR = "rgb(255, 131, 43)"
-SAVE_WAIT_MS = 1500  # > the 800 ms typing debounce plus the POST round trip
+COVER_EDITABLE_EXPRESSION = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    f" const h = d && d.querySelector('{COVER}'); return !!h && h.isContentEditable; }}"
+)
+COVER_TEXT_EXPRESSION = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    f" const h = d && d.querySelector('{COVER}'); return h ? h.textContent : null; }}"
+)
 WAIT_MS = 6000
 
 needs_writable_check = pytest.mark.skipif(
@@ -47,7 +55,7 @@ def _open_in_edit_mode(page: Page, deck: ServedDeck) -> None:
         f" return d && d.querySelector('{COVER}'); }}"
     )
     page.click("#edit-mode-btn")
-    page.wait_for_timeout(300)
+    wait_for_js(page, COVER_EDITABLE_EXPRESSION, True, what="the cover title editable")
 
 
 def _type_in_cover(page: Page, text: str) -> None:
@@ -112,7 +120,13 @@ def test_conflict_message_and_reload(page: Page, served_deck: ServedDeck) -> Non
 
     sent = len(posts)
     page.keyboard.type("YY")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_until(
+        page,
+        lambda: page.evaluate(COVER_TEXT_EXPRESSION),
+        lambda text: isinstance(text, str) and text.endswith("YY"),
+        what="the typed text in the cover title",
+    )
+    settle(page)  # the 800 ms debounce fires and the open conflict refuses the save
     assert len(posts) == sent
     assert f"{AGENT_TITLE}X" not in served_deck.path.read_text(encoding="utf-8")
 
@@ -167,7 +181,8 @@ def test_one_failed_poll_shows_nothing(page: Page, served_deck: ServedDeck) -> N
             route.abort()
 
     page.route("**/status", abort_once)
-    page.wait_for_timeout(1200)
+    wait_until(page, lambda: list(failed), lambda seen: seen == [1], what="the one aborted poll")
+    settle(page)
     assert failed == [1]
     assert page.evaluate("() => window.__seen") is False
     expect(page.locator("#connection-lost")).to_be_hidden()
@@ -219,8 +234,7 @@ def test_save_failure_is_shown_and_retried(page: Page, served_deck: ServedDeck) 
         assert page.evaluate("() => document.activeElement === document.getElementById('content-frame')") is True
     page.keyboard.type("R")
     expect(page.locator("#save-error")).to_be_hidden(timeout=WAIT_MS)
-    page.wait_for_timeout(300)
-    assert "CouvertureQR" in served_deck.path.read_text(encoding="utf-8")
+    wait_for_file(page, served_deck.path, "CouvertureQR")
     _wait_dot(page, SAVED_DOT_COLOR)
 
 
@@ -231,9 +245,8 @@ def test_own_save_does_not_reload_and_poll_keeps_base(page: Page, served_deck: S
     _open_in_edit_mode(page, served_deck)
     page.evaluate("() => { document.getElementById('content-frame').contentWindow.__probe = 1; }")
     _type_in_cover(page, "A")
-    page.wait_for_timeout(SAVE_WAIT_MS)
+    wait_for_file(page, served_deck.path, "CouvertureA")
     page.keyboard.type("B")
-    page.wait_for_timeout(SAVE_WAIT_MS)
-    assert "CouvertureAB" in served_deck.path.read_text(encoding="utf-8")
+    wait_for_file(page, served_deck.path, "CouvertureAB")
     expect(page.locator("#save-conflict")).to_be_hidden()
     assert page.evaluate("() => document.getElementById('content-frame').contentWindow.__probe") == 1
