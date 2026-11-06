@@ -79,3 +79,12 @@
 | US-0077 | SPEC-0013 | record, server and bind address arguments refused | US-0076 | 2 | landed | story/US-0077-record-server-and-bind-arguments | story/US-0076-deck-services-refuse-unencodable-paths |
 | US-0078 | SPEC-0013 | wait bound, idle close and send side bound | US-0072 | 1 | landed | story/US-0078-wait-bound-idle-close-send-bound | story/US-0077-record-server-and-bind-arguments |
 | US-0079 | SPEC-0013 | total request bound, slow suite and documentation | US-0074, US-0077, US-0078 | 2 | landed | story/US-0079-total-bound-slow-suite-and-docs | story/US-0078-wait-bound-idle-close-send-bound |
+| US-0080 | SPEC-0014 | per test time limit | main | 2 | todo | | |
+| US-0081 | SPEC-0014 | bounded stdio reads in tests | US-0080 | 2 | todo | | |
+| US-0082 | SPEC-0014 | a stop releases the port | US-0081 | 1 | todo | | |
+| US-0083 | SPEC-0014 | port range tests independent of the machine | main | 2 | todo | | |
+| US-0084 | SPEC-0014 | bounded observation and the autosave tests | main | 2 | todo | | |
+| US-0085 | SPEC-0014 | undo and redo tests observe and pass with late saves | US-0084 | 2 | todo | | |
+| US-0086 | SPEC-0014 | fullscreen, website, review and request editor waits | US-0084 | 2 | todo | | |
+| US-0087 | SPEC-0014 | save ui, refresh, origin and header gate waits | US-0084 | 2 | todo | | |
+| US-0088 | SPEC-0014 | fixed wait guard, run time and documentation | US-0082, US-0083, US-0085, US-0086, US-0087 | 2 | todo | | |
