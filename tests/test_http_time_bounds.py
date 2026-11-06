@@ -33,6 +33,7 @@ from tests.http_support import HEADER_END, RawReply, _parse
 SECRET = "ORIGINAL-SECRET"  # noqa: S105 - a marker, not a credential
 WAIT = 1.0
 TOTAL = 4.0
+CLOSE_MARGIN = 10.0  # generating a 27 MB export is CPU bound: 5.5 s measured at load average 22, the wait is 1 s
 TIMEOUT_BODY = {"error": "Request timeout"}
 LOGGER = "mcp_htmleditor.http_server"
 Serve = Callable[[Path], ServedDeck]
@@ -550,11 +551,11 @@ def test_time_bounds_export_to_a_client_not_reading_is_quiet(
     caplog.clear()
     before = handler_threads()
     conn = open_and_send(big.port, f"GET /export/{kind} HTTP/1.1\r\nHost: 127.0.0.1:{big.port}\r\n\r\n".encode())
-    deadline = time.monotonic() + 6.0
+    deadline = time.monotonic() + WAIT + CLOSE_MARGIN
     while not any("Connection closed while answering" in r.getMessage() for r in caplog.records):
         assert time.monotonic() < deadline, [r.getMessage() for r in caplog.records]
         time.sleep(0.05)
-    assert wait_threads_ended(before) == set()
+    assert wait_threads_ended(before, CLOSE_MARGIN) == set()
     conn.sock.close()
 
     ours = [r for r in caplog.records if r.name == LOGGER]
