@@ -5,7 +5,7 @@
 > Nature: BUG
 > Depth: M
 > Depth evidence: 2 modules (editor HTTP server lifecycle, test suite and its configuration); 16 requirements; no public HTTP contract change; no data model change
-> Status: designed
+> Status: implemented
 > Verdict: authority exists (BUG-001, BUG-004); no authority (BUG-002, BUG-003)
 > Defect class: n/a for BUG-001 and BUG-004; absent for BUG-002 and BUG-003
 > Severity: Low (BUG-001, BUG-002, BUG-003), Medium (BUG-004: makes the only quality gate machine dependent)
