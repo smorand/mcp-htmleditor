@@ -92,5 +92,5 @@
 | US-0090 | SPEC-0015 | keyboard steps, reset and undo of a width | US-0089 | 1 | done | story/US-0090-keyboard-reset-and-undo-of-a-width | story/US-0089-width-bar-and-drag-saved |
 | US-0094 | SPEC-0014 | faster server stop poll | US-0090 | 2 | done | story/US-0094-faster-server-stop-poll | story/US-0090-keyboard-reset-and-undo-of-a-width |
 | US-0091 | SPEC-0015 | where the width bar shows and hides | US-0090 | 2 | done | story/US-0091-where-the-width-bar-shows-and-hides | story/US-0094-faster-server-stop-poll |
-| US-0092 | SPEC-0015 | interrupted drags, saves during a drag, conflicts | US-0091 | 1 | todo | | |
+| US-0092 | SPEC-0015 | interrupted drags, saves during a drag, conflicts | US-0091 | 1 | done | story/US-0092-interrupted-drags-saves-and-conflicts | story/US-0091-where-the-width-bar-shows-and-hides |
 | US-0093 | SPEC-0015 | agent side, guidance lines and documentation | US-0092 | 2 | todo | | |

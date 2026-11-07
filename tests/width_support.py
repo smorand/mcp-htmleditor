@@ -263,6 +263,23 @@ def style_in_file(path: Path, text: str) -> str | None:
     return None if style is None else str(style)
 
 
+def markers_in(path: Path) -> list[str]:
+    """Editing markers left in the file: ids, classes or attributes starting with ``_mcp``, ``contenteditable``, and
+    the width bar's own ids. Empty when the file is clean (NFR-003)."""
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    found: list[str] = []
+    for tag in soup.find_all(True):
+        for name, value in tag.attrs.items():
+            values = value if isinstance(value, list) else [value]
+            if name.startswith("_mcp") or name == "contenteditable":
+                found.append(f"{tag.name} attribute {name}")
+            elif name == "id" and (str(value).startswith("_mcp") or value in ("width-bar", "width-readout")):
+                found.append(f"{tag.name} id {value}")
+            elif name == "class":
+                found.extend(f"{tag.name} class {c}" for c in values if str(c).startswith("_mcp"))
+    return found
+
+
 def point_bar(page: Page, selector: str) -> dict[str, float]:
     """Point at a framed text block and return the rectangle of the width bar shown on it."""
     box = block_box(page, selector)

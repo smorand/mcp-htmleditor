@@ -176,14 +176,22 @@ function onWidthBarPointerLeave(e) {
   if (!widthPointInRect(e.clientX - frameRect.left, e.clientY - frameRect.top, rect)) widthBarHide();
 }
 
-/** Called by onFrameLoad(): a new document never starts with the bar shown. */
+/** Called by onFrameLoad(): a new document never starts with the bar shown. A drag is dropped without touching
+    its block, which belongs to the document that is gone; nothing is saved. */
 function widthBarOnFrameLoad() {
+  widthDrag = null;
   widthBarHide();
 }
 
-/** Called by pollStatus() when it shows the update overlay: the agent is writing, no bar. */
+/** Called by pollStatus() when it shows the update overlay: the agent is writing, a drag is cancelled, no bar. */
 function widthBarOnAgentUpdate() {
-  if (!widthDrag) widthBarHide();
+  widthDragCancel();
+  widthBarHide();
+}
+
+/** True while the bar is pressed: pollStatus() then leaves an external write for the release save's conflict. */
+function widthDragActive() {
+  return widthDrag !== null;
 }
 
 /** Hover on the framed document: the bar follows the text block under the pointer, synchronously. */
@@ -276,6 +284,11 @@ function onWidthBarPointerUp(e) {
   widthBarPlace(drag.block);
 }
 
+/** pointercancel, or the capture lost without a pointerup (pointerup ends the drag first): cancel. */
+function onWidthBarPointerInterrupted(e) {
+  if (widthDrag && e.pointerId === widthDrag.pointerId) widthDragCancel();
+}
+
 /** Interrupted drag: the text is back at its width before the drag, nothing saved. */
 function widthDragCancel() {
   const drag = widthDrag;
@@ -359,7 +372,8 @@ function initWidthBar() {
   bar.addEventListener('pointerdown', onWidthBarPointerDown);
   bar.addEventListener('pointermove', onWidthBarPointerMove);
   bar.addEventListener('pointerup', onWidthBarPointerUp);
-  bar.addEventListener('pointercancel', widthDragCancel);
+  bar.addEventListener('pointercancel', onWidthBarPointerInterrupted);
+  bar.addEventListener('lostpointercapture', onWidthBarPointerInterrupted);
   bar.addEventListener('keydown', onWidthBarKeyDown);
   bar.addEventListener('dblclick', onWidthBarDoubleClick);
   bar.addEventListener('pointerleave', onWidthBarPointerLeave);

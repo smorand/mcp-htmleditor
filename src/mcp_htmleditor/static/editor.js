@@ -336,7 +336,8 @@ async function pollStatus() {
     const mtimeChanged = lastMtime !== null && status.mtime !== lastMtime;
     // Reload only for EXTERNAL changes (agent wrote the file). Never reload
     // because of our own save: that would flash the iframe and lose the caret.
-    const externalChange = mtimeChanged && !selfSaving && !hasPendingChanges;
+    // Nor during a width drag: its release save meets the conflict notice instead (SPEC-0015 DEC-008).
+    const externalChange = mtimeChanged && !selfSaving && !hasPendingChanges && !widthDragActive();
     if ((wasUpdating || externalChange) && !status.update_in_progress) {
       wasUpdating = false;
       lastMtime   = status.mtime;
