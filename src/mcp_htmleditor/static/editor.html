@@ -105,6 +105,12 @@
   <!-- The actual HTML file rendered as-is in a full-page iframe -->
   <iframe id="content-frame" src="/content-frame" sandbox="allow-scripts allow-same-origin allow-forms allow-fullscreen" allow="fullscreen" allowfullscreen></iframe>
 
+  <!-- Text width bar (SPEC-0015): laid over the frame, never inserted into the framed document -->
+  <div id="width-bar" role="separator" aria-orientation="vertical" aria-label="Largeur du texte"
+       title="Glisser pour régler la largeur, double clic pour revenir à la largeur du modèle" tabindex="0" hidden>
+    <span id="width-readout" hidden></span>
+  </div>
+
   <script src="/static/slide-layouts.js"></script>
   <script src="/static/doc-blocks.js"></script>
   <script src="/static/editor-undo.js"></script>
@@ -115,6 +121,7 @@
   <script src="/static/editor-slides.js"></script>
   <script src="/static/editor-blocks.js"></script>
   <script src="/static/editor-drag.js"></script>
+  <script src="/static/editor-width.js"></script>
   <script src="/static/editor-requests.js"></script>
   <script src="/static/editor.js"></script>
 </body>

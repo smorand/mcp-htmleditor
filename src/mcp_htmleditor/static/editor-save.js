@@ -21,7 +21,9 @@ async function runSave(options) {
     // Strip editor artifacts on a detached clone, never on the live DOM:
     // removing contenteditable from the focused zone would move focus to
     // <body> and drop the keystrokes typed after the save (SPEC-0004).
-    const clone = doc.documentElement.cloneNode(true);
+    // A width drag preview is taken out around the clone, so a save during a drag writes the width
+    // the text had before it (SPEC-0015).
+    const clone = withWidthPreviewSuspended(() => doc.documentElement.cloneNode(true));
     clone.querySelectorAll('[contenteditable]').forEach(el => {
       el.removeAttribute('contenteditable');
       el.style.outline = ''; el.style.cursor = '';

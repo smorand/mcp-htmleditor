@@ -43,6 +43,7 @@ function injectEditMode(doc) {
   enableImageDrop(doc);
   if (isDocument || isWebsite) injectDocDragHandles(doc);
   if (isPresentation) enableArchNodeDrag(doc);
+  widthBarAttach(doc);
 }
 
 function removeEditMode(doc) {
@@ -57,6 +58,7 @@ function removeEditMode(doc) {
   doc.getElementById('_mcp_editor_styles')?.remove();
   removeDocDragHandles(doc);
   removeArchNodeDrag(doc);
+  widthBarDetach(doc);
   hideFormatBar();
   hideInsertBar();
 }

@@ -88,7 +88,7 @@
 | US-0086 | SPEC-0014 | fullscreen, website, review and request editor waits | US-0084 | 2 | landed | story/US-0086-fullscreen-website-review-editor-waits | story/US-0085-undo-redo-tests-observe-late-saves |
 | US-0087 | SPEC-0014 | save ui, refresh, origin and header gate waits | US-0084 | 2 | landed | story/US-0087-save-ui-refresh-origin-gate-waits | story/US-0086-fullscreen-website-review-editor-waits |
 | US-0088 | SPEC-0014 | fixed wait guard, run time and documentation | US-0082, US-0083, US-0085, US-0086, US-0087 | 2 | landed | story/US-0088-fixed-wait-guard-run-time-and-docs | story/US-0087-save-ui-refresh-origin-gate-waits |
-| US-0089 | SPEC-0015 | width bar and drag saved as one declaration | main | 1 | todo | | |
+| US-0089 | SPEC-0015 | width bar and drag saved as one declaration | main | 1 | done | story/US-0089-width-bar-and-drag-saved | main |
 | US-0090 | SPEC-0015 | keyboard steps, reset and undo of a width | US-0089 | 1 | todo | | |
 | US-0091 | SPEC-0015 | where the width bar shows and hides | US-0090 | 2 | todo | | |
 | US-0092 | SPEC-0015 | interrupted drags, saves during a drag, conflicts | US-0091 | 1 | todo | | |

@@ -35,6 +35,7 @@ EXPECTED_ORDER = [
     "editor-slides.js",
     "editor-blocks.js",
     "editor-drag.js",
+    "editor-width.js",
     "editor-requests.js",
     "editor.js",
 ]

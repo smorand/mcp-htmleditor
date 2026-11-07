@@ -471,3 +471,28 @@ body:has(#ask-ai-panel:not([hidden])) #notices { right: 344px; }
   border: 1px solid #393939;
 }
 #requests-list .request-text { line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* ── Text width bar (SPEC-0015): editor chrome laid over the frame, never in the edited file ── */
+#width-bar[hidden],
+#width-readout[hidden] { display: none; }
+#width-bar {
+  position: fixed;
+  z-index: 9000;
+  width: 6px;
+  background: rgba(15, 98, 254, 0.55);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+#width-bar:hover { background: #0f62fe; }
+#width-readout {
+  position: absolute;
+  top: 50%; left: 10px;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  background: #161616;
+  color: #f4f4f4;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
