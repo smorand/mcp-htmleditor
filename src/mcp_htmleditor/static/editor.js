@@ -348,7 +348,9 @@ async function pollStatus() {
       return;
     }
   }
-  lastMtime = status.mtime; // baseMtime stays: unsaved edits are still based on the version they started from
+  // baseMtime stays: unsaved edits are still based on the version they started from. During a width drag lastMtime
+  // stays too, so a drag that ends without a save still reloads on the next poll (SPEC-0015 DEC-008).
+  if (!widthDragActive()) lastMtime = status.mtime;
   requestsOnStatus(status);
 }
 

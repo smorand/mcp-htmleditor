@@ -114,6 +114,14 @@ node and add-edge via right-click (see `skill/topics/arch-diagram.md` § Éditio
 la souris): every structural change saves then calls the server's `arch-layout`
 engine, the browser never computes a position itself.
 
+Text width bar: pointing at a text block shows a thin bar on its right edge. Drag it to
+set the text's width live (steps of 10 px, Alt for single pixels, 80 to 1280 px); focus it
+and use the arrow keys (Shift for 50 px); double click it to go back to the template's
+width. Letting go saves one declaration, `max-width:Npx`, in the text's inline `style`
+(other declarations kept), as a single undo step, and nothing of the bar reaches the
+file. Agents read it as a plain declaration. The PPTX and DOCX exports ignore it (the
+text keeps its block's width, see BL-0033).
+
 Undo/redo (Ctrl+Z / Cmd+Z, Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y), active in edit mode:
 covers every structural mutation above (node move, node/edge/table/gantt-task
 add/remove, slide insert/delete, document block insert/reorder) with a 50-deep

@@ -242,3 +242,32 @@ def test_width_keys_undo_redo_drag(width_page: Page, tmp_path: Path, serve_deck:
     open_editor(page, deck.port)
     assert undo_disabled(page)
     assert style_in_file(deck.path, A) == "max-width:650px"
+
+
+UNDO_DEPTH = "() => [undoStack.length, redoStack.length]"
+
+
+def test_width_keys_undo_shortcuts_on_focused_bar(
+    width_page: Page, tmp_path: Path, serve_deck: Callable[[Path], ServedDeck]
+) -> None:
+    """FR-009 / SC-004: Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z undo and redo a width while the bar has the focus."""
+    page = width_page
+    deck = _served(tmp_path, serve_deck)
+    open_editor(page, deck.port)
+
+    drag_bar(page, PARAGRAPH["A"], 47)
+    _style_becomes(page, deck, A, "max-width:650px")
+    assert page.evaluate(UNDO_DEPTH) == [1, 0]
+
+    # An undo or redo reloads the frame, which hides the bar and drops its focus: focus it again before each key.
+    for key, depth, style in (
+        ("Control+z", [0, 1], "max-width:600px"),
+        ("Control+y", [1, 0], "max-width:650px"),
+        ("Control+z", [0, 1], "max-width:600px"),
+        ("Control+Shift+z", [1, 0], "max-width:650px"),
+    ):
+        focus_bar(page, PARAGRAPH["A"])
+        assert page.evaluate("() => document.activeElement.id") == "width-bar"
+        page.keyboard.press(key)
+        wait_for_js(page, UNDO_DEPTH, depth, what=f"undo and redo depths after {key}")
+        _style_becomes(page, deck, A, style)

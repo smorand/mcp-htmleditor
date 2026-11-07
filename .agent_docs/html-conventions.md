@@ -198,6 +198,14 @@ artifacts on a detached clone of the document and never mutates the live DOM. Re
 `contenteditable` from the focused zone moves focus to `<body>` and drops the keystrokes
 typed after the save. A new client artifact must be stripped on the clone too.
 
+2026-11-07 (SPEC-0015): the text width bar (`#width-bar`, `#width-readout`) belongs to the shell page and is
+never inserted into the framed document, so it needs no `_EDITOR_ARTIFACTS` entry. The live drag preview is set
+through `el.style`, which rewrites the whole style attribute (hex to `rgb(...)`, quotes in `url(...)`).
+Rule for text styles: never write a saved style through `el.style`; rebuild the text from the attribute as it was
+before the drag and use `setAttribute('style', text)`. The preview is suspended around every serialization
+(`withWidthPreviewSuspended` in `editor-width.js`): a new serialization path (save, snapshot, export of the
+document) must run inside it.
+
 ## Undo / redo (structural mutations, `editor-undo.js`)
 
 Ctrl+Z / Cmd+Z (undo) and Ctrl+Shift+Z / Cmd+Shift+Z / Ctrl+Y (redo) are active only in
@@ -211,7 +219,7 @@ snapshot per drag gesture, not per pointermove), arch-node add/remove/rename/res
 arch-edge create, image insert via drag-drop (`embedImageFile`'s `insertAdjacentHTML`
 branch — unlike the file-picker's `execCommand('insertHTML', ...)`, this does NOT push a
 native contenteditable undo step), table row/col add/remove/table delete, gantt task
-add/resize/rename/delete, slide insert/delete, document block insert/reorder (drag
+add/resize/rename/delete, text width change (drag, key press or reset: one step each, SPEC-0015), slide insert/delete, document block insert/reorder (drag
 handle), annotation edit/delete.
 
 **Deliberately NOT covered, on purpose:** plain contenteditable text edits (typing,

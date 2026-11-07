@@ -330,8 +330,13 @@ function widthActionBlock() {
   return widthBlock;
 }
 
-/** Right and Left step the width on the slide by 10 (50 with Shift); Delete and Backspace reset. Other keys untouched. */
+/** Right and Left step the width on the slide by 10 (50 with Shift); Delete and Backspace reset. Undo and redo
+    shortcuts go to the editor's own handler, which listens on the framed document only (FR-009). Other keys untouched. */
 function onWidthBarKeyDown(e) {
+  if ((e.ctrlKey || e.metaKey) && 'zZyY'.includes(e.key) && e.key.length === 1) {
+    handleUndoRedoKeydown(e);
+    return;
+  }
   const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
   const reset = e.key === 'Delete' || e.key === 'Backspace';
   if (!step && !reset) return;

@@ -21,6 +21,7 @@ from tests.width_support import (
     deck_d3,
     drag_bar,
     open_editor,
+    point_bar,
     show_slide_2,
     style_in_file,
     width_page,
@@ -156,3 +157,31 @@ def test_width_drag_other_declarations_verbatim(
     assert style_in_file(deck.path, text) == expected
     assert "rgb(" not in saved
     assert saved == baseline.replace(f'style="{original}"', f'style="{expected}"', 1)
+
+
+# NFR-001: the reflow is synchronous with the pointermove. The move is dispatched and the block measured in the same
+# page.evaluate call, with no await in between: no frame, timer or task can run between the two.
+MOVE_THEN_MEASURE = """([sel, x, y]) => {
+  const bar = document.getElementById('width-bar');
+  bar.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: x, clientY: y, bubbles: true }));
+  const block = document.getElementById('content-frame').contentDocument.querySelector(sel);
+  return [getComputedStyle(block).maxWidth, block.offsetWidth];
+}"""
+
+
+def test_width_drag_reflow_synchronous(
+    width_page: Page, tmp_path: Path, serve_deck: Callable[[Path], ServedDeck]
+) -> None:
+    """NFR-001: a pointermove of the drag has reflowed the block before the event dispatch returns."""
+    deck = _served(tmp_path, serve_deck, deck_d1())
+    open_editor(width_page, deck.port)
+    bar = point_bar(width_page, PARAGRAPH["A"])
+    x, y = bar["x"] + bar["width"] / 2, bar["y"] + bar["height"] / 2
+    width_page.mouse.move(x, y)
+    width_page.mouse.down()
+    try:
+        max_width, width = width_page.evaluate(MOVE_THEN_MEASURE, [PARAGRAPH["A"], x + 100, y])
+    finally:
+        width_page.mouse.up()
+
+    assert (max_width, width) == ("700px", 700)

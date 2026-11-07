@@ -97,7 +97,7 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   apart, 10 s bound), never after a fixed delay. A `wait_for_timeout(` that stays carries a trailing `# pacing: <reason>`;
   `tests/test_no_fixed_waits.py` fails the gate otherwise. Child processes over stdio go through `tests/stdio_support.py`.
 - JS has no build step: `node --check src/mcp_htmleditor/static/*.js`.
-- The editor is twelve classic scripts loaded in the order of `editor.html`; the PPTX exporter
+- The editor is thirteen classic scripts loaded in the order of `editor.html`; the PPTX exporter
   is a composed `_SlideBuilder` of mixins (`export/pptx_*.py`). See `.agent_docs/architecture.md`.
 - `src/mcp_htmleditor/version.py` stays committed with `"dev"`; the build overwrites it
   from the git tag.

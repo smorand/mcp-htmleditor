@@ -26,6 +26,7 @@ from tests.test_save_ui_e2e import CONFLICT_TEXT, LOST_TEXT, PENDING_DOT_COLOR
 from tests.width_support import (
     PARAGRAPH,
     READOUT,
+    count_polls,
     deck_d1,
     double_click_bar,
     drag_bar,
@@ -36,6 +37,7 @@ from tests.width_support import (
     point_bar,
     style_in_file,
     undo_disabled,
+    wait_polls,
     width_page,
     write_fixture,
 )
@@ -254,10 +256,12 @@ def test_width_failures_file_changed_during_drag(
     open_editor(page, deck.port)
 
     page.evaluate(f"() => {{ {FRAME_WINDOW}.__probe = 1; }}")
+    count_polls(page)
     x, y = _press_and_move(page, PARAGRAPH["A"], 100)
     wait_for_js(page, "() => selfSaving", False, what="no save in flight")
     _agent_writes(deck, f">{J}<", f">{CHANGED}<")
-    wait_for_js(page, "() => lastMtime", deck.path.stat().st_mtime, what="the poll saw the write")
+    # Observed by answered polls, not lastMtime: lastMtime no longer moves during a drag (DEC-008 stale view fix).
+    wait_polls(page)
     page.mouse.move(x + 50, y)
     assert page.evaluate(READOUT) == "650 px"
     page.mouse.up()
@@ -267,6 +271,50 @@ def test_width_failures_file_changed_during_drag(
     assert page.evaluate(PROBE) == 1, "the frame reloaded during the drag"
     saved = deck.path.read_text(encoding="utf-8")
     assert f">{CHANGED}<" in saved
+    assert style_in_file(deck.path, A) == "max-width:600px"
+
+
+def test_width_failures_drag_ended_without_save_shows_agent_write(
+    width_page: Page, tmp_path: Path, serve_deck: Callable[[Path], ServedDeck]
+) -> None:
+    """DEC-008: an agent write during a drag that ends without a save (release at the original value, press with no
+    move, pointercancel) is shown once the drag ends, by the next poll; nothing is saved."""
+    page = width_page
+    deck = _served(tmp_path, serve_deck)
+    open_editor(page, deck.port)
+    count_polls(page)
+
+    def back_to_start(x: float, y: float) -> None:
+        page.mouse.move(x, y)
+        assert page.evaluate(READOUT) == "600 px"
+        page.mouse.up()
+
+    def cancel(_x: float, _y: float) -> None:
+        page.evaluate(CANCEL)
+        page.mouse.up()
+
+    endings: list[tuple[str, float, Callable[[float, float], None]]] = [
+        ("release at the original value", 100, back_to_start),
+        ("press with no move", 0, lambda _x, _y: page.mouse.up()),
+        ("pointercancel", 100, cancel),
+    ]
+    for n, (ending, dx, end) in enumerate(endings, 1):
+        written = f"{CHANGED} {n}"
+        previous = J if n == 1 else f"{CHANGED} {n - 1}"
+        x, y = _press_and_move(page, PARAGRAPH["A"], dx)
+        _agent_writes(deck, f">{previous}<", f">{written}<")
+        wait_polls(page)
+        assert page.evaluate(FRAME_TEXT, PARAGRAPH["J"]) == previous, f"{ending}: reloaded during the drag"
+        end(x, y)
+        wait_until(
+            page,
+            lambda: page.evaluate(FRAME_TEXT, PARAGRAPH["J"]),
+            lambda text, shown=written: text == shown,
+            what=f"{ending}: the agent's text shown after the drag",
+        )
+        assert page.evaluate(SAVES) == 0, f"{ending}: a save was sent"
+        open_editor(page, deck.port)
+        count_polls(page)
     assert style_in_file(deck.path, A) == "max-width:600px"
 
 

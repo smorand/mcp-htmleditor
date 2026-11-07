@@ -14,7 +14,7 @@ import pytest
 from bs4 import BeautifulSoup, Tag
 from playwright.sync_api import Browser, Page
 
-from tests.browser_wait import wait_for_js
+from tests.browser_wait import wait_for_js, wait_until
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CARBON_BOOTSTRAP = REPO_ROOT / "templates" / "bootstrap" / "slides-empty.html"
@@ -235,18 +235,58 @@ def drag_bar(page: Page, selector: str, dx: float, *, alt: bool = False, steps: 
     start_x = bar["x"] + bar["width"] / 2
     y = bar["y"] + bar["height"] / 2
     page.mouse.move(start_x, y)
+    seen: list[str] = []
+    # Released in `finally`: a failure must not leave Alt or the button held on the module's shared page.
     if alt:
         page.keyboard.down("Alt")
-    page.mouse.down()
-    seen: list[str] = []
-    for step in range(1, steps + 1):
-        page.mouse.move(start_x + dx * step / steps, y)
-        seen.append(page.evaluate(READOUT))
-    page.mouse.up()
-    if alt:
-        page.keyboard.up("Alt")
+    try:
+        page.mouse.down()
+        try:
+            for step in range(1, steps + 1):
+                page.mouse.move(start_x + dx * step / steps, y)
+                seen.append(page.evaluate(READOUT))
+        finally:
+            page.mouse.up()
+    finally:
+        if alt:
+            page.keyboard.up("Alt")
     seen.append(page.evaluate(READOUT))
     return seen
+
+
+POLL_COUNTER_SCRIPT = """
+(() => {
+  if (window.__statusPolls !== undefined) return;
+  window.__statusPolls = 0;
+  const send = window.fetch;
+  window.fetch = async (input, init) => {
+    const response = await send(input, init);
+    const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+    if (url.pathname === '/status') window.__statusPolls++;
+    return response;
+  };
+})()
+"""
+
+
+def count_polls(page: Page) -> None:
+    """Count the editor's answered ``/status`` polls in ``window.__statusPolls`` (installed once per page load)."""
+    page.evaluate(POLL_COUNTER_SCRIPT)
+
+
+def wait_polls(page: Page, count: int = 3) -> None:
+    """Wait until ``count`` more ``/status`` polls have been answered.
+
+    The one in flight may predate the call and the counter moves before a poll is handled, so the default 3 means
+    at least one poll that started after the call has been fully handled.
+    """
+    start = int(page.evaluate("() => window.__statusPolls"))
+    wait_until(
+        page,
+        lambda: int(page.evaluate("() => window.__statusPolls")),
+        lambda n: n >= start + count,
+        what=f"{count} status polls answered",
+    )
 
 
 def element_starting_with(html: str, text: str) -> Tag:

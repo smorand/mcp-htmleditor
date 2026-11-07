@@ -39,6 +39,7 @@ Tout contenu que l'humain doit pouvoir modifier visuellement porte un `data-edit
 - Blocs document: **＋ Bloc avant** / **Bloc après ＋** (titre, sous-titre, h1 à h5, paragraphe, tableau, liste) et poignée de drag ⠿; après le drop l'ordre du DOM est l'ordre visuel, sans attribut ni style ajouté.
 - Schéma d'architecture: les `arch-node` se déplacent à la souris (écrit `data-x` / `data-y` en %).
 - Clic droit: `table` (ligne, colonne, supprimer), `gantt-task` (agrandir, réduire, renommer, supprimer), `gantt` (ajouter une tâche), `arch-node`, `arch-diagram`, `annotation`.
+- Largeur d'un texte: barre sur son bord droit (glisser par pas de 10px, Alt au pixel, flèches; double clic: largeur du modèle). Écrit `max-width:Npx` dans son `style`.
 
 ## Workflows de l'agent
 

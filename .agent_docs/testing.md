@@ -202,6 +202,19 @@ sets `HTMLEDITOR_SKILL_DIR` and isolates `HTMLEDITOR_ARCH_CHECKS_DIR`; tests mut
 `SkillTree`. `tests/data/skill_anchors.json` lists, per topic, the strings that must stay in the
 shipped text (every topic but `arch-qa`, whose anchors live in `tests/test_arch_checks.py`).
 
+### Text width bar tests (2026-11-07, SPEC-0015, DEC-011)
+
+* `tests/width_support.py`: shared module page (`width_page`, one Chromium page per module), decks D1 to W1, drag and
+  key helpers, `window.__widthSaves` (POST `/content` counter). Five files hold E2E-001 to E2E-043:
+  `test_width_drag_e2e.py` (001 to 007, 042), `test_width_keys_undo_e2e.py` (008 to 016, 020, 030, 037, 038, 040),
+  `test_width_failures_e2e.py` (017 to 019, 026, 027, 032, 036, 039), `test_width_visibility_e2e.py`
+  (021 to 025, 031, 033, 043), `test_width_agent_e2e.py` (028, 029, 034, 035, 041). Run them with `make test ARGS='-k width'`.
+* The two guidance lines (`skill/topics/create.md`, `export.md`) are asserted verbatim in a child process; the
+  core `skill/core.md` is pinned by sha256 in E2E-035.
+* Audit fixes (2026-11-07, US-0093): undo shortcuts on the focused bar, NFR-001 synchronous reflow, a drag ending
+  without a save still reloads an agent write. `lastMtime` no longer moves during a drag: observe polls with
+  `count_polls` / `wait_polls` (window.__statusPolls), never `lastMtime`.
+
 ### Test step budget trims (2026-11-06, SPEC-0014 BT-022, <= 330 s)
 
 * `save_delay` (autosave and undo/redo e2e files) is parametrized per test by `pytest_generate_tests`:

@@ -53,6 +53,7 @@ La charte est détectée (tokens `--med-*` médicale, `--ei-*` Euro-Information,
 - SVG inline (aucune conversion vectorielle): utiliser un `<img>` PNG.
 - Fonds de `<span>` (`tag-blue`, `tag-green`, `.med-badge`): seule la couleur du texte reste.
 - Images distantes (`http://`, `https://`): signalées et ignorées, les télécharger ou passer en base64.
+- Le `max-width` d'un texte (barre de largeur de l'éditeur): la zone de texte garde la largeur de son bloc.
 
 ### Diagnostics et vérification
 

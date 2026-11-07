@@ -26,9 +26,10 @@ REPO = Path(__file__).resolve().parents[1]
 CREATE = REPO / "skill" / "topics" / "create.md"
 NOT_BLANK = "A reason is required to skip a request"
 # The story says 3 800 bytes for the shipped file, but after SPEC-0006 the file already holds about 7 100 bytes.
-# The real budget enforced by the audit is 8 000 bytes for topic_output, so the file bound is 7 900 here.
+# The real budget enforced by the audit is 8 000 bytes for topic_output, so the file bound is 7 980 here
+# (SPEC-0015 DEC-010: the width line takes the file to 7 964).
 TOPIC_OUTPUT_BUDGET = 8000
-SHIPPED_FILE_BUDGET = 7900
+SHIPPED_FILE_BUDGET = 7980
 
 
 @pytest.fixture

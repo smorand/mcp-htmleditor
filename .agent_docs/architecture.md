@@ -115,6 +115,7 @@ previous content goes to the history first (`history.snapshot`) and is discarded
 | `static/editor-slides.js` | Slide picker, insert, delete, `renumberSlides` |
 | `static/editor-blocks.js` | Document block picker and insert before or after |
 | `static/editor-drag.js` | Drag reorder of document blocks, mouse move of arch nodes (`data-x`/`data-y` in %) |
+| `static/editor-width.js` | Text width bar (SPEC-0015): `#width-bar` and `#width-readout` live in the shell page, never in the framed document; drag, keys, reset; `withWidthPreviewSuspended`. Hooks: `widthBarAttach`/`widthBarDetach` in `editor-edit.js`, the suspended clone in `editor-save.js`, the suspended `outerHTML` in `editor-undo.js`, `widthBarOnFrameLoad`, `widthBarOnAgentUpdate` and `widthDragActive` (no external-change reload during a drag) in `editor.js` |
 | `static/editor-requests.js` | Ask AI panel (`#ask-ai-btn`, `#ask-ai-panel`), side list `#requests-side` (`Requests (n)`), suggestion Apply buttons; polls `requests_revision` from `/status` and refetches `GET /requests` when it moves |
 | `static/editor.js` | State declarations, start up block, polling; loaded last |
 | `static/slide-layouts.js` | Per template slide layouts (`LAYOUT_SETS.carbon`, `.ei`) |

@@ -32,9 +32,10 @@ REPO = Path(__file__).resolve().parents[1]
 CREATE = REPO / "skill" / "topics" / "create.md"
 CORE = REPO / "skill" / "core.md"
 # The story says 3 800 bytes for the shipped file; since SPEC-0006 it holds about 7 800 bytes (BL-0028).
-# The real bounds are the audit budget for topic_output (8 000) and 7 900 for the file.
+# The real bounds are the audit budget for topic_output (8 000) and 7 980 for the file
+# (SPEC-0015 DEC-010: the width line takes it to 7 964).
 TOPIC_OUTPUT_BUDGET = 8000
-SHIPPED_FILE_BUDGET = 7900
+SHIPPED_FILE_BUDGET = 7980
 TWO_SUGGESTIONS = [
     {
         "id": "s1",
