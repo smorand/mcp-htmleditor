@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: M
 > Depth evidence: depth M imposed by the requester (`--depth M`); counts: 2 areas (browser editing, agent guidance), 15 requirements, no persisted concept, no public contract change beyond one new inline declaration in the saved file
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-06
 > Project: existing
 > From backlog: n/a
