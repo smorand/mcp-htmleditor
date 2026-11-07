@@ -18,6 +18,11 @@ const WIDTH_STEP = 10;
 const WIDTH_STEP_SHIFT = 50;
 const WIDTH_BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, [data-editable~="text"]';
 const WIDTH_ZONE = '[data-editable~="text"]';
+// Layout tables (role="presentation", as in mails) hold text; data tables do not.
+const WIDTH_EXCLUDED = 'img, picture, svg, video, canvas, table:not([role="presentation"]), '
+  + '[data-type="arch-node"], [data-type="arch-edge"], [data-type="gantt-task"], [data-type="annotation"], '
+  + '#_mcp_format_bar, #_mcp_insert_bar, ._mcp_drag_handle, '
+  + '#_editor_ctx_host';
 
 let widthBlock = null; // text block the bar is shown on
 let widthDrag = null;  // {block, originalStyle, startWidth, startX, ratio, value, moved, pointerId}
@@ -86,7 +91,9 @@ function styleWithoutWidth(text) {
 /** Innermost paragraph, heading, list item, quotation, caption or zone holding `target`, laid out as a block. */
 function widthBlockAt(doc, target) {
   if (!editMode || !target) return null;
+  if (document.fullscreenElement || doc.fullscreenElement || overlay.style.display === 'flex') return null;
   let el = target.nodeType === Node.ELEMENT_NODE ? target : target.parentElement;
+  if (!el || el.closest(WIDTH_EXCLUDED)) return null;
   const view = doc.defaultView;
   while (el && el.closest(WIDTH_ZONE)) {
     if (el.matches(WIDTH_BLOCKS)) {
@@ -141,6 +148,44 @@ function widthReadoutHide() {
   if (readout) readout.hidden = true;
 }
 
+/** The bar's block is gone, hidden or off the document (slide change, reload): hide; otherwise follow it. */
+function widthBarFollow() {
+  const block = widthBlock;
+  if (!block || widthDrag) return;
+  if (!block.isConnected || block.getBoundingClientRect().width === 0) widthBarHide();
+  else widthBarPlace(block);
+}
+
+function widthPointInRect(x, y, rect) {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+/** The pointer left the framed document: hide, unless it went onto the bar (shell coordinates of the event). */
+function onWidthFramePointerLeave(e) {
+  if (widthDrag || !widthBlock) return;
+  const frameRect = frame.getBoundingClientRect();
+  const barRect = widthBarElement().getBoundingClientRect();
+  if (!widthPointInRect(frameRect.left + e.clientX, frameRect.top + e.clientY, barRect)) widthBarHide();
+}
+
+/** The pointer left the bar: hide, unless it went back onto the block. */
+function onWidthBarPointerLeave(e) {
+  if (widthDrag || !widthBlock) return;
+  const frameRect = frame.getBoundingClientRect();
+  const rect = widthBlock.getBoundingClientRect();
+  if (!widthPointInRect(e.clientX - frameRect.left, e.clientY - frameRect.top, rect)) widthBarHide();
+}
+
+/** Called by onFrameLoad(): a new document never starts with the bar shown. */
+function widthBarOnFrameLoad() {
+  widthBarHide();
+}
+
+/** Called by pollStatus() when it shows the update overlay: the agent is writing, no bar. */
+function widthBarOnAgentUpdate() {
+  if (!widthDrag) widthBarHide();
+}
+
 /** Hover on the framed document: the bar follows the text block under the pointer, synchronously. */
 function onWidthFramePointerMove(e) {
   if (widthDrag) return;
@@ -151,14 +196,23 @@ function onWidthFramePointerMove(e) {
 
 /** Called at the end of injectEditMode(doc). */
 function widthBarAttach(doc) {
-  if (widthBarDoc && widthBarDoc !== doc) widthBarDoc.removeEventListener('pointermove', onWidthFramePointerMove);
+  if (widthBarDoc && widthBarDoc !== doc) widthFrameListeners(widthBarDoc, 'removeEventListener');
   widthBarDoc = doc;
-  doc.addEventListener('pointermove', onWidthFramePointerMove);
+  widthFrameListeners(doc, 'addEventListener');
+}
+
+/** Add or remove the listeners of the framed document (the same functions, so a second add is a no-op). */
+function widthFrameListeners(doc, method) {
+  doc[method]('pointermove', onWidthFramePointerMove);
+  doc.documentElement[method]('pointerleave', onWidthFramePointerLeave);
+  doc[method]('scroll', widthBarFollow, true);
+  doc[method]('click', widthBarFollow);
+  doc[method]('keyup', widthBarFollow);
 }
 
 /** Called in removeEditMode(doc): listener removed, drag cancelled, bar hidden. */
 function widthBarDetach(doc) {
-  doc.removeEventListener('pointermove', onWidthFramePointerMove);
+  widthFrameListeners(doc, 'removeEventListener');
   if (widthBarDoc === doc) widthBarDoc = null;
   widthDragCancel();
   widthBarHide();
@@ -308,6 +362,8 @@ function initWidthBar() {
   bar.addEventListener('pointercancel', widthDragCancel);
   bar.addEventListener('keydown', onWidthBarKeyDown);
   bar.addEventListener('dblclick', onWidthBarDoubleClick);
+  bar.addEventListener('pointerleave', onWidthBarPointerLeave);
+  window.addEventListener('resize', widthBarFollow);
 }
 
 initWidthBar();

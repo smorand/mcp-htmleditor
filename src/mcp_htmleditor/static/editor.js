@@ -198,6 +198,7 @@ const docActions   = document.getElementById('toolbar-doc-actions');
    ============================================================ */
 function onFrameLoad() {
   try {
+    widthBarOnFrameLoad();
     const doc = frame.contentDocument;
     if (!doc) return;
     // Detect presentation mode from <html data-doc-type>
@@ -324,6 +325,7 @@ async function pollStatus() {
 
   if (status.update_in_progress) {
     overlay.style.display = 'flex';
+    widthBarOnAgentUpdate();
     statusDot.style.color  = DOT_LLM;
     statusDot.title = 'Modification par l\'agent en cours';
     wasUpdating = true;

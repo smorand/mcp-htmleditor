@@ -127,6 +127,29 @@ def deck_d3() -> str:
     return deck_d1().replace("</head>", SCALED_SLIDE_STYLE + "\n</head>", 1)
 
 
+def deck_d2() -> str:
+    """D2 (spec 9.0): a Perso document, title `Rapport Q1`, `Paragraphe 1` to `Paragraphe 40`, the first 500 wide."""
+    html = (REPO_ROOT / "templates" / "bootstrap" / "document-perso-empty.html").read_text(encoding="utf-8")
+    start = html.index('<h1 class="doc-title"')
+    end = html.index("</article>")
+    title = '<h1 class="doc-title" data-editable="text">Rapport Q1</h1>\n'
+    paragraphs = "".join(
+        f'<p data-editable="text"{' style="max-width:500px"' if n == 1 else ""}>Paragraphe {n}</p>\n'
+        for n in range(1, 41)
+    )
+    return html[:start] + title + paragraphs + html[end:]
+
+
+def deck_m1() -> str:
+    """M1 (spec 9.0): the mail bootstrap as is."""
+    return (REPO_ROOT / "templates" / "bootstrap" / "mail-empty.html").read_text(encoding="utf-8")
+
+
+def deck_w1() -> str:
+    """W1 (spec 9.0): the website bootstrap as is."""
+    return (REPO_ROOT / "templates" / "bootstrap" / "website-empty.html").read_text(encoding="utf-8")
+
+
 def write_fixture(folder: Path, text: str) -> Path:
     """Write ``text`` as ``deck.html`` in ``folder`` and return its path."""
     path = folder / "deck.html"
@@ -158,6 +181,25 @@ def open_editor(page: Page, port: int) -> None:
     wait_for_js(page, EDIT_BUTTON_WIRED, True, what="the edit button wired")
     page.click("#edit-mode-btn")
     wait_for_js(page, EDITABLE, True, what="edit mode on")
+
+
+DOCUMENT_READY = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    " return !!d && d.readyState === 'complete' && !!d.querySelector('[data-editable]'); }"
+)
+DOCUMENT_EDITABLE = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    " const e = d && d.querySelector('[data-editable~=\"text\"]'); return !!e && e.isContentEditable; }"
+)
+
+
+def open_document(page: Page, port: int) -> None:
+    """Open the editor on a document, a mail or a website (no slides) and turn edit mode on."""
+    page.goto(f"http://127.0.0.1:{port}/")
+    wait_for_js(page, DOCUMENT_READY, True, what="the framed document loaded")
+    wait_for_js(page, EDIT_BUTTON_WIRED, True, what="the edit button wired")
+    page.click("#edit-mode-btn")
+    wait_for_js(page, DOCUMENT_EDITABLE, True, what="edit mode on")
 
 
 def block_box(page: Page, selector: str) -> dict[str, float]:
