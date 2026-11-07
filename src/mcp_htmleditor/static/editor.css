@@ -485,6 +485,8 @@ body:has(#ask-ai-panel:not([hidden])) #notices { right: 344px; }
   user-select: none;
 }
 #width-bar:hover { background: #0f62fe; }
+/* :focus, not :focus-visible: Chromium does not apply :focus-visible after a mouse click (NFR-002) */
+#width-bar:focus { outline: 2px solid #0f62fe; outline-offset: 1px; }
 #width-readout {
   position: absolute;
   top: 50%; left: 10px;

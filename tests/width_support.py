@@ -62,6 +62,8 @@ EDITABLE = (
     "() => { const d = document.getElementById('content-frame').contentDocument;"
     " const p = d.querySelector('.slide-body p[data-editable]'); return !!p && p.isContentEditable; }"
 )
+# editor.js wires the edit button after its first /status answer, in the task that writes the file name.
+EDIT_BUTTON_WIRED = "() => document.getElementById('toolbar-filename').textContent !== '\u2014'"
 READOUT = "() => { const r = document.getElementById('width-readout'); return r && !r.hidden ? r.textContent : null; }"
 
 
@@ -153,6 +155,7 @@ def show_slide_2(page: Page, port: int) -> None:
 def open_editor(page: Page, port: int) -> None:
     """Open the editor, show slide 2 and turn edit mode on."""
     show_slide_2(page, port)
+    wait_for_js(page, EDIT_BUTTON_WIRED, True, what="the edit button wired")
     page.click("#edit-mode-btn")
     wait_for_js(page, EDITABLE, True, what="edit mode on")
 
@@ -186,10 +189,7 @@ def drag_bar(page: Page, selector: str, dx: float, *, alt: bool = False, steps: 
 
     Return the readouts seen after each pointer move, the last one after the release (``None`` when hidden).
     """
-    box = block_box(page, selector)
-    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-    bar = bar_box(page)
-    assert bar is not None, f"no width bar on {selector}"
+    bar = point_bar(page, selector)
     start_x = bar["x"] + bar["width"] / 2
     y = bar["y"] + bar["height"] / 2
     page.mouse.move(start_x, y)
@@ -219,3 +219,34 @@ def style_in_file(path: Path, text: str) -> str | None:
     """The ``style`` attribute of the element of the file whose text starts with ``text``, ``None`` when absent."""
     style = element_starting_with(path.read_text(encoding="utf-8"), text).get("style")
     return None if style is None else str(style)
+
+
+def point_bar(page: Page, selector: str) -> dict[str, float]:
+    """Point at a framed text block and return the rectangle of the width bar shown on it."""
+    box = block_box(page, selector)
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    bar = bar_box(page)
+    assert bar is not None, f"no width bar on {selector}"
+    return bar
+
+
+def focus_bar(page: Page, selector: str) -> None:
+    """Point at a framed text block, then click its width bar, which takes the keyboard focus."""
+    bar = point_bar(page, selector)
+    page.mouse.click(bar["x"] + bar["width"] / 2, bar["y"] + bar["height"] / 2)
+
+
+def double_click_bar(page: Page, selector: str) -> None:
+    """Point at a framed text block, then double click its width bar."""
+    bar = point_bar(page, selector)
+    page.mouse.dblclick(bar["x"] + bar["width"] / 2, bar["y"] + bar["height"] / 2)
+
+
+def undo_disabled(page: Page) -> bool:
+    """True when the editor's Undo button is disabled."""
+    return bool(page.evaluate("() => document.getElementById('undo-btn').disabled"))
+
+
+def redo_disabled(page: Page) -> bool:
+    """True when the editor's Redo button is disabled."""
+    return bool(page.evaluate("() => document.getElementById('redo-btn').disabled"))

@@ -15,6 +15,7 @@
 const WIDTH_MIN = 80;
 const WIDTH_MAX = 1280;
 const WIDTH_STEP = 10;
+const WIDTH_STEP_SHIFT = 50;
 const WIDTH_BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, figcaption, [data-editable~="text"]';
 const WIDTH_ZONE = '[data-editable~="text"]';
 
@@ -217,8 +218,7 @@ function onWidthBarPointerUp(e) {
   widthReadoutHide();
   if (!drag.moved || drag.value === null) return;
   widthStyleRestore(drag.block, drag.originalStyle);
-  const text = styleWithWidth(drag.originalStyle, drag.value);
-  if (text !== drag.originalStyle) widthCommit(drag.block, drag.originalStyle, text);
+  widthChange(drag.block, styleWithWidth(drag.originalStyle, drag.value));
   widthBarPlace(drag.block);
 }
 
@@ -240,6 +240,53 @@ function widthCommit(block, originalStyle, text) {
   saveContent();
 }
 
+/* ── Keyboard and reset ───────────────────────────────────── */
+
+/** Apply `text` (null: no style attribute) as one width change, unless the style text would not change. */
+function widthChange(block, text) {
+  const originalStyle = block.getAttribute('style');
+  if (text === originalStyle) return;
+  widthCommit(block, originalStyle, text);
+  widthBarPlace(block);
+}
+
+/** Give the template's width back: drop max-width; a text without one is left alone (no rebuild). */
+function widthReset(block) {
+  const originalStyle = block.getAttribute('style');
+  if (!styleHasWidth(originalStyle)) return;
+  widthChange(block, styleWithoutWidth(originalStyle));
+}
+
+/** The bar's block when a key or double click may act on it: shown, still in the document, no drag running. */
+function widthActionBlock() {
+  if (widthDrag || !widthBlock || !widthBlock.isConnected) return null;
+  return widthBlock;
+}
+
+/** Right and Left step the width on the slide by 10 (50 with Shift); Delete and Backspace reset. Other keys untouched. */
+function onWidthBarKeyDown(e) {
+  const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  const reset = e.key === 'Delete' || e.key === 'Backspace';
+  if (!step && !reset) return;
+  e.preventDefault();
+  const block = widthActionBlock();
+  if (!block) return;
+  if (reset) {
+    widthReset(block);
+    return;
+  }
+  const view = block.ownerDocument.defaultView;
+  const current = Math.round(parseFloat(view.getComputedStyle(block).width));
+  const value = Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, current + step * (e.shiftKey ? WIDTH_STEP_SHIFT : WIDTH_STEP)));
+  widthChange(block, styleWithWidth(block.getAttribute('style'), value));
+}
+
+function onWidthBarDoubleClick(e) {
+  e.preventDefault();
+  const block = widthActionBlock();
+  if (block) widthReset(block);
+}
+
 /** Run `fn` with the original style text in place of a drag preview, then re-apply the preview; return fn(). */
 function withWidthPreviewSuspended(fn) {
   const drag = widthDrag;
@@ -259,6 +306,8 @@ function initWidthBar() {
   bar.addEventListener('pointermove', onWidthBarPointerMove);
   bar.addEventListener('pointerup', onWidthBarPointerUp);
   bar.addEventListener('pointercancel', widthDragCancel);
+  bar.addEventListener('keydown', onWidthBarKeyDown);
+  bar.addEventListener('dblclick', onWidthBarDoubleClick);
 }
 
 initWidthBar();

@@ -43,7 +43,7 @@ function captureDomSnapshot(doc) {
 
   const detachedDrag = detachDragArtifacts(doc);
 
-  const html = doc.documentElement.outerHTML;
+  const html = withWidthPreviewSuspended(() => doc.documentElement.outerHTML);
 
   backup.forEach(({ el, ce, outline, cursor }) => {
     el.contentEditable = ce; el.style.outline = outline; el.style.cursor = cursor;
