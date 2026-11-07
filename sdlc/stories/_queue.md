@@ -90,6 +90,7 @@
 | US-0088 | SPEC-0014 | fixed wait guard, run time and documentation | US-0082, US-0083, US-0085, US-0086, US-0087 | 2 | landed | story/US-0088-fixed-wait-guard-run-time-and-docs | story/US-0087-save-ui-refresh-origin-gate-waits |
 | US-0089 | SPEC-0015 | width bar and drag saved as one declaration | main | 1 | done | story/US-0089-width-bar-and-drag-saved | main |
 | US-0090 | SPEC-0015 | keyboard steps, reset and undo of a width | US-0089 | 1 | done | story/US-0090-keyboard-reset-and-undo-of-a-width | story/US-0089-width-bar-and-drag-saved |
+| US-0094 | SPEC-0014 | faster server stop poll | US-0090 | 2 | done | story/US-0094-faster-server-stop-poll | story/US-0090-keyboard-reset-and-undo-of-a-width |
 | US-0091 | SPEC-0015 | where the width bar shows and hides | US-0090 | 2 | todo | | |
 | US-0092 | SPEC-0015 | interrupted drags, saves during a drag, conflicts | US-0091 | 1 | todo | | |
 | US-0093 | SPEC-0015 | agent side, guidance lines and documentation | US-0092 | 2 | todo | | |

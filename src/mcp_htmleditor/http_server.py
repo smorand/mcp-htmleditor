@@ -1098,7 +1098,7 @@ def start_http_server(
         _server_instance = server
         logger.info("HTTP server listening on http://%s:%d/ (file: %s)", bind_host, resolved_port, file)
 
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
         thread.start()
         _server_thread = thread
 

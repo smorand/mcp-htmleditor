@@ -436,3 +436,12 @@ def test_serve_stops_on_ctrl_c_and_releases_the_port(tmp_path: Path) -> None:
     assert any("Stopping server." in line for line in seen), seen
     with pytest.raises(ConnectionRefusedError):
         socket.create_connection(("127.0.0.1", port), timeout=1)
+
+
+def test_stop_returns_promptly_with_no_connection(lifecycle_env: Path) -> None:
+    """US-0094: the stop must not wait for the stdlib's default 0.5 s poll interval."""
+    port = free_port()
+    assert start_http_server(str(lifecycle_env), port=port, host="127.0.0.1") == (True, port)
+    started = time.monotonic()
+    stop_http_server()
+    assert time.monotonic() - started < 0.25
