@@ -18,6 +18,7 @@ from pptx.util import Inches
 from .pptx_components import color_of, first_pct, inches
 from .pptx_model import _ANNOT_CLASS_COLORS, FILL_KEYS, _BuilderBase, _Para
 from .pptx_style import Box, TextStyle, classes, parse_color, style_props
+from .pptx_vectors import is_vector_src
 
 
 class ImagesMixin(_BuilderBase):
@@ -93,9 +94,10 @@ class ImagesMixin(_BuilderBase):
         """Resolve an image source to something python-pptx can read.
 
         Data URIs are decoded in memory; relative paths resolve against the
-        directory of the HTML file; remote URLs are refused.
+        directory of the HTML file; remote URLs are refused. A vector source gives
+        ``None`` without a warning: the slide pre pass already named it.
         """
-        if not src:
+        if not src or is_vector_src(src):
             return None
         if src.startswith("data:"):
             header, _, payload = src.partition(",")

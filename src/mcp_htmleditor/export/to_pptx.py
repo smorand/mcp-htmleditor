@@ -52,6 +52,7 @@ from .pptx_style import (
     has_class,
 )
 from .pptx_text import TextMixin
+from .pptx_vectors import vector_figure_warnings
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,8 @@ def _build_pptx(input_html: str, output_pptx: str) -> ExportReport:
         report=report,
     )
     for index, article in enumerate(articles):
+        for warning in vector_figure_warnings(article, index + 1):
+            report.warn(warning)
         slide = prs.slides.add_slide(blank_layout)
         _SlideBuilder(context, slide, article, index).build()
 

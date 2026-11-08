@@ -89,6 +89,7 @@ previous content goes to the history first (`history.snapshot`) and is discarded
 | `export/pptx_model.py` | Shared model: `ExportReport`, `_Context`, `_Block`, `_Column`, `_Region`, `_Para`, column width helpers and `_BuilderBase`, the base class of every mixin (declares the shared instance attributes and stubs for cross mixin calls) |
 | `export/pptx_text.py` | `TextMixin`: HTML elements to styled paragraphs and runs, text frames, rectangle and textbox primitives |
 | `export/pptx_images.py` | `ImagesMixin`: annotated images, plain images, picture primitives (source decoding, aspect probing, insertion) |
+| `export/pptx_vectors.py` | Pure per slide pre pass `vector_figure_warnings(slide, number)` called by `to_pptx` before each slide build: one warning per inline `<svg>` or vector `<img>` (`.svg` or `data:image/svg`), skipping nested svg and figures under button, script, template, noscript, select; reuses `to_docx.SVG_ADVICE`. `pptx_images._image_source` returns `None` silently for a vector `src` (2026-11-08, SPEC-0016) |
 | `export/pptx_arch.py` | `ArchMixin`: `_render_arch`, nodes as native shapes, edges as segments, arrow tips, step badges, labels |
 | `export/pptx_gantt.py` | `GanttMixin`: Gantt head, bars, legend, plus the class-free fallback `_is_inline_gantt`: structural detection of a hand-authored, fully inline-styled Gantt, see `skill/topics/gantt.md` § Variante |
 | `export/pptx_blocks.py` | `BlocksMixin`: block measurement and renderers (grid, panel, table, rule, hbar) and the block dispatcher |
