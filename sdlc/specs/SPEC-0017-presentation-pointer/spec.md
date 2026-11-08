@@ -5,6 +5,7 @@
 > Depth: M
 > Depth evidence: 2 areas (the deck being presented, the editor page), 14 requirements, no persisted concept, no public contract change; the files written by the agent keep their format
 > Status: implemented
+> Amended: 2026-11-08 (BL-0040: E2E-008 steps match FR-NEW-006; FR-NEW-005 rules 3 to 5 and the page number made explicit)
 > Generated on: 2026-11-08
 > Project: existing
 > From backlog: n/a
@@ -270,11 +271,16 @@ ended.
      or frame) and that has a background colour or picture other than transparent and other than the
      slide's own background colour, or a shadow, or a visible border on all four sides, such as a card or a
      tile, is the box; a container whose direct children include two or more boxes under this rule is never
-     a box itself; an element with a border on only some sides (a header with a bottom rule, a table cell)
+     a box itself (only its direct children count, each judged on its own appearance, not on what it
+     contains); an element with a border on only some sides (a header with a bottom rule, a table cell)
      is never a box by this rule;
   4. with no such element, the nearest block holding text directly (a headline, a paragraph, a list item) or
-     an image or drawing is the box;
-  5. text set inside a line (a bold word, a span) is never a box itself, and the slide itself is never one;
+     an image or drawing is the box; a block whose text sits only in text set inside a line (a paragraph
+     made of one bold span) holds that text; one of the slide's own layout areas is never the box by this
+     rule either;
+  5. text set inside a line (a bold word, a span, a pill sitting in a line of text) is never a box itself,
+     whatever its fill or border; images and drawings are not text set inside a line; the slide itself is
+     never a box;
   6. an element whose own area is 85 % or more of the slide's area is skipped and the search continues
      upward from it; when it reaches the slide with no box found by rule 3, rule 4 applies.
   The ring is a red `#DA1E28` line 3 slide pixels thick, whose outer edge lies 6 slide pixels outside the box
@@ -284,8 +290,8 @@ ended.
   the slide is not shown.
   The slide's own layout areas, never a box by rule 3, are, in every template: the area holding the
   eyebrow, headline, rule and subtitle; the body area; the footer or foot band with its page number; the
-  grey top band; and the inner frame surrounding the content. Whatever sits inside these areas is judged
-  on its own by rules 1 to 6.
+  grey top band; and the inner frame surrounding the content. The page number is part of its footer or foot
+  band and is never a box. Whatever else sits inside these areas is judged on its own by rules 1 to 6.
 - **User visible text:** none.
 - **Scenario:** SC-001, SC-002
 - **Priority:** Must
@@ -610,9 +616,11 @@ nothing). Total 39. Happy to failure ratio 1:1.83.
 - **Scenario:** SC-001
 - **Requirements:** FR-NEW-005
 - **Given** Deck P served, presented, pointer on
-- **When** the presenter clicks the second row's first cell, then the first row's last cell
-- **Then** after each click the ring surrounds the whole table, not a cell; after the second click the ring
-  is the same as after the first
+- **When** the presenter clicks the second row's first cell, then an empty area of the slide background,
+  then the first row's last cell
+- **Then** after each cell click the ring surrounds the whole table, not a cell; after the background click
+  no ring shows; the ring after the last click is the same as after the first (a second cell clicked while
+  the table is ringed would remove the ring, FR-NEW-006)
 - **Priority:** High
 
 #### E2E-009: Clicking the ringed box again removes the ring
@@ -1014,6 +1022,9 @@ move shows it again (FR-NEW-004, EXC-002d, E2E-026).
 **Not re-audited:** the amendments of rounds 3 and 4, and these product choice answers, were NOT audited
 again. The user authorized a fourth round only; the spec is closed on that decision.
 **No implementation detail outside Section 14:** PASS (self consistency rounds 1 to 4, check 14).
+**Amendment 2026-11-08 (BL-0040, after implementation, not re-audited):** E2E-008 steps aligned with
+FR-NEW-006; FR-NEW-005 rules 3, 4 and 5 and the layout areas paragraph state the readings the tests encode
+(see 14.3 I13). No behavior, test id or count changed.
 
 ## 14. Evidence appendix (for /sdlc-design and the auditor, not for the product owner)
 
@@ -1078,3 +1089,14 @@ Test command: `make test` (subset: `make test ARGS='-k "fullscreen or present"'`
   maps each template's areas. Signal: E2E-007, E2E-036.
 - I9. The fixture sizes (1600 × 900, slide 960 × 540) follow the existing deck browser tests
   (`tests/test_reference_decks_present_e2e.py:3`).
+- I13. Amendment from BL-0040 (2026-11-08): E2E-008 clicks the slide background between the two cell clicks,
+  as `tests/test_pointer_served_e2e.py::test_pointer_served_table_is_one_box` does; FR-NEW-005 states the
+  readings of design DEC-008 (container test on direct children only; rule 4 never a layout area; page number
+  part of the footer, `LAYOUT_AREAS` of DEC-009; a block whose text sits only in inline descendants is the box,
+  `holdsText` in `templates/bootstrap/slides-empty.html`; every `inline*` display except `img`, `svg`, `video`,
+  `canvas` is text inside a line). Design corrections for whoever reads design.md (not edited): the guard marker
+  is `window.togglePointer = function` (`tests/test_presentation_templates_fullscreen.py:17`), not
+  `function togglePointer(` (design.md, US-0105); DEC-015 needs `:fullscreen #deck-controls { display:none
+  !important; }` because the container's inline `display:flex` wins
+  (`templates/reference/slides/presentation-standard.html:196`). Left open in BL-0041: a click on a form
+  field's label, and a click on the black margins, neither tested.
