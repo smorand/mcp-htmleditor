@@ -96,7 +96,7 @@
 | US-0093 | SPEC-0015 | agent side, guidance lines and documentation | US-0092 | 2 | landed | story/US-0093-agent-side-guidance-lines-and-docs | story/US-0092-interrupted-drags-saves-and-conflicts |
 | US-0095 | SPEC-0016 | end relayed by the editor page | main | 1 | done | story/US-0095-end-relayed-by-the-editor-page | main |
 | US-0096 | SPEC-0016 | vector figures named in the pptx warnings | main | 2 | done | story/US-0096-vector-figures-named-in-pptx-warnings | story/US-0095-end-relayed-by-the-editor-page |
-| US-0097 | SPEC-0016 | presentation mode of the shell decks | main | 1 | todo | | |
+| US-0097 | SPEC-0016 | presentation mode of the shell decks | main | 1 | done | story/US-0097-presentation-mode-of-the-shell-decks | story/US-0096-vector-figures-named-in-pptx-warnings |
 | US-0098 | SPEC-0016 | presentation mode of the stacked decks | US-0097 | 1 | todo | | |
 | US-0099 | SPEC-0016 | guard over every presentation template | US-0098 | 2 | todo | | |
 | US-0100 | SPEC-0016 | lock the pandoc and server record arbitrations | main | 2 | todo | | |

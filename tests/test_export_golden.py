@@ -23,6 +23,9 @@ from mcp_htmleditor.export.to_pptx import to_pptx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_FILE = REPO_ROOT / "tests" / "testdata" / "pptx_slide_hashes.json"
+# Recorded from `git show c507194:templates/reference/slides/example-carbon-complete.html` (SPEC-0016/DEC-010).
+EXAMPLE_CARBON_COMPLETE_FILE = REPO_ROOT / "tests" / "testdata" / "example_carbon_complete_slide_hashes.json"
+EXAMPLE_CARBON_COMPLETE = "templates/reference/slides/example-carbon-complete.html"
 TEMPLATES = (
     "templates/bootstrap/slides-ei-empty.html",
     "templates/bootstrap/slides-empty.html",
@@ -59,6 +62,16 @@ def test_golden_file_covers_exactly_the_ten_templates() -> None:
     golden = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))
 
     assert sorted(golden) == sorted(TEMPLATES)
+
+
+def test_example_carbon_complete_export_is_unchanged(tmp_path: Path) -> None:
+    """SPEC-0016/BT-032: 9 slides, each slide XML equal to its export at c507194."""
+    reference = json.loads(EXAMPLE_CARBON_COMPLETE_FILE.read_text(encoding="utf-8"))
+
+    hashes = slide_hashes(EXAMPLE_CARBON_COMPLETE, tmp_path)
+
+    assert len(hashes) == 9
+    assert hashes == reference
 
 
 def record() -> None:

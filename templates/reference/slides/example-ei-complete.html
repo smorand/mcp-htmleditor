@@ -263,6 +263,24 @@
   .contact-card .name { font-size:13px; font-weight:700; color:var(--ei-blue); }
   .contact-card .role { font-size:11.5px; color:var(--ei-gray-dark); margin-top:2px; }
   .contact-card .mail { font-size:11.5px; color:var(--ei-blue-2); margin-top:6px; }
+  /* ── Mode présentation (fullscreen): masquer l'UI, slide en plein écran ── */
+  /* Chaque sélecteur commence par :fullscreen: l'export PPTX ignore les sélecteurs
+     contenant ':' et les hachages de référence ne bougent pas (SPEC-0016/DEC-007). */
+  :fullscreen .shell-header,
+  :fullscreen .toolbar,
+  :fullscreen .nav-arrow,
+  :fullscreen .status-bar { display:none !important; }
+  :fullscreen .stage { background:#000; }
+  :fullscreen .slide-frame { padding:0; }
+  /* Zoom uniforme (comme PowerPoint): la slide garde sa taille de conception
+     et est agrandie via scale au lieu d'être étirée. --fs-scale est calculé
+     par updateFullscreenScale(). */
+  :fullscreen .slide {
+    border:none; box-shadow:none;
+    scale: var(--fs-scale, 1);
+    transform-origin: center center;
+  }
+  :fullscreen body { background:#000; }
 </style>
 </head>
 <body>
@@ -282,6 +300,9 @@
     <svg class="cds-select-icon" viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 11L3 6h10z"></path></svg>
   </div>
   <span class="cds-tag" id="progress-tag">1 / 9</span>
+  <button class="cds-btn-icon" id="btn-present" onclick="enterPresentation()" title="Présenter (F)">
+    <svg viewBox="0 0 16 16"><path d="M1 1h14v10H9v2h2v1H5v-1h2v-2H1zm1 1v8h12V2z"></path></svg>
+  </button>
 </div>
 
 <div class="stage">
@@ -761,6 +782,38 @@
     document.getElementById('nav-prev').disabled = current === 0;
     document.getElementById('btn-next').disabled = current === TOTAL - 1;
     document.getElementById('nav-next').disabled = current === TOTAL - 1;
+    updateFullscreenScale();
+  }
+
+  // Plein écran = zoom uniforme, pas un étirement: la slide garde sa taille de
+  // conception et --fs-scale (scale, voir CSS) l'agrandit pour remplir l'écran,
+  // mesurée à l'échelle 1 sur la slide courante (hauteurs différentes par slide).
+  function updateFullscreenScale() {
+    const slide = document.querySelector('.slide.active');
+    const root = document.documentElement;
+    if (!document.fullscreenElement || !slide) {
+      root.style.removeProperty('--fs-scale');
+      return;
+    }
+    root.style.setProperty('--fs-scale', '1'); // mesurer la taille naturelle avant de recalculer
+    const rect = slide.getBoundingClientRect();
+    const scale = Math.min(window.innerWidth / rect.width, window.innerHeight / rect.height);
+    root.style.setProperty('--fs-scale', String(scale));
+  }
+
+  document.addEventListener('fullscreenchange', updateFullscreenScale);
+  window.addEventListener('resize', updateFullscreenScale);
+
+  function enterPresentation() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }
+
+  function exitPresentation() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen && document.exitFullscreen();
+    }
   }
 
   function navigate(dir) {
@@ -773,10 +826,12 @@
   document.addEventListener('keydown', e => {
     const ae = document.activeElement;
     if (ae && (ae.isContentEditable || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); navigate(1); }
     if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  navigate(-1);
     if (e.key === 'Home') goToSlide(0);
     if (e.key === 'End')  goToSlide(TOTAL - 1);
+    if (e.key === 'f' || e.key === 'F') enterPresentation();
+    if (e.key === 'Escape') exitPresentation();
   });
 
   buildOptions();
