@@ -96,6 +96,25 @@ def test_pointer_ring_headline_and_paragraph(pointer_file_page: Page, deck_p_pat
 
 
 @needs_chromium
+def test_pointer_ring_block_of_inline_text(pointer_file_page: Page, deck_p_path: Path) -> None:
+    """E2E-006, rule 4 variant: a block whose text sits only in inline descendants is the box, never the inline."""
+    page = pointer_file_page
+    _presented_pointer_on(page, deck_p_path)
+    page.keyboard.press("ArrowRight")
+    wait_state(page, lambda s: s["current"] == 1, "slide 2 shown")
+    wait_slide_settled(page)
+    for inner, block in (
+        ("#inline-h1 strong", "#inline-h1"),
+        ("#inline-p span", "#inline-p"),
+        ("#mixed-p b", "#mixed-p"),
+        ("#pill", "#pill-p"),
+    ):
+        click_centre(page, inner)
+        check = wait_ringed(page, block)
+        assert not is_ringed({**check, "box": ring_around(page, inner)["box"]}), f"{inner} ringed itself"
+
+
+@needs_chromium
 def test_pointer_ring_click_ringed_box_again(pointer_file_page: Page, deck_p_path: Path) -> None:
     """E2E-009."""
     page = pointer_file_page

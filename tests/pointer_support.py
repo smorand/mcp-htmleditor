@@ -60,8 +60,15 @@ SLIDE_1_BODY = """
           </div>
         </div>
 """
+# Slide 2 also holds blocks whose text sits only in inline descendants (FR-NEW-005 rule 4, BL-0039).
 SLIDE_2_BODY = """
         <p data-editable="text" style="color:#f4f4f4">Dark paragraph</p>
+        <h1 class="slide-h1" id="inline-h1" data-editable="text" style="color:#f4f4f4"><strong>Bold headline</strong>
+        </h1>
+        <p id="inline-p" data-editable="text" style="color:#f4f4f4"><span>Spanned paragraph</span></p>
+        <p id="mixed-p" data-editable="text" style="color:#f4f4f4"><em>Mixed</em> <span><b>inline</b> words</span></p>
+        <p id="pill-p" data-editable="text"><span id="pill" style="display:inline-block; padding:2px 8px;
+           background:#393939; color:#f4f4f4">Pill</span></p>
         <div class="cds-tile" id="edge-tile" style="position:absolute; left:0; top:300px; width:200px">Edge tile</div>
 """
 # The panel covers 90 % of the slide's area (the body's padding box is the slide's, 958 by 538 inside its border),
@@ -269,11 +276,18 @@ def open_served(page: Page, port: int) -> None:
 
 
 def present_with(page: Page, control: str) -> None:
-    """Press an editor toolbar control that presents the served deck; return once it is full screen and still."""
-    shown = page.evaluate(
-        "([sel]) => { const b = document.querySelector(sel); return !!b && b.offsetWidth > 0; }", [control]
+    """Press an editor toolbar control that presents the served deck; return once it is full screen and still.
+
+    The editor shows its controls from the frame's ``load`` event, a task after the deck's document is complete
+    (``EDITOR_READY``), so the control is awaited, not read once."""
+    wait_until(
+        page,
+        lambda: page.evaluate(
+            "([sel]) => { const b = document.querySelector(sel); return !!b && b.offsetWidth > 0; }", [control]
+        ),
+        bool,
+        what=f"{control} shown in the editor toolbar",
     )
-    assert shown, f"{control} is not shown in the editor toolbar"
     page.click(control)
     wait_state(page, lambda s: s["fullscreen"] == "HTML", "the served deck presented", FRAME_DOC)
     wait_slide_settled(page, FRAME_DOC)
@@ -286,6 +300,14 @@ def dispatch_key(page: Page, key: str) -> bool:
 
 def pointer_control(page: Page) -> dict[str, Any]:
     control: dict[str, Any] = page.evaluate(POINTER_CONTROL)
+    return control
+
+
+def wait_pointer_control(page: Page) -> dict[str, Any]:
+    """The Pointeur control once shown: it is shown from the frame's ``load`` event, after ``EDITOR_READY``."""
+    control: dict[str, Any] = wait_until(
+        page, lambda: pointer_control(page), lambda c: c["shown"], what="Pointeur shown"
+    )
     return control
 
 

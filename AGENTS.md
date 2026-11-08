@@ -82,6 +82,11 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   presentation file missing it (e.g. created before this convention) is a bug to patch,
   not a valid variant. The five reference decks comply, and
   `tests/test_presentation_templates_fullscreen.py` enforces it on every presentation file under `templates/`.
+  The same files carry the presentation pointer (SPEC-0017): three parts per file (the block holding
+  `window.togglePointer = function`, a Pointeur control, the L key). Edit the block only in
+  `templates/bootstrap/slides-empty.html` (between `<!-- deck-pointer:begin -->` and `<!-- deck-pointer:end -->`), then run
+  `make sync-deck-pointer` (`make check-generated` fails on a stale copy); the guard reports `<stem>: missing
+  pointer|Pointeur control|L key`. See `.agent_docs/html-conventions.md` § Presentation pointer.
 - Architecture diagrams (`data-type="arch-diagram"`) with 4+ nodes or a multi-row flow:
   never write `data-x`/`data-y` by hand, author the declarative topology (`arch-row` /
   `arch-node` / `arch-col` / `arch-edge` / `arch-lane` / `arch-spacer`) and run

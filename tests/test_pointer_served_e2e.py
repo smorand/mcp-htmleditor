@@ -40,6 +40,7 @@ from tests.pointer_support import (
     present_with,
     resize_presented,
     ring_around,
+    wait_pointer_control,
     wait_presenting,
     wait_ringed,
     wait_slide_settled,
@@ -261,14 +262,14 @@ def test_pointer_served_pointeur_control(pointer_file_page: Page, served_p: Serv
     """E2E-004."""
     page = pointer_file_page
     open_served(page, served_p.port)
-    control = pointer_control(page)
-    assert control["exists"] and control["shown"], control
+    control = wait_pointer_control(page)
+    assert control["exists"], control
     assert control["afterPresent"] and control["left"] > control["presentRight"], control
     assert control["title"] == control["label"] == "Présenter avec le pointeur (L)"
     assert control["text"] == "Pointeur"
 
     present_with(page, "#pointer-btn")
-    assert pointer_state(page, FRAME_DOC)["on"], "Pointeur presented with the pointer off"
+    wait_state(page, lambda s: s["on"], "Pointeur presented with the pointer on", FRAME_DOC)
     assert _dot_at_background(_move_and_read(page))
 
     page.keyboard.press("Escape")
@@ -280,7 +281,7 @@ def test_pointer_served_pointeur_control(pointer_file_page: Page, served_p: Serv
     page.keyboard.press("Escape")
     wait_state(page, _not_presented, "full screen left", FRAME_DOC)
     present_with(page, "#pointer-btn")
-    assert pointer_state(page, FRAME_DOC)["on"]
+    wait_state(page, lambda s: s["on"], "Pointeur presented again with the pointer on", FRAME_DOC)
     text = served_p.path.read_text(encoding="utf-8")
     served_p.path.write_text(text.replace("Plain <strong>", "Changed <strong>", 1), encoding="utf-8")
     wait_until(

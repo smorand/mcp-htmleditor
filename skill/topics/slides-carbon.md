@@ -95,6 +95,10 @@ Deux leviers, dans cet ordre: (1) `class="slide dense"` sur l'article (environ 5
 
 La référence `ibm-carbon.html` est un catalogue autonome dont les slides dépassent 540 px: copier ses composants en respectant le budget 540 px, jamais sa densité ni son modèle de hauteur variable.
 
+## Pointeur
+
+En présentation plein écran, L (ou le bouton Pointeur à côté de Présenter) remplace le curseur par un point rouge et un clic entoure le bloc visé; le pointeur démarre éteint et rien n'est écrit dans le fichier.
+
 ## Ajouter une slide
 
 1. Copier un `<article class="slide" …>` existant; changer `id`, `data-id`, `data-title` (N = prochain index).

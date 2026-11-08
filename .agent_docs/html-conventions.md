@@ -104,6 +104,34 @@ Editor relay: while presenting, the parent page forwards arrows, space, `Home`, 
 deck; `End` counts `[data-type="slide"]` and calls `goToSlide(count - 1)` because `TOTAL` is a `const`, not a
 window property. `tests/test_presentation_templates_fullscreen.py` is the guard for all of the above.
 
+## Presentation pointer (2026-11-08, SPEC-0017)
+
+Every presentation template carries the pointer: L (or the Pointeur control, which fullscreens with the pointer armed)
+turns the mouse into a red dot while presenting; a click rings the box under it. It starts off at every presentation
+and nothing of it reaches the file.
+
+* **One source, eleven copies.** The block lives in `templates/bootstrap/slides-empty.html` between `<!-- deck-pointer:begin -->`
+  and `<!-- deck-pointer:end -->`; `make sync-deck-pointer` (`tools/sync_deck_pointer.py`) copies it into the 10 other presentation
+  templates, `--check` runs inside `make check-generated`. Never edit a copy. A template without the begin marker is left alone.
+* **Guard** `tests/test_presentation_templates_fullscreen.py` checks three parts per presentation file, one line each when
+  missing: `<stem>: missing pointer` (`window.togglePointer = function`), `<stem>: missing Pointeur control` (`id="btn-pointer"`),
+  `<stem>: missing L key` (`e.key === 'l' || e.key === 'L'`).
+* **Not a box:** `LAYOUT_AREAS` (in the block) lists the layout classes of every template (`.slide-header`, `.slide-body`,
+  `.med-head`, `.slide-footer`, `.slide-inner`...); a new template's area classes must be added there or the ring will
+  surround the whole area. The ring rules (inside a tile or table, else headline or paragraph) are FR-NEW-005.
+* **Text in inline children (2026-11-08):** a headline, paragraph or list item whose text sits only in inline descendants
+  (`<h1><strong>Cover</strong></h1>`, a span, an inline-block pill) is the box (`holdsText`); the inline element never is.
+* **L in a field:** each deck's own key table returns first when `document.activeElement` is an input, textarea, select or
+  contenteditable (not the shared block); a deck written by hand must keep that line.
+* **Fullscreenchange race:** entering fullscreen never turns the pointer off (the event arrives a frame after
+  `fullscreenElement`, and an L typed between the two must stay); leaving does. `armed` (Pointeur control) is consumed by the event.
+* **Stacked decks** (`presentation-standard.html`, `roadmap-one-pager.html`): `#btn-pointer` and `#btn-present` sit in
+  `#deck-controls` (DEC-015). Its inline `display:flex` beats a plain rule, so the hide rule is
+  `:fullscreen #deck-controls { display:none !important; }` (DEC-015's text says `display:none`; the built decks need `!important`).
+* **Editor:** `#pointer-btn` (shown only when `deckCarriesPointer()`, so a deck made before the pointer has none); `editor.js` relays
+  L to `togglePointer()` except in edit mode; `editor-edit.js` calls `setPointerAllowed(!editMode)`; `editor-save.js` strips
+  `#deck-pointer-layer` and `data-deck-pointer` from the save's detached clone, like `data-fs-current`.
+
 ## Documents
 
 * Headings are semantic `<h1>` to `<h5>` (classes `doc-title`, `doc-subtitle`,

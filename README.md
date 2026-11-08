@@ -129,6 +129,12 @@ undo/redo stack. Plain text edits inside a text zone keep using the browser's ow
 native undo, untouched by this feature — see `.agent_docs/html-conventions.md` §
 Undo / redo for the exact scope and the native-vs-structural interaction.
 
+### Presenting
+
+Open a deck with the **Présenter** button (or press F) to show it full screen; the arrow keys, space, Home and
+End move between slides and Escape leaves. While presenting full screen, press L or start with the **Pointeur** button beside the present button to turn the mouse into a red dot; a click rings the box under it (a tile, a table, else the headline or paragraph); the pointer starts off at every presentation and nothing of it is ever written to the file.
+It works the same in a deck opened directly and in the editor (not while edit mode is on).
+
 ### Saving, conflicts and history
 
 The editor saves the whole document. Each save carries the modification time the browser last saw; if the

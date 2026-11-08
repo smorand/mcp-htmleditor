@@ -138,6 +138,13 @@ resizes the slide. Two things must hold:
   forwards arrow, space and escape keydowns from the parent into the iframe's `navigate()` / `goToSlide()`
   while `document.fullscreenElement` is set.
 
+### Presentation pointer (SPEC-0017)
+
+The pointer is deck code (one block in every presentation template, see `.agent_docs/html-conventions.md` § Presentation
+pointer). The editor only relays: `#pointer-btn` (`editor.js`, shown when `deckCarriesPointer()`), the L key
+forwarded except in edit mode, `setPointerAllowed(!editMode)` from `editor-edit.js`, and `editor-save.js` removes
+`#deck-pointer-layer` and `data-deck-pointer` from the saved clone.
+
 ## Templates and tools
 
 Template resolution order: `HTMLEDITOR_TEMPLATES_DIR`, then

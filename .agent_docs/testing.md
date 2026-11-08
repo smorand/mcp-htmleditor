@@ -227,6 +227,20 @@ shipped text (every topic but `arch-qa`, whose anchors live in `tests/test_arch_
   both pass alone. Treat a step above 330 s at load above 30 as machine noise, re-run before trimming.
 * SPEC-0016 tests (decks, guard, vectors, arbitrations, relay): about 26 s, under the 40 s of DEC-014.
 
+### SPEC-0017 pointer tests (2026-11-08, US-0110)
+
+* `tests/pointer_support.py` holds Deck P and the shared Chromium page (1600 by 900); the browser modules are
+  `test_pointer_dot_e2e.py` (dot, L, Pointeur control), `test_pointer_ring_e2e.py` (rings, touch, reduced motion),
+  `test_pointer_served_e2e.py` (editor presentation, relay, save strip) and `test_pointer_templates_e2e.py` (the 11 templates).
+  `test_sync_deck_pointer.py` covers the sync tool; the guard rows are in `test_presentation_templates_fullscreen.py`.
+* The editor shows `#pointer-btn` from the frame's `load` event, a task after `EDITOR_READY` (iframe `readyState`
+  complete): wait for a control's state (`present_with`, `wait_pointer_control`), never read it once (intermittent E2E-004).
+* E2E-034 (README and `slides-carbon` topic each state the pointer in one sentence) is in `test_skill_shipped.py`; it checks words, not the sentence.
+* Budget: the SPEC-0017 browser tests at most 40 s together (DEC-018).
+* Closing run (2026-11-08): `make test ARGS='-k "pointer or presentation_templates_fullscreen or skill_shipped"'` 116 passed in 35.60 s
+  (load 14 to 17). `make check`: 1839 passed, 2 skipped, 8 deselected; first run test step 353.56 s with the load rising from 4 to 34
+  (above 330 s), re-run once as DEC-018 says: 325.36 s (limit 330 s), load 38 falling to 12.
+
 ### Test step budget trims (2026-11-06, SPEC-0014 BT-022, <= 330 s)
 
 * `save_delay` (autosave and undo/redo e2e files) is parametrized per test by `pytest_generate_tests`:

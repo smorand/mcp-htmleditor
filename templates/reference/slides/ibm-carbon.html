@@ -1494,12 +1494,20 @@
       }
       for (e = start; e && e !== slide; e = e.parentElement) {
         if (skipped(e)) continue;
-        if (/^(IMG|SVG)$/.test(e.tagName.toUpperCase())) return e;
-        for (var n = e.firstChild; n; n = n.nextSibling) {
-          if (n.nodeType === 3 && n.nodeValue.trim()) return e;
-        }
+        if (/^(IMG|SVG)$/.test(e.tagName.toUpperCase()) || holdsText(e)) return e;
       }
       return null;
+    }
+
+    // Un bloc tient son texte directement, ou par du texte en ligne (gras, span, pastille inline-block):
+    // l'élément en ligne n'est jamais la boîte, son bloc l'est (FR-NEW-005 règles 4 et 5).
+    function holdsText(e) {
+      for (var n = e.firstChild; n; n = n.nextSibling) {
+        if (n.nodeType === 3 && n.nodeValue.trim()) return true;
+        if (n.nodeType === 1 && !REPLACED[n.tagName.toUpperCase()]
+          && /^inline/.test(getComputedStyle(n).display) && holdsText(n)) return true;
+      }
+      return false;
     }
 
     // Un clic sur la slide courante pose l'anneau, le déplace ou l'enlève; un lien, un bouton ou un champ

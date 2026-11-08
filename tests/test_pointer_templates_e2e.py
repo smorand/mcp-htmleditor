@@ -2,7 +2,8 @@
 
 One module page at 1600 by 900 (DEC-017). E2E-036: the layout areas of the Euro-Information starting point are not
 boxes. E2E-029: the 11 templates, each served in turn by one editor server (a second ``start_http_server`` call
-switches the served file), pointed at, then exported as before. E2E-032: Deck S (a copy of the stacked
+switches the served file), pointed at, then exported as before; FR-NEW-012: L typed in a field of each of them.
+E2E-032: Deck S (a copy of the stacked
 ``presentation-standard.html``) opened directly, and a deck made from each starting point, served.
 """
 
@@ -86,10 +87,23 @@ STACKED_CONTROLS = """
 # Starting point: (key, its headline's selector).
 STARTING_POINTS = (("carbon", ".slide-h1"), ("ei", ".slide-cover-title"), ("medical", ".med-cover-title"))
 ELEVEN = (*TEMPLATES, EXAMPLE_CARBON_COMPLETE)
-# build_deck retitles the Carbon cover to ``<strong>Cover</strong>``; the starting point's own headline also holds
-# plain text after its bold part, the shape kept here (a headline whose text is all inside inline children is not
-# a text block for the pointer's rule FR-NEW-005).
-CARBON_HEADLINE = ("<strong>Cover</strong>", "<strong>Cover</strong> de la présentation")
+# FR-NEW-012: the deck's L, spied on, typed with the focus in a text field then in an editable text, then on the page.
+L_IN_FIELDS = """
+() => {
+  let calls = 0;
+  window.togglePointer = () => { calls += 1; };
+  const input = document.body.appendChild(document.createElement('input'));
+  const editable = document.body.appendChild(document.createElement('div'));
+  editable.contentEditable = 'true';
+  const type = target => { target.focus();
+    target.dispatchEvent(new KeyboardEvent('keydown', {key: 'L', bubbles: true, cancelable: true})); };
+  type(input); type(editable);
+  const typed = calls;
+  input.blur(); editable.blur();
+  document.dispatchEvent(new KeyboardEvent('keydown', {key: 'l', bubbles: true, cancelable: true}));
+  return {typed, onPage: calls - typed};
+}
+"""
 
 
 def ei_deck() -> str:
@@ -245,9 +259,19 @@ def test_pointer_stacked_deck_and_every_starting_point(
 
     serve = serve_in_turn(serve_deck)
     for key, headline in STARTING_POINTS:
-        deck = build_deck(key, ("Cover", "Second")).replace(*CARBON_HEADLINE, 1)
+        deck = build_deck(key, ("Cover", "Second"))
         path = Path(write_deck(tmp_path / f"new-{key}.html", deck))
         open_editor(page, serve(path), path.name)
         present_with(page, "#pointer-btn")
         wait_state(page, lambda s: s["on"], f"{key}: pointer on", FRAME_DOC)
         present_and_step(page, FRAME_DOC, headline, 1600 / 960)
+
+
+@needs_chromium
+def test_pointer_l_typed_in_a_field_of_every_template(pointer_file_page: Page) -> None:
+    """FR-NEW-012 in the 11 templates opened directly: L typed in a text field or an editable text is text."""
+    page = pointer_file_page
+    leave_full_screen(page)
+    for template in ELEVEN:
+        page.goto((REPO_ROOT / template).as_uri())
+        assert page.evaluate(L_IN_FIELDS) == {"typed": 0, "onPage": 1}, template

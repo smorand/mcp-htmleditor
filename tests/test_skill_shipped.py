@@ -345,3 +345,37 @@ def test_no_topic_states_a_fullscreen_gap_on_the_carbon_reference(real_tree: Non
     assert any("ibm-carbon.html" in s and "dépassent 540 px" in s for s in _sentences(result.stdout))
     assert not any(":fullscreen" in s for s in _sentences(result.stdout) if "ibm-carbon" in s)
     assert len(result.stdout.encode("utf-8")) <= TOPIC_BUDGET_BYTES
+
+
+POINTER_WORDS = (
+    ("L", re.compile(r"\bL\b")),
+    ("Pointeur", re.compile(r"Pointeur")),
+    ("click", re.compile(r"click|clic")),
+    ("ring", re.compile(r"ring|entoure")),
+    ("starts off", re.compile(r"starts off|démarre éteint")),
+    ("file", re.compile(r"\bfile\b|fichier")),
+)
+
+
+def _pointer_sentence_gaps(text: str) -> list[str]:
+    """Words missing from the best sentence (split on `. ` and line ends) that names the pointer."""
+    best: list[str] | None = None
+    for sentence in _sentences(text):
+        missing = [name for name, word in POINTER_WORDS if not word.search(sentence)]
+        if best is None or len(missing) < len(best):
+            best = missing
+    return best if best is not None else [name for name, _ in POINTER_WORDS]
+
+
+def test_readme_and_slides_topic_each_state_the_pointer_in_one_sentence(real_tree: None) -> None:
+    """SPEC-0017/E2E-034: one sentence of each text names L, Pointeur, click, ring, starts off and file."""
+    from mcp_htmleditor.cli import main
+
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    assert "### Presenting" in readme
+    presenting = readme.split("### Presenting", 1)[1].split("\n### ", 1)[0]
+    result = CliRunner().invoke(main, ["skill", "--type", "slides-carbon"])
+    assert result.exit_code == 0
+    assert _pointer_sentence_gaps(presenting) == []
+    assert _pointer_sentence_gaps(result.stdout) == []
+    assert len(result.stdout.encode("utf-8")) <= TOPIC_BUDGET_BYTES

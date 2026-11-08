@@ -13,7 +13,8 @@
     "cds-notification",
     "stat-grid",
     "buildOptions()",
-    "Ne jamais supprimer les `data-type`, `data-id`, `data-title`"
+    "Ne jamais supprimer les `data-type`, `data-id`, `data-title`",
+    "bouton Pointeur à côté de Présenter"
   ],
   "slides-ei": [
     "Table de correspondance des classes",
