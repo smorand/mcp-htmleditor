@@ -9,5 +9,5 @@
 | `make` is the only entry point for tooling | `AGENTS.md:11`, `.agent_docs/makefile.md` | nothing (convention only) |
 | Configuration is read only through `Settings` | `AGENTS.md`, SPEC-0001 DEC-010 | nothing (convention only); one violation BL-0011 |
 | Logs go to stderr or file, never stdout | `AGENTS.md:48`, `src/mcp_htmleditor/logging_config.py:97` | nothing (convention only) |
-| Every slide template ships fullscreen support | `AGENTS.md:67`, `.agent_docs/html-conventions.md` | `tests/test_medical_template.py:86` for medical only; five reference decks violate it (BL-0007) |
+| Every slide template ships fullscreen support | `AGENTS.md:67`, `.agent_docs/html-conventions.md` | `tests/test_presentation_templates_fullscreen.py` (every presentation file under `templates/`) |
 | Static JS passes `node --check` | `AGENTS.md:83`, `.agent_docs/architecture.md:67` | nothing (not in `make check`) |
