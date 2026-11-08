@@ -97,7 +97,8 @@ def test_add_script_before_body_end():
 
 
 def test_big_deck_counts_slides_and_images():
-    assert rs.big_deck(40).count('data-type="slide"') == 40
+    # The slides are the articles: the pointer's script quotes the attribute in its selectors.
+    assert len(ARTICLE.findall(rs.big_deck(40))) == 40
     with_images = rs.big_deck(40, with_images=True)
     assert all("<img" in a for a in ARTICLE.findall(with_images))
     assert with_images.count('src="pics/ok.png"') == 20

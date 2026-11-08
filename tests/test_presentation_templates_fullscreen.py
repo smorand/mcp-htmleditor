@@ -23,9 +23,6 @@ POINTER_PARTS = (
 # Stems not carrying the pointer yet; each template story (US-0106 to US-0109) removes its own, US-0109 drops the set.
 PENDING_POINTER = frozenset(
     {
-        "euro-information",
-        "slides-ei-empty",
-        "example-ei-complete",
         "slides-medical-empty",
         "medical",
         "example-medical-complete",
