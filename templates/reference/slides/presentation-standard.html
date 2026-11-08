@@ -193,10 +193,14 @@
     :fullscreen section[data-type="slide"]:not([data-fs-current]) { display:none; }
     :fullscreen section[data-type="slide"][data-fs-current] { margin:0; box-shadow:none; flex:none; scale:var(--fs-scale, 1); transform-origin:center center; }
     :fullscreen #btn-present { display:none; }
+    :fullscreen #deck-controls { display:none !important; }   /* l'attribut style du conteneur fixe display:flex */
   </style>
 </head>
 <body>
-  <button id="btn-present" onclick="enterPresentation()" title="Présenter (F)" style="position:fixed;top:16px;right:16px;z-index:10">Présenter</button>
+  <div id="deck-controls" style="position:fixed;top:16px;right:16px;z-index:10;display:flex;gap:8px;align-items:flex-start">
+    <button id="btn-pointer" onclick="presentWithPointer()" title="Présenter avec le pointeur (L)" aria-label="Présenter avec le pointeur (L)">Pointeur</button>
+    <button id="btn-present" onclick="enterPresentation()" title="Présenter (F)">Présenter</button>
+  </div>
 
   <!-- Slide 1: Couverture -->
   <section data-type="slide" data-id="slide-cover" data-title="Couverture" class="slide-cover">
@@ -320,6 +324,7 @@
       if (e.key === 'Home') { e.preventDefault(); goToSlide(0); }
       if (e.key === 'End')  { e.preventDefault(); goToSlide(slides.length - 1); }
       if (e.key === 'f' || e.key === 'F') enterPresentation();
+      if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) togglePointer();
       if (e.key === 'Escape') exitPresentation();
     });
 
@@ -334,5 +339,224 @@
     }
   </script>
 
+<!-- deck-pointer:begin -->
+<style id="deck-pointer-style">
+  /* Pointeur de présentation (SPEC-0017): point rouge sur la slide courante, touche L.
+     Aucun sélecteur de classe ici: l'export PPTX ne lit que les règles à classe. */
+  :fullscreen[data-deck-pointer] [data-type="slide"],
+  :fullscreen[data-deck-pointer] [data-type="slide"] * { cursor:none !important; }
+  #deck-pointer-layer { position:fixed; overflow:hidden; pointer-events:none; z-index:2147483647; margin:0; padding:0; }
+  #deck-pointer-dot, #deck-pointer-ring { position:absolute; pointer-events:none; box-sizing:border-box; margin:0; }
+  #deck-pointer-dot { border-radius:50%; background:#FA4D56; }   /* red #FA4D56; white #FFFFFF halo set inline as a box-shadow */
+  #deck-pointer-ring { border-style:solid; border-color:#DA1E28; background:transparent; }   /* red #DA1E28 */
+  @media print { #deck-pointer-layer { display:none !important; } }
+</style>
+<script id="deck-pointer-script">
+  (function () {
+    var DOT = 18, HALO = 2, GAP = 6, LINE = 3;   // en pixels de slide
+    // Zones de mise en page des slides, de tous les modèles: jamais une boîte (SPEC-0017 DEC-009).
+    var LAYOUT_AREAS = '.slide-header, .slide-title-area, .med-head, .slide-body, .slide-footer, '
+      + '.slide-footer-right, .slide-foot, .slide-foot-page, .med-foot, .med-cover-foot, .med-band, .slide-inner';
+    var CONTROLS = 'a[href], button, input, select, textarea';
+    var REPLACED = {IMG: 1, SVG: 1, VIDEO: 1, CANVAS: 1};
+    var allowed = true, armed = false, on = false;
+    var lastPoint = null, layer = null, dot = null, frame = 0;
+    var ring = null, ringBox = null, shownSlide = null;
+
+    function currentSlide() {
+      return document.querySelector('[data-type="slide"].active, [data-type="slide"][data-fs-current]')
+        || document.querySelector('[data-type="slide"]');
+    }
+
+    // Calque fixe hors de toute slide, posé sur le rectangle de la slide courante (qui le rogne);
+    // s = facteur d'échelle de la slide, les tailles sont données en pixels de slide.
+    function draw() {
+      var slide = currentSlide();
+      if (!layer || !slide) return;
+      followSlide(slide);
+      var r = slide.getBoundingClientRect();
+      var s = slide.offsetWidth ? r.width / slide.offsetWidth : 1;
+      layer.style.left = r.left + 'px'; layer.style.top = r.top + 'px';
+      layer.style.width = r.width + 'px'; layer.style.height = r.height + 'px';
+      drawRing(r, s);
+      var inside = lastPoint && lastPoint.x >= r.left && lastPoint.x <= r.right
+        && lastPoint.y >= r.top && lastPoint.y <= r.bottom;
+      if (!inside) { dot.style.display = 'none'; return; }
+      dot.style.display = 'block';
+      dot.style.width = dot.style.height = DOT * s + 'px';
+      dot.style.left = lastPoint.x - r.left - DOT / 2 * s + 'px';
+      dot.style.top = lastPoint.y - r.top - DOT / 2 * s + 'px';
+      dot.style.boxShadow = '0 0 0 ' + HALO * s + 'px #FFFFFF';
+    }
+
+    // Anneau autour de sa boîte, redessiné à chaque image (animation d'entrée, redimensionnement).
+    // Rayons: un pourcentage est gardé (un cercle reste un cercle), une longueur est mise à l'échelle
+    // puis agrandie de GAP.
+    function drawRing(r, s) {
+      if (!ring) return;
+      if (!ringBox.isConnected) { removeRing(); return; }
+      var b = ringBox.getBoundingClientRect(), cs = getComputedStyle(ringBox);
+      ring.style.left = b.left - r.left - GAP * s + 'px';
+      ring.style.top = b.top - r.top - GAP * s + 'px';
+      ring.style.width = b.width + 2 * GAP * s + 'px';
+      ring.style.height = b.height + 2 * GAP * s + 'px';
+      ring.style.borderWidth = LINE * s + 'px';
+      ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].forEach(function (corner) {
+        var value = cs['border' + corner + 'Radius'].split(' ').map(function (part) {
+          return /%$/.test(part) ? part : parseFloat(part) * s + GAP * s + 'px';
+        }).join(' ');
+        ring.style['border' + corner + 'Radius'] = value;
+      });
+    }
+
+    function removeRing() {
+      if (ring) ring.remove();
+      ring = ringBox = null;
+    }
+
+    // Changer de slide enlève l'anneau (FR-NEW-007); vu par la boucle comme par un clic arrivé avant elle.
+    function followSlide(slide) {
+      if (slide !== shownSlide) { removeRing(); shownSlide = slide; }
+    }
+
+    function showRing(box) {
+      ringBox = box;
+      ring = document.createElement('div'); ring.id = 'deck-pointer-ring';
+      layer.appendChild(ring);
+      draw();
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        ring.animate([{opacity: 0, scale: 0.92}, {opacity: 1, scale: 1}], {duration: 150, easing: 'ease-out'});
+      }
+    }
+
+    // FR-NEW-005, lectures de DEC-008: un dessin compte pour un, un tableau est sa propre boîte, puis la
+    // première carte (fond, ombre ou bordure sur les quatre côtés) qui ne contient pas deux cartes, sinon
+    // le bloc de texte, l'image ou le dessin le plus proche. Les zones de mise en page, le texte en ligne
+    // et ce qui couvre 85 % de la slide ne sont jamais une boîte; la slide non plus.
+    function findBox(target, slide) {
+      var slideRect = slide.getBoundingClientRect();
+      var slideArea = slideRect.width * slideRect.height;
+      var slideBackground = getComputedStyle(slide).backgroundColor;
+      function skipped(e) {
+        var r = e.getBoundingClientRect();
+        var inline = !REPLACED[e.tagName.toUpperCase()] && /^inline/.test(getComputedStyle(e).display);
+        return e.matches(LAYOUT_AREAS) || inline || r.width * r.height >= 0.85 * slideArea;
+      }
+      function visible(colour) {
+        var alpha = /rgba\([^)]*,\s*([\d.]+)\)/.exec(colour);
+        return colour !== 'transparent' && (!alpha || parseFloat(alpha[1]) > 0);
+      }
+      function framed(cs) {
+        return ['Top', 'Right', 'Bottom', 'Left'].every(function (side) {
+          var style = cs['border' + side + 'Style'];
+          return style !== 'none' && style !== 'hidden' && parseFloat(cs['border' + side + 'Width']) > 0
+            && visible(cs['border' + side + 'Color']);
+        });
+      }
+      function candidate(e) {
+        if (skipped(e)) return false;
+        var cs = getComputedStyle(e);
+        return cs.backgroundImage !== 'none' || cs.boxShadow !== 'none' || framed(cs)
+          || (visible(cs.backgroundColor) && cs.backgroundColor !== slideBackground);
+      }
+      var start = target, e;
+      for (e = target; e && e !== slide; e = e.parentElement) {
+        if (e.tagName.toUpperCase() === 'SVG') start = e;
+      }
+      for (e = start; e && e !== slide; e = e.parentElement) {
+        if (e.tagName.toUpperCase() === 'TABLE') return e;
+      }
+      for (e = start; e && e !== slide; e = e.parentElement) {
+        if (candidate(e) && Array.prototype.filter.call(e.children, candidate).length < 2) return e;
+      }
+      for (e = start; e && e !== slide; e = e.parentElement) {
+        if (skipped(e)) continue;
+        if (/^(IMG|SVG)$/.test(e.tagName.toUpperCase())) return e;
+        for (var n = e.firstChild; n; n = n.nextSibling) {
+          if (n.nodeType === 3 && n.nodeValue.trim()) return e;
+        }
+      }
+      return null;
+    }
+
+    // Un clic sur la slide courante pose l'anneau, le déplace ou l'enlève; un lien, un bouton ou un champ
+    // garde son clic et l'anneau ne change pas (FR-NEW-006, FR-NEW-008). Un toucher produit aussi un clic.
+    document.addEventListener('click', function (e) {
+      var slide = currentSlide();
+      if (!on || !slide || !(e.target instanceof Element) || !slide.contains(e.target)) return;
+      var control = e.target.closest(CONTROLS);
+      if (control && slide.contains(control)) return;
+      followSlide(slide);
+      var box = findBox(e.target, slide);
+      var same = box && box === ringBox;
+      removeRing();
+      if (box && !same) showRing(box);
+    });
+
+    function loop() { draw(); frame = requestAnimationFrame(loop); }
+
+    function turnOn() {
+      if (on) return;
+      on = true;
+      document.documentElement.setAttribute('data-deck-pointer', '');
+      layer = document.createElement('div'); layer.id = 'deck-pointer-layer';
+      dot = document.createElement('div'); dot.id = 'deck-pointer-dot';
+      layer.appendChild(dot);
+      document.body.appendChild(layer);
+      shownSlide = currentSlide();
+      loop();
+    }
+
+    function turnOff() {
+      on = false;
+      cancelAnimationFrame(frame);
+      if (layer) layer.remove();
+      layer = dot = ring = ringBox = shownSlide = null;
+      document.documentElement.removeAttribute('data-deck-pointer');
+    }
+
+    window.armPointer = function (value) { armed = !!value && allowed; };
+
+    window.presentWithPointer = function () {
+      window.armPointer(true);
+      var el = document.documentElement;
+      try {
+        var request = el.requestFullscreen ? el.requestFullscreen()
+          : el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null;
+        if (request && request.then) request.then(null, function () { armed = false; });
+      } catch (err) { armed = false; }
+    };
+
+    window.togglePointer = function () {
+      if (!document.fullscreenElement || !allowed) return;
+      if (on) turnOff(); else turnOn();
+    };
+
+    window.setPointerAllowed = function (value) {
+      allowed = !!value;
+      if (!allowed) { armed = false; turnOff(); }
+    };
+
+    // Une présentation démarre éteinte (la sortie l'éteint), sauf si le contrôle Pointeur l'a armée.
+    // L'entrée n'éteint jamais: l'événement arrive une image après fullscreenElement, et un L tapé
+    // entre les deux ne doit pas être annulé.
+    document.addEventListener('fullscreenchange', function () {
+      if (!document.fullscreenElement) turnOff();
+      else if (armed && allowed) turnOn();
+      armed = false;
+    });
+    // Seule la souris montre le point; un contact tactile ou stylet, ou la sortie de la fenêtre, le cache.
+    document.addEventListener('pointermove', function (e) {
+      if (e.pointerType === 'mouse') { lastPoint = {x: e.clientX, y: e.clientY}; draw(); }
+    }, true);
+    document.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse') { lastPoint = null; draw(); }
+    }, true);
+    document.addEventListener('mouseout', function (e) {
+      if (!e.relatedTarget) { lastPoint = null; draw(); }
+    }, true);
+  })();
+</script>
+<!-- deck-pointer:end -->
 </body>
 </html>

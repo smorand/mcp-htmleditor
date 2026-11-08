@@ -20,17 +20,10 @@ POINTER_PARTS = (
     ("Pointeur control", 'id="btn-pointer"'),
     ("L key", "e.key === 'l' || e.key === 'L'"),
 )
-# Stems not carrying the pointer yet; each template story (US-0106 to US-0109) removes its own, US-0109 drops the set.
-PENDING_POINTER = frozenset(
-    {
-        "presentation-standard",
-        "roadmap-one-pager",
-    }
-)
 POINTER_BLOCK = re.compile(r"<!-- deck-pointer:begin -->.*?<!-- deck-pointer:end -->", re.DOTALL)
-BODY_END = "</body>"
-BUTTON = '<button id="btn-pointer">Pointeur</button>'
-L_LINE = "<script>if (e.key === 'l' || e.key === 'L') togglePointer();</script>"
+ROADMAP = TEMPLATES_ROOT / "reference" / "slides" / "roadmap-one-pager.html"
+POINTER_CONTROL = re.compile(r'<button id="btn-pointer"[^>]*>Pointeur</button>')
+L_LINE = re.compile(r"^[ \t]*if \(\(e\.key === 'l'[^\n]*\n", re.MULTILINE)
 
 EXPECTED_TODAY = (
     "bootstrap/slides-empty.html",
@@ -124,17 +117,9 @@ def test_guard_fails_on_a_new_template_without_markers(tmp_path: Path) -> None:
     )
 
 
-POINTER_CHECKED = [path for path in DISCOVERED if path.stem not in PENDING_POINTER]
-
-
-@pytest.mark.parametrize("path", POINTER_CHECKED, ids=lambda path: path.stem)
+@pytest.mark.parametrize("path", DISCOVERED, ids=lambda path: path.stem)
 def test_presentation_template_ships_the_pointer(path: Path) -> None:
     assert missing_pointer_lines(path.stem, path.read_text(encoding="utf-8")) == []
-
-
-def test_pending_pointer_names_only_discovered_templates() -> None:
-    stems = {path.stem for path in DISCOVERED}
-    assert stems >= PENDING_POINTER, sorted(PENDING_POINTER - stems)
 
 
 def test_pointer_check_reports_every_part_of_a_template_without_markers() -> None:
@@ -150,42 +135,34 @@ def test_pointer_markers_in_a_comment_only_do_not_count() -> None:
     assert len(missing_pointer_lines("x", html)) == 3
 
 
-def _copy_with_pointer_on_roadmap(tmp_path: Path) -> tuple[Path, str]:
-    """Copy templates/ and give roadmap-one-pager the three parts, as US-0109 will leave it."""
-    root = tmp_path / "templates"
-    shutil.copytree(TEMPLATES_ROOT, root)
-    source = (root / "bootstrap" / "slides-empty.html").read_text(encoding="utf-8")
-    block = POINTER_BLOCK.search(source)
-    assert block is not None
-    roadmap = root / "reference" / "slides" / "roadmap-one-pager.html"
-    html = roadmap.read_text(encoding="utf-8")
-    assert BODY_END in html
-    html = html.replace(BODY_END, f"{BUTTON}\n{L_LINE}\n{block.group(0)}\n{BODY_END}", 1)
-    roadmap.write_text(html, encoding="utf-8")
-    assert missing_pointer_lines(roadmap.stem, html) == []
-    return roadmap, html
+def _roadmap_with_pointer() -> str:
+    """roadmap-one-pager as US-0109 left it, carrying the three parts once each."""
+    html = ROADMAP.read_text(encoding="utf-8")
+    assert missing_pointer_lines(ROADMAP.stem, html) == []
+    assert len(POINTER_CONTROL.findall(html)) == len(L_LINE.findall(html)) == 1
+    return html
 
 
 # SPEC-0017/E2E-033
-def test_guard_names_the_reference_deck_that_lost_the_pointer(tmp_path: Path) -> None:
-    roadmap, html = _copy_with_pointer_on_roadmap(tmp_path)
+def test_guard_names_the_reference_deck_that_lost_the_pointer() -> None:
+    html = _roadmap_with_pointer()
     block = POINTER_BLOCK.search(html)
     assert block is not None
 
-    assert missing_pointer_lines(roadmap.stem, html.replace(block.group(0), "")) == [
+    assert missing_pointer_lines(ROADMAP.stem, html.replace(block.group(0), "")) == [
         "roadmap-one-pager: missing pointer"
     ]
 
 
-def test_guard_names_the_reference_deck_that_lost_only_the_pointeur_control(tmp_path: Path) -> None:
-    roadmap, html = _copy_with_pointer_on_roadmap(tmp_path)
+def test_guard_names_the_reference_deck_that_lost_only_the_pointeur_control() -> None:
+    html = _roadmap_with_pointer()
 
-    assert missing_pointer_lines(roadmap.stem, html.replace(BUTTON, "")) == [
+    assert missing_pointer_lines(ROADMAP.stem, POINTER_CONTROL.sub("", html)) == [
         "roadmap-one-pager: missing Pointeur control"
     ]
 
 
-def test_guard_names_the_reference_deck_that_lost_only_the_l_key(tmp_path: Path) -> None:
-    roadmap, html = _copy_with_pointer_on_roadmap(tmp_path)
+def test_guard_names_the_reference_deck_that_lost_only_the_l_key() -> None:
+    html = _roadmap_with_pointer()
 
-    assert missing_pointer_lines(roadmap.stem, html.replace(L_LINE, "")) == ["roadmap-one-pager: missing L key"]
+    assert missing_pointer_lines(ROADMAP.stem, L_LINE.sub("", html)) == ["roadmap-one-pager: missing L key"]
