@@ -94,10 +94,10 @@
 | US-0091 | SPEC-0015 | where the width bar shows and hides | US-0090 | 2 | landed | story/US-0091-where-the-width-bar-shows-and-hides | story/US-0094-faster-server-stop-poll |
 | US-0092 | SPEC-0015 | interrupted drags, saves during a drag, conflicts | US-0091 | 1 | landed | story/US-0092-interrupted-drags-saves-and-conflicts | story/US-0091-where-the-width-bar-shows-and-hides |
 | US-0093 | SPEC-0015 | agent side, guidance lines and documentation | US-0092 | 2 | landed | story/US-0093-agent-side-guidance-lines-and-docs | story/US-0092-interrupted-drags-saves-and-conflicts |
-| US-0095 | SPEC-0016 | end relayed by the editor page | main | 1 | done | story/US-0095-end-relayed-by-the-editor-page | main |
-| US-0096 | SPEC-0016 | vector figures named in the pptx warnings | main | 2 | done | story/US-0096-vector-figures-named-in-pptx-warnings | story/US-0095-end-relayed-by-the-editor-page |
-| US-0097 | SPEC-0016 | presentation mode of the shell decks | main | 1 | done | story/US-0097-presentation-mode-of-the-shell-decks | story/US-0096-vector-figures-named-in-pptx-warnings |
-| US-0098 | SPEC-0016 | presentation mode of the stacked decks | US-0097 | 1 | done | story/US-0098-presentation-mode-of-the-stacked-decks | story/US-0097-presentation-mode-of-the-shell-decks |
-| US-0099 | SPEC-0016 | guard over every presentation template | US-0098 | 2 | done | story/US-0099-guard-over-every-presentation-template | story/US-0098-presentation-mode-of-the-stacked-decks |
-| US-0100 | SPEC-0016 | lock the pandoc and server record arbitrations | main | 2 | done | story/US-0100-lock-pandoc-and-server-record-arbitrations | story/US-0099-guard-over-every-presentation-template |
-| US-0101 | SPEC-0016 | skill sentence, documentation and converge | US-0095, US-0096, US-0099, US-0100 | 2 | done | story/US-0101-skill-sentence-docs-and-converge | story/US-0100-lock-pandoc-and-server-record-arbitrations |
+| US-0095 | SPEC-0016 | end relayed by the editor page | main | 1 | landed | story/US-0095-end-relayed-by-the-editor-page | main |
+| US-0096 | SPEC-0016 | vector figures named in the pptx warnings | main | 2 | landed | story/US-0096-vector-figures-named-in-pptx-warnings | story/US-0095-end-relayed-by-the-editor-page |
+| US-0097 | SPEC-0016 | presentation mode of the shell decks | main | 1 | landed | story/US-0097-presentation-mode-of-the-shell-decks | story/US-0096-vector-figures-named-in-pptx-warnings |
+| US-0098 | SPEC-0016 | presentation mode of the stacked decks | US-0097 | 1 | landed | story/US-0098-presentation-mode-of-the-stacked-decks | story/US-0097-presentation-mode-of-the-shell-decks |
+| US-0099 | SPEC-0016 | guard over every presentation template | US-0098 | 2 | landed | story/US-0099-guard-over-every-presentation-template | story/US-0098-presentation-mode-of-the-stacked-decks |
+| US-0100 | SPEC-0016 | lock the pandoc and server record arbitrations | main | 2 | landed | story/US-0100-lock-pandoc-and-server-record-arbitrations | story/US-0099-guard-over-every-presentation-template |
+| US-0101 | SPEC-0016 | skill sentence, documentation and converge | US-0095, US-0096, US-0099, US-0100 | 2 | landed | story/US-0101-skill-sentence-docs-and-converge | story/US-0100-lock-pandoc-and-server-record-arbitrations |

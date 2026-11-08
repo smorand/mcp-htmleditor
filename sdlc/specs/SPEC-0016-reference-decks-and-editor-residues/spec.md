@@ -5,7 +5,7 @@
 > Nature: BUG
 > Depth: L
 > Depth evidence: 4 modules (reference slide templates, browser editor script, PPTX exporter, test suite guard) plus two arbitrations on the state store and the DOCX exporter; 21 requirements; no HTTP contract change; no data model change
-> Status: designed
+> Status: implemented
 > Verdict: authority exists (BUG-001, BUG-002, BUG-003); no authority for the two arbitrations of section 1.4 (defect class: wrong)
 > Defect class: n/a for BUG-001 to BUG-003; wrong for legacy FR-010 (reload clause) and legacy FR-016 (pandoc clause)
 > Severity: Medium (BUG-003), Low (BUG-001, BUG-002)
