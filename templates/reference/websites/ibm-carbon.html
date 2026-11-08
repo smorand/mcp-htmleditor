@@ -2,7 +2,7 @@
   Reference: catalogue de composants site web, charte IBM Carbon.
   Usage: cloner la section utile depuis ce fichier (ne pas dupliquer tout le
   fichier). Le point de depart minimal est templates/bootstrap/website-empty.html.
-  Conventions: skill/types/website.md.
+  Conventions: mcp-htmleditor skill --type website.
 -->
 <!DOCTYPE html>
 <html lang="fr" data-doc-type="website">
@@ -342,7 +342,7 @@
 <script>
   // Bascule d'onglet (horizontal ou vertical): le clic est porte par le
   // <button> (onclick, bubbling depuis le <span data-editable> qu'il
-  // contient) - voir skill/types/website.md § Interactivite.
+  // contient) - voir mcp-htmleditor skill --type website § Interactivité.
   function switchSiteTab(btn, panelId) {
     const scope = btn.closest('.site-tabs, .site-tabs-vertical');
     if (!scope) return;

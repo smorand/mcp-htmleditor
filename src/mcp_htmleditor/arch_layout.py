@@ -9,7 +9,7 @@ that the existing skill, the browser renderer and the PPTX exporter already read
 unchanged (see ``export/to_pptx.py::_render_arch``, which walks the diagram
 recursively and does not care how the attributes were produced).
 
-Design invariants (see ``skill/types/arch-diagram.md`` and
+Design invariants (see ``skill/topics/arch-diagram.md`` and
 ``.agent_docs/html-conventions.md``):
 
 * ``arch-row`` / ``arch-lane`` are inert wrappers, never given
@@ -18,7 +18,7 @@ Design invariants (see ``skill/types/arch-diagram.md`` and
 * A diagram with no ``arch-row`` child is a legacy, hand authored diagram
   (``data-x``/``data-y`` written by hand): this module leaves it untouched, so
   both formats coexist in the same file without conflict.
-* A node flagged ``data-layout="manual"`` (set by ``editor.js`` on the first
+* A node flagged ``data-layout="manual"`` (set by ``editor-drag.js`` on the first
   mouse drag) is never repositioned again: it still reserves its slot in its
   row's column distribution, but its own box is read back from its existing
   attributes for edge routing instead of being recomputed.
@@ -99,7 +99,7 @@ _TIP_TRANSFORMS = {
     "d": "translate(-50%,-100%)",
     "u": "translate(-50%,0)",
 }
-"""Anchor transform per tip direction, matching ``skill/types/arch-diagram.md``."""
+"""Anchor transform per tip direction, matching ``skill/topics/arch-diagram.md``."""
 
 _MANAGED_EDGE_CLASSES = frozenset({"arch-edge", "arch-line-h", "arch-line-v", "dashed"})
 """Classes this module owns on an edge's anchor element; anything else is preserved."""
@@ -388,7 +388,7 @@ def _resolve_row_slots(row: Tag, row_top: float, row_height: float) -> dict[str,
     share one column while a wide node next to them keeps the full row height.
     An ``arch-spacer`` slot reserves width and produces no node box: it is how
     a node in one row aligns under a specific node of a different row without
-    spanning the whole row (see ``skill/types/arch-diagram.md``).
+    spanning the whole row (see ``skill/topics/arch-diagram.md``).
     """
     slots = _row_slots(row)
     if not slots:

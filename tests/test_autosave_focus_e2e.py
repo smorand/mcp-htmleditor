@@ -1,6 +1,6 @@
 """E2E tests for SPEC-0004: a background autosave must not touch the work in progress.
 
-Bug: ``saveContent()`` in ``editor.js`` removed the ``contenteditable``
+Bug: ``saveContent()`` in ``editor-save.js`` removed the ``contenteditable``
 attribute from every editable element, the focused one included, to serialize
 the page. The browser then moved focus to ``<body>`` and the keystrokes typed
 after each autosave (800 ms after the last one) were lost.

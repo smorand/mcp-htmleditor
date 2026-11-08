@@ -6,7 +6,7 @@
   Profite du mode edition complet (texte, blocs deplacables/inserables) comme un
   document, sans les contraintes mail-safe ni les limites de hauteur d'une slide.
   Catalogue de composants complet (nav variantes, tabs, cartes, footer): voir
-  templates/reference/websites/ibm-carbon.html. Conventions: skill/types/website.md.
+  templates/reference/websites/ibm-carbon.html. Conventions: mcp-htmleditor skill --type website.
   Date: 2026-08
 -->
 <!DOCTYPE html>
@@ -172,7 +172,7 @@
   // qu'il contient: l'evenement remonte du span au bouton par bubbling normal, donc
   // le clic bascule toujours l'onglet, meme en mode edition. Le navigateur peut en
   // plus y poser un curseur d'edition (comportement normal de tout data-editable,
-  // pas un defaut) - voir skill/types/website.md § Interactivite.
+  // pas un defaut) - voir mcp-htmleditor skill --type website § Interactivité.
   function switchSiteTab(btn, panelId) {
     const tabs = btn.closest('.site-tabs');
     if (!tabs) return;

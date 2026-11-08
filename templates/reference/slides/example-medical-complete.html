@@ -21,7 +21,7 @@
   dossier, ni date de soin calendaire; uniquement des temps relatifs.
 
   Budget: 540 px de contenu par slide, rognage silencieux au-delà
-  (skill/types/slides.md § Hauteur utile d'une slide).
+  (mcp-htmleditor skill --type medical § Hauteur).
 -->
 <html lang="fr" data-doc-type="presentation" data-doc-template="medical">
 <head>
@@ -112,7 +112,7 @@
   @keyframes fadein { from { opacity:0; translate:0 6px; } to { opacity:1; translate:0 0; } }
 
   /* Surface sombre: toute slide dont la preuve principale est une image
-     medicale (TDM, EBUS, endoscopie, histologie). Voir skill/types/medical.md. */
+     medicale (TDM, EBUS, endoscopie, histologie). Voir mcp-htmleditor skill --type medical. */
   .slide.dark { background:var(--med-dark); color:var(--med-dark-text); }
   .slide.dark .med-band { background:var(--med-dark-panel); }
   .slide.dark .slide-h1 { color:var(--med-dark-text); }
@@ -151,7 +151,7 @@
   .slide.dense .slide-body { padding-top:8px; }
   .slide.dense .med-foot { min-height:38px; }
 
-  /* Listes a puces: 4 puces maximum, 2 lignes par puce (skill/types/medical.md).
+  /* Listes a puces: 4 puces maximum, 2 lignes par puce (mcp-htmleditor skill --type medical).
      La couleur est portee par la liste, pas par les <li>: les variantes de
      surface (`.slide.dark .med-list`) doivent pouvoir la reprendre par heritage,
      y compris a l'export PPTX qui n'indexe pas les selecteurs a combinateur. */
@@ -195,7 +195,7 @@
   /* Bande d'images alignees (2 a 4 vignettes). Chaque enfant porte sa largeur
      (w-50 / w-33 / w-25): l'export PPTX ne reconnait une rangee de colonnes que
      si au moins un enfant declare une largeur explicite, un `flex:1` partout
-     retombe en empilement vertical. Voir skill/types/medical.md § Largeurs. */
+     retombe en empilement vertical. Voir mcp-htmleditor skill --type medical § Largeurs. */
   .med-strip { display:flex; gap:12px; align-items:flex-start; }
   /* Grille d'images: un .med-grid empile des .med-strip (jamais display:grid,
      que l'export ne sait pas mesurer). 4 images maximum, au-dela scinder. */
@@ -365,7 +365,7 @@
   }
   .med-sources { flex:1; min-width:0; }
   /* Toute slide portant des pixels de tiers doit avoir une ligne de source
-     non vide (skill/types/medical.md § Citer ses sources). */
+     non vide (mcp-htmleditor skill --type medical-sources § Citer ses sources). */
   .med-source { font-size:10px; line-height:1.35; color:var(--med-muted); margin-bottom:2px; }
   .med-source .src-title { color:var(--med-ref); font-weight:700; }
   .med-source .src-ref { color:var(--med-muted); }

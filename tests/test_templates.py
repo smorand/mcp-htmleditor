@@ -75,7 +75,7 @@ def test_mail_template_is_mail_safe() -> None:
     # Ignore par le moteur Word d'Outlook (coins carres, ombre perdue); sans
     # gravite en soi, mais overflow:hidden y laisse le contenu debordant
     # visible au lieu de le couper: ne jamais s'appuyer sur ce trio pour le
-    # rendu final. Voir skill/types/mail.md.
+    # rendu final. Voir skill/topics/mail.md.
     assert "border-radius" not in content
     assert "overflow:hidden" not in content
     assert "overflow: hidden" not in content

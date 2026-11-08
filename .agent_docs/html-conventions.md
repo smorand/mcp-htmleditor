@@ -41,7 +41,7 @@ export or the editor silently degrades.
   width, so a bare `flex:1` everywhere exports as a vertical stack (and gets cropped).
   Same reason `.med-grid` is a vertical flex container of `.med-strip` rows, never a
   `display:grid` (the exporter does not read `grid-template-columns`). Authoring rules:
-  `skill/types/medical.md`.
+  `skill/topics/medical.md`.
 * **CSS source direction is the opposite of EI.** For `ei`, the reference deck is the
   source and `make bootstrap-ei` generates the bootstrap. For `medical`,
   `templates/bootstrap/slides-medical-empty.html` is the source and

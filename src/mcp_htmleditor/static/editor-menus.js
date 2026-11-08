@@ -5,7 +5,7 @@
    Declarative arch-diagram mouse editing (add/remove node, add edge)
 
    These write the SAME markup the LLM authors (arch-row / arch-node /
-   arch-edge, see skill/types/arch-diagram.md): no position is ever computed
+   arch-edge, see skill/topics/arch-diagram.md): no position is ever computed
    here client-side. Every structural change is followed by saveThenLayout(),
    which persists the DOM then asks the server to run the Python layout
    engine (POST /arch-layout) exactly as `mcp-htmleditor arch-layout` would,
@@ -265,7 +265,7 @@ function getContextMenuItems(dtype, el, doc) {
         }}];
       }
       // Legacy diagram (no arch-row yet): keep the historical hand-positioned
-      // node, unrelated to the declarative engine (see skill/types/arch-diagram.md).
+      // node, unrelated to the declarative engine (see skill/topics/arch-diagram.md).
       return [{ label: '＋ Ajouter nœud', action: () => {
         const label = prompt('Libellé :', 'Nouveau nœud');
         if (!label) return;

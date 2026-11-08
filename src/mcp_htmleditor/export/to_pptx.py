@@ -18,7 +18,7 @@ Inside a slide the exporter runs a small block flow engine:
 3. blocks are stacked vertically in their region, flexible blocks absorb the
    remaining space, and everything is scaled down when the content overflows.
 
-Fidelity notes live in ``skill/workflow-export.md``.
+Fidelity notes live in ``skill/topics/export.md``.
 """
 
 from __future__ import annotations

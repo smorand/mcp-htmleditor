@@ -1,4 +1,4 @@
-"""E2E tests for structural undo/redo (Ctrl+Z / Ctrl+Shift+Z) in editor.js.
+"""E2E tests for structural undo/redo (Ctrl+Z / Ctrl+Shift+Z) in editor-undo.js.
 
 Real browser tests, same pattern as test_fullscreen_e2e.py: a real
 ThreadingHTTPServer plus a real headless Chromium via pytest-playwright.
@@ -80,7 +80,7 @@ def _deck_with_arch_diagram(tmp_path: Path) -> Path:
     """Grow the Carbon bootstrap's single slide with a 1-node arch-diagram.
 
     Reuses the bootstrap's own arch-node CSS (already embedded, see
-    skill/types/arch-diagram.md), just adds a positioned node to drag.
+    skill/topics/arch-diagram.md), just adds a positioned node to drag.
     """
     src = templates_module.template_path("carbon")
     html = src.read_text(encoding="utf-8")

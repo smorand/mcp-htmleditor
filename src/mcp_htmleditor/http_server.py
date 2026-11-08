@@ -599,7 +599,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         """Recompute every declarative arch-diagram in the current file.
 
         Called by the browser right after it saves a structural diagram edit
-        (add/remove node or edge, see editor.js's ``requestArchLayout``): the
+        (add/remove node or edge, see editor-menus.js's ``saveThenLayout``): the
         browser cannot run the Python layout engine itself, so it POSTs here,
         the server writes the recomputed positions to disk, and the existing
         polling loop picks up the mtime change and reloads the iframe — the
@@ -917,7 +917,7 @@ def _rebuild_full_html(canvas_html: str, current_file: str | None) -> str:
     preserved: ``lang`` (pandoc turns it into the Word document language, so
     losing it makes an exported DOCX default to en-US), ``data-doc-type``
     (drives the editor mode) and every ``data-asset-*`` (fallback data URIs used
-    when inserting a slide, see resolveTemplateAssets in static/editor.js).
+    when inserting a slide, see resolveTemplateAssets in static/editor-slides.js).
     """
     head_content: str = ""
     html_attrs = ""

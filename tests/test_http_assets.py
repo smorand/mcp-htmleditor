@@ -1,7 +1,7 @@
 """Preservation of the template asset attributes when rebuilding a document.
 
 `<html data-asset-*="data:...">` carries the fallback data URIs that
-`resolveTemplateAssets()` (static/editor.js) uses when the document has no slide
+`resolveTemplateAssets()` (static/editor-slides.js) uses when the document has no slide
 to copy an asset from. Losing them on a save would silently break the footer logo
 of every slide inserted afterwards.
 """

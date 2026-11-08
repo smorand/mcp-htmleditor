@@ -132,6 +132,5 @@ The MCP server exposes twenty one tools, `get_skill`, `outline`, `get_slide`, `p
 one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
 story (`skill-audit` fails otherwise); see `.agent_docs/architecture.md`.
 
-Specifications live in `specs/*.md` (never modify an existing one, only reference and
-flag inconsistencies). Deferred feature ideas not yet worth a full spec are tracked in
-`specs/BACKLOG.md`.
+Specifications live in `sdlc/specs/SPEC-NNNN-<slug>/` (never modify an existing one, only reference and
+flag inconsistencies). Deferred ideas are tracked one per file in `sdlc/backlog/BL-NNNN-<slug>.md`.

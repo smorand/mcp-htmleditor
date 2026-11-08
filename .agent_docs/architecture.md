@@ -203,8 +203,7 @@ another routing skill file (the installed `~/.pi/agent/dynamic-skills/html-edito
 the variable is unset and the file exists, else the source tree one is checked). Tool line rule
 (DEC-010): a story that registers a tool adds one `- <name>: <description>` line to the `## Tools`
 section of `skill/core.md` in the same story, otherwise `skill-audit` reports it. The skill text never
-states a tool count. The old skill is frozen in `docs/skill-archive/`; code comments naming
-`skill/types/*` or `skill/workflow-*` are stale (backlog).
+states a tool count. The old skill is frozen in `docs/skill-archive/`.
 
 ## Deck service layer (`deck/`, `fileio.py`)
 

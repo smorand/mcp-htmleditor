@@ -156,7 +156,7 @@ LAYOUT_SETS.carbon = {
         </div>
         <div class="slide-body">
           <!-- Connecteur ancré par calcul: bord droit de A (36, 47) vers bord gauche de B (64, 47).
-               Voir skill/types/arch-diagram.md, jamais de flèche en glyphe posée à l'estime. -->
+               Voir mcp-htmleditor skill --type arch-diagram, jamais de flèche en glyphe posée à l'estime. -->
           <div data-type="arch-diagram"
                style="position:relative; min-height:280px; border:1px dashed #e0e0e0; padding:24px;">
             <div data-type="arch-node" data-label="Composant A" data-shape="box"
@@ -189,7 +189,7 @@ LAYOUT_SETS.carbon = {
    plus l'anneau de logo au coin bas-gauche.
    Le logo rond ({{CHEVRONS}}) et la couverture ({{COVER}}) sont récupérés
    depuis le document actif à l'insertion, ou à défaut depuis les attributs
-   data-asset-* de <html> (voir editor.js resolveTemplateAssets).
+   data-asset-* de <html> (voir editor-slides.js resolveTemplateAssets).
    Markup du logo obligatoire: .slide-foot-logo > .logo-disc > img, seul
    dimensionné par le CSS du template (16px). Sans .logo-disc, l'image sort
    du disque blanc.
@@ -303,7 +303,7 @@ LAYOUT_SETS.ei = {
           <div class="slide-title-rule"></div>
           <div class="slide-body">
             <!-- Connecteur ancré par calcul: bord droit de A (36, 47) vers bord gauche de B (64, 47).
-                 Voir skill/types/arch-diagram.md, jamais de flèche en glyphe posée à l'estime. -->
+                 Voir mcp-htmleditor skill --type arch-diagram, jamais de flèche en glyphe posée à l'estime. -->
             <div data-type="arch-diagram"
                  style="position:relative; min-height:220px;">
               <div data-type="arch-node" data-label="Composant A" data-shape="box"
@@ -336,7 +336,7 @@ LAYOUT_SETS.ei = {
    principale est une image medicale (TDM, EBUS, endoscopie, histologie).
    Chaque enfant d'une rangee porte sa largeur (w-33, w-50, w-60...): sans
    largeur explicite, l'export PPTX retombe en empilement vertical.
-   Regles completes: skill/types/medical.md
+   Regles completes: skill/topics/medical.md
    ============================================================ */
 LAYOUT_SETS.medical = {
 

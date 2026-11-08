@@ -184,7 +184,7 @@ class Settings(BaseSettings):
         Seeded once by ``make install`` (never overwritten on reinstall, unlike
         the bulk template copy: this file is meant to be edited in place, see
         ``skill/checks/arch-diagram-checklist.md`` for the bundled default and
-        ``skill/workflow-arch-qa.md`` for how it is used).
+        ``skill/topics/arch-qa.md`` for how it is used).
         """
         return self.arch_checks_dir_override or self.config_dir / "arch-checks"
 

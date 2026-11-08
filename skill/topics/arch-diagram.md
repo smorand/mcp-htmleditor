@@ -50,7 +50,7 @@ ou l'outil MCP `layout_arch_diagram(file, diagram_id=None)` (même fonction Pyth
   </div>
   ```
 - **`arch-spacer`**: slot de rangée invisible, sans nœud, pour aligner un nœud sous une colonne précise d'une rangée plus large (`<div data-type="arch-spacer"></div>`).
-- **`data-step`** sur `arch-edge`: badge numéroté (cercle coloré) au milieu du segment; couleur via `data-color`. Exemple: `<div data-type="arch-edge" data-from="a" data-to="b" data-step="5" data-color="#2CA02C"></div>`. Le badge n'est pas converti à l'export PPTX.
+- **`data-step`** sur `arch-edge`: badge numéroté (cercle coloré) au milieu du segment; couleur via `data-color`. Exemple: `<div data-type="arch-edge" data-from="a" data-to="b" data-step="5" data-color="#2CA02C"></div>`. Le badge est exporté en PPTX (cercle numéroté).
 
 ### Mouse edit et limites
 

@@ -4,7 +4,7 @@
   Usage: copier ce fichier, renseigner data-title sur chaque section,
          ajouter les slides dans .slide-frame, mettre à jour TOTAL et slideNames.
   Référence complète (catalogue de composants): templates/reference/slides/ibm-carbon.html
-  Contrainte de hauteur utile et conventions dense/compact: skill/types/slides.md
+  Contrainte de hauteur utile et conventions dense/compact: mcp-htmleditor skill --type slides-carbon
 -->
 <html lang="fr" data-doc-type="presentation">
 <head>
@@ -83,7 +83,7 @@
   /* Canevas fixe 16:9 (960x540), aligne sur la charte EI: une slide Carbon
      est desormais une vraie diapositive a taille fixe, pas un document qui
      grandit avec son contenu. Le contenu qui deborde est rogne (overflow:
-     hidden), jamais scrollé en silence — voir skill/types/slides.md,
+     hidden), jamais scrollé en silence — voir mcp-htmleditor skill --type slides-carbon,
      section "Hauteur utile d'une slide". */
   .slide {
     display:none; width:100%; max-width:960px; aspect-ratio:16/9; background:var(--cds-background);
@@ -102,7 +102,7 @@
   .slide-subtitle { margin-top:var(--cds-spacing-04); font-size:16px; color:var(--cds-text-secondary); line-height:1.5; max-width:600px; }
   .slide-body { padding:var(--cds-spacing-07) var(--cds-spacing-08); flex:1; }
   /* Slide dense: paddings resserres pour tenir dans la hauteur utile (voir
-     skill/types/slides.md, section hauteur utile). Usage: class="slide dense". */
+     mcp-htmleditor skill --type slides-carbon, section hauteur utile). Usage: class="slide dense". */
   .slide.dense .slide-header { padding:22px var(--cds-spacing-08) 18px; }
   .slide.dense .slide-body { padding:18px var(--cds-spacing-08); }
   .slide-footer {
@@ -204,7 +204,7 @@
   .arch-edge-label { position:absolute; font-size:9.5px; color:var(--cds-text-secondary); white-space:nowrap; }
   /* Lane (swimlane) grouping several arch-row: box derived automatically by the
      declarative layout engine (mcp-htmleditor arch-layout) from the union of its
-     rows' node boxes, never guessed by hand. See skill/types/arch-diagram.md. */
+     rows' node boxes, never guessed by hand. See mcp-htmleditor skill --type arch-diagram. */
   [data-type="arch-lane"] {
     position:absolute; box-sizing:border-box; pointer-events:none;
     border:1.5px dashed var(--cds-border-strong-01); border-radius:8px;
@@ -220,7 +220,7 @@
      union box), so giving it a border/background directly makes it read as one
      bordered card wrapping its stacked nodes. The corner label sits INSIDE the
      box (not above it, unlike a lane): a col commonly starts at the diagram's own
-     top edge, and a slide has a hard overflow:hidden budget (skill/types/slides.md
+     top edge, and a slide has a hard overflow:hidden budget (mcp-htmleditor skill --type slides-carbon
      § Hauteur utile) that would silently clip a label floated above row 0. */
   [data-type="arch-col"] { position:absolute; box-sizing:border-box; }
   [data-type="arch-col"][data-label]::before {

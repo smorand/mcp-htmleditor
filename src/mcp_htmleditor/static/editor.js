@@ -307,7 +307,7 @@ function updateDocActionsVisibility() {
   // A website reuses the document block-insert/drag machinery (getDocumentArticle()
   // only cares about article[data-type="document"], not the html-level doc-type), but
   // deliberately gets neither export button: it has no PPTX/DOCX destination by design
-  // (see skill/types/website.md), so nothing here should ever call exportContent() for it.
+  // (see skill/topics/website.md), so nothing here should ever call exportContent() for it.
   const showDocBlockUi = isDocument || isWebsite;
   if (docActions) {
     docActions.style.display = (showDocBlockUi && editMode) ? 'inline-flex' : 'none';

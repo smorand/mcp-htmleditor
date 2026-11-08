@@ -276,7 +276,7 @@ def arch_layout_cmd(file: str, diagram_id: str | None) -> None:
 
     A diagram is "declarative" once it has at least one arch-row child; legacy
     diagrams (data-x/data-y written by hand) are left untouched. See
-    skill/types/arch-diagram.md for the authored format.
+    skill/topics/arch-diagram.md for the authored format.
     """
     from .arch_layout import layout_file
 

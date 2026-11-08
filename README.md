@@ -616,5 +616,5 @@ Makefile            single entry point for every operation
 ## Skill documentation
 
 Run `mcp-htmleditor skill` for the core, then `mcp-htmleditor skill --type <topic>` for a
-topic (`--all` prints everything). Source files live in `skill/core.md` and `skill/topics/`. The dynamic Pi skill in `.pi/skills/mcp-htmleditor/`
+topic (`--all` prints everything). Source files live in `skill/core.md` and `skill/topics/`. The dynamic Pi skill `dynamic-skills/html-editor/SKILL.md` (installed by `make install-skill` into `~/.pi/agent/dynamic-skills/html-editor/`)
 triggers on "html powerpoint" / "html edition" / "html doc" and defers to the CLI.

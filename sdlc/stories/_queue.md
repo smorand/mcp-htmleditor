@@ -110,7 +110,7 @@
 | US-0108 | SPEC-0017 | pointer in the medical decks | US-0107 | 2 | landed | story/US-0108-pointer-in-the-medical-decks | story/US-0107-pointer-in-the-ei-decks |
 | US-0109 | SPEC-0017 | stacked decks and every template | US-0104, US-0108 | 1 | landed | story/US-0109-stacked-decks-and-every-template | story/US-0108-pointer-in-the-medical-decks |
 | US-0110 | SPEC-0017 | pointer documentation and converge | US-0109 | 2 | landed | story/US-0110-pointer-documentation-and-converge | story/US-0109-stacked-decks-and-every-template |
-| US-0111 | SPEC-0018 | stale skill and script pointers | main | 1 | todo | | |
+| US-0111 | SPEC-0018 | stale skill and script pointers | main | 1 | done | story/US-0111-stale-skill-and-script-pointers | main |
 | US-0112 | SPEC-0018 | agent docs consolidation | US-0111 | 1 | todo | | |
 | US-0113 | SPEC-0019 | state loader and serve poll cleanup | main | 2 | todo | | |
 | US-0114 | SPEC-0019 | single editor artifact strip | main | 1 | todo | | |

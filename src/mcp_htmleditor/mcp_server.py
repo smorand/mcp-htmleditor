@@ -184,7 +184,7 @@ def layout_arch_diagram(file: str, diagram_id: str | None = None) -> dict[str, A
     """Compute and write the layout of every declarative arch-diagram in a file.
 
     The LLM authors topology only (arch-row / arch-node / arch-edge / arch-lane,
-    see skill/types/arch-diagram.md), never coordinates. This tool derives the
+    see skill/topics/arch-diagram.md), never coordinates. This tool derives the
     final data-x/data-y/data-width/data-height percentages deterministically:
     no collision between nodes, straight connectors on aligned columns, labels
     centered on their segment by construction, lane boxes sized from the union
