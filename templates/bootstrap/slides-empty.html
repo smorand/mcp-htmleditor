@@ -291,6 +291,7 @@
   <button class="cds-btn-icon" id="btn-present" onclick="enterPresentation()" title="Présenter (F)">
     <svg viewBox="0 0 16 16"><path d="M1 1h14v10H9v2h2v1H5v-1h2v-2H1zm1 1v8h12V2z"></path></svg>
   </button>
+  <button class="cds-btn-icon" id="btn-pointer" onclick="presentWithPointer()" title="Présenter avec le pointeur (L)" aria-label="Présenter avec le pointeur (L)" style="width:auto;padding:0 12px">Pointeur</button>
 </div>
 
 <div class="stage">
@@ -401,6 +402,7 @@
     if (e.key === 'Home') goToSlide(0);
     if (e.key === 'End')  goToSlide(TOTAL - 1);
     if (e.key === 'f' || e.key === 'F') enterPresentation();
+    if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) togglePointer();
     if (e.key === 'Escape') exitPresentation();
   });
 
@@ -419,5 +421,111 @@
   buildOptions();
   render();
 </script>
+<!-- deck-pointer:begin -->
+<style id="deck-pointer-style">
+  /* Pointeur de présentation (SPEC-0017): point rouge sur la slide courante, touche L.
+     Aucun sélecteur de classe ici: l'export PPTX ne lit que les règles à classe. */
+  :fullscreen[data-deck-pointer] [data-type="slide"],
+  :fullscreen[data-deck-pointer] [data-type="slide"] * { cursor:none !important; }
+  #deck-pointer-layer { position:fixed; overflow:hidden; pointer-events:none; z-index:2147483647; margin:0; padding:0; }
+  #deck-pointer-dot, #deck-pointer-ring { position:absolute; pointer-events:none; box-sizing:border-box; margin:0; }
+  #deck-pointer-dot { border-radius:50%; background:#FA4D56; }   /* red #FA4D56; white #FFFFFF halo set inline as a box-shadow */
+  #deck-pointer-ring { border-style:solid; border-color:#DA1E28; background:transparent; }   /* red #DA1E28 */
+  @media print { #deck-pointer-layer { display:none !important; } }
+</style>
+<script id="deck-pointer-script">
+  (function () {
+    var DOT = 18, HALO = 2;            // en pixels de slide
+    var allowed = true, armed = false, on = false;
+    var lastPoint = null, layer = null, dot = null, frame = 0;
+
+    function currentSlide() {
+      return document.querySelector('[data-type="slide"].active, [data-type="slide"][data-fs-current]')
+        || document.querySelector('[data-type="slide"]');
+    }
+
+    // Calque fixe hors de toute slide, posé sur le rectangle de la slide courante (qui le rogne);
+    // s = facteur d'échelle de la slide, les tailles sont données en pixels de slide.
+    function draw() {
+      var slide = currentSlide();
+      if (!layer || !slide) return;
+      var r = slide.getBoundingClientRect();
+      var s = slide.offsetWidth ? r.width / slide.offsetWidth : 1;
+      layer.style.left = r.left + 'px'; layer.style.top = r.top + 'px';
+      layer.style.width = r.width + 'px'; layer.style.height = r.height + 'px';
+      var inside = lastPoint && lastPoint.x >= r.left && lastPoint.x <= r.right
+        && lastPoint.y >= r.top && lastPoint.y <= r.bottom;
+      if (!inside) { dot.style.display = 'none'; return; }
+      dot.style.display = 'block';
+      dot.style.width = dot.style.height = DOT * s + 'px';
+      dot.style.left = lastPoint.x - r.left - DOT / 2 * s + 'px';
+      dot.style.top = lastPoint.y - r.top - DOT / 2 * s + 'px';
+      dot.style.boxShadow = '0 0 0 ' + HALO * s + 'px #FFFFFF';
+    }
+
+    function loop() { draw(); frame = requestAnimationFrame(loop); }
+
+    function turnOn() {
+      if (on) return;
+      on = true;
+      document.documentElement.setAttribute('data-deck-pointer', '');
+      layer = document.createElement('div'); layer.id = 'deck-pointer-layer';
+      dot = document.createElement('div'); dot.id = 'deck-pointer-dot';
+      layer.appendChild(dot);
+      document.body.appendChild(layer);
+      loop();
+    }
+
+    function turnOff() {
+      on = false;
+      cancelAnimationFrame(frame);
+      if (layer) layer.remove();
+      layer = dot = null;
+      document.documentElement.removeAttribute('data-deck-pointer');
+    }
+
+    window.armPointer = function (value) { armed = !!value && allowed; };
+
+    window.presentWithPointer = function () {
+      window.armPointer(true);
+      var el = document.documentElement;
+      try {
+        var request = el.requestFullscreen ? el.requestFullscreen()
+          : el.webkitRequestFullscreen ? el.webkitRequestFullscreen() : null;
+        if (request && request.then) request.then(null, function () { armed = false; });
+      } catch (err) { armed = false; }
+    };
+
+    window.togglePointer = function () {
+      if (!document.fullscreenElement || !allowed) return;
+      if (on) turnOff(); else turnOn();
+    };
+
+    window.setPointerAllowed = function (value) {
+      allowed = !!value;
+      if (!allowed) { armed = false; turnOff(); }
+    };
+
+    // Une présentation démarre éteinte (la sortie l'éteint), sauf si le contrôle Pointeur l'a armée.
+    // L'entrée n'éteint jamais: l'événement arrive une image après fullscreenElement, et un L tapé
+    // entre les deux ne doit pas être annulé.
+    document.addEventListener('fullscreenchange', function () {
+      if (!document.fullscreenElement) turnOff();
+      else if (armed && allowed) turnOn();
+      armed = false;
+    });
+    // Seule la souris montre le point; un contact tactile ou stylet, ou la sortie de la fenêtre, le cache.
+    document.addEventListener('pointermove', function (e) {
+      if (e.pointerType === 'mouse') { lastPoint = {x: e.clientX, y: e.clientY}; draw(); }
+    }, true);
+    document.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse') { lastPoint = null; draw(); }
+    }, true);
+    document.addEventListener('mouseout', function (e) {
+      if (!e.relatedTarget) { lastPoint = null; draw(); }
+    }, true);
+  })();
+</script>
+<!-- deck-pointer:end -->
 </body>
 </html>
