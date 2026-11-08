@@ -91,6 +91,19 @@ in the toolbar. A template missing this block is a bug, not a variant: old files
 before this convention existed (no `:fullscreen` at all) must be patched the same way
 when noticed, not left as is.
 
+**Stacked variant (2026-11, SPEC-0016):** a deck whose slides are stacked `section[data-type="slide"]` in the
+body (`presentation-standard.html`, `roadmap-one-pager.html`) has no `.stage`. Its CSS shows only the slide
+carrying `data-fs-current`, which exists only while presenting (`enterPresentation()` only requests
+fullscreen; the deck's `fullscreenchange` handler calls `render()`, which sets the marker and `--fs-scale` on
+entering and removes both on leaving, so printing and PPTX see every slide).
+Save rule (2026-11, US-0101): an editor save while presenting never writes `data-fs-current` nor `--fs-scale`:
+`stripPresentingState()` in `editor-save.js` removes them from the save's detached clone (as text on <html>'s
+style, other declarations byte-exact; an emptied `style` is dropped), never from the live document. `#btn-present` sits outside every
+slide, and every selector starts with `:fullscreen` so the PPTX resolver ignores them.
+Editor relay: while presenting, the parent page forwards arrows, space, `Home`, `End` and `Escape` to the
+deck; `End` counts `[data-type="slide"]` and calls `goToSlide(count - 1)` because `TOTAL` is a `const`, not a
+window property. `tests/test_presentation_templates_fullscreen.py` is the guard for all of the above.
+
 ## Documents
 
 * Headings are semantic `<h1>` to `<h5>` (classes `doc-title`, `doc-subtitle`,

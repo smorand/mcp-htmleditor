@@ -320,3 +320,28 @@ def test_anchored_topics_have_a_topic_file() -> None:
         assert not any(dash in text for dash in DASHES), topic
         for anchor in anchors:
             assert anchor in text, (topic, anchor)
+
+
+def _sentences(text: str) -> Iterator[str]:
+    for line in text.splitlines():
+        yield from re.split(r"\. |: ", line)
+
+
+def test_no_topic_states_a_fullscreen_gap_on_the_carbon_reference(real_tree: None) -> None:
+    """SPEC-0016/BT-024: no sentence holds `ibm-carbon` with `:fullscreen` or `plein écran`; the 540 px clause stays."""
+    offenders = [
+        f"{path.name}: {sentence}"
+        for path in sorted((SKILL_DIR / "topics").glob("*.md"))
+        for sentence in _sentences(path.read_text(encoding="utf-8"))
+        if "ibm-carbon" in sentence and (":fullscreen" in sentence or "plein écran" in sentence)
+    ]
+    assert offenders == []
+
+    from mcp_htmleditor.cli import main
+
+    result = CliRunner().invoke(main, ["skill", "--type", "slides-carbon"])
+    assert result.exit_code == 0
+    assert "dépassent 540 px" in result.stdout
+    assert any("ibm-carbon.html" in s and "dépassent 540 px" in s for s in _sentences(result.stdout))
+    assert not any(":fullscreen" in s for s in _sentences(result.stdout) if "ibm-carbon" in s)
+    assert len(result.stdout.encode("utf-8")) <= TOPIC_BUDGET_BYTES

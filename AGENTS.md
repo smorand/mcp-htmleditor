@@ -80,7 +80,8 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   CSS, `#btn-present` button, `enterPresentation`/`exitPresentation`/
   `updateFullscreenScale` JS): see `.agent_docs/html-conventions.md` § Fullscreen. A
   presentation file missing it (e.g. created before this convention) is a bug to patch,
-  not a valid variant.
+  not a valid variant. The five reference decks comply, and
+  `tests/test_presentation_templates_fullscreen.py` enforces it on every presentation file under `templates/`.
 - Architecture diagrams (`data-type="arch-diagram"`) with 4+ nodes or a multi-row flow:
   never write `data-x`/`data-y` by hand, author the declarative topology (`arch-row` /
   `arch-node` / `arch-col` / `arch-edge` / `arch-lane` / `arch-spacer`) and run

@@ -401,6 +401,10 @@ class ServeRun:
         return self.seen
 
 
+SIGINT_SETTLE_S = 0.5
+STOP_TIMEOUT_S = 30
+
+
 def serve_on_free_port(doc: Path, env: dict[str, str]) -> ServeRun:
     """Like ``start_on_free_port`` for a child ``serve``: a port taken between probe and bind ends the child early."""
     for _ in range(PORT_ATTEMPTS):
@@ -424,10 +428,14 @@ def test_serve_stops_on_ctrl_c_and_releases_the_port(tmp_path: Path) -> None:
     port, process = run.port, run.process
     try:
         assert health(port) == 200
+        # Readiness: "Serving on" printed (serving()), health 200, and the child still alive after a short
+        # observation, so the SIGINT lands inside cli.py's try and not between the echo and it.
+        with pytest.raises(subprocess.TimeoutExpired):
+            process.wait(timeout=SIGINT_SETTLE_S)
 
         process.send_signal(signal.SIGINT)
 
-        assert process.wait(timeout=10) == 0
+        assert process.wait(timeout=STOP_TIMEOUT_S) == 0  # bounded, wide enough for an overloaded machine
     finally:
         if process.poll() is None:
             process.kill()

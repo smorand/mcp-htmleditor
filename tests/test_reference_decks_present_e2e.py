@@ -243,3 +243,93 @@ def test_reference_deck_presents_in_editor(
         assert soup.find_all(attrs={STACKED_MARKER: True}) == []
         assert soup.html is not None
         assert "--fs-scale" not in str(soup.html.get("style", ""))
+
+
+STACKED_DECKS: tuple[Deck, ...] = tuple(deck for deck in DECKS if deck[1] == "stacked")
+TYPED = "Zq7"
+FRAME_EDITABLE = (
+    "() => { const d = document.getElementById('content-frame').contentDocument;"
+    " const e = d && d.querySelector('[data-editable~=\"text\"]'); return !!e && e.isContentEditable; }"
+)
+
+
+def _assert_no_presenting_state(saved: str) -> None:
+    """R2: a saved file carries no `data-fs-current`, no `--fs-scale` and no empty `style` on <html>."""
+    soup = BeautifulSoup(saved, "html.parser")
+    assert soup.find_all(attrs={STACKED_MARKER: True}) == []
+    assert soup.html is not None
+    assert "--fs-scale" not in str(soup.html.get("style", ""))
+    assert "style" not in soup.html.attrs, f"<html> kept style={soup.html.get('style')!r}"
+
+
+@needs_chromium
+@pytest.mark.parametrize("deck", STACKED_DECKS, ids=[deck[0] for deck in STACKED_DECKS])
+def test_save_while_presenting_writes_no_presenting_state(
+    page: Page,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    serve_deck: Callable[[Path], ServedDeck],
+    deck: Deck,
+) -> None:
+    """Design R2: typing while presenting in edit mode, the autosave and an explicit save, then leaving."""
+    name, _family, _count = deck
+    monkeypatch.setenv("HTMLEDITOR_TEMPLATES_DIR", str(REPO_ROOT / "templates"))
+    config_module.reset_settings_cache()
+    served = serve_deck(_deck_copy(tmp_path, name))
+    page.set_viewport_size({"width": WIDTH, "height": HEIGHT})
+    page.goto(f"http://127.0.0.1:{served.port}/", wait_until="networkidle")
+    observe: Observe = lambda: page.evaluate(  # noqa: E731
+        f"({MEASURE})(document.getElementById('content-frame').contentDocument)"
+    )
+    wait_until(
+        page,
+        lambda: page.evaluate("document.getElementById('toolbar-filename').textContent"),
+        lambda t: t != "\u2014",
+        what="the edit button wired",
+    )
+    page.click("#edit-mode-btn")
+    wait_until(page, lambda: page.evaluate(FRAME_EDITABLE), bool, what="edit mode on")
+
+    page.click("#present-btn")
+    _assert_presenting(page, observe, "slide-0")
+    page.frame_locator("#content-frame").locator('[data-fs-current] [data-editable~="text"]').first.click()
+    page.keyboard.type(TYPED)
+    autosaved = wait_until(
+        page, lambda: served.path.read_text(encoding="utf-8"), lambda text: TYPED in text, what="the autosave"
+    )
+    assert observe()["fullscreen"] == "HTML", "the autosave did not run while presenting"
+    _assert_no_presenting_state(autosaved)
+
+    page.evaluate("() => saveContent()")
+    assert observe()["fullscreen"] == "HTML"
+    _assert_no_presenting_state(served.path.read_text(encoding="utf-8"))
+
+    page.evaluate("document.getElementById('content-frame').contentDocument.exitFullscreen()")
+    wait_until(page, observe, lambda m: m["fullscreen"] is None and m["markers"] == 0, what="presenting left")
+    page.evaluate("() => saveContent()")
+    _assert_no_presenting_state(served.path.read_text(encoding="utf-8"))
+
+
+FOCUS_DECKS: tuple[Deck, ...] = (DECKS[1], DECKS[3])
+
+
+@needs_chromium
+@pytest.mark.parametrize("deck", FOCUS_DECKS, ids=[deck[0] for deck in FOCUS_DECKS])
+def test_keys_in_an_editable_zone_do_not_present_nor_move(page: Page, tmp_path: Path, deck: Deck) -> None:
+    """BR-012 focus clause: with the caret in a contenteditable zone, `f`, `End` and `ArrowRight` are text keys."""
+    name, family, _count = deck
+    page.set_viewport_size({"width": WIDTH, "height": HEIGHT})
+    page.goto(_deck_copy(tmp_path, name).as_uri())
+    observe: Observe = lambda: page.evaluate(f"({MEASURE})(document)")  # noqa: E731
+    before = observe()["current"]
+    zone = page.locator('[data-editable~="text"]').first
+    zone.evaluate("el => { el.contentEditable = 'true'; el.focus(); }")
+    assert page.evaluate("document.activeElement.isContentEditable")
+    for key in ("f", "End", "ArrowRight"):
+        page.keyboard.press(key)
+    measure = observe()
+    assert measure["fullscreen"] is None
+    assert measure["current"] == before
+    if family == "stacked":
+        assert page.evaluate("current") == 0
+    assert "f" in zone.text_content()

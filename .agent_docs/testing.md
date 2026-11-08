@@ -110,7 +110,12 @@ installed non editable copy shadows `src/` and the suite silently measures old c
 | `test_skill_shipped.py` | Gates on the real `skill/` tree (2026-11-04, US-0034): the 15 topic files must exist (no skipping), per topic budget, title, `Reference:` last line for the six reference topics, anchors; `--all` equals core plus topics; legacy files gone, `docs/skill-archive/` present; E2E-006 clean `skill-audit` (16 `OK` lines, `skill-audit: OK`). Mutation cases run the same gates on a tmp copy of `skill/` with a topic removed or a stale word added |
 | `test_export_pptx.py` | Slide detection on all templates, no `<script>` or shell text in the output, base64 and relative images, table spans and column widths, Gantt geometry, arch node shapes, annotation placement, geometry and style helpers |
 | `test_export_docx.py` | HTML preprocessing (single title), charter detection, `word/styles.xml` patching, header and footer parts, cache and fallbacks, end to end pandoc exports guarded by `skipif` when pandoc is absent |
-| `test_fullscreen_e2e.py` | SC-008 / FR-026-028 (see retrospective spec): fullscreen presentation mode via a real `ThreadingHTTPServer` + real headless Chromium (`pytest-playwright`). Toolbar/nav-arrow hiding, slide filling the screen, keyboard navigation independent of focus, the parent-side fallback CSS safety net, and exit-preserves-position. Guarded by `skipif` when Chromium is not installed |
+| `test_fullscreen_e2e.py` | SC-008 / FR-026-028 (see retrospective spec): fullscreen presentation mode via a real `ThreadingHTTPServer` + real headless Chromium (`pytest-playwright`). Toolbar/nav-arrow hiding, slide filling the screen, keyboard navigation independent of focus, the parent-side fallback CSS safety net, exit-preserves-position, and (SPEC-0016) the editor relay of `Home`/`End`/arrows while presenting. Guarded by `skipif` when Chromium is not installed |
+| `test_reference_decks_present_e2e.py` | SPEC-0016: each of the five reference decks presents from the file and inside the editor, leaving keeps slide three (real Chromium) |
+| `test_presentation_templates_fullscreen.py` | SPEC-0016 guard: every presentation file under `templates/` ships the fullscreen markers; the five decks are listed |
+| `test_export_pptx_vectors.py` | SPEC-0016: PPTX warnings name every vector figure (CLI and agent tool), numbering, silent shell icons, unreadable raster keeps its warning |
+| `test_legacy_arbitrations.py` | SPEC-0016: DOCX without pandoc fails explicitly, a stale server record is not adopted |
+| `test_export_golden.py` | also holds the BT-032 fixture: slide hashes of `example-carbon-complete.html` (`tests/testdata/example_carbon_complete_slide_hashes.json`) |
 | `test_autosave_focus_e2e.py` | SPEC-0004 (2026-10-10): a background autosave never moves focus, caret or selection and never drops keystrokes; saved file still clean, no self reload, status dot back to saved. Same real server + Chromium harness, `skipif` without Chromium. Results awaited with `browser_wait`, each test run with prompt and 2 s late saves (US-0084), BT-014 (bound and last value) |
 | `render_support.py` | Render fixtures (SPEC-0008): `ei_deck_html`, `med_deck_html` (adds `h-md` to the figures), string injectors (`inject_in_body`, `append_to_slide`, `set_slide_class`, `add_script`), `big_deck`, PNG helpers, `needs_chromium` (skips a browser test without Chromium) |
 | `test_render_install.py` | SPEC-0008: Chromium install and missing browser message |
@@ -214,6 +219,13 @@ shipped text (every topic but `arch-qa`, whose anchors live in `tests/test_arch_
 * Audit fixes (2026-11-07, US-0093): undo shortcuts on the focused bar, NFR-001 synchronous reflow, a drag ending
   without a save still reloads an agent write. `lastMtime` no longer moves during a drag: observe polls with
   `count_polls` / `wait_polls` (window.__statusPolls), never `lastMtime`.
+
+### SPEC-0016 closing run (2026-11-08, US-0101)
+
+* `make check`: 1768 passed, 2 skipped, 8 deselected, test step 320.14 s (limit 330 s), load average 20 to 33.
+  A first run at load 35 to 42 took 438.87 s and failed two unrelated tests (a width drag e2e, the Ctrl+C serve test);
+  both pass alone. Treat a step above 330 s at load above 30 as machine noise, re-run before trimming.
+* SPEC-0016 tests (decks, guard, vectors, arbitrations, relay): about 26 s, under the 40 s of DEC-014.
 
 ### Test step budget trims (2026-11-06, SPEC-0014 BT-022, <= 330 s)
 

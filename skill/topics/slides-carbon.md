@@ -93,7 +93,7 @@ Une slide dispose de 540 px nets. Au delà, `.slide` (`overflow:hidden`) **rogne
 
 Deux leviers, dans cet ordre: (1) `class="slide dense"` sur l'article (environ 50 px gagnés); (2) `class="cds-structured-list compact"` (environ 4 px par ligne). Sinon couper: au delà de 80 px de débordement, scinder en deux slides, jamais réduire la police. Vérifier par capture que le pied est visible.
 
-La référence `ibm-carbon.html` est un catalogue autonome, sans CSS `:fullscreen`, dont les slides dépassent 540 px: copier ses composants en respectant le budget 540 px, jamais sa densité ni son modèle de hauteur variable.
+La référence `ibm-carbon.html` est un catalogue autonome dont les slides dépassent 540 px: copier ses composants en respectant le budget 540 px, jamais sa densité ni son modèle de hauteur variable.
 
 ## Ajouter une slide
 

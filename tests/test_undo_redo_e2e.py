@@ -312,7 +312,9 @@ def test_undo_does_not_fire_inside_active_text_editing(page: Page, doc_server: s
     # Now focus the title (contenteditable) and type.
     _inner(page, "doc.querySelector('h1').focus()")
     page.keyboard.type(" extra")
-    _await_inner(page, "doc.querySelector('h1').textContent", lambda text: "extra" in str(text), what="typed title")
+    _await_inner(
+        page, "doc?.querySelector('h1')?.textContent ?? null", lambda text: "extra" in str(text), what="typed title"
+    )
 
     page.keyboard.press(f"{MOD}+z")  # nothing to rewire: the shortcut must be left to the browser
     settle(page)  # BR-010: an undo that would wrongly fire has had its time before the absence is asserted

@@ -31,6 +31,7 @@ async function runSave(options) {
     clone.querySelectorAll('#_mcp_format_bar, #_mcp_insert_bar').forEach(bar => { bar.style.display = 'none'; });
     clone.querySelectorAll('._mcp_drag_handle, ._mcp_drop_indicator').forEach(node => node.remove());
     clone.querySelectorAll('._mcp_drag_host').forEach(host => host.classList.remove('_mcp_drag_host'));
+    stripPresentingState(clone);
 
     const payload = { html: '<!DOCTYPE html>\n' + clone.outerHTML };
     if (baseMtime !== null) payload.base_mtime = baseMtime;
@@ -54,6 +55,18 @@ async function runSave(options) {
     selfSaving = false;
     saveCount++;
   }
+}
+
+/** A save while presenting (or after) writes none of the deck's runtime state (SPEC-0016 R2):
+ *  `data-fs-current` goes, and `--fs-scale` leaves <html>'s style as text, so every other declaration
+ *  keeps its bytes (SPEC-0015 DEC-003); a style left empty is removed. */
+function stripPresentingState(root) {
+  root.querySelectorAll('[data-fs-current]').forEach(el => el.removeAttribute('data-fs-current'));
+  const style = root.getAttribute('style');
+  if (style === null) return;
+  const kept = style.split(';').filter(part => !/^\s*--fs-scale\s*:/.test(part)).join(';');
+  if (kept.trim() === '' || kept.trim() === ';') root.removeAttribute('style');
+  else if (kept !== style) root.setAttribute('style', kept);
 }
 
 /** 200: the answer's mtime is both the next base and the poll's reference, so our own write never reloads. */

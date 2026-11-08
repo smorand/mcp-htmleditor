@@ -100,4 +100,4 @@
 | US-0098 | SPEC-0016 | presentation mode of the stacked decks | US-0097 | 1 | done | story/US-0098-presentation-mode-of-the-stacked-decks | story/US-0097-presentation-mode-of-the-shell-decks |
 | US-0099 | SPEC-0016 | guard over every presentation template | US-0098 | 2 | done | story/US-0099-guard-over-every-presentation-template | story/US-0098-presentation-mode-of-the-stacked-decks |
 | US-0100 | SPEC-0016 | lock the pandoc and server record arbitrations | main | 2 | done | story/US-0100-lock-pandoc-and-server-record-arbitrations | story/US-0099-guard-over-every-presentation-template |
-| US-0101 | SPEC-0016 | skill sentence, documentation and converge | US-0095, US-0096, US-0099, US-0100 | 2 | todo | | |
+| US-0101 | SPEC-0016 | skill sentence, documentation and converge | US-0095, US-0096, US-0099, US-0100 | 2 | done | story/US-0101-skill-sentence-docs-and-converge | story/US-0100-lock-pandoc-and-server-record-arbitrations |

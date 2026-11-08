@@ -60,7 +60,10 @@ CANCEL = (
     ".dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1, bubbles: true }))"
 )
 RELEASE_CAPTURE = "() => document.getElementById('width-bar').releasePointerCapture(1)"
-FRAME_TEXT = "(sel) => document.getElementById('content-frame').contentDocument.querySelector(sel).textContent"
+# Null-safe: polled while the reloaded iframe is still parsing, when the node does not exist yet.
+FRAME_TEXT = (
+    "(sel) => document.getElementById('content-frame').contentDocument?.querySelector(sel)?.textContent ?? null"
+)
 BLOCK_WIDTH = (
     "(sel) => document.getElementById('content-frame').contentDocument.querySelector(sel).getBoundingClientRect().width"
 )
