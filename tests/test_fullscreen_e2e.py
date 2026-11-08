@@ -38,7 +38,7 @@ from playwright.sync_api import Page
 from mcp_htmleditor import config as config_module
 from mcp_htmleditor import templates as templates_module
 from mcp_htmleditor.http_server import start_http_server, stop_http_server
-from tests.browser_wait import wait_for_js, wait_until
+from tests.browser_wait import settle, wait_for_js, wait_until
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -286,3 +286,122 @@ def test_exiting_fullscreen_keeps_the_current_slide_and_restores_the_ui(page: Pa
     assert _inner(page, "doc.fullscreenElement") is None
     assert _progress(page) == "3 / 3"
     assert _inner(page, "getComputedStyle(doc.querySelector('.toolbar')).display") != "none"
+
+
+# SPEC-0016 relay tests (BUG-001, DEC-002). Headless Chromium keeps the keyboard focus in the
+# iframe whatever the test focuses (E4), so `page.keyboard.press` reaches the deck's own handler
+# and never the editor page's relay. These tests dispatch the keydown on the editor page's
+# own `document` and return `defaultPrevented`.
+
+DISPATCH_KEY = (
+    "k => { const e = new KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true});"
+    " document.dispatchEvent(e); return e.defaultPrevented; }"
+)
+
+
+def _dispatch(page: Page, key: str) -> bool:
+    return bool(page.evaluate(DISPATCH_KEY, key))
+
+
+def _present(page: Page, deck_server: str) -> None:
+    page.set_viewport_size({"width": 1600, "height": 900})
+    page.goto(deck_server, wait_until="networkidle")
+    page.click("#present-btn")
+    _wait_slide_fullscreen(page)
+    assert _progress(page) == "1 / 3"
+
+
+@needs_chromium
+def test_end_is_relayed_by_the_editor_page(page: Page, deck_server: str) -> None:
+    """SPEC-0016/BT-001: End dispatched on the editor page shows the deck's last slide."""
+    _present(page, deck_server)
+
+    _dispatch(page, "End")
+
+    _wait_progress(page, "3 / 3")
+
+
+@needs_chromium
+def test_full_key_table_through_the_relay(page: Page, deck_server: str) -> None:
+    """SPEC-0016/BT-010: every navigation key works through the relay, once per key press."""
+    _present(page, deck_server)
+    steps = [
+        ("End", "3 / 3"),
+        ("End", "3 / 3"),
+        ("ArrowLeft", "2 / 3"),
+        ("Home", "1 / 3"),
+        (" ", "2 / 3"),
+        ("ArrowDown", "3 / 3"),
+        ("ArrowUp", "2 / 3"),
+        ("ArrowRight", "3 / 3"),
+        ("ArrowRight", "3 / 3"),
+    ]
+    for key, expected in steps:
+        prevented = _dispatch(page, key)
+        # The relay calls the deck synchronously, so the progress is final when dispatch returns.
+        assert _progress(page) == expected, f"after {key!r}"
+        if key != "Home":
+            assert prevented, f"{key!r} default action not prevented"
+
+    _dispatch(page, "Escape")
+    wait_for_js(page, "() => document.fullscreenElement", None, what="fullscreen left", bound=2.0)
+
+
+@needs_chromium
+def test_one_move_per_key_whichever_document_gets_it(page: Page, deck_server: str) -> None:
+    """SPEC-0016/BT-011: a key reaching the deck is not also relayed (one move, never two)."""
+    _present(page, deck_server)
+    assert page.evaluate("() => document.activeElement.id") == "content-frame"
+
+    page.keyboard.press("End")
+    _wait_progress(page, "3 / 3")
+    page.keyboard.press("ArrowLeft")
+    _wait_progress(page, "2 / 3")
+
+
+@needs_chromium
+def test_relay_tolerates_a_deck_without_navigation(page: Page, deck_server: str, tmp_path: Path) -> None:
+    """SPEC-0016/BT-012: no page error without goToSlide; nothing relayed while not presenting."""
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+
+    # Second half first, on D3: edit mode on, not presenting, caret inside the slide title.
+    page.set_viewport_size({"width": 1600, "height": 900})
+    page.goto(deck_server, wait_until="networkidle")
+    page.click("#edit-mode-btn")
+    _wait_inner(
+        page,
+        "doc.querySelector('.slide.active .slide-cover-title').isContentEditable",
+        True,
+        what="slide title editable",
+    )
+    _inner(
+        page,
+        "(() => { const h = doc.querySelector('.slide.active .slide-cover-title'); h.focus();"
+        " const r = doc.createRange(); r.selectNodeContents(h); r.collapse(true);"
+        " const s = doc.defaultView.getSelection(); s.removeAllRanges(); s.addRange(r); return true; })()",
+    )
+    assert _inner(page, "doc.activeElement === doc.querySelector('.slide.active .slide-cover-title')") is True
+    _dispatch(page, "End")
+    settle(page)
+    assert _progress(page) == "1 / 3"
+
+    # First half: the doc bootstrap has no navigate()/goToSlide() globals.
+    doc_file = tmp_path / "doc.html"
+    doc_file.write_text(templates_module.template_path("doc").read_text(encoding="utf-8"), encoding="utf-8")
+    stop_http_server()
+    port = _free_port()
+    start_http_server(str(doc_file), port=port)
+    page.goto(f"http://127.0.0.1:{port}/", wait_until="networkidle")
+    page.click("body")
+    page.evaluate("() => document.getElementById('content-frame').contentDocument.documentElement.requestFullscreen()")
+    _wait_slide_fullscreen(page)
+    assert _inner(page, "typeof doc.defaultView.goToSlide") == "undefined"
+    before = _inner(page, "doc.body.innerText")
+
+    _dispatch(page, "End")
+    _dispatch(page, "Home")
+    settle(page)
+
+    assert errors == []
+    assert _inner(page, "doc.body.innerText") == before

@@ -145,7 +145,7 @@ const docActions   = document.getElementById('toolbar-doc-actions');
   // Safety net: some browsers never move keyboard focus into the iframe's
   // document once fullscreen starts (frame.focus() above is not reliable
   // everywhere), so the slide template's own keydown listener never sees
-  // the keypress. While presenting, forward arrow/space/escape keys typed
+  // the keypress. While presenting, forward arrow/space/Home/End/Escape keys typed
   // in the PARENT document straight into the iframe's navigate()/goToSlide()
   // globals. Keydown events fired *inside* the iframe never bubble up to
   // this listener (separate document), so there is no double-handling.
@@ -161,6 +161,10 @@ const docActions   = document.getElementById('toolbar-doc-actions');
       win.navigate(-1);
     } else if (e.key === 'Home' && typeof win.goToSlide === 'function') {
       win.goToSlide(0);
+    } else if (e.key === 'End' && typeof win.goToSlide === 'function') {
+      // TOTAL is a const in the decks, not a window property: count the slides.
+      const count = win.document.querySelectorAll('[data-type="slide"]').length;
+      if (count > 0) { e.preventDefault(); win.goToSlide(count - 1); }
     } else if (e.key === 'Escape') {
       document.exitFullscreen && document.exitFullscreen();
     }
