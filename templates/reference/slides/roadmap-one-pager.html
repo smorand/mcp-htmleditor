@@ -87,9 +87,16 @@
       background: #f8f8f8;
       border-radius: 4px;
     }
+    /* Présentation (touche F): seule la slide courante, centrée et mise à l'échelle sur fond noir.
+       Tous les sélecteurs commencent par :fullscreen, l'export PPTX les ignore. */
+    :fullscreen body { margin:0; height:100vh; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#000; }
+    :fullscreen section[data-type="slide"]:not([data-fs-current]) { display:none; }
+    :fullscreen section[data-type="slide"][data-fs-current] { margin:0; box-shadow:none; flex:none; scale:var(--fs-scale, 1); transform-origin:center center; }
+    :fullscreen #btn-present { display:none; }
   </style>
 </head>
 <body>
+  <button id="btn-present" onclick="enterPresentation()" title="Présenter (F)" style="position:fixed;top:16px;right:16px;z-index:10">Présenter</button>
 
   <section data-type="slide" data-id="slide-roadmap" data-title="Roadmap">
 
@@ -202,6 +209,73 @@
     </div><!-- /gantt -->
 
   </section>
+
+  <script>
+    // Slides empilées hors présentation; en présentation (F), seule la slide courante est
+    // affichée. data-fs-current et --fs-scale n'existent que pendant la présentation: une
+    // sauvegarde de l'éditeur ne les écrit jamais dans le fichier.
+    const slides = Array.from(document.querySelectorAll('[data-type="slide"]'));
+    let current = 0;
+
+    function render() {
+      if (document.fullscreenElement) {
+        slides.forEach((slide, i) => slide.toggleAttribute('data-fs-current', i === current));
+        updateFullscreenScale();
+        return;
+      }
+      slides.forEach(slide => slide.removeAttribute('data-fs-current'));
+      updateFullscreenScale();
+      slides[current].scrollIntoView({ block: 'start' });
+    }
+
+    // Plein écran = zoom uniforme de la slide à sa taille de conception (1280 px de large).
+    function updateFullscreenScale() {
+      const slide = slides[current];
+      const root = document.documentElement;
+      if (!document.fullscreenElement || !slide) {
+        root.style.removeProperty('--fs-scale');
+        return;
+      }
+      root.style.setProperty('--fs-scale', '1'); // mesurer la taille naturelle avant de recalculer
+      const rect = slide.getBoundingClientRect();
+      const scale = Math.min(window.innerWidth / rect.width, window.innerHeight / rect.height);
+      root.style.setProperty('--fs-scale', String(scale));
+    }
+
+    document.addEventListener('fullscreenchange', render);
+    window.addEventListener('resize', updateFullscreenScale);
+
+    function navigate(dir) {
+      const next = current + dir;
+      if (next >= 0 && next < slides.length) { current = next; render(); }
+    }
+
+    function goToSlide(idx) {
+      const next = parseInt(idx, 10);
+      if (next >= 0 && next < slides.length) { current = next; render(); }
+    }
+
+    document.addEventListener('keydown', e => {
+      const ae = document.activeElement;
+      if (ae && (ae.isContentEditable || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); navigate(1); }
+      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  { e.preventDefault(); navigate(-1); }
+      if (e.key === 'Home') { e.preventDefault(); goToSlide(0); }
+      if (e.key === 'End')  { e.preventDefault(); goToSlide(slides.length - 1); }
+      if (e.key === 'f' || e.key === 'F') enterPresentation();
+      if (e.key === 'Escape') exitPresentation();
+    });
+
+    function enterPresentation() {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    }
+
+    function exitPresentation() {
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen();
+    }
+  </script>
 
 </body>
 </html>
