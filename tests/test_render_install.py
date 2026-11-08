@@ -88,7 +88,8 @@ def test_med_deck_marks_slide_two_dark():
     html = rs.med_deck_html()
     assert 'class="slide dark"' in _article(html, "slide-2")
     assert html.count('class="slide dark"') == 1
-    assert len(re.findall(r'data-type="slide"', html)) == 6
+    # The slides are the articles: the pointer's script quotes the attribute in its selectors.
+    assert len(ARTICLE.findall(html)) == 6
 
 
 def test_add_script_before_body_end():
