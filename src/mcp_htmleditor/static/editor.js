@@ -69,6 +69,7 @@ function markSaved() {
 }
 const editBtn      = document.getElementById('edit-mode-btn');
 const presentBtn   = document.getElementById('present-btn');
+const pointerBtn   = document.getElementById('pointer-btn');
 const exportPptxBtn = document.getElementById('export-pptx-btn');
 const exportDocxBtn = document.getElementById('export-docx-btn');
 const slideActions = document.getElementById('toolbar-slide-actions');
@@ -105,34 +106,10 @@ const docActions   = document.getElementById('toolbar-doc-actions');
   redoBtn.addEventListener('click', () => { if (!redoBtn.disabled) performRedo(); });
   updateUndoRedoVisibility();
 
-  // Present button: fullscreen the inner document (not the iframe element)
-  // so keyboard events stay inside the iframe's own document. Fullscreen
-  // alone does NOT move keyboard focus there, so the click on this button
-  // (which lives in the parent shell) would otherwise keep focus on the
-  // button itself and the slide's own arrow-key navigation would never
-  // fire: explicitly focus the iframe once fullscreen is granted.
-  presentBtn.addEventListener('click', () => {
-    try {
-      const inner = frame.contentDocument && frame.contentDocument.documentElement;
-      if (inner && inner.requestFullscreen) {
-        inner.requestFullscreen().then(() => frame.focus()).catch(() => {
-          frame.requestFullscreen
-            ? frame.requestFullscreen()
-            : frame.webkitRequestFullscreen && frame.webkitRequestFullscreen();
-        });
-      } else if (inner && inner.webkitRequestFullscreen) {
-        inner.webkitRequestFullscreen();
-        frame.focus();
-      } else {
-        throw new Error('Fullscreen API unavailable on inner document');
-      }
-    } catch (e) {
-      // fallback: fullscreen the iframe element itself
-      frame.requestFullscreen
-        ? frame.requestFullscreen()
-        : frame.webkitRequestFullscreen && frame.webkitRequestFullscreen();
-    }
-  });
+  // Present button (presentDeck below); Pointeur: the same presentation with
+  // the deck's pointer armed (SPEC-0017 DEC-013).
+  presentBtn.addEventListener('click', () => presentDeck(false));
+  pointerBtn.addEventListener('click', () => presentDeck(true));
   document.addEventListener('fullscreenchange', () => {
     // Re-assert focus on every transition into fullscreen (covers the case
     // where the user re-enters via the iframe's own 'f' shortcut too).
@@ -145,7 +122,7 @@ const docActions   = document.getElementById('toolbar-doc-actions');
   // Safety net: some browsers never move keyboard focus into the iframe's
   // document once fullscreen starts (frame.focus() above is not reliable
   // everywhere), so the slide template's own keydown listener never sees
-  // the keypress. While presenting, forward arrow/space/Home/End/Escape keys typed
+  // the keypress. While presenting, forward arrow/space/Home/End/L/Escape keys typed
   // in the PARENT document straight into the iframe's navigate()/goToSlide()
   // globals. Keydown events fired *inside* the iframe never bubble up to
   // this listener (separate document), so there is no double-handling.
@@ -165,6 +142,11 @@ const docActions   = document.getElementById('toolbar-doc-actions');
       // TOTAL is a const in the decks, not a window property: count the slides.
       const count = win.document.querySelectorAll('[data-type="slide"]').length;
       if (count > 0) { e.preventDefault(); win.goToSlide(count - 1); }
+    } else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey && !editMode
+               && typeof win.togglePointer === 'function') {
+      // The deck's pointer (SPEC-0017 FR-NEW-001); none while edit mode is on (FR-NEW-012).
+      e.preventDefault();
+      win.togglePointer();
     } else if (e.key === 'Escape') {
       document.exitFullscreen && document.exitFullscreen();
     }
@@ -198,6 +180,57 @@ const docActions   = document.getElementById('toolbar-doc-actions');
 })();
 
 /* ============================================================
+   Present
+   ============================================================ */
+/**
+ * Fullscreen the inner document (not the iframe element) so keyboard events
+ * stay inside the iframe's own document. Fullscreen alone does NOT move
+ * keyboard focus there, so the click on the toolbar button (which lives in
+ * the parent shell) would otherwise keep focus on the button itself and the
+ * slide's own arrow-key navigation would never fire: explicitly focus the
+ * iframe once fullscreen is granted.
+ * withPointer arms the deck's pointer before the request (the deck turns it on
+ * when its full screen starts); each fallback (the iframe element full screen,
+ * where the deck's own full screen never starts) disarms it, so nothing stays
+ * armed for a later presentation (SPEC-0017 DEC-013).
+ */
+function presentDeck(withPointer) {
+  const win = frame.contentWindow;
+  const arm = (value) => { if (win && typeof win.armPointer === 'function') win.armPointer(value); };
+  const fallback = () => {
+    arm(false);
+    frame.requestFullscreen
+      ? frame.requestFullscreen()
+      : frame.webkitRequestFullscreen && frame.webkitRequestFullscreen();
+  };
+  try {
+    if (withPointer) arm(true);
+    const inner = frame.contentDocument && frame.contentDocument.documentElement;
+    if (inner && inner.requestFullscreen) {
+      inner.requestFullscreen().then(() => frame.focus()).catch(fallback);
+    } else if (inner && inner.webkitRequestFullscreen) {
+      inner.webkitRequestFullscreen();
+      frame.focus();
+    } else {
+      throw new Error('Fullscreen API unavailable on inner document');
+    }
+  } catch (e) {
+    fallback();
+  }
+}
+
+/** The deck carries the pointer (SPEC-0017): a deck created before it shows no Pointeur control. */
+function deckCarriesPointer() {
+  try {
+    const win = frame.contentWindow;
+    return !!win && ['presentWithPointer', 'armPointer', 'togglePointer', 'setPointerAllowed']
+      .every(name => typeof win[name] === 'function');
+  } catch (e) {
+    return false;
+  }
+}
+
+/* ============================================================
    Iframe load
    ============================================================ */
 function onFrameLoad() {
@@ -210,6 +243,7 @@ function onFrameLoad() {
     isPresentation = docType === 'presentation';
     isDocument     = docType === 'document';
     isWebsite      = docType === 'website';
+    syncPointerAllowed();
     updateSlideActionsVisibility();
     updateDocActionsVisibility();
     syncBrowserTabTitle(doc);
@@ -261,6 +295,7 @@ function syncBrowserTabTitle(doc) {
 function updateSlideActionsVisibility() {
   slideActions.style.display   = (isPresentation && editMode) ? 'inline-flex' : 'none';
   presentBtn.style.display     = isPresentation ? 'inline-flex' : 'none';
+  pointerBtn.style.display     = (isPresentation && !editMode && deckCarriesPointer()) ? 'inline-flex' : 'none';
   exportPptxBtn.style.display  = isPresentation ? 'inline-flex' : 'none';
   exportDocxBtn.style.display  = 'none'; // PPTX only for presentations
 }

@@ -40,7 +40,7 @@ SLIDE_1_BODY = """
         <div style="display:flex; justify-content:space-between; height:100%">
           <div style="width:380px; display:flex; flex-direction:column; gap:12px">
             <p data-editable="text">Plain <strong>paragraph</strong></p>
-            <div class="cds-tile" id="tile-a"><div class="tile-title">Tile A</div></div>
+            <div class="cds-tile" id="tile-a"><div class="tile-title" data-editable="text">Tile A</div></div>
             <div class="cds-tile" id="tile-b"><div class="tile-title">Tile B</div></div>
             <table id="table-p" style="border-collapse:collapse">
               <tr><td style="border-bottom:1px solid #8d8d8d; padding:4px">Row 1</td>
@@ -123,7 +123,8 @@ RING_AROUND = """
     return {left: r.left, top: r.top, width: r.width, height: r.height}; };
   const ring = doc.getElementById('deck-pointer-ring');
   return {box: rect(doc.querySelector(sel)), ring: rect(ring),
-          rings: doc.querySelectorAll('#deck-pointer-ring').length};
+          rings: doc.querySelectorAll('#deck-pointer-ring').length,
+          still: !ring || ring.getAnimations().every(a => a.playState !== 'running')};
 }
 """
 
@@ -154,6 +155,21 @@ def deck_p() -> str:
     html = html[:start] + first + others + html[end:]
     html = html.replace("const TOTAL = 1;", "const TOTAL = 3;", 1)
     return html.replace('"Titre de la présentation",\n', '"Pointer test",\n    "Dark",\n    "Last",\n', 1)
+
+
+POINTER_BLOCK = re.compile(r"<!-- deck-pointer:begin -->.*?<!-- deck-pointer:end -->\n?", re.DOTALL)
+POINTER_CONTROL_LINE = re.compile(r'^[ \t]*<button[^\n]*id="btn-pointer"[^\n]*\n', re.MULTILINE)
+POINTER_KEY_LINE = re.compile(r"^[ \t]*if \(\(e\.key === 'l'[^\n]*\n", re.MULTILINE)
+
+
+def deck_o() -> str:
+    """Deck O (spec 9.0, DEC-017): Deck P without the deck-pointer block, the Pointeur control and the L line."""
+    html = deck_p()
+    for pattern in (POINTER_BLOCK, POINTER_CONTROL_LINE, POINTER_KEY_LINE):
+        html, count = pattern.subn("", html)
+        if count != 1:
+            raise AssertionError(f"Deck P changed shape: {pattern.pattern!r} matched {count} times")
+    return html
 
 
 @pytest.fixture(scope="module")
@@ -205,11 +221,8 @@ def resize_presented(page: Page, width: int, height: int) -> CDPSession:
 
 def present_served(page: Page, port: int) -> None:
     """Open the editor page on Deck P served at ``port``, present it with ``#present-btn``, turn the pointer on."""
-    leave_full_screen(page)
-    page.set_viewport_size({"width": WIDTH, "height": HEIGHT})
-    page.goto(f"http://127.0.0.1:{port}/", wait_until="networkidle")
-    page.click("#present-btn")
-    wait_state(page, lambda s: s["fullscreen"] == "HTML", "the served deck presented", FRAME_DOC)
+    open_served(page, port)
+    present_with(page, "#present-btn")
     wait_until(
         page,
         lambda: page.evaluate("document.activeElement.id"),
@@ -218,7 +231,62 @@ def present_served(page: Page, port: int) -> None:
     )
     page.keyboard.press("l")
     wait_state(page, lambda s: s["on"], "pointer on", FRAME_DOC)
+
+
+# editor.js wires its buttons after its first /status answer, in the task that writes the file name; the deck's
+# scripts have run once its document is complete.
+EDITOR_READY = (
+    "() => { const f = document.getElementById('content-frame'); const d = f && f.contentDocument;"
+    " return document.getElementById('toolbar-filename').textContent !== '\u2014'"
+    " && !!d && d.readyState === 'complete' && !!d.querySelector('#slide-2'); }"
+)
+# SPEC-0016 DEC-002: headless Chromium keeps the keyboard focus in the iframe, so a key "typed with the focus in
+# the editor page" is dispatched on the editor page's own document; returns defaultPrevented.
+DISPATCH_KEY = (
+    "k => { const e = new KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true});"
+    " document.dispatchEvent(e); return e.defaultPrevented; }"
+)
+# The editor's Pointeur control: present in the toolbar, shown, and its place beside the present control.
+POINTER_CONTROL = """
+() => {
+  const btn = document.getElementById('pointer-btn');
+  const present = document.getElementById('present-btn');
+  if (!btn) return {exists: false, shown: false};
+  const r = btn.getBoundingClientRect(), p = present.getBoundingClientRect();
+  return {exists: true, shown: getComputedStyle(btn).display !== 'none' && r.width > 0,
+          afterPresent: present.nextElementSibling === btn, left: r.left, presentRight: p.right,
+          title: btn.title, label: btn.getAttribute('aria-label'), text: btn.textContent.trim()};
+}
+"""
+
+
+def open_served(page: Page, port: int) -> None:
+    """Leave a full screen left by the previous test, size the window, open the editor page on the served deck."""
+    leave_full_screen(page)
+    page.set_viewport_size({"width": WIDTH, "height": HEIGHT})
+    page.goto(f"http://127.0.0.1:{port}/")
+    wait_until(page, lambda: page.evaluate(EDITOR_READY), bool, what="the editor and its deck ready")
+
+
+def present_with(page: Page, control: str) -> None:
+    """Press an editor toolbar control that presents the served deck; return once it is full screen and still."""
+    shown = page.evaluate(
+        "([sel]) => { const b = document.querySelector(sel); return !!b && b.offsetWidth > 0; }", [control]
+    )
+    assert shown, f"{control} is not shown in the editor toolbar"
+    page.click(control)
+    wait_state(page, lambda s: s["fullscreen"] == "HTML", "the served deck presented", FRAME_DOC)
     wait_slide_settled(page, FRAME_DOC)
+
+
+def dispatch_key(page: Page, key: str) -> bool:
+    """A key typed while the focus is in the editor page (DISPATCH_KEY); the relay acts synchronously."""
+    return bool(page.evaluate(DISPATCH_KEY, key))
+
+
+def pointer_control(page: Page) -> dict[str, Any]:
+    control: dict[str, Any] = page.evaluate(POINTER_CONTROL)
+    return control
 
 
 def pointer_state(page: Page, doc: str = DOC) -> PointerState:
@@ -248,8 +316,13 @@ def is_ringed(check: RingCheck, scale: float = SCALE) -> bool:
 
 
 def wait_ringed(page: Page, selector: str, doc: str = DOC, scale: float = SCALE) -> RingCheck:
+    """Wait until ``selector`` is ringed and the ring's entrance animation is over: a rect read during the animation
+    already passes ``is_ringed`` but differs by a pixel from the same ring read once it is still."""
     return wait_until(
-        page, lambda: ring_around(page, selector, doc), lambda c: is_ringed(c, scale), what=f"{selector} ringed"
+        page,
+        lambda: ring_around(page, selector, doc),
+        lambda c: c["still"] and is_ringed(c, scale),
+        what=f"{selector} ringed",
     )
 
 

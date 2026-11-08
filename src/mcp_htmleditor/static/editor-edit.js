@@ -25,6 +25,18 @@ function applyEditMode() {
   } catch (e) {
     console.warn('Could not toggle edit mode:', e);
   }
+  syncPointerAllowed();
+}
+
+/** No pointer while edit mode is on (SPEC-0017 FR-NEW-012): the deck decides, the editor pushes the mode.
+ *  A deck without the pointer (created before it) has no setPointerAllowed and is left alone. */
+function syncPointerAllowed() {
+  try {
+    const win = frame.contentWindow;
+    if (win && typeof win.setPointerAllowed === 'function') win.setPointerAllowed(!editMode);
+  } catch (e) {
+    console.warn('Could not reach the deck pointer:', e);
+  }
 }
 
 function injectEditMode(doc) {

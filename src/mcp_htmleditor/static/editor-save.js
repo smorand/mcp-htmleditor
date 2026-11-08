@@ -59,9 +59,12 @@ async function runSave(options) {
 
 /** A save while presenting (or after) writes none of the deck's runtime state (SPEC-0016 R2):
  *  `data-fs-current` goes, and `--fs-scale` leaves <html>'s style as text, so every other declaration
- *  keeps its bytes (SPEC-0015 DEC-003); a style left empty is removed. */
+ *  keeps its bytes (SPEC-0015 DEC-003); a style left empty is removed. The pointer's layer (dot and ring) and
+ *  its state on <html> go too (SPEC-0017 DEC-014); the deck's own pointer code and CSS stay. */
 function stripPresentingState(root) {
   root.querySelectorAll('[data-fs-current]').forEach(el => el.removeAttribute('data-fs-current'));
+  root.querySelectorAll('#deck-pointer-layer').forEach(node => node.remove());
+  root.removeAttribute('data-deck-pointer');
   const style = root.getAttribute('style');
   if (style === null) return;
   const kept = style.split(';').filter(part => !/^\s*--fs-scale\s*:/.test(part)).join(';');
