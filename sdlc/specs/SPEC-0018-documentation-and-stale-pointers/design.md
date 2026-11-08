@@ -4,7 +4,7 @@
 > Nature: DEBT
 > Depth: M
 > Depth evidence: one theme (documentation), 33 files, 58 stale lines plus 4 over length agent docs, no program contract change
-> Status: draft
+> Status: specified
 > Generated on: 2026-11-08
 > Behavior change: none in program behavior; documentation text only (DEC-002, DEC-003), declared in Section 7
 > From backlog: BL-0012, BL-0021, BL-0025, BL-0026 (and the over length `.agent_docs` files, project rule)
