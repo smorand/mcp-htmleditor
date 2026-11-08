@@ -4,7 +4,7 @@
 > Nature: DEBT
 > Depth: M
 > Depth evidence: 4 debt items in 3 modules (state, cli, editor scripts) plus test hardening, 12 files (7 edited, 5 created), 1 internal method removed, one skill sentence added, no other public contract change
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-08
 > Behavior change: none in program behavior; one skill text addition (DR-005), declared in Section 7
 > From backlog: BL-0009, BL-0011, BL-0014, BL-0036, BL-0010 (part: E2E-036)
@@ -223,3 +223,65 @@ Stories A, B and C are independent of each other and of SPEC-0018; each leaves t
 ## 11. Open questions
 
 - The test plan (Section 8) is treated as approved per the batch instruction; no interview round was held. Does not change observable behavior.
+
+## Design additions (2026-11-08)
+
+> Added by `/sdlc-design` (Phase 3D). No existing `DEC-`, `DR-` or `DT-` is changed; numbering continues at DEC-008.
+> Target tier: 2 (user instruction; `sdlc/constitution.md` holds no `Tier:`).
+
+### Validation (Phase 3D)
+
+- Every `DEC-` names what it implements; DR-001, DR-002, DR-007 by DEC-001; DR-003 by DEC-003; DR-004, DR-005 by DEC-004, DEC-005; DR-008 is a test (DT-030); DR-006 is the suite criterion.
+- Migration: three steps (Section 9), each leaves `make check` green.
+- Success criterion stated (Section 8.1): the existing suite passes unmodified, 4 tolerated removals (Section 8.4).
+- Spot check against main at `027d462`: `state.py:165-173` (`load`), `state.py:208-209` (`snapshot` reads `server.json`), `cli.py:14` (`import os`), `cli.py:220-226`, `rg -n "environ" src` (only `config.py:258` and `cli.py:221` access it), the five `.load()` calls `tests/test_state.py:172,183,193,465,468`, the tests at `:160`, `:179`, `:187`, `:346`, `:459`, `editor-undo.js:27-56`, `editor-save.js:14`, `:27-34`, `editor-drag.js:129`, `:140`, `:211`, `tests/test_presentation_templates_fullscreen.py:13`, `:50`, `tests/trace_support.py:115`, `tests/conftest.py:101`, `skill-audit` (`slides-carbon` 7798, `create` 7987 of 8000), 11 presentation templates.
+- **Stale count found:** `test_corrupt_records_are_ignored` is at `tests/test_state.py:379`, not `:380` (DEC-002, Section 8.4). The test name is the reference; stories cite `:379`. `presentation_files` is defined at `tests/test_presentation_templates_fullscreen.py:50` (Section 4.1 DR-004 cites `:51`, its docstring line).
+- **Dependency on SPEC-0018 (DR-008 note, Section 9):** verified against both perimeters. Stories A and B share no file region with SPEC-0018 (`cli.py:14`, `:220-221` here, `cli.py:279` there). Story C appends to `.agent_docs/testing.md` § Files, which SPEC-0018 story B consolidates: same region, so ordered (DEC-009).
+
+### File structure impact
+
+| Path | Action | Caused by | Story |
+|---|---|---|---|
+| `src/mcp_htmleditor/state.py` | remove `load()` | DR-001 | US-0113 |
+| `src/mcp_htmleditor/cli.py` | remove `:220-221` and `import os` | DR-002, DR-007 | US-0113 |
+| `tests/test_state.py` | remove 4 tests (Section 8.4) | DR-001 | US-0113 |
+| `tests/test_state_record.py` | create: DT-001, DT-002 | DR-001 | US-0113 |
+| `tests/test_serve_poll.py` | create: DT-003, DT-010, DT-011 | DR-002, DR-007 | US-0113 |
+| `src/mcp_htmleditor/static/editor-save.js` | add `stripEditorArtifacts`, `runSave` calls it | DR-003 | US-0114 |
+| `src/mcp_htmleditor/static/editor-undo.js` | `captureDomSnapshot` calls it | DR-003 | US-0114 |
+| `tests/test_editor_artifact_strip.py` | create: DT-012 | DR-003 | US-0114 |
+| `skill/topics/slides-carbon.md` | one sentence at `:96` | DR-005 | US-0115 |
+| `tests/test_presentation_markers_structural.py` | create: DT-020, DT-021 | DR-004, DR-005 | US-0115 |
+| `tests/test_tracing_no_content.py` | create: DT-030 | DR-008 | US-0115 |
+| `.agent_docs/testing.md` | § Files: five rows | project doc rule | US-0115 |
+
+### Test strategy
+
+| Test | Level | Driver | Location | Story |
+|---|---|---|---|---|
+| DT-001 | integration | in process `EditorState` | `tests/test_state_record.py` | US-0113 |
+| DT-002 | structural | `hasattr` | `tests/test_state_record.py` | US-0113 |
+| DT-003 | structural | file scan of `src/` | `tests/test_serve_poll.py` | US-0113 |
+| DT-010 | integration | `_serve_file` with server doubles | `tests/test_serve_poll.py` | US-0113 |
+| DT-011 | integration | same | `tests/test_serve_poll.py` | US-0113 |
+| DT-012 | structural | text of `static/*.js` | `tests/test_editor_artifact_strip.py` | US-0114 |
+| DT-020 | structural | regex per template, parametrized | `tests/test_presentation_markers_structural.py` | US-0115 |
+| DT-021 | functional (CLI in process) | `CliRunner` on `main` | `tests/test_presentation_markers_structural.py` | US-0115 |
+| DT-030 | functional e2e | child traced server (`run_traced_server`) | `tests/test_tracing_no_content.py` | US-0115 |
+
+Byte identity of the undo snapshot and of the saved HTML (DR-006) is carried by the existing browser suites, unmodified: `tests/test_undo_redo_e2e.py`, `tests/test_save_ui_e2e.py`, `tests/test_autosave_focus_e2e.py`, `tests/test_save_safety_e2e.py`. Test data: generated (`html_file`, `fresh_state`, `tests/deck_support.py` EI deck); no user data.
+
+### Decisions (continued)
+
+- **DEC-008:** Three stories, one per step of Section 9. **Obliged by:** DR-001 to DR-008. **Rationale:** each step closes its own tests and fits the T2 file budget (5, 3 and 4 files). Story B gets `min_tier: 1`: byte identity of the live document after the snapshot depends on the restore order and on `querySelectorAll` working on both a document and a detached clone, which no new test asserts directly (only the existing browser suites catch it). **Alternatives considered:** one story (12 files); B at T2 (silent pitfall). **Source:** design. **Evidence:** `editor-undo.js:27-56`, `editor-save.js:26-34`.
+- **DEC-009:** Story C (US-0115) depends on SPEC-0018 story B (US-0112). Since that story lands first, the ordering note of Section 9 resolves to its first branch: `tests/test_agent_docs_size.py` exists, and the five rows keep `.agent_docs/testing.md` at most 220 lines (it is at most 200 after US-0112). **Obliged by:** DR-006 (the suite, SPEC-0018 DT-013 included, stays green). **Alternatives considered:** independent (two writers on the same region, conflict and possible DT-013 red). **Source:** design. **Evidence:** `.agent_docs/testing.md:74`, SPEC-0018 DEC-009.
+- **DEC-010:** New test files and new comments of this spec follow SPEC-0018 DT-010 and DT-012, which are on main before them: no `skill/types/`, `skill/workflow-` or `.pi/skills/`, and a comment pointer of the forms `see <script>.js <name>`, `<name>() in <script>.js` names the script that defines `function <name>(`. **Obliged by:** DR-006. **Source:** SPEC-0018 design DR-001, DR-002. **Evidence:** SPEC-0018 Section 8.3.
+- **DEC-011:** Test time: SPEC-0019 adds at most 6 s (DEC-007) and SPEC-0018 under 2 s, against a test step measured at 320 to 325 s for a 330 s cap. US-0115 measures the new tests and the full step and pastes both; a step above 330 s at load above 30 is re run once (`.agent_docs/testing.md` § SPEC-0016 closing run); a step above 330 s at normal load stops the story and opens a backlog entry for a trim (a trim is its own decision, DEC-006). **Obliged by:** DR-006. **Source:** design. **Evidence:** `.agent_docs/testing.md:225`, `:240`.
+
+### Stories
+
+| Story | Title | Priority | Requirements | Depends on | min_tier | Closes spec |
+|---|---|---|---|---|---|---|
+| US-0113 | state loader and serve poll cleanup | P1 | DR-001, DR-002, DR-006, DR-007 | main | 2 | no |
+| US-0114 | single editor artifact strip | P1 | DR-003, DR-006 | main | 1 | no |
+| US-0115 | presentation guards and span privacy | P2 | DR-004, DR-005, DR-006, DR-008 | US-0112, US-0113, US-0114 | 2 | yes |
