@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: M
 > Depth evidence: 2 areas (the deck being presented, the editor page), 14 requirements, no persisted concept, no public contract change; the files written by the agent keep their format
-> Status: designed
+> Status: implemented
 > Generated on: 2026-11-08
 > Project: existing
 > From backlog: n/a
