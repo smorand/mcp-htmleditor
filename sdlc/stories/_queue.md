@@ -104,7 +104,7 @@
 | US-0102 | SPEC-0017 | pointer dot, l key and the deck's pointeur control | main | 1 | done | story/US-0102-pointer-dot-l-key-and-deck-control | main |
 | US-0103 | SPEC-0017 | ring and the box choice rules | US-0102 | 1 | done | story/US-0103-ring-and-box-choice-rules | story/US-0102-pointer-dot-l-key-and-deck-control |
 | US-0104 | SPEC-0017 | editor pointeur control, relay, edit mode and save | US-0103 | 1 | done | story/US-0104-editor-pointer-control-relay-edit-save | story/US-0103-ring-and-box-choice-rules |
-| US-0105 | SPEC-0017 | pointer sync tool and template guard | US-0102 | 2 | todo | | |
+| US-0105 | SPEC-0017 | pointer sync tool and template guard | US-0102 | 2 | done | story/US-0105-pointer-sync-tool-and-template-guard | story/US-0104-editor-pointer-control-relay-edit-save |
 | US-0106 | SPEC-0017 | pointer in the carbon reference decks | US-0103, US-0105 | 2 | todo | | |
 | US-0107 | SPEC-0017 | pointer in the ei decks | US-0106 | 2 | todo | | |
 | US-0108 | SPEC-0017 | pointer in the medical decks | US-0107 | 2 | todo | | |

@@ -22,7 +22,8 @@ EI_OUT = "templates/bootstrap/slides-ei-empty.html"
 MEDICAL_SOURCE = "templates/bootstrap/slides-medical-empty.html"
 MEDICAL_CATALOGUE = "templates/reference/slides/medical.html"
 MEDICAL_EXAMPLE = "templates/reference/slides/example-medical-complete.html"
-TEMPLATE_FILES = [EI_SOURCE, EI_OUT, MEDICAL_SOURCE, MEDICAL_CATALOGUE, MEDICAL_EXAMPLE]
+POINTER_SOURCE = "templates/bootstrap/slides-empty.html"  # `make check-generated` also runs the pointer sync
+TEMPLATE_FILES = [EI_SOURCE, EI_OUT, MEDICAL_SOURCE, MEDICAL_CATALOGUE, MEDICAL_EXAMPLE, POINTER_SOURCE]
 
 EI_TOOL = "tools/gen_ei_bootstrap.py"
 MEDICAL_TOOL = "tools/sync_medical_css.py"
@@ -34,7 +35,7 @@ MEDICAL_EDIT_LINE = 40  # inside the style block, which starts at line 31
 @pytest.fixture
 def repo_copy(tmp_path: Path) -> Path:
     """Copy tools/ and the five template files with the same relative layout."""
-    for tool in (EI_TOOL, MEDICAL_TOOL, "tools/freshness.py"):
+    for tool in (EI_TOOL, MEDICAL_TOOL, "tools/sync_deck_pointer.py", "tools/freshness.py"):
         _copy(REPO_ROOT / tool, tmp_path / tool)
     for rel in TEMPLATE_FILES:
         _copy(REPO_ROOT / rel, tmp_path / rel)
