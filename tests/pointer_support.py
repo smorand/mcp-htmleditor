@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from playwright.sync_api import Browser, Page
+from playwright.sync_api import Browser, CDPSession, Page
 
 from tests.browser_wait import wait_until
 
@@ -64,8 +64,10 @@ SLIDE_2_BODY = """
         <p data-editable="text" style="color:#f4f4f4">Dark paragraph</p>
         <div class="cds-tile" id="edge-tile" style="position:absolute; left:0; top:300px; width:200px">Edge tile</div>
 """
+# The panel covers 90 % of the slide's area (the body's padding box is the slide's, 958 by 538 inside its border),
+# so FR-NEW-005 rule 6 skips it.
 SLIDE_3_BODY = """
-        <div id="panel" style="position:absolute; left:5%; top:5%; width:90%; height:90%; background:#e0e0e0">
+        <div id="panel" style="position:absolute; left:0; top:5%; width:100%; height:90%; background:#e0e0e0">
           <p data-editable="text">Last</p>
         </div>
 """
@@ -89,7 +91,9 @@ doc => {
   let ring = null;
   if (shown(ringEl)) {
     const r = ringEl.getBoundingClientRect();
-    ring = {left: r.left, top: r.top, width: r.width, height: r.height};
+    const cs = win.getComputedStyle(ringEl);
+    ring = {left: r.left, top: r.top, width: r.width, height: r.height,
+            border: parseFloat(cs.borderTopWidth), opacity: cs.opacity};
   }
   return {
     on: doc.documentElement.hasAttribute('data-deck-pointer'),
@@ -104,6 +108,24 @@ doc => {
 """
 
 PointerState = dict[str, Any]
+RingCheck = dict[str, Any]
+
+DOC = "document"
+FRAME_DOC = "document.getElementById('content-frame').contentDocument"
+SCALE = WIDTH / 960
+RING_GAP = 6  # slide pixels between the box and the ring's outer edge
+RING_LINE = 3  # slide pixels of the ring's line
+
+# The ring and the rect of one element of the deck, read together ("X ringed" compares the two).
+RING_AROUND = """
+(doc, sel) => {
+  const rect = el => { if (!el) return null; const r = el.getBoundingClientRect();
+    return {left: r.left, top: r.top, width: r.width, height: r.height}; };
+  const ring = doc.getElementById('deck-pointer-ring');
+  return {box: rect(doc.querySelector(sel)), ring: rect(ring),
+          rings: doc.querySelectorAll('#deck-pointer-ring').length};
+}
+"""
 
 
 def _slide(index: int, title: str, body: str, style: str = "") -> str:
@@ -150,28 +172,145 @@ def pointer_file_page(browser: Browser) -> Iterator[Page]:
     context.close()
 
 
-def pointer_state(page: Page) -> PointerState:
-    state: PointerState = page.evaluate(f"({POINTER_STATE})(document)")
+@pytest.fixture(scope="module")
+def pointer_touch_page(browser: Browser) -> Iterator[Page]:
+    """A page on a screen taking touch and a mouse (E2E-026), window 1600 by 900."""
+    context = browser.new_context(viewport=VIEWPORT, has_touch=True)  # type: ignore[arg-type]  # TypedDict
+    page = context.new_page()
+    yield page
+    context.close()
+
+
+@pytest.fixture(scope="module")
+def pointer_reduced_page(browser: Browser) -> Iterator[Page]:
+    """A page whose system asks for reduced motion (E2E-027), window 1600 by 900."""
+    context = browser.new_context(viewport=VIEWPORT, reduced_motion="reduce")  # type: ignore[arg-type]  # TypedDict
+    page = context.new_page()
+    yield page
+    context.close()
+
+
+def resize_presented(page: Page, width: int, height: int) -> CDPSession:
+    """Resize a full screen window: Chromium refuses ``set_viewport_size`` then, so the viewport is emulated.
+
+    The emulation lasts as long as the returned session: clear it there (``Emulation.clearDeviceMetricsOverride``).
+    """
+    session = page.context.new_cdp_session(page)
+    session.send(
+        "Emulation.setDeviceMetricsOverride",
+        {"width": width, "height": height, "deviceScaleFactor": 0, "mobile": False},
+    )
+    return session
+
+
+def present_served(page: Page, port: int) -> None:
+    """Open the editor page on Deck P served at ``port``, present it with ``#present-btn``, turn the pointer on."""
+    leave_full_screen(page)
+    page.set_viewport_size({"width": WIDTH, "height": HEIGHT})
+    page.goto(f"http://127.0.0.1:{port}/", wait_until="networkidle")
+    page.click("#present-btn")
+    wait_state(page, lambda s: s["fullscreen"] == "HTML", "the served deck presented", FRAME_DOC)
+    wait_until(
+        page,
+        lambda: page.evaluate("document.activeElement.id"),
+        lambda v: v == "content-frame",
+        what="focus in the deck",
+    )
+    page.keyboard.press("l")
+    wait_state(page, lambda s: s["on"], "pointer on", FRAME_DOC)
+    wait_slide_settled(page, FRAME_DOC)
+
+
+def pointer_state(page: Page, doc: str = DOC) -> PointerState:
+    state: PointerState = page.evaluate(f"({POINTER_STATE})({doc})")
     return state
 
 
-def open_deck_p(page: Page, path: Path, width: int = WIDTH, height: int = HEIGHT) -> None:
-    """Leave a full screen left by the previous test, size the window, load Deck P afresh."""
+def ring_around(page: Page, selector: str, doc: str = DOC) -> RingCheck:
+    """The ring state and the rect of the element ``selector`` of the deck's document, read in one go."""
+    check: RingCheck = page.evaluate(f"([sel]) => ({RING_AROUND})({doc}, sel)", [selector])
+    return check
+
+
+def is_ringed(check: RingCheck, scale: float = SCALE) -> bool:
+    """One ring shown whose outer edge lies 6 slide pixels (times ``scale``) +-1 screen pixel outside the box."""
+    ring, box = check["ring"], check["box"]
+    if check["rings"] != 1 or ring is None or box is None:
+        return False
+    gap = RING_GAP * scale
+    edges = (
+        box["left"] - ring["left"],
+        box["top"] - ring["top"],
+        ring["left"] + ring["width"] - box["left"] - box["width"],
+        ring["top"] + ring["height"] - box["top"] - box["height"],
+    )
+    return all(abs(edge - gap) <= 1 for edge in edges)
+
+
+def wait_ringed(page: Page, selector: str, doc: str = DOC, scale: float = SCALE) -> RingCheck:
+    return wait_until(
+        page, lambda: ring_around(page, selector, doc), lambda c: is_ringed(c, scale), what=f"{selector} ringed"
+    )
+
+
+def next_frames(page: Page, doc: str = DOC) -> None:
+    """Return once the deck's document has drawn two more frames, so its frame loop has seen the last action."""
+    page.evaluate(
+        f"() => new Promise(r => {{ const w = ({doc}).defaultView;"
+        " w.requestAnimationFrame(() => w.requestAnimationFrame(r)); })"
+    )
+
+
+def click_centre(page: Page, selector: str, doc: str = DOC) -> None:
+    """Click the middle of ``selector`` of the deck's document at its screen place (the deck fills the page)."""
+    box = page.evaluate(
+        f"([sel]) => {{ const r = ({doc}).querySelector(sel).getBoundingClientRect();"
+        " return [r.left + r.width / 2, r.top + r.height / 2]; }",
+        [selector],
+    )
+    page.mouse.click(box[0], box[1])
+
+
+def leave_full_screen(page: Page) -> None:
+    """Leave a full screen left by the previous test of the module page."""
     if page.evaluate("!!document.fullscreenElement"):
         page.evaluate("document.exitFullscreen()")
         wait_until(
             page, lambda: page.evaluate("!!document.fullscreenElement"), lambda v: not v, what="full screen left"
         )
+
+
+def open_deck_p(page: Page, path: Path, width: int = WIDTH, height: int = HEIGHT) -> None:
+    """Leave a full screen left by the previous test, size the window, load Deck P afresh."""
+    leave_full_screen(page)
     page.set_viewport_size({"width": width, "height": height})
     page.goto(path.as_uri())
 
 
-def wait_state(page: Page, holds: Any, what: str) -> PointerState:
-    return wait_until(page, lambda: pointer_state(page), holds, what=what)
+def wait_state(page: Page, holds: Any, what: str, doc: str = DOC) -> PointerState:
+    return wait_until(page, lambda: pointer_state(page, doc), holds, what=what)
 
 
 def wait_presenting(page: Page) -> PointerState:
     return wait_state(page, lambda s: s["fullscreen"] == "HTML", "the deck presented full screen")
+
+
+# True once the current slide is scaled to fit the window and its entrance animation is over, so the screen
+# place of an element read now is where a click lands.
+SLIDE_SETTLED = """
+doc => {
+  const win = doc.defaultView;
+  const slide = doc.querySelector('[data-type="slide"].active, [data-type="slide"][data-fs-current]');
+  if (!slide || !doc.fullscreenElement) return false;
+  const fit = Math.min(win.innerWidth / slide.offsetWidth, win.innerHeight / slide.offsetHeight);
+  const running = slide.getAnimations().some(a => a.playState === 'running');
+  return !running && Math.abs(slide.getBoundingClientRect().width - fit * slide.offsetWidth) <= 1;
+}
+"""
+
+
+def wait_slide_settled(page: Page, doc: str = DOC) -> None:
+    wait_until(page, lambda: page.evaluate(f"({SLIDE_SETTLED})({doc})"), lambda v: v, what="the slide fitted and still")
 
 
 def print_pdf_normalized(page: Page) -> bytes:
