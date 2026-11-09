@@ -1,8 +1,7 @@
 # Architecture
 
-Single page HTML is the source of truth. The browser renders the file as is inside an
-iframe, the LLM agent writes the file on disk, the browser notices the new mtime and
-reloads. No build step, no framework, no database.
+Single page HTML is the source of truth. The browser renders the file as is inside an iframe, the LLM agent writes
+the file on disk, the browser notices the new mtime and reloads. No build step, no framework, no database.
 
 ```
 LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_server ◀──HTTP──▶ browser
@@ -33,33 +32,31 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 | `skill_content.py` | `SkillLibrary`: core (`skill/core.md`, 7000 bytes max), 15 topics (`skill/topics/<t>.md`, 8000 max), `--all`; `arch-qa` appends the checklist (user one if any, else the shipped `skill/checks/`) |
 | `skill_audit.py` | `run_audit`, `find_stale`, `listed_tools`: sizes, budgets, core `## Tools` lines versus `registered_tool_names()`, stale statements in core, topics and routing skill |
 
-`_EditorHandler` and the server lifecycle functions are the I/O boundary and are marked
-`# pragma: no cover`; the pure helpers next to them (`_strip_editor_artifacts`,
-`_rebuild_full_html`, `health_payload`) are fully tested.
+`_EditorHandler` and the server lifecycle functions are the I/O boundary and are marked `# pragma: no cover`; the
+pure helpers next to them (`_strip_editor_artifacts`, `_rebuild_full_html`, `health_payload`) are fully tested.
 
 ## Request gate
 
-2026-11-05, SPEC-0013 (US-0071): `_refuse_untrusted_request` runs on every `GET` except `/health` and every
-`POST`, unknown paths included, and starts with `_refuse_ambiguous_headers`. Its order is fixed: a folded header
-value (`\r` or `\n` inside, the stdlib keeps the continuation line), a repeated `Host`, `Origin`,
-`Content-Length` or `Content-Type` (first repeated name in that order, even when the lines are identical), any
-`Transfer-Encoding`, a `Host` holding `@`. Each answers `400` through `_refuse_request`, logs one warning
-`Refused <METHOD> <path>: <error>` (no header value, no body) and reads no body. Only then come the SPEC-0005
-host and origin checks (403). `OPTIONS` (405) and other methods (stdlib 501) stay outside the gate. Tests send raw
-bytes with `tests/http_support.py` (`exchange`, `RawReply`, `json_body`) because a standard client merges
-duplicated headers.
+SPEC-0013 (US-0071): `_refuse_untrusted_request` runs on every `GET` except `/health` and every `POST`, unknown
+paths included, and starts with `_refuse_ambiguous_headers`. Its order is fixed: a folded header value (`\r` or
+`\n` inside, the stdlib keeps the continuation line), a repeated `Host`, `Origin`, `Content-Length` or
+`Content-Type` (first repeated name in that order, even when the lines are identical), any `Transfer-Encoding`, a
+`Host` holding `@`. Each answers `400` through `_refuse_request`, logs one warning `Refused <METHOD> <path>: <error>`
+(no header value, no body) and reads no body. Only then come the SPEC-0005 host and origin checks (403). `OPTIONS`
+(405) and other methods (stdlib 501) stay outside the gate. Tests send raw bytes with `tests/http_support.py`
+(`exchange`, `RawReply`, `json_body`) because a standard client merges duplicated headers.
 
 ## Time bounds
 
-2026-11-05, SPEC-0013: `http_deadline.py`. `DeadlineReader` waits at most `WAIT_SECONDS` (30 s) per byte and
-cuts the request `TOTAL_SECONDS` (300 s) after the connection's first byte (`_arm`: min of wait and total left;
-injected `clock`), receiving the request only, not running it nor the answer (`DeadlineWriter`: a wait per
-chunk). `RequestTimeout` with bytes answers `408` plus one `Refused` warning, without bytes it closes silently.
-The constants are a test seam, never a setting.
+SPEC-0013: `http_deadline.py`. `DeadlineReader` waits at most `WAIT_SECONDS` (30 s) per byte and cuts the request
+`TOTAL_SECONDS` (300 s) after the connection's first byte (`_arm`: min of wait and total left; injected `clock`),
+receiving the request only, not running it nor the answer (`DeadlineWriter`: a wait per chunk). `RequestTimeout`
+with bytes answers `408` plus one `Refused` warning, without bytes it closes silently. The constants are a test
+seam, never a setting.
 
 ## Stop sequence
 
-2026-11-06, SPEC-0014 (US-0082): `stop_http_server` clears the globals under `_server_lock`, then
+SPEC-0014 (US-0082): `stop_http_server` clears the globals under `_server_lock`, then
 `shutdown()` (ends the loop only), `server_close()` (closes the listener: connect refused, port rebindable at once
 thanks to the stdlib `allow_reuse_address`; daemon handler threads, nothing joined), `connections.close_idle()`.
 `http_connections.ConnectionRegistry` (one per `_EditorServer`, one lock): `setup` adds the socket (shut at once
@@ -70,13 +67,11 @@ answer, then close. Gotcha: a connection still in the listen backlog at the stop
 
 ## Save path
 
-The editor posts the whole document. Before writing, the server strips everything the
-browser injected (format bar, insert bar, style tag, context menu host, drag handles,
-drop indicator, `contenteditable`, `_mcp_*` classes, browser extension attributes) and
-clears the generated `#slide-select` options, so the file on disk stays clean for the
-next agent. A save targeting `templates/bootstrap/` or `templates/reference/` is
-ignored: those files are meant to be copied, not edited. The 409 check (`base_mtime`) and the write run in
-one process only; an agent or another process writing the file directly is not covered. The write
+The editor posts the whole document. Before writing, the server strips everything the browser injected (list in
+`html-conventions.md` § Editor artifacts, plus `_mcp_*` classes) and clears the generated `#slide-select` options,
+so the file on disk stays clean for the next agent. A save targeting `templates/bootstrap/` or
+`templates/reference/` is ignored: those files are meant to be copied, not edited. The 409 check (`base_mtime`) and
+the write run in one process only; an agent or another process writing the file directly is not covered. The write
 is `fileio.atomic_write` with reason `browser-save` (`keep-mine` when forced), traced as `file.write`; the
 previous content goes to the history first (`history.snapshot`) and is discarded if the replace fails.
 `patch` and `restore` use the same writer (reasons `patch`, `restore`).
@@ -122,88 +117,73 @@ previous content goes to the history first (`history.snapshot`) and is discarded
 | `static/slide-layouts.js` | Per template slide layouts (`LAYOUT_SETS.carbon`, `.ei`) |
 | `static/doc-blocks.js` | Document block definitions (title, subtitle, h1 to h5, paragraph, table, list) |
 | `static/editor.css` | Toolbar, overlay and picker styles |
-
-Validate JS with `node --check src/mcp_htmleditor/static/*.js`.
+| all `static/*.js` | Validate with `node --check src/mcp_htmleditor/static/*.js` |
 
 ### Fullscreen presentation mode (gotcha)
 
-The present button fullscreens the inner document (`frame.contentDocument.documentElement`), not the
-`<iframe>`, so the slide template's own `:fullscreen` CSS (inside the served HTML) hides the nav bar and
+The present button fullscreens the inner document (`frame.contentDocument.documentElement`), not the `<iframe>`, so
+the template's own `:fullscreen` CSS (`html-conventions.md` § Fullscreen presentation mode) hides the nav bar and
 resizes the slide. Two things must hold:
 
-- The `<iframe>` in `editor.html` needs `sandbox="... allow-fullscreen"` (plus `allow="fullscreen"`).
-  Without it `requestFullscreen()` is silently denied and `editor.js` falls back to fullscreening the
-  `<iframe>` itself, where the template CSS never matches.
-- Fullscreen does not move focus into the iframe, so `editor.js` calls `frame.focus()` once granted and
-  forwards arrow, space and escape keydowns from the parent into the iframe's `navigate()` / `goToSlide()`
-  while `document.fullscreenElement` is set.
+- The `<iframe>` in `editor.html` needs `sandbox="... allow-fullscreen"` (plus `allow="fullscreen"`). Without it
+  `requestFullscreen()` is silently denied and `editor.js` falls back to fullscreening the `<iframe>` itself,
+  where the template CSS never matches.
+- Fullscreen does not move focus into the iframe, so `editor.js` calls `frame.focus()` once granted and forwards
+  arrows, space, `Home`, `End` and `Escape` from the parent into the iframe's `navigate()` / `goToSlide()` while
+  `document.fullscreenElement` is set; `End` counts `[data-type="slide"]` and calls `goToSlide(count - 1)`
+  because `TOTAL` is a `const`, not a window property.
 
 ### Presentation pointer (SPEC-0017)
 
-The pointer is deck code (one block in every presentation template, see `.agent_docs/html-conventions.md` § Presentation
-pointer). The editor only relays: `#pointer-btn` (`editor.js`, shown when `deckCarriesPointer()`), the L key
-forwarded except in edit mode, `setPointerAllowed(!editMode)` from `editor-edit.js`, and `editor-save.js` removes
-`#deck-pointer-layer` and `data-deck-pointer` from the saved clone.
+The pointer is deck code (one block in every presentation template, see `.agent_docs/html-conventions.md` §
+Presentation pointer). The editor only relays: `#pointer-btn` (`editor.js`, shown only when `deckCarriesPointer()`,
+so a deck made before the pointer has none), the L key forwarded to `togglePointer()` except in edit mode,
+`setPointerAllowed(!editMode)` from `editor-edit.js`, and `editor-save.js` strips `#deck-pointer-layer` and
+`data-deck-pointer` from the save's detached clone, like `data-fs-current`.
 
 ## Templates and tools
 
-Template resolution order: `HTMLEDITOR_TEMPLATES_DIR`, then
-`~/.config/mcp-htmleditor/templates/` (written by `make install`), then `<repo>/templates/`.
-After editing anything under `templates/`, either run `make install` or export
-`HTMLEDITOR_TEMPLATES_DIR=$PWD/templates`, otherwise the installed copy wins and the
-change looks like it did nothing.
+Template resolution order: `HTMLEDITOR_TEMPLATES_DIR`, then `~/.config/mcp-htmleditor/templates/` (written by
+`make install`), then `<repo>/templates/`. After editing anything under `templates/`, either run `make install` or
+export `HTMLEDITOR_TEMPLATES_DIR=$PWD/templates`, otherwise the installed copy wins and the change looks like it
+did nothing. `templates/bootstrap/slides-ei-empty.html` is generated by `make bootstrap-ei`
+(`tools/gen_ei_bootstrap.py`) from `templates/reference/slides/euro-information.html`, the single source of the EI
+charter CSS: never hand edit the bootstrap. `tools/check_ei_insert.py` drives a real browser (playwright) to check EI slide
+insertion (footer logo, `.logo-disc`, renumbering) and writes PNG captures; it stays out of `make check` on
+purpose. Run it after touching the EI bootstrap, `slide-layouts.js` or `renumberSlides` / `resolveTemplateAssets`.
 
-`templates/bootstrap/slides-ei-empty.html` is generated by `make bootstrap-ei`
-(`tools/gen_ei_bootstrap.py`) from `templates/reference/slides/euro-information.html`:
-the reference is the single source of the EI charter CSS. Never hand edit the bootstrap.
+**`mail` template.** Document family charter (`data-doc-template="mail"`). Email clients ignore `<head><style>`,
+so every colour and spacing that matters is inline `style=""` and the layout is nested `<table>` (no flexbox, grid
+or `position:absolute`). `charter_for("mail")` returns `None`: no `reference.docx`, a mail is sent as is. Blocks
+from the `+ Bloc` picker land unstyled; clone a styled section instead (`skill/topics/mail.md`).
 
-`tools/check_ei_insert.py` drives a real browser (playwright) to check EI slide
-insertion (footer logo, `.logo-disc`, renumbering) and writes PNG captures. It stays
-out of `make check` on purpose. Run it after touching the EI bootstrap,
-`slide-layouts.js` or `renumberSlides` / `resolveTemplateAssets`.
-
-**2026-08, `mail` template.** Document family charter (`data-doc-template="mail"`). Email clients
-ignore `<head><style>`, so every colour and spacing that matters is inline `style=""` and the layout is
-nested `<table>` (no flexbox, grid or `position:absolute`). `charter_for("mail")` returns `None`: no
-`reference.docx`, a mail is sent as is. Blocks from the `+ Bloc` picker land unstyled; clone a styled
-section instead (`skill/topics/mail.md`).
-
-**2026-08, `website` template.** `data-doc-type="website"` is tracked by an `isWebsite` flag in `editor.js`:
-it reuses the document block insert and drag machinery (`article[data-type="document"]`) but shows
-neither export button (`updateDocActionsVisibility()` gates the block toolbar on `isDocument || isWebsite`
-and the DOCX button on `isDocument`). No exporter reads `data-doc-type`; a CLI export of a website file is
-not defended against. See `skill/topics/website.md`.
+**`website` template.** `data-doc-type="website"` is tracked by an `isWebsite` flag in `editor.js`: it reuses the
+document block insert and drag machinery (`article[data-type="document"]`) but shows neither export button
+(`updateDocActionsVisibility()` gates the block toolbar on `isDocument || isWebsite` and the DOCX button on
+`isDocument`). No exporter reads `data-doc-type`; a CLI export of a website file is not defended against. See
+`skill/topics/website.md`.
 
 ## LLM workflow
 
-```
-update_start() → write the HTML file → update_end()
-```
-
-`update_start()` raises the overlay in the browser and suppresses mtime reloads,
-`update_end()` clears it and lets the next poll reload the content. Never write the file
+`update_start()` → write the HTML file → `update_end()`. `update_start()` raises the overlay in the browser and
+suppresses mtime reloads, `update_end()` clears it and lets the next poll reload the content. Never write the file
 without those flanking calls.
 
-2026-11-03 (SPEC-0012, DEC-001, DEC-002): `_SlideBuilder` is composed from mixin classes
-(`TextMixin`, `ImagesMixin`, `ArchMixin`, `GanttMixin`, `BlocksMixin`, `FlowMixin`, `ChromeMixin`),
-each defined in its own `export/pptx_*.py` module and inheriting `_BuilderBase` from
-`pptx_model.py`, which declares the shared attributes and a stub for every method called across
-mixins (strict typing without `type: ignore`). The editor is split into classic scripts, not ES
-modules, so `file://` and the global function names keep working. Load order is fixed in
-`editor.html`: `slide-layouts.js`, `doc-blocks.js`, `editor-undo.js`, `editor-edit.js`,
-`editor-format.js`, `editor-menus.js`, `editor-save.js`, `editor-slides.js`, `editor-blocks.js`,
-`editor-drag.js`, `editor-requests.js`, `editor.js`. The top level `let` and `const` of `editor.js` are only touched
-inside functions by the other scripts, never at evaluation time.
+SPEC-0012 (DEC-001, DEC-002): the `_SlideBuilder` mixins of § Export pipeline inherit `_BuilderBase`, which stubs
+every method called across mixins (strict typing without `type: ignore`). The editor is split into classic scripts,
+not ES modules, so `file://` and the global function names keep working. Load order is fixed in `editor.html`:
+`slide-layouts.js`, `doc-blocks.js`, `editor-undo.js`, `editor-edit.js`, `editor-format.js`, `editor-menus.js`,
+`editor-save.js`, `editor-slides.js`, `editor-blocks.js`, `editor-drag.js`, `editor-requests.js`, `editor.js`. The
+top level `let` and `const` of `editor.js` are touched by the other scripts only inside functions.
 
-2026-11-04 (SPEC-0006, US-0034): progressive skill. `mcp-htmleditor skill` prints the core, `--type <t>`
-one topic, `--all` the core then the 15 topics; `get_skill(type=None)` returns the same text over MCP,
-which makes the tool count eight. This supersedes SPEC-0001 FR-009 (seven operations) without editing
-it. Test seams: `HTMLEDITOR_SKILL_DIR` points at another skill tree, `HTMLEDITOR_ROUTING_SKILL` at
-another routing skill file (the installed `~/.pi/agent/dynamic-skills/html-editor/SKILL.md` wins when
-the variable is unset and the file exists, else the source tree one is checked). Tool line rule
-(DEC-010): a story that registers a tool adds one `- <name>: <description>` line to the `## Tools`
-section of `skill/core.md` in the same story, otherwise `skill-audit` reports it. The skill text never
-states a tool count. The old skill is frozen in `docs/skill-archive/`.
+SPEC-0006 (US-0034), progressive skill: `mcp-htmleditor skill` prints the core, `--type <t>` one topic, `--all` the
+core then the 15 topics; `get_skill(type=None)` returns the same text over MCP (this superseded SPEC-0001 FR-009
+without editing it). Test seams: `HTMLEDITOR_SKILL_DIR` points at another skill tree, `HTMLEDITOR_ROUTING_SKILL` at
+another routing skill file (the installed `~/.pi/agent/dynamic-skills/html-editor/SKILL.md` wins when the variable
+is unset and the file exists, else the source tree one is checked). Tool line rule (DEC-010): a story that
+registers a tool adds one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
+story, otherwise `skill-audit` reports it. The skill text never states a tool count. The old skill is frozen in
+`docs/skill-archive/`.
 
 ## Deck service layer (`deck/`, `fileio.py`)
 

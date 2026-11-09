@@ -84,10 +84,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
   a slide with no `data-title` gets `Slide` (as the editor does). Nothing is created when a constant is
   missing; `slideNames.forEach` is not matched. The list ends at the first `]` outside a string.
 - Limits: a duplicated attribute is edited on its first occurrence only; a counter written through an entity
-  is not recognised.
-
-- Tests: `assert_only_region_changed(before, after, marker)` in `tests/deck_support.py` proves byte identity
-  outside the element found by plain substring search.
+  is not recognised. Byte identity outside an edited element: `assert_only_region_changed` (`testing.md` § Files).
 
 ## `lint FILE [--json]` (`deck/lint.py`, US-0042)
 
