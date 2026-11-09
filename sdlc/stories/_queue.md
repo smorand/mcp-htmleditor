@@ -114,4 +114,4 @@
 | US-0112 | SPEC-0018 | agent docs consolidation | US-0111 | 1 | done | story/US-0112-agent-docs-consolidation | story/US-0111-stale-skill-and-script-pointers |
 | US-0113 | SPEC-0019 | state loader and serve poll cleanup | main | 2 | done | story/US-0113-state-loader-and-serve-poll-cleanup | story/US-0112-agent-docs-consolidation |
 | US-0114 | SPEC-0019 | single editor artifact strip | main | 1 | done | story/US-0114-single-editor-artifact-strip | story/US-0113-state-loader-and-serve-poll-cleanup |
-| US-0115 | SPEC-0019 | presentation guards and span privacy | US-0112, US-0113, US-0114 | 2 | todo | | |
+| US-0115 | SPEC-0019 | presentation guards and span privacy | US-0112, US-0113, US-0114 | 2 | done | story/US-0115-presentation-guards-and-span-privacy | story/US-0114-single-editor-artifact-strip |
