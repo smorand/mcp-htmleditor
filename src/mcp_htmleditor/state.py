@@ -162,16 +162,6 @@ class EditorState:
         }
         self._write_record(_file_dir(self.current_file) / _SERVER, record)
 
-    def load(self) -> None:
-        """Load port, pid and poll interval from the current file's server record, if readable."""
-        if not self.current_file:
-            return
-        data = _read_record(_file_dir(self.current_file) / _SERVER)
-        port, pid, poll = data.get("port"), data.get("pid"), data.get("poll_interval")
-        self.port = port if _is_int(port) else self.port
-        self.server_pid = pid if _is_int(pid) else self.server_pid
-        self.poll_interval = int(poll) if _is_number(poll) else self.poll_interval
-
     def _write_record(self, path: Path, record: dict[str, Any]) -> bool:
         try:
             _atomic_write_json(path, record)
@@ -222,10 +212,6 @@ def _file_dir(file: str) -> Path:
     """Directory holding the records of ``file``, keyed by its resolved absolute path."""
     key = hashlib.sha256(str(Path(file).resolve()).encode("utf-8")).hexdigest()[:_KEY_LENGTH]
     return config.state_dir() / "files" / key
-
-
-def _is_int(value: Any) -> TypeGuard[int]:
-    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _is_number(value: Any) -> TypeGuard[int | float]:

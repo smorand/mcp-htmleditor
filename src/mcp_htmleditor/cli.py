@@ -11,7 +11,6 @@ from __future__ import annotations
 import functools
 import json
 import logging
-import os
 import sys
 import webbrowser
 from collections.abc import Callable
@@ -216,9 +215,6 @@ def _serve_file(file: str, port: int | None, poll: int | None, host: str, *, ope
 
     from .http_server import start_http_server
     from .state import get_state
-
-    if poll is not None:
-        os.environ["HTMLEDITOR_POLL_INTERVAL"] = str(poll)
 
     abs_file = str(Path(file).resolve())
     state = get_state()

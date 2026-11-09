@@ -157,44 +157,6 @@ def test_get_mtime_existing_file(fresh_state: EditorState, html_file: Path) -> N
     assert fresh_state.get_mtime() == html_file.stat().st_mtime
 
 
-def test_save_then_load_roundtrip(fresh_state: EditorState, html_file: Path) -> None:
-    """load() restores what save() persisted."""
-    fresh_state.set_file(str(html_file))
-    fresh_state.port = 5555
-    fresh_state.server_pid = 4242
-    fresh_state.poll_interval = 250
-    fresh_state.save()
-
-    # Mutate in-memory, then load from disk to overwrite.
-    fresh_state.port = 1
-    fresh_state.server_pid = None
-    fresh_state.poll_interval = 1
-    fresh_state.load()
-
-    assert fresh_state.port == 5555
-    assert fresh_state.server_pid == 4242
-    assert fresh_state.poll_interval == 250
-
-
-def test_load_missing_file_is_noop(fresh_state: EditorState, tmp_path: Path) -> None:
-    """load() with no state file on disk leaves state untouched."""
-    fresh_state.current_file = str(tmp_path / "doc.html")
-    fresh_state.port = 4321
-    fresh_state.load()
-    assert fresh_state.port == 4321
-
-
-def test_load_corrupt_file_is_ignored(fresh_state: EditorState, html_file: Path) -> None:
-    """A corrupt server.json is swallowed and does not raise."""
-    fresh_state.set_file(str(html_file))
-    fresh_state.port = 4321
-    (_file_dir(html_file) / "server.json").write_text("{ not valid json", encoding="utf-8")
-    # Must not raise.
-    fresh_state.load()
-    assert fresh_state.current_file == str(html_file.resolve())
-    assert fresh_state.port == 4321
-
-
 # ----------------------------------------------------------------------
 # Acceptance tests (SPEC-0009)
 # ----------------------------------------------------------------------
@@ -454,19 +416,6 @@ def test_failed_removal_still_ends_the_flag_here(
     clock.advance(1)
     record.write_text(json.dumps({"file": str(html_file), "started_at": clock.now}), encoding="utf-8")
     assert fresh_state.update_in_progress is True, "a later start by another process is still read"
-
-
-def test_load_ignores_wrongly_typed_values(fresh_state: EditorState, html_file: Path) -> None:
-    """server.json values of the wrong type are ignored; valid ones are taken."""
-    fresh_state.set_file(str(html_file))
-    defaults = (fresh_state.port, fresh_state.server_pid, fresh_state.poll_interval)
-    server = _file_dir(html_file) / "server.json"
-    server.write_text(json.dumps({"port": "80", "pid": True, "poll_interval": [1]}), encoding="utf-8")
-    fresh_state.load()
-    assert (fresh_state.port, fresh_state.server_pid, fresh_state.poll_interval) == defaults
-    server.write_text(json.dumps({"port": 7845, "pid": 42, "poll_interval": 500}), encoding="utf-8")
-    fresh_state.load()
-    assert (fresh_state.port, fresh_state.server_pid, fresh_state.poll_interval) == (7845, 42, 500)
 
 
 def test_directories_are_private(fresh_state: EditorState, html_file: Path) -> None:
