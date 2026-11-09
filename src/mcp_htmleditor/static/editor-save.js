@@ -24,13 +24,7 @@ async function runSave(options) {
     // A width drag preview is taken out around the clone, so a save during a drag writes the width
     // the text had before it (SPEC-0015).
     const clone = withWidthPreviewSuspended(() => doc.documentElement.cloneNode(true));
-    clone.querySelectorAll('[contenteditable]').forEach(el => {
-      el.removeAttribute('contenteditable');
-      el.style.outline = ''; el.style.cursor = '';
-    });
-    clone.querySelectorAll('#_mcp_format_bar, #_mcp_insert_bar').forEach(bar => { bar.style.display = 'none'; });
-    clone.querySelectorAll('._mcp_drag_handle, ._mcp_drop_indicator').forEach(node => node.remove());
-    clone.querySelectorAll('._mcp_drag_host').forEach(host => host.classList.remove('_mcp_drag_host'));
+    stripEditorArtifacts(clone); // a clone is thrown away: its restore is not needed
     stripPresentingState(clone);
 
     const payload = { html: '<!DOCTYPE html>\n' + clone.outerHTML };
@@ -55,6 +49,37 @@ async function runSave(options) {
     selfSaving = false;
     saveCount++;
   }
+}
+
+/** Take the editor's artifacts out of `root` (a document or a detached element), the one list shared by the
+ *  save (on a clone) and the undo snapshot (on the live document, see editor-undo.js captureDomSnapshot):
+ *  contenteditable with its outline and cursor, the format and insert bars hidden, the drag handles, drop
+ *  indicator and drag hosts (see editor-drag.js detachDragArtifacts). Returns a function putting every
+ *  artifact back as it was. */
+function stripEditorArtifacts(root) {
+  const editables = [...root.querySelectorAll('[contenteditable]')];
+  const backup = editables.map(el => ({
+    el, ce: el.contentEditable,
+    outline: el.style.outline, cursor: el.style.cursor,
+  }));
+  editables.forEach(el => {
+    el.removeAttribute('contenteditable');
+    el.style.outline = ''; el.style.cursor = '';
+  });
+
+  // querySelectorAll, not getElementById: a detached clone has no getElementById.
+  const bars = [...root.querySelectorAll('#_mcp_format_bar, #_mcp_insert_bar')].map(bar => ({ bar, display: bar.style.display }));
+  bars.forEach(({ bar }) => { bar.style.display = 'none'; });
+
+  const detachedDrag = detachDragArtifacts(root);
+
+  return function restore() {
+    backup.forEach(({ el, ce, outline, cursor }) => {
+      el.contentEditable = ce; el.style.outline = outline; el.style.cursor = cursor;
+    });
+    bars.forEach(({ bar, display }) => { bar.style.display = display; });
+    reattachDragArtifacts(detachedDrag);
+  };
 }
 
 /** A save while presenting (or after) writes none of the deck's runtime state (SPEC-0016 R2):

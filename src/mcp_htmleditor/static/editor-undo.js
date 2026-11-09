@@ -25,33 +25,11 @@
 /** Serialize the iframe's current DOM state the same way saveContent() does,
  *  but WITHOUT writing to disk: used as a snapshot payload for undo/redo. */
 function captureDomSnapshot(doc) {
-  const editables = [...doc.querySelectorAll('[contenteditable]')];
-  const backup = editables.map(el => ({
-    el, ce: el.contentEditable,
-    outline: el.style.outline, cursor: el.style.cursor,
-  }));
-  editables.forEach(el => {
-    el.removeAttribute('contenteditable');
-    el.style.outline = ''; el.style.cursor = '';
-  });
-
-  const fb = doc.getElementById('_mcp_format_bar');
-  const ib = doc.getElementById('_mcp_insert_bar');
-  const fbDisplay = fb?.style.display; const ibDisplay = ib?.style.display;
-  if (fb) fb.style.display = 'none';
-  if (ib) ib.style.display = 'none';
-
-  const detachedDrag = detachDragArtifacts(doc);
-
+  // Stripped on the live document and put back, never on a clone: a clone would change the focus and blur
+  // events a snapshot causes (SPEC-0019 DEC-003). See editor-save.js stripEditorArtifacts.
+  const restore = stripEditorArtifacts(doc);
   const html = withWidthPreviewSuspended(() => doc.documentElement.outerHTML);
-
-  backup.forEach(({ el, ce, outline, cursor }) => {
-    el.contentEditable = ce; el.style.outline = outline; el.style.cursor = cursor;
-  });
-  if (fb) fb.style.display = fbDisplay;
-  if (ib) ib.style.display = ibDisplay;
-  reattachDragArtifacts(detachedDrag);
-
+  restore();
   return html;
 }
 
