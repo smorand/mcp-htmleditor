@@ -4,7 +4,7 @@
 > Nature: DEBT
 > Depth: M
 > Depth evidence: 4 debt items in 3 modules (state, cli, editor scripts) plus test hardening, 12 files (7 edited, 5 created), 1 internal method removed, one skill sentence added, no other public contract change
-> Status: designed
+> Status: implemented
 > Generated on: 2026-11-08
 > Behavior change: none in program behavior; one skill text addition (DR-005), declared in Section 7
 > From backlog: BL-0009, BL-0011, BL-0014, BL-0036, BL-0010 (part: E2E-036)
