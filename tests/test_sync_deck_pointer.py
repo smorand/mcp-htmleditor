@@ -153,3 +153,24 @@ def test_makefile_wires_the_tool_into_sync_and_check_generated() -> None:
 
     assert "sync-deck-pointer:\n\t@uv run python tools/sync_deck_pointer.py\n" in makefile
     assert "uv run python tools/sync_deck_pointer.py --check || rc=1; exit $$rc" in makefile
+
+
+PRESENTER = "<!-- deck-presenter:begin -->\n<style>/* new */</style>\n<!-- deck-presenter:end -->"
+
+
+def test_a_second_block_of_the_source_is_inserted_after_the_pointer_then_kept_fresh(
+    tool: ModuleType, root: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = root / SOURCE_REL
+    source.write_text(source.read_text(encoding="utf-8").replace(END, f"{END}\n{PRESENTER}"), encoding="utf-8")
+
+    assert tool.sync(root, True) == 1
+    assert f"templates/{FRESH_REL} [deck-presenter]: stale (block missing); run: make sync-deck-pointer" in (
+        capsys.readouterr().out
+    )
+
+    assert tool.sync(root, False) == 0
+    updated = (root / FRESH_REL).read_text(encoding="utf-8")
+    assert updated.index(END) < updated.index(PRESENTER)
+    assert tool.sync(root, True) == 0
+    assert f"templates/{FRESH_REL} [deck-presenter]: fresh" in capsys.readouterr().out

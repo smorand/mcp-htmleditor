@@ -46,6 +46,7 @@ def _open(page: Page, deck: ServedDeck, heading: str) -> None:
     get_state().poll_interval = POLL_MS
     page.goto(f"http://127.0.0.1:{deck.port}/")
     expect(page.locator("#suggestions-heading")).to_have_text(heading, timeout=5000)
+    page.click("#requests-toggle")
 
 
 def _row(page: Page, suggestion_id: str) -> Any:
@@ -102,6 +103,7 @@ def test_e2e_019_apply_twice(page: Page, served_deck: ServedDeck) -> None:
     stale = page.context.new_page()
     stale.goto(f"http://127.0.0.1:{served_deck.port}/")
     expect(stale.locator("#suggestions-heading")).to_have_text("AI suggestions (1)", timeout=5000)
+    stale.click("#requests-toggle")
 
     def block_requests_fetch(route: Route) -> None:
         if route.request.method == "GET":

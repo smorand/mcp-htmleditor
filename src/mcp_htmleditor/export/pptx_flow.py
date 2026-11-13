@@ -23,6 +23,7 @@ from .pptx_model import (
     _BuilderBase,
     _Column,
     _column_widths,
+    _is_notes,
     _Para,
     _Region,
 )
@@ -101,7 +102,7 @@ class FlowMixin(_BuilderBase):
         """Turn one element into zero, one or several layout blocks."""
         if not isinstance(element, Tag) or element.name in SKIP_TAGS:
             return []
-        if id(element) in self.handled or has_class(element, *SHELL_CLASSES):
+        if id(element) in self.handled or has_class(element, *SHELL_CLASSES) or _is_notes(element):
             return []
         if str(element.get("aria-hidden") or "") == "true":
             return []
@@ -228,7 +229,7 @@ class FlowMixin(_BuilderBase):
     @staticmethod
     def _is_block_child(child: Tag) -> bool:
         """Tell whether a child element is laid out as a block of its own."""
-        if child.name in SKIP_TAGS:
+        if child.name in SKIP_TAGS or _is_notes(child):
             return False
         return (
             child.name in BLOCK_TAGS

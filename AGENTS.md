@@ -87,6 +87,9 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   `templates/bootstrap/slides-empty.html` (between `<!-- deck-pointer:begin -->` and `<!-- deck-pointer:end -->`), then run
   `make sync-deck-pointer` (`make check-generated` fails on a stale copy); the guard reports `<stem>: missing
   pointer|Pointeur control|L key`. See `.agent_docs/html-conventions.md` § Presentation pointer.
+- Speaker notes (SPEC-0022): `<aside data-role="speaker-notes">` direct child of a slide, hidden by an attribute selector
+  rule, exported to the PPTX notes page, never a shape. Keys F P S E, the presenter block and the shell pieces:
+  `.agent_docs/html-conventions.md` § Speaker notes, `.agent_docs/architecture.md` § Shell pieces of SPEC-0022.
 - Architecture diagrams (`data-type="arch-diagram"`) with 4+ nodes or a multi-row flow:
   never write `data-x`/`data-y` by hand, author the declarative topology (`arch-row` /
   `arch-node` / `arch-col` / `arch-edge` / `arch-lane` / `arch-spacer`) and run

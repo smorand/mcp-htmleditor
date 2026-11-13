@@ -370,7 +370,6 @@
     if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  navigate(-1);
     if (e.key === 'Home') goToSlide(0);
     if (e.key === 'End')  goToSlide(TOTAL - 1);
-    if (e.key === 'f' || e.key === 'F') enterPresentation();
     if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) togglePointer();
     if (e.key === 'Escape') exitPresentation();
   });
@@ -617,5 +616,245 @@
   })();
 </script>
 <!-- deck-pointer:end -->
+<!-- deck-presenter:begin -->
+<style id="deck-presenter-style">
+  /* Notes de l'orateur et mode présentateur (SPEC-0022): notes jamais visibles, ni à l'écran ni à l'impression.
+     Aucun sélecteur de classe ici: l'export PPTX ne lit que les règles à classe. */
+  [data-role="speaker-notes"] { display:none !important; }
+  @media print { [data-role="speaker-notes"] { display:none !important; } }
+</style>
+<script id="deck-presenter-script">
+  (function () {
+    if (window.name === 'deck-preview') return;   // une vignette du présentateur n'installe rien et n'ouvre rien
+    var presenter = null, lastState = '', observer = null, poll = 0, pending = 0;
+
+    function slideList() { return Array.prototype.slice.call(document.querySelectorAll('[data-type="slide"]')); }
+
+    function currentIndex(list) {
+      // Certains modèles gardent l'index dans une variable globale `current` et n'ont aucune marque dans le DOM.
+      if (typeof current === 'number' && current >= 0 && current < list.length) return current;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].classList.contains('active') || list[i].hasAttribute('data-fs-current')) return i;
+      }
+      return 0;
+    }
+
+    function notesOf(slide) {
+      for (var n = slide.firstElementChild; n; n = n.nextElementSibling) {
+        if (n.getAttribute('data-role') === 'speaker-notes') return n.textContent;
+      }
+      return '';
+    }
+
+    function deckState() {
+      var list = slideList();
+      return {
+        type: 'deck-state', index: currentIndex(list), total: list.length,
+        titles: list.map(function (s) { return s.getAttribute('data-title') || ''; }),
+        notes: list.map(notesOf)
+      };
+    }
+
+    function isOpen() { return !!(presenter && !presenter.closed); }
+
+    function sendState(force) {
+      if (!isOpen()) return;
+      var state = deckState(), text = JSON.stringify(state);
+      if (!force && text === lastState) return;
+      lastState = text;
+      try { presenter.postMessage(state, '*'); } catch (err) { /* fenêtre en cours de fermeture */ }
+    }
+
+    function schedule() {
+      if (pending) return;
+      pending = setTimeout(function () { pending = 0; sendState(false); }, 30);
+    }
+
+    function inPointer(node) {
+      var el = node && node.nodeType === 1 ? node : node && node.parentElement;
+      return !!(el && el.closest && el.closest('#deck-pointer-layer'));
+    }
+
+    function goTo(index) {
+      if (typeof window.goToSlide === 'function') { window.goToSlide(index); return; }
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+      for (var i = 0; i < index; i++) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    }
+
+    function step(dir) {
+      if (typeof window.navigate === 'function') { window.navigate(dir); return; }
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: dir > 0 ? 'ArrowRight' : 'ArrowLeft', bubbles: true }));
+    }
+
+    // Vignette: copie du HTML du deck où un script ne montre que la slide N, sans le reste de la page.
+    var PREVIEW_STYLE = '[data-pv-hide]{display:none !important} html,body{margin:0 !important;overflow:hidden !important;background:#fff !important}'
+      + ' #deck-pointer-layer{display:none !important}';
+    var PREVIEW_SCRIPT = '(function(){var idx=0;'
+      + 'function all(){return [].slice.call(document.querySelectorAll(\'[data-type="slide"]\'));}'
+      + 'function fit(){var s=all()[idx];if(!s)return;var p=function(k,v){s.style.setProperty(k,v,"important");};'
+      + 'p("position","fixed");p("left","0");p("top","0");p("margin","0");p("box-shadow","none");p("scale","none");p("transform","none");p("transform-origin","0 0");'
+      + 'var w=s.offsetWidth||1,h=s.offsetHeight||1,k=Math.min(innerWidth/w,innerHeight/h);'
+      + 'p("left",((innerWidth-w*k)/2)+"px");p("top",((innerHeight-h*k)/2)+"px");p("transform","scale("+k+")");}'
+      + 'function show(i){var list=all();if(!list[i])return;idx=i;'
+      + '[].forEach.call(document.querySelectorAll("[data-pv-hide]"),function(n){n.removeAttribute("data-pv-hide");});'
+      + 'list.forEach(function(x){x.classList.remove("active");x.removeAttribute("data-fs-current");});'
+      + 'var s=list[i];s.classList.add("active");'
+      + 'for(var n=s;n&&n!==document.body;n=n.parentElement){var par=n.parentElement;if(!par)break;'
+      + '[].forEach.call(par.children,function(c){if(c!==n&&!/^(SCRIPT|STYLE|LINK|META|TEMPLATE)$/.test(c.tagName))c.setAttribute("data-pv-hide","");});}'
+      + 'fit();}'
+      + 'addEventListener("message",function(e){var d=e.data;if(e.source===parent&&d&&d.type==="preview-goto")show(d.index);});'
+      + 'addEventListener("resize",fit);})();';
+
+    function previewHtml() {
+      var clone = document.documentElement.cloneNode(true);
+      clone.removeAttribute('data-deck-pointer');
+      clone.style.removeProperty('--fs-scale');
+      var layer = clone.querySelector('#deck-pointer-layer');
+      if (layer) layer.remove();
+      var style = document.createElement('style');
+      style.textContent = PREVIEW_STYLE;
+      var script = document.createElement('script');
+      script.textContent = PREVIEW_SCRIPT;
+      var body = clone.querySelector('body') || clone;
+      body.appendChild(style);
+      body.appendChild(script);
+      var head = clone.querySelector('head');
+      if (head && !head.querySelector('base')) {
+        var base = document.createElement('base');
+        base.setAttribute('href', document.baseURI);
+        head.insertBefore(base, head.firstChild);
+      }
+      return '<!DOCTYPE html>' + clone.outerHTML;
+    }
+
+    var PAGE_STYLE = 'html,body{height:100%;margin:0;background:#161616;color:#f4f4f4;font-family:system-ui,sans-serif}'
+      + 'body{display:flex;flex-direction:column}'
+      + '#p-bar{display:flex;gap:12px;align-items:center;padding:8px 12px;background:#262626;flex:none}'
+      + '#p-bar span{font-variant-numeric:tabular-nums}#p-count{font-weight:700}#p-bar button{font:inherit;padding:4px 10px;cursor:pointer}'
+      + '#p-main{flex:1;display:flex;gap:12px;padding:12px;min-height:0}'
+      + '#p-left{flex:3;display:flex;flex-direction:column;min-width:0}#p-right{flex:2;display:flex;flex-direction:column;gap:12px;min-width:0}'
+      + '#p-cur-box{flex:1;min-height:0;display:flex}#p-nxt-box{height:34%;min-height:120px;display:flex;position:relative;flex:none}'
+      + 'iframe{flex:1;border:1px solid #525252;background:#fff;width:100%;height:100%}'
+      + '#p-end{display:none;position:absolute;inset:0;align-items:center;justify-content:center;border:1px solid #525252;background:#262626;font-size:20px}'
+      + '#p-label-next{font-size:13px;color:#c6c6c6;flex:none}#p-next-title{margin-left:6px;color:#f4f4f4}'
+      + '#p-notes{flex:1;overflow:auto;white-space:pre-wrap;background:#262626;padding:12px;font-size:22px;line-height:1.4}';
+
+    var PAGE_SCRIPT = ''
+      + 'var opener_=window.opener,idx=0,total=0,titles=[],notes=[],t0=Date.now(),size=22;'
+      + 'function $(id){return document.getElementById(id);}'
+      + 'function cmd(c,i){try{opener_.postMessage({type:"deck-cmd",cmd:c,index:i},"*");}catch(e){}}'
+      + 'function goto_(){[$("p-cur"),$("p-nxt")].forEach(function(f,n){if(f.contentWindow)f.contentWindow.postMessage({type:"preview-goto",index:idx+n},"*");});}'
+      + 'function draw(){$("p-count").textContent=total?(idx+1)+" / "+total:"";$("p-title").textContent=titles[idx]||"";'
+      + 'var last=idx+1>=total;$("p-end").style.display=last?"flex":"none";$("p-nxt").style.visibility=last?"hidden":"visible";'
+      + '$("p-next-title").textContent=last?"":(titles[idx+1]||"");$("p-notes").textContent=notes[idx]||"";'
+      + 'goto_();}'
+      + 'function tick(){var s=Math.floor((Date.now()-t0)/1000),p=function(n){return(n<10?"0":"")+n;};'
+      + '$("p-timer").textContent=p(Math.floor(s/3600))+":"+p(Math.floor(s/60)%60)+":"+p(s%60);'
+      + '$("p-clock").textContent=new Date().toLocaleTimeString();}'
+      + 'function font(d){size=Math.max(12,Math.min(72,size+d));$("p-notes").style.fontSize=size+"px";}'
+      + 'addEventListener("message",function(e){var d=e.data;if(e.source!==opener_||!d||d.type!=="deck-state")return;'
+      + 'idx=d.index;total=d.total;titles=d.titles||[];notes=d.notes||[];draw();});'
+      + '$("p-cur").addEventListener("load",goto_);$("p-nxt").addEventListener("load",goto_);'
+      + '$("p-prev").onclick=function(){cmd("prev");};$("p-next").onclick=function(){cmd("next");};'
+      + '$("p-reset").onclick=function(){t0=Date.now();tick();};$("p-fminus").onclick=function(){font(-2);};$("p-fplus").onclick=function(){font(2);};'
+      + 'addEventListener("keydown",function(e){if(e.ctrlKey||e.metaKey||e.altKey)return;var k=e.key;'
+      + 'if(k==="ArrowRight"||k==="ArrowDown"||k===" "||k==="PageDown"){e.preventDefault();cmd("next");}'
+      + 'else if(k==="ArrowLeft"||k==="ArrowUp"||k==="PageUp"){e.preventDefault();cmd("prev");}'
+      + 'else if(k==="Home"){e.preventDefault();cmd("goto",0);}else if(k==="End"){e.preventDefault();cmd("goto",total-1);}'
+      + 'else if(k==="s"||k==="S"){cmd("close");}});'
+      + 'var f=$("p-cur");f.srcdoc=DECK_HTML;$("p-nxt").srcdoc=DECK_HTML;tick();setInterval(tick,1000);';
+
+    function presenterPage() {
+      var json = JSON.stringify(previewHtml()).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+      return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presenter</title><style>' + PAGE_STYLE + '</style></head><body>'
+        + '<div id="p-bar"><span id="p-count"></span><span id="p-title"></span><span style="flex:1"></span>'
+        + '<span id="p-timer">00:00:00</span><button id="p-reset" type="button">Reset</button><span id="p-clock"></span>'
+        + '<button id="p-prev" type="button">&#9664; Prev</button><button id="p-next" type="button">Next &#9654;</button>'
+        + '<button id="p-fminus" type="button">A-</button><button id="p-fplus" type="button">A+</button></div>'
+        + '<div id="p-main"><div id="p-left"><div id="p-cur-box"><iframe id="p-cur" name="deck-preview" title="Current slide"></iframe></div></div>'
+        + '<div id="p-right"><div id="p-label-next">Next:<span id="p-next-title"></span></div>'
+        + '<div id="p-nxt-box"><iframe id="p-nxt" name="deck-preview" title="Next slide"></iframe><div id="p-end">End of presentation</div></div>'
+        + '<div id="p-notes"></div></div></div>'
+        + '<script>var DECK_HTML = ' + json + ';<\/script><script>' + PAGE_SCRIPT + '<\/script><\/body><\/html>';
+    }
+
+    function startWatching() {
+      observer = new MutationObserver(function (records) {
+        for (var i = 0; i < records.length; i++) if (!inPointer(records[i].target)) { schedule(); return; }
+      });
+      observer.observe(document.documentElement, {
+        subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'data-fs-current']
+      });
+      // Filet pour les modèles qui gardent l'index hors du DOM, et détection de la fermeture de la fenêtre.
+      poll = setInterval(function () {
+        if (!isOpen()) { stopWatching(); return; }
+        sendState(false);
+      }, 250);
+    }
+
+    function stopWatching() {
+      if (observer) { observer.disconnect(); observer = null; }
+      if (poll) { clearInterval(poll); poll = 0; }
+      if (pending) { clearTimeout(pending); pending = 0; }
+      presenter = null; lastState = '';
+    }
+
+    window.isPresenterOpen = isOpen;
+
+    window.openPresenter = function () {
+      if (isOpen()) { presenter.focus(); return presenter; }
+      var win = window.open('', 'deck-presenter', 'popup=yes,width=1280,height=800');
+      if (!win) return null;
+      presenter = win;
+      win.document.open();
+      win.document.write(presenterPage());
+      win.document.close();
+      startWatching();
+      sendState(true);
+      setTimeout(function () { sendState(true); }, 300);
+      return win;
+    };
+
+    window.closePresenter = function () {
+      var win = presenter;
+      stopWatching();
+      if (win && !win.closed) win.close();
+    };
+
+    window.togglePresenter = function () {
+      if (isOpen()) window.closePresenter(); else window.openPresenter();
+    };
+
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!presenter || e.source !== presenter || !d || d.type !== 'deck-cmd') return;
+      if (d.cmd === 'next') step(1);
+      else if (d.cmd === 'prev') step(-1);
+      else if (d.cmd === 'goto') goTo(parseInt(d.index, 10) || 0);
+      else if (d.cmd === 'close') window.closePresenter();
+      schedule();
+    });
+
+    window.addEventListener('pagehide', function () { if (isOpen()) presenter.close(); });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      var ae = document.activeElement;
+      if (ae && (ae.isContentEditable || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return;
+      var key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+      if (key === 'f') {
+        if (document.fullscreenElement) { if (typeof exitPresentation === 'function') exitPresentation(); }
+        else if (typeof enterPresentation === 'function') enterPresentation();
+      } else if (key === 'p') {
+        if (typeof window.togglePointer === 'function') window.togglePointer();
+      } else if (key === 's') {
+        window.togglePresenter();
+      } else if (key === 'e') {
+        if (window.parent !== window) window.parent.postMessage({ type: 'deck-key', key: 'e' }, '*');
+      }
+    });
+  })();
+</script>
+<!-- deck-presenter:end -->
 </body>
 </html>

@@ -54,6 +54,14 @@ SKIP_TAGS = frozenset(
 )
 """Tags never exported: code, decorations and interactive shell widgets."""
 
+NOTES_ROLE = "speaker-notes"  # data-role of the speaker notes aside (SPEC-0022 FR-6): notes page, never a shape
+
+
+def _is_notes(element: Tag) -> bool:
+    """Tell whether an element is a speaker notes aside."""
+    return element.get("data-role") == NOTES_ROLE
+
+
 SHELL_CLASSES = frozenset({"toolbar", "shell-header", "status-bar", "nav-arrow", "stage", "slide-frame"})
 """Classes of the navigation shell, outside of any slide content."""
 

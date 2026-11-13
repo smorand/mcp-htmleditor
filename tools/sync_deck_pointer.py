@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Propagate the presentation pointer block from the Carbon bootstrap to every presentation template.
+"""Propagate the deck blocks (pointer, presenter) from the Carbon bootstrap to every presentation template.
 
-``templates/bootstrap/slides-empty.html`` is the single source of the pointer code: the block between
-``<!-- deck-pointer:begin -->`` and ``<!-- deck-pointer:end -->`` (markers included). Every other
-``templates/**/*.html`` whose opening ``<html>`` tag holds ``data-doc-type="presentation"`` and that already
-holds the begin marker gets its block replaced by the source's. A template without the marker is left alone.
+``templates/bootstrap/slides-empty.html`` is the single source of the deck code: the blocks between
+``<!-- deck-pointer:begin -->`` / ``<!-- deck-pointer:end -->`` and ``<!-- deck-presenter:begin -->`` /
+``<!-- deck-presenter:end -->`` (markers included). Every other ``templates/**/*.html`` whose opening ``<html>``
+tag holds ``data-doc-type="presentation"`` and that already holds the pointer begin marker gets each block replaced
+by the source's; a block the source holds and the template lacks is inserted right after the previous block.
+A template without the pointer marker is left alone. The pointer block is mandatory in the source; the others
+are synced only when the source holds them.
 ``tests/test_presentation_templates_fullscreen.py`` names the templates that still lack the pointer.
 
 Usage:
@@ -23,8 +26,9 @@ from freshness import report_line
 REPO = Path(__file__).resolve().parents[1]
 TEMPLATES = REPO / "templates"
 SOURCE_REL = "bootstrap/slides-empty.html"
-BEGIN = "<!-- deck-pointer:begin -->"
-END = "<!-- deck-pointer:end -->"
+BLOCKS = ("deck-pointer", "deck-presenter")
+BEGIN = f"<!-- {BLOCKS[0]}:begin -->"
+END = f"<!-- {BLOCKS[0]}:end -->"
 MAKE_TARGET = "sync-deck-pointer"
 
 HTML_TAG = re.compile(r"<html\b[^>]*>", re.IGNORECASE)
@@ -38,26 +42,35 @@ def is_presentation(html: str) -> bool:
     return match is not None and PRESENTATION_ATTRIBUTE.search(match.group(0)) is not None
 
 
-def block_span(text: str, label: str) -> tuple[int, int] | None:
+def markers(name: str) -> tuple[str, str]:
+    return f"<!-- {name}:begin -->", f"<!-- {name}:end -->"
+
+
+def block_span(text: str, label: str, name: str = BLOCKS[0]) -> tuple[int, int] | None:
     """Offsets of the block, markers included; None without a begin marker; SystemExit without an end marker."""
-    start = text.find(BEGIN)
+    begin, end_marker = markers(name)
+    start = text.find(begin)
     if start == -1:
         return None
-    end = text.find(END, start)
+    end = text.find(end_marker, start)
     if end == -1:
-        raise SystemExit(f"error: {label} has {BEGIN} but no {END}")
-    return start, end + len(END)
+        raise SystemExit(f"error: {label} has {begin} but no {end_marker}")
+    return start, end + len(end_marker)
 
 
-def source_block(source: Path, label: str) -> str:
-    """The block of the source file; SystemExit when the source or its block is absent."""
+def source_blocks(source: Path, label: str) -> dict[str, str]:
+    """The blocks of the source file by name; SystemExit when the source or its pointer block is absent."""
     if not source.is_file():
         raise SystemExit(f"error: source not found: {label}")
     text = source.read_text(encoding="utf-8")
-    span = block_span(text, label)
-    if span is None:
+    found: dict[str, str] = {}
+    for name in BLOCKS:
+        span = block_span(text, label, name)
+        if span is not None:
+            found[name] = text[span[0] : span[1]]
+    if BLOCKS[0] not in found:
         raise SystemExit(f"error: {label} has no {BEGIN} block to copy")
-    return text[span[0] : span[1]]
+    return found
 
 
 def target_files(root: Path, source: Path) -> list[Path]:
@@ -71,26 +84,39 @@ def target_files(root: Path, source: Path) -> list[Path]:
 
 
 def sync(root: Path, check: bool) -> int:
-    """Rewrite (or only check) the block of every target under ``root``; return a process exit code."""
+    """Rewrite (or only check) the blocks of every target under ``root``; return a process exit code."""
     source = root / SOURCE_REL
-    reference = source_block(source, source.relative_to(root.parent).as_posix())
+    references = source_blocks(source, source.relative_to(root.parent).as_posix())
     all_fresh = True
     for target in target_files(root, source):
-        label = target.relative_to(root.parent).as_posix()
+        base_label = target.relative_to(root.parent).as_posix()
         text = target.read_text(encoding="utf-8")
-        span = block_span(text, label)
-        if span is None:  # unreachable: target_files kept only files holding the begin marker
-            continue
-        current = text[span[0] : span[1]]
-        line, is_fresh = report_line(label, reference, current, MAKE_TARGET, offset=text.count("\n", 0, span[0]))
-        if check:
-            print(line)
-        elif is_fresh:
-            print(f"ok: {label}")
-        else:
-            target.write_text(text[: span[0]] + reference + text[span[1] :], encoding="utf-8")
-            print(f"updated: {label}")
-        all_fresh &= is_fresh
+        for name, reference in references.items():
+            label = base_label if name == BLOCKS[0] else f"{base_label} [{name}]"
+            span = block_span(text, label, name)
+            if span is None:
+                previous = block_span(text, label, BLOCKS[BLOCKS.index(name) - 1])
+                if previous is None:  # unreachable: the pointer block is held, and blocks are inserted in order
+                    continue
+                if check:
+                    print(f"{label}: stale (block missing); run: make {MAKE_TARGET}")
+                else:
+                    text = text[: previous[1]] + "\n" + reference + text[previous[1] :]
+                    target.write_text(text, encoding="utf-8")
+                    print(f"updated: {label}")
+                all_fresh = False
+                continue
+            current = text[span[0] : span[1]]
+            line, is_fresh = report_line(label, reference, current, MAKE_TARGET, offset=text.count("\n", 0, span[0]))
+            if check:
+                print(line)
+            elif is_fresh:
+                print(f"ok: {label}")
+            else:
+                text = text[: span[0]] + reference + text[span[1] :]
+                target.write_text(text, encoding="utf-8")
+                print(f"updated: {label}")
+            all_fresh &= is_fresh
     return 0 if all_fresh or not check else 1
 
 

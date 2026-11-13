@@ -68,6 +68,23 @@ from the live document. `#btn-present` sits outside every slide, and every selec
 the PPTX resolver ignores them. Editor relay of the keys: `architecture.md` § Fullscreen presentation mode.
 `tests/test_presentation_templates_fullscreen.py` is the guard for all of the above.
 
+## Speaker notes and presenter block (SPEC-0022, 2026-05)
+
+* **Notes:** `<aside data-role="speaker-notes">` as a direct child of the slide, plain text, newlines kept. Hidden by
+  `[data-role="speaker-notes"]{display:none !important}` in the deck block: an attribute selector, never a class, because the
+  PPTX resolver only reads class rules. The PPTX exporter skips the aside in the flow (`NOTES_ROLE`, `_is_notes` in
+  `export/pptx_model.py`) and writes its text to `slide.notes_slide` (`_write_notes` in `to_pptx.py`); a whitespace only
+  aside or no aside means no notes slide; a nested aside is not a note but is never exported as a shape either.
+  `deck/` services (outline, get-slide, lint, patch `replace_slide`) keep the aside untouched (`tests/test_pptx_speaker_notes.py`).
+* **deck-presenter block:** second synced block in `templates/bootstrap/slides-empty.html`, markers
+  `<!-- deck-presenter:begin -->` / `<!-- deck-presenter:end -->`. `tools/sync_deck_pointer.py` copies both blocks and
+  `make check-generated` checks both. It defines `togglePresenter`, `openPresenter`, `closePresenter`, `isPresenterOpen` and owns the
+  key handler for F P S E: the per template `f` line is gone, the `L` line stays, `P` calls `togglePointer()`. In a
+  `deck-preview` window it installs nothing.
+* **Messages** (`postMessage`, target `*`, sender checked by `event.source`): deck to presenter `deck-state`
+  `{index,total,titles,notes}`; presenter to deck `deck-cmd` `next|prev|goto|close`; framed deck to editor shell `deck-key`
+  `{key:'e'}`; preview iframes (`srcdoc`, name `deck-preview`) follow `preview-goto`.
+
 ## Presentation pointer (SPEC-0017)
 
 Every presentation template carries the pointer: L (or the Pointeur control, fullscreen with the pointer armed) turns

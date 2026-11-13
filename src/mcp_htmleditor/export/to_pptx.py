@@ -39,6 +39,7 @@ from .pptx_flow import FlowMixin
 from .pptx_gantt import GanttMixin
 from .pptx_images import ImagesMixin
 from .pptx_model import (
+    NOTES_ROLE,
     ExportReport,
     _BuilderBase,
     _column_widths,  # noqa: F401 - re-exported, imported from here by the tests
@@ -187,6 +188,16 @@ class _SlideBuilder(ArchMixin, BlocksMixin, ChromeMixin, FlowMixin, GanttMixin, 
             regions = self._chrome_generic()
         for region in regions:
             self._flow(region)
+        self._write_notes()
+
+    def _write_notes(self) -> None:
+        """Copy the speaker notes aside (direct child) onto the notes page; no aside, no notes slide."""
+        for child in self.article.children:
+            if isinstance(child, Tag) and child.get("data-role") == NOTES_ROLE:
+                text = child.get_text()
+                if text.strip():
+                    self.slide.notes_slide.notes_text_frame.text = text.strip("\n")
+                return
 
     def _slide_kind(self) -> str:
         """Return the ``data-slide-type`` of the slide, inferred when absent."""

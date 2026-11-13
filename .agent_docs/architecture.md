@@ -141,6 +141,17 @@ so a deck made before the pointer has none), the L key forwarded to `togglePoint
 `setPointerAllowed(!editMode)` from `editor-edit.js`, and `editor-save.js` strips `#deck-pointer-layer` and
 `data-deck-pointer` from the save's detached clone, like `data-fs-current`.
 
+### Shell pieces of SPEC-0022 (2026-05)
+
+* `#requests-toggle` (toolbar) opens `#requests-side`, closed by default, `aria-expanded` and `aria-controls` in sync,
+  label `Requests (n)` (`editor-requests.js`).
+* `#notes-btn` and `#notes-panel` (`editor-notes.js`): bottom textarea bound to the current slide's aside, writes it
+  (created when missing, removed when emptied) and schedules the normal save; relays the change to an open presenter.
+* `#presenter-btn` calls the deck's `togglePresenter()`. The shell accepts `{type:'deck-key', key:'e'}` only when
+  `event.source === frame.contentWindow`; keys typed in the shell itself are forwarded to the deck for F P S.
+* The iframe `sandbox` gains `allow-popups allow-popups-to-escape-sandbox` so the presenter and its previews can open.
+* PPTX export of the notes: `.agent_docs/html-conventions.md` § Speaker notes.
+
 ## Templates and tools
 
 Template resolution order: `HTMLEDITOR_TEMPLATES_DIR`, then `~/.config/mcp-htmleditor/templates/` (written by

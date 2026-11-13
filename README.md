@@ -135,6 +135,16 @@ Open a deck with the **Présenter** button (or press F) to show it full screen; 
 End move between slides and Escape leaves. While presenting full screen, press L or start with the **Pointeur** button beside the present button to turn the mouse into a red dot; a click rings the box under it (a tile, a table, else the headline or paragraph); the pointer starts off at every presentation and nothing of it is ever written to the file.
 It works the same in a deck opened directly and in the editor (not while edit mode is on).
 
+Keys (ignored with Ctrl, Meta or Alt, and while typing in an input, textarea, select or editable text): **F** toggles fullscreen, **P** toggles the pointer (L still works, no effect in edit mode), **S** opens or closes the presenter window, **E** toggles edit mode (editor only; a deck opened directly has no editor, so E does nothing). They work from a `file://` deck (F, P, S) and in the editor whether focus is in the slide frame or in the editor shell (E, F, P, S).
+
+The toolbar **Requests** button (label `Requests (n)` with the pending count) opens and closes the right panel holding the requests and the AI suggestions; it starts closed.
+
+#### Speaker notes and presenter mode (SPEC-0022)
+
+Notes live in the slide: `<aside data-role="speaker-notes">plain text, newlines kept</aside>`, a direct child of the `data-type="slide"` element. They are hidden on screen and in print and exported to the PPTX notes page (slides without notes get none). An agent writes them with `patch` (`replace_slide`) or in the file between `update_start` and `update_end`.
+
+In the editor, in edit mode on a presentation, the **Notes** button docks a panel at the bottom with a textarea for the current slide: typing writes the aside (created when missing, removed when emptied) and saves as usual. **S** or the **Présentateur** button opens a window named `deck-presenter` with the current slide, the next slide (or an end marker), the notes in large adjustable type, the slide counter, an elapsed timer with reset, the clock and previous and next buttons; arrows, Space, Home and End navigate. The main window and the presenter follow each other, and an open presenter shows note edits live. It works from a `file://` deck.
+
 ### Saving, conflicts and history
 
 The editor saves the whole document. Each save carries the modification time the browser last saw; if the

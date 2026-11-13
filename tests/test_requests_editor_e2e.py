@@ -37,6 +37,7 @@ EXPECTED_ORDER = [
     "editor-drag.js",
     "editor-width.js",
     "editor-requests.js",
+    "editor-notes.js",
     "editor.js",
 ]
 XSS_TEXT = "<img src=x onerror=window.__xss=1>"
@@ -139,7 +140,7 @@ def test_slide_none_when_the_file_has_no_slide(
     path.write_text("<!DOCTYPE html><html><body><p>x</p></body></html>", encoding="utf-8")
     deck = serve_deck(path)
     page.goto(f"http://127.0.0.1:{deck.port}/")
-    page.wait_for_selector("#requests-heading")
+    page.wait_for_selector("#requests-heading", state="attached")
     _open_panel(page)
     assert page.text_content("#ask-ai-slide") == "Slide: none"
     assert _queue(page, "Say hello") == "Request R-0001 queued"
@@ -213,6 +214,7 @@ def test_e2e_021_ids_are_never_reused(page: Page, served_deck: ServedDeck) -> No
     assert _queue(page, "second") == "Request R-0002 queued"
     _wait_heading(page, "Requests (2)")
 
+    page.click("#requests-toggle")
     page.click("#requests-list li[data-request-id='R-0002'] button.request-delete")
     _wait_heading(page, "Requests (1)")
     assert _lines(page) == ["R-0001 pending slide-0 first"]
@@ -231,6 +233,7 @@ def test_delete_failure_shows_the_server_error_and_keeps_the_request(page: Page,
         "**/requests/delete",
         lambda route: route.fulfill(status=200, content_type="application/json", body='{"ok": false, "error": "boom"}'),
     )
+    page.click("#requests-toggle")
     page.click("#requests-list li[data-request-id='R-0001'] button.request-delete")
     page.wait_for_function("() => document.getElementById('ask-ai-message').textContent !== ''")
     assert page.text_content("#ask-ai-message") == "Could not delete the request: boom"
@@ -279,15 +282,46 @@ def test_skipped_request_shows_its_reason(page: Page, served_deck: ServedDeck) -
     service.queue(served_deck.path, "Do it", "slide-2")
     service.complete(served_deck.path, "R-0001", "skipped", "Not possible")
     _open(page, served_deck)
+    page.click("#requests-toggle")
     page.wait_for_selector("#requests-list li")
     assert _lines(page) == ["R-0001 skipped slide-2 Do it Not possible"]
     assert page.text_content("#requests-heading") == "Requests (0)"
 
 
 @needs_chromium
+def test_requests_toggle_opens_and_closes_the_side_list(page: Page, served_deck: ServedDeck) -> None:
+    """SPEC-0022 FR-1: closed by default, aria in sync, label carries the pending count, frame takes the width."""
+    _service().queue(served_deck.path, "one", None)
+    _service().queue(served_deck.path, "two", None)
+    page.set_viewport_size({"width": 1600, "height": 900})
+    _open(page, served_deck)
+    _wait_heading(page, "Requests (2)")
+    assert page.text_content("#requests-toggle") == "Requests (2)"
+    assert page.get_attribute("#requests-toggle", "aria-controls") == "requests-side"
+    assert page.get_attribute("#requests-toggle", "aria-expanded") == "false"
+    assert not page.is_visible("#requests-side")
+    assert page.evaluate("() => document.getElementById('content-frame').getBoundingClientRect().width") == 1600
+
+    page.click("#requests-toggle")
+    assert page.is_visible("#requests-side")
+    assert page.get_attribute("#requests-toggle", "aria-expanded") == "true"
+    assert page.evaluate("() => document.getElementById('content-frame').getBoundingClientRect().width") == 1300
+
+    page.click("#requests-toggle")
+    assert not page.is_visible("#requests-side")
+    assert page.get_attribute("#requests-toggle", "aria-expanded") == "false"
+
+    page.click("#ask-ai-btn")
+    page.fill("#ask-ai-text", "three")
+    page.click("#ask-ai-queue")
+    page.wait_for_function("() => document.getElementById('requests-toggle').textContent === 'Requests (3)'")
+
+
+@needs_chromium
 def test_side_list_is_hidden_in_fullscreen_and_iframe_is_narrowed(page: Page, served_deck: ServedDeck) -> None:
     page.set_viewport_size({"width": 1600, "height": 900})
     _open(page, served_deck)
+    page.click("#requests-toggle")
     assert page.is_visible("#requests-side")
     assert page.evaluate("() => document.getElementById('content-frame').getBoundingClientRect().width") == 1300
     page.click("#present-btn")

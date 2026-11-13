@@ -19,6 +19,8 @@
   const askAiMessage = document.getElementById('ask-ai-message');
   const requestsHeading = document.getElementById('requests-heading');
   const requestsList    = document.getElementById('requests-list');
+  const requestsSide    = document.getElementById('requests-side');
+  const requestsToggle  = document.getElementById('requests-toggle');
   const suggestionsHeading = document.createElement('h2');
   const suggestionsList    = document.createElement('ul');
 
@@ -202,6 +204,7 @@
 
   function requestsRender(snapshot) {
     requestsHeading.textContent = 'Requests (' + snapshot.pending + ')';
+    requestsToggle.textContent = requestsHeading.textContent;
     requestsList.replaceChildren(...snapshot.requests.map(requestsRenderLine));
     const suggestions = Array.isArray(snapshot.suggestions) ? snapshot.suggestions : [];
     suggestionsHeading.textContent = 'AI suggestions (' + suggestions.length + ')';
@@ -248,6 +251,11 @@
   suggestionsHeading.textContent = 'AI suggestions (0)';
   document.getElementById('requests-side').append(suggestionsHeading, suggestionsList);
   if (window.ResizeObserver) new ResizeObserver(requestsPlaceSide).observe(askAiPanel);
+  requestsToggle.addEventListener('click', () => {
+    const open = requestsSide.hidden;
+    requestsSide.hidden = !open;
+    requestsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
   askAiBtn.addEventListener('click', () => askAiSetOpen(askAiPanel.hidden));
   askAiQueue.addEventListener('click', askAiSubmit);
 

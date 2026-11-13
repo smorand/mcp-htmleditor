@@ -33,6 +33,7 @@ EXPECTED_SCRIPT_ORDER = [
     "editor-drag.js",
     "editor-width.js",
     "editor-requests.js",
+    "editor-notes.js",
     "editor.js",
 ]
 EDITOR_SCRIPTS = [name for name in EXPECTED_SCRIPT_ORDER if name.startswith("editor")]

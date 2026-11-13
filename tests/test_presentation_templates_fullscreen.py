@@ -20,6 +20,13 @@ POINTER_PARTS = (
     ("Pointeur control", 'id="btn-pointer"'),
     ("L key", "e.key === 'l' || e.key === 'L'"),
 )
+PRESENTER_PARTS = (
+    ("presenter block", 'id="deck-presenter-style"'),
+    ("presenter script", "window.togglePresenter = function"),
+    ("notes hiding rule", '[data-role="speaker-notes"] { display:none !important; }'),
+    ("F key", "if (key === 'f')"),
+)
+F_LINE = "e.key === 'f' || e.key === 'F') enterPresentation()"
 POINTER_BLOCK = re.compile(r"<!-- deck-pointer:begin -->.*?<!-- deck-pointer:end -->", re.DOTALL)
 ROADMAP = TEMPLATES_ROOT / "reference" / "slides" / "roadmap-one-pager.html"
 POINTER_CONTROL = re.compile(r'<button id="btn-pointer"[^>]*>Pointeur</button>')
@@ -166,3 +173,28 @@ def test_guard_names_the_reference_deck_that_lost_only_the_l_key() -> None:
     html = _roadmap_with_pointer()
 
     assert missing_pointer_lines(ROADMAP.stem, L_LINE.sub("", html)) == ["roadmap-one-pager: missing L key"]
+
+
+def missing_presenter_lines(name: str, html: str) -> list[str]:
+    """One ``<name>: missing <part>`` line per absent presenter part; a template handler still owning F is reported."""
+    code = HTML_COMMENT.sub("", html)
+    lines = [f"{name}: missing {part}" for part, marker in PRESENTER_PARTS if marker not in code]
+    if F_LINE in code:
+        lines.append(f"{name}: duplicate F handler")
+    return lines
+
+
+# SPEC-0022 (FR-2, FR-3, FR-6, FR-7): the eleven presentation files carry the presenter block and no own F handler
+@pytest.mark.parametrize("path", DISCOVERED, ids=lambda path: path.stem)
+def test_presentation_template_ships_the_presenter_block(path: Path) -> None:
+    assert missing_presenter_lines(path.stem, path.read_text(encoding="utf-8")) == []
+
+
+def test_presenter_check_reports_every_part_and_a_leftover_f_handler() -> None:
+    assert missing_presenter_lines("x", "<html></html>") == [
+        "x: missing presenter block",
+        "x: missing presenter script",
+        "x: missing notes hiding rule",
+        "x: missing F key",
+    ]
+    assert missing_presenter_lines("x", f"if ({F_LINE};")[-1] == "x: duplicate F handler"

@@ -47,6 +47,10 @@ La charte est détectée (tokens `--med-*` médicale, `--ei-*` Euro-Information,
 - Polices non embarquées (Segoe UI pour EI, IBM Plex Sans pour Carbon, repli système).
 - Sélecteurs descendants indexés sur leur dernière classe.
 
+### Notes du présentateur
+
+L'`<aside data-role="speaker-notes">` enfant direct d'une slide n'est jamais une forme: son texte (retours à la ligne gardés) va dans la page de notes de la slide. Sans `aside`, pas de page de notes.
+
 ### Perdu
 
 - Animations et transitions CSS; compteurs CSS et pseudo-éléments (`::before`, `::after`).

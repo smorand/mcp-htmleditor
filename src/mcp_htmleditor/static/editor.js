@@ -69,6 +69,7 @@ function markSaved() {
 }
 const editBtn      = document.getElementById('edit-mode-btn');
 const presentBtn   = document.getElementById('present-btn');
+const presenterBtn = document.getElementById('presenter-btn');
 const pointerBtn   = document.getElementById('pointer-btn');
 const exportPptxBtn = document.getElementById('export-pptx-btn');
 const exportDocxBtn = document.getElementById('export-docx-btn');
@@ -93,13 +94,10 @@ const docActions   = document.getElementById('toolbar-doc-actions');
 
   initNotices();
 
-  editBtn.addEventListener('click', () => {
-    editMode = !editMode;
-    editBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
-    applyEditMode();
-    updateSlideActionsVisibility();
-    updateDocActionsVisibility();
-    updateUndoRedoVisibility();
+  editBtn.addEventListener('click', toggleEditMode);
+  presenterBtn.addEventListener('click', () => {
+    const win = frame.contentWindow;
+    if (win && typeof win.togglePresenter === 'function') win.togglePresenter();
   });
 
   undoBtn.addEventListener('click', () => { if (!undoBtn.disabled) performUndo(); });
@@ -142,7 +140,7 @@ const docActions   = document.getElementById('toolbar-doc-actions');
       // TOTAL is a const in the decks, not a window property: count the slides.
       const count = win.document.querySelectorAll('[data-type="slide"]').length;
       if (count > 0) { e.preventDefault(); win.goToSlide(count - 1); }
-    } else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey && !editMode
+    } else if ((e.key === 'l' || e.key === 'L' || e.key === 'p' || e.key === 'P') && !e.ctrlKey && !e.metaKey && !e.altKey && !editMode
                && typeof win.togglePointer === 'function') {
       // The deck's pointer (SPEC-0017 FR-NEW-001); none while edit mode is on (FR-NEW-012).
       e.preventDefault();
@@ -151,6 +149,9 @@ const docActions   = document.getElementById('toolbar-doc-actions');
       document.exitFullscreen && document.exitFullscreen();
     }
   });
+
+  document.addEventListener('keydown', onShellKey);
+  window.addEventListener('message', onDeckMessage);
 
   // Export buttons
   exportPptxBtn.addEventListener('click', () => triggerExport('pptx'));
@@ -178,6 +179,55 @@ const docActions   = document.getElementById('toolbar-doc-actions');
   } catch (e) { /* cross-origin or not ready yet; the load event will fire */ }
   setInterval(pollStatus, pollInterval);
 })();
+
+/** The edit button's logic, shared with the E key (SPEC-0022 FR-4). */
+function toggleEditMode() {
+  editMode = !editMode;
+  editBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
+  applyEditMode();
+  updateSlideActionsVisibility();
+  updateDocActionsVisibility();
+  updateUndoRedoVisibility();
+}
+
+/* ============================================================
+   Shell shortcuts (SPEC-0022 FR-4, FR-5b): focus in the editor page, not in the iframe.
+   A key typed in the iframe never reaches this document (separate document), so the deck's
+   own handler and this one never both act. In fullscreen, L and P stay with the forwarding
+   listener above.
+   ============================================================ */
+function onShellKey(e) {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  const key = (e.key || '').toLowerCase();
+  const win = frame.contentWindow;
+  if (key === 'e') {
+    if (document.fullscreenElement) return;
+    e.preventDefault();
+    toggleEditMode();
+  } else if (key === 'f') {
+    if (!isPresentation) return;
+    e.preventDefault();
+    if (document.fullscreenElement) document.exitFullscreen();
+    else presentDeck(false);
+  } else if (key === 'p') {
+    if (document.fullscreenElement || editMode || !win || typeof win.togglePointer !== 'function') return;
+    e.preventDefault();
+    win.togglePointer();
+  } else if (key === 's') {
+    if (!win || typeof win.togglePresenter !== 'function') return;
+    e.preventDefault();
+    win.togglePresenter();
+  }
+}
+
+/** The deck, framed, asks the shell to toggle edit mode: only the iframe's own window is believed. */
+function onDeckMessage(event) {
+  const data = event.data;
+  if (event.source !== frame.contentWindow || !data || data.type !== 'deck-key') return;
+  if (String(data.key).toLowerCase() === 'e') toggleEditMode();
+}
 
 /* ============================================================
    Present
@@ -296,6 +346,8 @@ function updateSlideActionsVisibility() {
   slideActions.style.display   = (isPresentation && editMode) ? 'inline-flex' : 'none';
   presentBtn.style.display     = isPresentation ? 'inline-flex' : 'none';
   pointerBtn.style.display     = (isPresentation && !editMode && deckCarriesPointer()) ? 'inline-flex' : 'none';
+  presenterBtn.style.display   = (isPresentation && typeof (frame.contentWindow || {}).togglePresenter === 'function') ? 'inline-flex' : 'none';
+  if (typeof window.notesSync === 'function') window.notesSync();
   exportPptxBtn.style.display  = isPresentation ? 'inline-flex' : 'none';
   exportDocxBtn.style.display  = 'none'; // PPTX only for presentations
 }

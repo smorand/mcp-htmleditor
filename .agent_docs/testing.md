@@ -186,6 +186,11 @@ slide; for DOCX compare the `<w:t>` runs and the `w:pStyle` sequence of `word/do
   is pinned by sha256 in E2E-035. `lastMtime` does not move during a drag (US-0093): observe polls with
   `count_polls` / `wait_polls` (window.__statusPolls), never `lastMtime`.
 
+### Speaker notes export tests (SPEC-0022)
+
+`tests/test_pptx_speaker_notes.py`: round trip HTML to PPTX to notes text, no shape from the aside, no notes slide without
+notes, outline, lint, get-slide and `replace_slide` keep the aside. Run: `make test ARGS='-k notes'`.
+
 ### Pointer tests (SPEC-0017)
 
 * `tests/pointer_support.py` holds Deck P and the shared Chromium page (1600 by 900); the browser modules are

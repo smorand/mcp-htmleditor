@@ -210,11 +210,16 @@ html, body {
 /* ── Iframe: full remaining height ───────────────────────────── */
 #content-frame {
   display: block;
-  width: calc(100% - 300px); /* the requests side list takes the right 300px */
+  width: 100%;
   height: calc(100vh - 24px);
   border: none;
   background: #ffffff;
 }
+
+/* the requests side list, when open, takes the right 300px */
+body:has(#requests-side:not([hidden])) #content-frame { width: calc(100% - 300px); }
+/* the notes dock covers the bottom of the frame while open: the frame gives it room */
+body:has(#notes-panel:not([hidden])) #content-frame { height: calc(100vh - 24px - 130px); }
 
 /* ── Fallback fullscreen (parent shell) ──────────────────────────
    Normally requestFullscreen() targets the document INSIDE the
@@ -231,6 +236,7 @@ html, body {
 }
 body:has(#content-frame:fullscreen) #toolbar,
 body:has(#content-frame:fullscreen) #requests-side,
+body:has(#content-frame:fullscreen) #notes-panel,
 body:has(#content-frame:fullscreen) #ask-ai-panel,
 body:has(#content-frame:fullscreen) #update-overlay {
   display: none !important;
@@ -499,4 +505,52 @@ body:has(#ask-ai-panel:not([hidden])) #notices { right: 344px; }
   font-size: 11px;
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* ── Requests toggle, presenter and notes (SPEC-0022) ─────────── */
+#requests-toggle,
+#presenter-btn,
+#notes-btn {
+  height: 20px;
+  padding: 0 10px;
+  background: #262626;
+  color: #c6c6c6;
+  border: 1px solid #393939;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+#requests-toggle:hover,
+#requests-toggle[aria-expanded="true"],
+#notes-btn[aria-expanded="true"],
+#presenter-btn:hover { color: #f4f4f4; border-color: #6f6f6f; }
+#ask-ai-btn { margin-left: 0; }
+#requests-toggle { margin-left: auto; }
+#notes-panel[hidden] { display: none; }
+#notes-panel {
+  position: fixed;
+  left: 0; bottom: 0; height: 130px;
+  width: 100%;
+  z-index: 9980;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: #1c1c1c;
+  border-top: 1px solid #393939;
+  color: #c6c6c6;
+  font-size: 12px;
+}
+body:has(#requests-side:not([hidden])) #notes-panel { width: calc(100% - 300px); }
+#notes-text {
+  flex: 1;
+  resize: none;
+  padding: 6px;
+  background: #161616;
+  color: #f4f4f4;
+  border: 1px solid #525252;
+  font-family: inherit;
+  font-size: 13px;
 }
