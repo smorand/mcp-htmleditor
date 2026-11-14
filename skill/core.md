@@ -32,7 +32,7 @@ mcp-htmleditor templates
 mcp-htmleditor new <template> <file> [--serve]
 ```
 
-`<template>` is one of `ei, carbon, medical, doc, doc-perso, doc-ei, mail, website`.
+`<template>` is one of `ei, carbon, medical, breathe, doc, doc-perso, doc-ei, mail, website`.
 
 ## Tools
 
@@ -48,7 +48,7 @@ mcp-htmleditor new <template> <file> [--serve]
 - get_slide: Read the HTML of one slide, large images replaced by data:ref:img-N.
 - patch: Apply validated, atomic, self renumbering slide operations (set_text, replace_slide, insert_slide, delete_slide, move_slide) to a presentation; dry_run validates only.
 - lint: Check a file against the structure and charter rules; returns problems, errors and warnings.
-- list_templates: List the 8 template keys with their description.
+- list_templates: List the 9 template keys with their description.
 - new_file: Create a file from a template key; refuses an existing target.
 - export: Export a presentation to pptx or a document to docx.
 - history: list the saved previous versions of a file, newest first (id, bytes, reason).

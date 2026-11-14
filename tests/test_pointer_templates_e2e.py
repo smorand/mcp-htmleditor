@@ -18,6 +18,7 @@ import pytest
 from playwright.sync_api import Page
 
 from mcp_htmleditor.http_server import start_http_server
+from tests.breathe_support import breathe_deck, breathe_slide
 from tests.browser_wait import wait_until
 from tests.conftest import ServedDeck, needs_chromium
 from tests.deck_support import build_deck, write_deck
@@ -85,7 +86,12 @@ STACKED_CONTROLS = """
 })
 """
 # Starting point: (key, its headline's selector).
-STARTING_POINTS = (("carbon", ".slide-h1"), ("ei", ".slide-cover-title"), ("medical", ".med-cover-title"))
+STARTING_POINTS = (
+    ("carbon", ".slide-h1"),
+    ("ei", ".slide-cover-title"),
+    ("medical", ".med-cover-title"),
+    ("breathe", ".med-cover-big"),  # the title spans are blocks: the ring lands on the key phrase
+)
 ELEVEN = (*TEMPLATES, EXAMPLE_CARBON_COMPLETE)
 # FR-NEW-012: the deck's L, spied on, typed with the focus in a text field then in an editable text, then on the page.
 L_IN_FIELDS = """
@@ -259,7 +265,7 @@ def test_pointer_stacked_deck_and_every_starting_point(
 
     serve = serve_in_turn(serve_deck)
     for key, headline in STARTING_POINTS:
-        deck = build_deck(key, ("Cover", "Second"))
+        deck = breathe_deck(breathe_slide("Second")) if key == "breathe" else build_deck(key, ("Cover", "Second"))
         path = Path(write_deck(tmp_path / f"new-{key}.html", deck))
         open_editor(page, serve(path), path.name)
         present_with(page, "#pointer-btn")

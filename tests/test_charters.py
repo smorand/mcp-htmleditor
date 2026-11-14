@@ -18,6 +18,13 @@ EXPECTED_TEMPLATES = [
             "Presentation medicale (congres/staff): teal+orange, images commentees, citations",
         ),
     ),
+    (
+        "breathe",
+        (
+            "bootstrap/slides-breathe-empty.html",
+            "Breathe congress presentation: airway story line, ice and navy panels, Georgia titles, 1 cover slide",
+        ),
+    ),
     ("doc", ("bootstrap/document-empty.html", "Word-like document (single column)")),
     (
         "doc-perso",
@@ -58,7 +65,17 @@ def test_templates_is_built_by_a_comprehension() -> None:
 def test_registry_order_and_fields() -> None:
     from mcp_htmleditor.export.charters import REGISTRY
 
-    assert [c.key for c in REGISTRY] == ["ei", "carbon", "medical", "doc", "doc-perso", "doc-ei", "mail", "website"]
+    assert [c.key for c in REGISTRY] == [
+        "ei",
+        "carbon",
+        "medical",
+        "breathe",
+        "doc",
+        "doc-perso",
+        "doc-ei",
+        "mail",
+        "website",
+    ]
     by_key = {c.key: c for c in REGISTRY}
     assert by_key["medical"].css_tokens == ("--med-teal",)
     assert by_key["medical"].css_classes == ("med-rule",)
@@ -66,6 +83,9 @@ def test_registry_order_and_fields() -> None:
     assert by_key["ei"].css_classes == ("slide-inner",)
     assert by_key["carbon"].css_tokens == ("--ibm-blue", "--cds-")
     assert by_key["carbon"].css_classes == ("slide-header",)
+    assert by_key["breathe"].css_tokens == ("--breathe-ice",)
+    assert by_key["breathe"].css_classes == ()
+    assert by_key["breathe"].layout_set == "breathe"
     assert {c.key: c.docx_key for c in REGISTRY if c.docx_key} == {"doc-perso": "perso", "doc-ei": "ei"}
     assert all(not c.css_tokens and not c.css_classes for c in REGISTRY if c.kind != "presentation")
 

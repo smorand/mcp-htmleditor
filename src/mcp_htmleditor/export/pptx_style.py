@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, replace
 from bs4 import BeautifulSoup, Tag
 from pptx.util import Emu, Inches
 
-from .charters import REGISTRY
+from .charters import REGISTRY, is_breathe
 
 # ---------------------------------------------------------------------------
 # Canvas geometry
@@ -360,6 +360,21 @@ THEME_MEDICAL = Theme(
     table_header_fg="FFFFFF",
 )
 
+THEME_BREATHE = Theme(
+    key="breathe",
+    font="Trebuchet MS",
+    mono_font="Courier New",
+    primary="0C7B70",
+    primary_alt="1D8379",
+    accent="CD8684",
+    text="194757",
+    secondary="587480",
+    surface="E7F7FF",
+    border="CFE3EA",
+    table_header_bg="0C7B70",
+    table_header_fg="FFFFFF",
+)
+
 THEME_GENERIC = Theme(
     key="generic",
     font="Arial",
@@ -391,6 +406,10 @@ def detect_theme(soup: BeautifulSoup) -> Theme:
     cost is O(markers) substring searches over the stylesheet text.
     """
     css = stylesheet_text(soup)
+    html = soup.find("html")
+    declared = html.get("data-doc-template") if isinstance(html, Tag) else None
+    if is_breathe(declared if isinstance(declared, str) else None, css):
+        return THEME_BREATHE
     specs = {spec.key: spec for spec in REGISTRY if spec.kind == "presentation"}
     for key, theme in _THEME_PRIORITY:
         spec = specs[key]
@@ -549,6 +568,7 @@ _CLASS_STYLES: dict[str, dict[str, TextStyle]] = {
     "ei": _EI_STYLES,
     "carbon": _CARBON_STYLES,
     "medical": _MEDICAL_STYLES,
+    "breathe": {},  # painted from the rendered HTML (SPEC-0023); the degraded flow reads the CSS sizes
     "generic": {},
 }
 

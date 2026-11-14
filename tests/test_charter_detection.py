@@ -1,4 +1,4 @@
-"""Results of the two charter detectors on the eight bootstrap templates (SPEC-0012/DT-002).
+"""Results of the two charter detectors on the nine bootstrap templates (SPEC-0012/DT-002, SPEC-0023).
 
 ``detect_theme`` (Python, PPTX export) and ``detectTemplate`` (JavaScript, run in
 Chromium) are compared with ``tests/testdata/detector_table.json``, recorded from the
@@ -20,19 +20,27 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import Page, sync_playwright
 
 from mcp_htmleditor import config as config_module
-from mcp_htmleditor.export.pptx_style import THEME_CARBON, THEME_EI, THEME_GENERIC, THEME_MEDICAL, detect_theme
+from mcp_htmleditor.export.pptx_style import (
+    THEME_BREATHE,
+    THEME_CARBON,
+    THEME_EI,
+    THEME_GENERIC,
+    THEME_MEDICAL,
+    detect_theme,
+)
 from mcp_htmleditor.templates import template_path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TABLE_FILE = REPO_ROOT / "tests" / "testdata" / "detector_table.json"
 LAYOUTS_JS = REPO_ROOT / "src" / "mcp_htmleditor" / "static" / "slide-layouts.js"
-KEYS = ("ei", "carbon", "medical", "doc", "doc-perso", "doc-ei", "mail", "website")
+KEYS = ("ei", "carbon", "medical", "breathe", "doc", "doc-perso", "doc-ei", "mail", "website")
 
 # The facts known before SPEC-0012: key -> (detect_theme Theme.key, detectTemplate).
 FACTS = {
     "ei": (THEME_EI.key, "ei"),
     "carbon": (THEME_CARBON.key, "carbon"),
     "medical": (THEME_MEDICAL.key, "medical"),
+    "breathe": (THEME_BREATHE.key, "breathe"),  # SPEC-0023
     "doc": (THEME_GENERIC.key, "carbon"),
     "doc-perso": (THEME_GENERIC.key, "carbon"),
     "doc-ei": (THEME_EI.key, "ei"),

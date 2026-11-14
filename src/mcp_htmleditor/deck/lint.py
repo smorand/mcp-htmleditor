@@ -25,7 +25,8 @@ ERROR = "error"
 CARBON = "carbon"
 TOTAL = re.compile(r"const\s+TOTAL\s*=\s*(\d+)\s*;")
 NAMES = re.compile(r"const\s+slideNames\s*=\s*\[")
-TEMPLATE_TEXTS = ("Contenu de la slide", "Titre de la présentation")
+# French placeholders of SPEC-0007, the English one of the Breathe starting point (SPEC-0023 FR-MOD-003)
+TEMPLATE_TEXTS = ("Contenu de la slide", "Titre de la présentation", "Title of the presentation")
 TEMPLATE_EYEBROW = "Section · Slide 01 / 01"
 HIDDEN_TEXT_TAGS = frozenset({"script", "style"})
 QUOTES = "\"'`"

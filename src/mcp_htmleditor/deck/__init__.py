@@ -12,7 +12,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from ..export.charters import REGISTRY
+from ..export.charters import BREATHE, REGISTRY, is_breathe
 from ..textcheck import UNENCODABLE_FILE_NAME, is_utf8_encodable
 
 DOC_TYPES = ("presentation", "document", "website")
@@ -100,6 +100,9 @@ def document_article(soup: BeautifulSoup) -> Tag | None:
 def _presentation_charter(soup: BeautifulSoup) -> str:
     html = soup.find("html")
     style = "".join(tag.get_text() for tag in soup.find_all("style"))
+    declared = html.get("data-doc-template") if isinstance(html, Tag) else None
+    if is_breathe(declared if isinstance(declared, str) else None, style):
+        return BREATHE
     if MEDICAL_MARK in style or (isinstance(html, Tag) and html.get("data-doc-template") == "medical"):
         return "medical"
     if EI_MARK in style or soup.find(class_=EI_COVER_CLASS) is not None:

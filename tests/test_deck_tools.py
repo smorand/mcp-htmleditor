@@ -21,7 +21,7 @@ from mcp_htmleditor.templates import list_templates
 from tests.deck_support import FIXED_TIME, deck_ei, run_cli, write_deck
 
 REPO = Path(__file__).resolve().parents[1]
-KEYS = ["ei", "carbon", "medical", "doc", "doc-perso", "doc-ei", "mail", "website"]
+KEYS = ["ei", "carbon", "medical", "breathe", "doc", "doc-perso", "doc-ei", "mail", "website"]
 UNKNOWN_TEMPLATE = f'error: Unknown template "x". Valid templates: {", ".join(KEYS)}'
 NO_SLIDE = 'error: No slide exported: check that the document has data-type="slide" elements.'
 PANDOC_MISSING = "pandoc not found in PATH: install pandoc to export to DOCX."

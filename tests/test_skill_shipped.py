@@ -37,7 +37,7 @@ LANDING_TOOLS = {
     "get_slide",
     "patch",
 }
-TEMPLATE_KEYS = ("ei", "carbon", "medical", "doc", "doc-perso", "doc-ei", "mail", "website")
+TEMPLATE_KEYS = ("ei", "carbon", "medical", "breathe", "doc", "doc-perso", "doc-ei", "mail", "website")
 CORE_STRINGS = (
     "update_start",
     "update_end",

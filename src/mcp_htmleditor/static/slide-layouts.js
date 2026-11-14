@@ -6,12 +6,16 @@
  * Fragment HTML minimal avec attributs data-* requis. {{ID}} est remplacé à
  * l'insertion.
  *
- * detectTemplate(doc) → 'ei' | 'carbon' | 'medical'. getLayouts(doc) → le bon jeu.
+ * detectTemplate(doc) → 'ei' | 'carbon' | 'medical' | 'breathe'. getLayouts(doc) → le bon jeu.
+ * Breathe (SPEC-0023 DEC-001): la déclaration data-doc-template gagne, puis le marqueur --breathe-ice.
  */
 
 function detectTemplate(doc) {
   if (!doc) return 'carbon';
+  const declared = doc.documentElement.getAttribute('data-doc-template');
   const html = doc.documentElement.outerHTML;
+  const css = Array.from(doc.querySelectorAll('style'), (s) => s.textContent).join('').replace(/\/\*[\s\S]*?\*\//g, '');
+  if (declared === 'breathe' || (declared !== 'medical' && css.includes('--breathe-ice'))) return 'breathe';
   if (/--med-teal|data-doc-template="medical"/i.test(html)) return 'medical';
   if (/--ei-blue|slide-cover-logos|Euro.Information/i.test(html)) return 'ei';
   return 'carbon';

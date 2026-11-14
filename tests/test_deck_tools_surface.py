@@ -19,7 +19,7 @@ from .stdio_support import run_session
 
 REPO = Path(__file__).resolve().parents[1]
 CORE = REPO / "skill" / "core.md"
-TEMPLATE_KEYS = ["ei", "carbon", "medical", "doc", "doc-perso", "doc-ei", "mail", "website"]
+TEMPLATE_KEYS = ["ei", "carbon", "medical", "breathe", "doc", "doc-perso", "doc-ei", "mail", "website"]
 FINAL_TOOLS = {
     "start_server",
     "stop_server",

@@ -1,4 +1,8 @@
 {
+  "breathe": {
+    "detectTemplate": "breathe",
+    "detect_theme": "breathe"
+  },
   "carbon": {
     "detectTemplate": "carbon",
     "detect_theme": "carbon"

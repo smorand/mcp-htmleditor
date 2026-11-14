@@ -1,7 +1,7 @@
-"""Charter rules L007 to L011 (SPEC-0007 FR-NEW-014, DEC-006, DEC-008).
+"""Charter rules L007 to L011 (SPEC-0007 FR-NEW-014, DEC-006, DEC-008; SPEC-0023 FR-NEW-011 to FR-NEW-013).
 
-Foreign classes, medical flex rows and source lines, remote images and palette warnings for one slide
-(or one scope for the images). The class tables and the palettes of the three presentation charters live
+Foreign classes, flex rows and source lines (medical and Breathe), remote images and palette warnings for one
+slide (or one scope for the images). The class tables and the palettes of the four presentation charters live
 here and nowhere else. Rules are plain functions held in a table keyed by code; no printing.
 """
 
@@ -15,10 +15,32 @@ from bs4.element import Tag
 ERROR = "error"
 WARNING = "warning"
 MEDICAL = "medical"
+BREATHE = "breathe"
 FOREIGN_CLASSES: dict[str, tuple[tuple[str, ...], frozenset[str]]] = {
     MEDICAL: (
         ("cds-", "tag-", "stat-", "ei-"),
         frozenset({"slide-inner", "slide-header", "slide-footer", "slide-foot", "slide-foot-logo", "slide-foot-title"}),
+    ),
+    # Breathe shares the med- prefix with medical (SPEC-0023 DEC-004): the medical structure is named instead.
+    BREATHE: (
+        ("cds-", "tag-", "stat-", "ei-"),
+        frozenset(
+            {
+                "slide-inner",
+                "slide-header",
+                "slide-footer",
+                "slide-foot",
+                "slide-foot-logo",
+                "slide-foot-title",
+                "med-band",
+                "med-rule",
+                "med-head",
+                "med-foot",
+                "slide-body",
+                "slide-h1",
+                "slide-eyebrow",
+            }
+        ),
     ),
     "ei": (("med-", "stat-", "cw-", "mention-"), frozenset({"slide-header", "slide-footer"})),
     "carbon": (
@@ -38,8 +60,14 @@ FLEX_ROWS = (
     "med-timeline",
     "med-section-figs",
 )
+# Rows checked by L008 per charter: Breathe adds its full bleed panes, deep figures and priority rows.
+CHARTER_FLEX_ROWS: dict[str, tuple[str, ...]] = {
+    MEDICAL: FLEX_ROWS,
+    BREATHE: ("med-bleed", "med-figs-deep", "med-prio-row", *FLEX_ROWS),
+}
 WIDTH_CLASSES = frozenset({"w-25", "w-30", "w-33", "w-40", "w-50", "w-60", "w-70"})
 NO_SOURCE_TYPES = frozenset({"title", "thanks"})
+SOURCE_CHARTERS = frozenset({MEDICAL, BREATHE})  # L009: every picture of these charters cites its source
 PALETTES: dict[str, frozenset[str]] = {
     "ei": frozenset(["#003A8D", "#284AAA", "#285C99", "#FBAE40", "#EC6962", "#50565B", "#262626", "#F4F6F9"]),
     "carbon": frozenset(
@@ -66,6 +94,24 @@ PALETTES: dict[str, frozenset[str]] = {
             "#9AA7B4",
             "#4FC3D9",
             "#F2A33C",
+        ]
+    ),
+    BREATHE: frozenset(
+        [
+            "#0C7B70",
+            "#1D8379",
+            "#194757",
+            "#0E2B35",
+            "#E7F7FF",
+            "#F3FDFF",
+            "#A2EAF7",
+            "#83BBB5",
+            "#58A19A",
+            "#CD8684",
+            "#2F4C56",
+            "#587480",
+            "#9FC4CF",
+            "#CFE3EA",
         ]
     ),
 }
@@ -116,20 +162,21 @@ def _classes(slide: Tag) -> list[str]:
 
 def _width_problems(slide: Tag, charter: str) -> list[str]:
     """L008."""
-    if charter != MEDICAL:
+    rows = CHARTER_FLEX_ROWS.get(charter)
+    if rows is None:
         return []
     return [
         f"child of .{row} has no w-* width class"
-        for element, row in _flex_rows(slide)
+        for element, row in _flex_rows(slide, rows)
         for child in element.find_all(True, recursive=False)
         if not WIDTH_CLASSES.intersection(child.get("class") or [])
     ]
 
 
-def _flex_rows(slide: Tag) -> list[tuple[Tag, str]]:
+def _flex_rows(slide: Tag, names: tuple[str, ...]) -> list[tuple[Tag, str]]:
     rows = []
     for element in _elements(slide):
-        row = next((c for c in element.get("class") or [] if c in FLEX_ROWS), None)
+        row = next((c for c in element.get("class") or [] if c in names), None)
         if row:
             rows.append((element, row))
     return rows
@@ -137,7 +184,7 @@ def _flex_rows(slide: Tag) -> list[tuple[Tag, str]]:
 
 def _source_problems(slide: Tag, charter: str) -> list[str]:
     """L009."""
-    if charter != MEDICAL or slide.get("data-slide-type") in NO_SOURCE_TYPES or slide.find("img") is None:
+    if charter not in SOURCE_CHARTERS or slide.get("data-slide-type") in NO_SOURCE_TYPES or slide.find("img") is None:
         return []
     has_source = any(source.get_text().strip() for source in slide.select(".med-source"))
     return [] if has_source else ["slide has an image and no source line"]
