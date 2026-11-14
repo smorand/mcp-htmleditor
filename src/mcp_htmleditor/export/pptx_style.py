@@ -636,6 +636,9 @@ class StyleResolver:
     element itself (``.cds-notification.error``).
     """
 
+    stylesheet: str = ""
+    """The document stylesheets, comments stripped (read by the Breathe degraded chrome, SPEC-0023)."""
+
     active_scope: frozenset[str] = frozenset()
     """Classes of the slide currently exported (``slide dark`` and friends).
 
@@ -648,7 +651,8 @@ class StyleResolver:
         """Build a resolver from the ``<style>`` blocks of a document."""
         class_props: dict[str, dict[str, str]] = {}
         scoped_props: dict[str, list[tuple[frozenset[str], frozenset[str], dict[str, str]]]] = {}
-        for selectors, body in _RULE_RE.findall(stylesheet_text(soup)):
+        css = stylesheet_text(soup)
+        for selectors, body in _RULE_RE.findall(css):
             props = parse_declarations(body)
             if not props:
                 continue
@@ -662,7 +666,7 @@ class StyleResolver:
                     continue
                 for name in required:
                     scoped_props.setdefault(name, []).append((scope, required, props))
-        return cls(detect_theme(soup), collect_css_vars(soup), class_props, scoped_props)
+        return cls(detect_theme(soup), collect_css_vars(soup), class_props, scoped_props, stylesheet=css)
 
     def props(self, element: Tag) -> dict[str, str]:
         """Return the declarations that apply to an element."""

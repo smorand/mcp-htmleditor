@@ -6,6 +6,8 @@ chrome (backgrounds, frames, footers) and returns the content regions to flow.
 
 from __future__ import annotations
 
+import re
+
 from bs4 import Tag
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
@@ -310,6 +312,26 @@ class ChromeMixin(_BuilderBase):
             self._render_text(Box(SLIDE_W_IN - pad - 0.9, SLIDE_H_IN - 26.0 * PX_IN, 0.9, 0.22), page, anchor="middle")
         self._consume(foot)
         return top
+
+    def _chrome_breathe(self) -> list[_Region]:
+        """Degraded Breathe slide (SPEC-0023 FR-NEW-016): colour and background picture full bleed, content flowed.
+
+        The background picture is the ``url()`` of the slide's ``med-bg-*`` class in the decoration block, read
+        with its own pattern: a data URI holds a ``;`` that the declaration parser would split on.
+        """
+        canvas = Box.slide()
+        props = style_props(self.article)
+        fill = parse_color(props.get("background-color") or props.get("background"), self.res.css_vars)
+        self._rect(canvas, fill=fill or self._element_color(self.article) or "FFFFFF")
+        for name in classes(self.article):
+            if name.startswith("med-bg-"):
+                rule = re.search(
+                    rf"\.{re.escape(name)}\s*\{{\s*background-image:\s*url\(([^)]*)\)", self.res.stylesheet
+                )
+                if rule:
+                    self._add_picture(canvas, rule.group(1).strip("'\""), mode="stretch")
+                break
+        return [_Region(canvas.inset_px(56, 48), self._children(self.article))]
 
     def _chrome_generic(self) -> list[_Region]:
         """Fallback layout for documents without a known charter."""

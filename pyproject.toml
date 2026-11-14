@@ -117,6 +117,9 @@ ignore = [
 "src/mcp_htmleditor/export/pptx_flow.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
 "src/mcp_htmleditor/export/pptx_chrome.py" = ["PLR0911", "PLR0912", "ARG002", "PLR2004"]
 "src/mcp_htmleditor/export/pptx_style.py" = ["PLR2004"]
+# The painted Breathe finish embeds its page measure script as JavaScript (long lines kept as ported), and its
+# picture reader returns at each refusal (data URI, remote, missing, vector).
+"src/mcp_htmleditor/export/pptx_paint.py" = ["E501", "PLR0911"]
 "src/mcp_htmleditor/export/pptx_components.py" = ["PLR2004"]
 # ElementTree parses word/styles.xml produced locally by pandoc, not user input.
 "src/mcp_htmleditor/export/reference_docx.py" = ["S314"]

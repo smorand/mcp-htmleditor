@@ -45,6 +45,7 @@ from .pptx_model import (
     _column_widths,  # noqa: F401 - re-exported, imported from here by the tests
     _Context,
 )
+from .pptx_paint import paint_presentation
 from .pptx_style import (
     SLIDE_H_IN,
     SLIDE_W_IN,
@@ -120,6 +121,11 @@ def _build_pptx(input_html: str, output_pptx: str) -> ExportReport:
         slide = prs.slides.add_slide(blank_layout)
         _SlideBuilder(context, slide, article, index).build()
 
+    if resolver.theme.key == "breathe" and articles and articles[0] is not soup.body:
+        # SPEC-0023: Breathe compositions are repainted from the rendered HTML; the flowed slides stay when
+        # Chromium is unavailable (degraded export, one warning). The notes pages are kept either way.
+        paint_presentation(prs, source, report)
+
     report.slide_count = len(prs.slides)
     report.charter = resolver.theme.key
     out = Path(output_pptx)
@@ -184,6 +190,8 @@ class _SlideBuilder(ArchMixin, BlocksMixin, ChromeMixin, FlowMixin, GanttMixin, 
             regions = self._chrome_carbon()
         elif self.theme.key == "medical":
             regions = self._chrome_medical(kind)
+        elif self.theme.key == "breathe":
+            regions = self._chrome_breathe()
         else:
             regions = self._chrome_generic()
         for region in regions:
