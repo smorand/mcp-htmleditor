@@ -12,7 +12,7 @@ agents: `skill/topics/breathe.md`. Spec and design: `sdlc/specs/SPEC-0023-breath
 | Picker detection and set | `static/slide-layouts.js` `detectTemplate`, generated block `breathe-layouts:begin/end` |
 | Lint tables | `deck/charter_rules.py` (`BREATHE` in `FOREIGN_CLASSES`, `PALETTES`, `CHARTER_FLEX_ROWS`, `SOURCE_CHARTERS`) |
 | Embedding command | `breathe/inline.py`, CLI `breathe-inline` |
-| Painted PPTX | `export/pptx_paint.py`, called at the end of `to_pptx._build_pptx`; degraded chrome `pptx_chrome._chrome_breathe` |
+| Painted PPTX | `export/pptx_paint*.py` (generic since SPEC-0024, same painter as every charter), called at the end of `to_pptx._build_pptx`; degraded chrome `pptx_chrome._chrome_breathe` |
 | Files next to the deck | `deck_files.py`, `http_server._serve_deck_file` |
 | Catalogue and generator | `templates/assets/breathe/` (git LFS), `tools/breathe_assets.py` (`make breathe-assets`) |
 | Shipped decks | `templates/bootstrap/slides-breathe-empty.html`, `templates/reference/slides/breathe.html` |

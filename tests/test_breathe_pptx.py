@@ -40,7 +40,7 @@ from tests.deck_support import call_tool, run_cli
 
 REPO = Path(__file__).resolve().parents[1]
 PX = 12700
-DEGRADED = "Breathe deck exported without the rendered finish ({}). Install the browser with: make install-browser"
+DEGRADED = "Deck exported without the rendered finish ({}). Install the browser with: make install-browser"
 Shape = tuple[str, int, int, int, int, str]
 
 
@@ -177,6 +177,7 @@ def test_reference_deck_painted(tmp_path: Path) -> None:
     articles = BeautifulSoup(deck.read_text(encoding="utf-8"), "html.parser").find_all(attrs={"data-type": "slide"})
     expected_boxes = rendered_picture_boxes(deck, 23)
     faces: set[str] = set()
+    tables = 0
     for index, (slide, article) in enumerate(zip(slides, articles, strict=True)):
         shapes = list(slide.shapes)
         assert is_full_slide_picture(shapes[0]), index
@@ -184,6 +185,10 @@ def test_reference_deck_painted(tmp_path: Path) -> None:
         for aside in article.select('[data-role="speaker-notes"]'):
             aside.decompose()
         painted = "".join(w for s in shapes if s.has_text_frame for w in words(s.text_frame.text))
+        painted += "".join(  # native tables (SPEC-0024 FR-5) hold their words in cells
+            w for s in shapes if s.has_table for row in s.table.rows for c in row.cells for w in words(c.text)
+        )
+        tables += sum(1 for s in shapes if s.has_table)
         missing = [w for w in words(article.get_text(" ")) if w not in painted]  # tags split words: "clinical", "."
         assert missing == [], (index, missing)
         faces |= {r.font.name for s in shapes if s.has_text_frame for p in s.text_frame.paragraphs for r in p.runs}
@@ -194,6 +199,7 @@ def test_reference_deck_painted(tmp_path: Path) -> None:
         ]
         for box in expected_boxes[index]:
             assert any(all(abs(a - b) <= 1 for a, b in zip(box, pic, strict=True)) for pic in pictures), (index, box)
+    assert tables >= 1
     assert faces == {"Georgia", "Trebuchet MS"}
 
 
@@ -235,7 +241,7 @@ def test_remote_picture_skipped(tmp_path: Path) -> None:
     slide = Presentation(str(tmp_path / "r.pptx")).slides[1]
     assert sum(1 for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE) == 1  # the background only
     assert any(remote[:40] in warning for warning in report.warnings)
-    assert not any(w.startswith("Breathe deck exported without") for w in report.warnings)
+    assert not any(w.startswith("Deck exported without") for w in report.warnings)
 
 
 # -- degraded -----------------------------------------------------------------------------------------------
@@ -351,7 +357,9 @@ def test_measure_reasons(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
 def test_reference_declared_medical_then_switched(tmp_path: Path) -> None:
     ref_med = as_medical(REFERENCE.read_text(encoding="utf-8"))
     medical = write(tmp_path / "ref-med.html", ref_med)
-    to_pptx(str(medical), str(tmp_path / "ref-med.pptx"))
+    # SPEC-0024: the painted export draws what the HTML shows; the charter dispatch is the flow build (degraded result)
+    assert to_pptx(str(medical), str(tmp_path / "ref-med-painted.pptx")).charter == "medical"
+    to_pptx(str(medical), str(tmp_path / "ref-med.pptx"), paint=False)
     assert not any(
         is_full_slide_picture(next(iter(s.shapes))) for s in Presentation(str(tmp_path / "ref-med.pptx")).slides
     )
@@ -369,7 +377,7 @@ def test_reference_declared_medical_then_switched(tmp_path: Path) -> None:
 def test_wcbip_switched_is_painted_with_its_notes(tmp_path: Path) -> None:
     original = wcbip_or_skip()
     as_is = write(tmp_path / "wcbip.html", original)
-    to_pptx(str(as_is), str(tmp_path / "wcbip.pptx"))
+    to_pptx(str(as_is), str(tmp_path / "wcbip.pptx"), paint=False)  # the flow build keys on the declared charter
     assert not any(
         is_full_slide_picture(next(iter(s.shapes))) for s in Presentation(str(tmp_path / "wcbip.pptx")).slides
     )
@@ -464,7 +472,17 @@ def test_painted_boxes_text_crop_and_spacing(tmp_path: Path) -> None:
             for s in shapes
             if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE
         ]
+        tables = [[s.left / PX, s.top / PX, s.width / PX, s.height / PX] for s in shapes if s.has_table]
         for box in wanted["boxes"]:
+            if any(  # a cell fill of a native table lives in the table frame, not in a rectangle
+                t[0] - 1 <= box[0]
+                and t[1] - 1 <= box[1]
+                and box[0] + box[2] <= t[0] + t[2] + 1
+                and box[1] + box[3] <= t[1] + t[3] + 1
+                for t in tables
+            ):
+                checked_boxes += 1
+                continue
             assert any(all(abs(a - b) <= 1 for a, b in zip(box, rect, strict=True)) for rect in rects), (index, box)
             checked_boxes += 1
         frames = [s for s in shapes if s.shape_type == MSO_SHAPE_TYPE.TEXT_BOX]
@@ -495,13 +513,14 @@ def test_painted_boxes_text_crop_and_spacing(tmp_path: Path) -> None:
 
 @needs_chromium
 def test_missing_and_vector_pictures_skipped(tmp_path: Path) -> None:
-    """FR-NEW-014: a missing linked picture and a vector picture are skipped with the exporter's warnings."""
+    """FR-NEW-014, SPEC-0024 FR-4: a missing linked picture is skipped with a warning, a vector picture rasterised."""
     svg = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnLz4="
     body = f'<img src="assets/missing.png" alt="m"><img src="{svg}" alt="v" style="width:40px;height:40px">'
     deck = write(tmp_path / "p.html", breathe_deck(breathe_slide("P", body)))
     assert run_cli("breathe-inline", str(deck))[2] == 0
     report = to_pptx(str(deck), str(tmp_path / "p.pptx"))
     slide = Presentation(str(tmp_path / "p.pptx")).slides[1]
-    assert sum(1 for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE) == 1  # the background only
+    # the background and the vector image, which the browser rasterises (SPEC-0024 FR-4); the missing file is skipped
+    assert sum(1 for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE) == 2
     assert any(w.startswith("Image introuvable, ignoree: ") and w.endswith("missing.png") for w in report.warnings)
-    assert any("SVG" in w or "svg" in w for w in report.warnings)
+    assert not any("SVG" in w or "svg" in w for w in report.warnings)

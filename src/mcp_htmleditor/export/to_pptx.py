@@ -63,19 +63,21 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def to_pptx(input_html: str, output_pptx: str) -> ExportReport:
+def to_pptx(input_html: str, output_pptx: str, *, paint: bool = True) -> ExportReport:
     """Convert an HTML presentation to a PPTX file.
 
     Args:
         input_html: Path to the source HTML file.
         output_pptx: Destination path of the generated ``.pptx``.
+        paint: Repaint the slides from the rendered HTML (needs Chromium). ``False`` keeps the flow build, which is
+            also the degraded result when the render is unavailable.
 
     Returns:
         An :class:`ExportReport` with the number of slides written and the list
         of warnings (missing images, unsupported components, empty documents).
     """
     with trace_span("export.pptx", {"file.path": str(Path(input_html).resolve())}) as span:
-        report = _build_pptx(input_html, output_pptx)
+        report = _build_pptx(input_html, output_pptx, paint)
         span.set_attribute("slide.count", report.slide_count)
         span.set_attribute("warning.count", len(report.warnings))
         logger.info(
@@ -88,7 +90,7 @@ def to_pptx(input_html: str, output_pptx: str) -> ExportReport:
         return report
 
 
-def _build_pptx(input_html: str, output_pptx: str) -> ExportReport:
+def _build_pptx(input_html: str, output_pptx: str, paint: bool = True) -> ExportReport:
     """Do the actual HTML to PPTX conversion (see :func:`to_pptx`)."""
     source = Path(input_html)
     soup = BeautifulSoup(source.read_text(encoding="utf-8"), "html.parser")
@@ -115,16 +117,19 @@ def _build_pptx(input_html: str, output_pptx: str) -> ExportReport:
         base_dir=source.resolve().parent,
         report=report,
     )
+    vector_warnings: list[str] = []
     for index, article in enumerate(articles):
         for warning in vector_figure_warnings(article, index + 1):
             report.warn(warning)
+            vector_warnings.append(warning)
         slide = prs.slides.add_slide(blank_layout)
         _SlideBuilder(context, slide, article, index).build()
 
-    if resolver.theme.key == "breathe" and articles and articles[0] is not soup.body:
-        # SPEC-0023: Breathe compositions are repainted from the rendered HTML; the flowed slides stay when
-        # Chromium is unavailable (degraded export, one warning). The notes pages are kept either way.
-        paint_presentation(prs, source, report)
+    if paint and articles and articles[0] is not soup.body and paint_presentation(prs, source, report):
+        # SPEC-0024: every presentation is repainted from the rendered HTML; the flowed slides stay when Chromium is
+        # unavailable (degraded export, one warning). The notes pages are kept either way. The painted slides carry
+        # the vector figures as pictures, so their "ignored" warnings no longer apply.
+        report.warnings[:] = [w for w in report.warnings if w not in vector_warnings]
 
     report.slide_count = len(prs.slides)
     report.charter = resolver.theme.key

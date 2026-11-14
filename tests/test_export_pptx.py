@@ -270,7 +270,7 @@ def test_euro_information_template_exports_every_slide(tmp_path: Path) -> None:
     expected = len(find_slides(BeautifulSoup(source.read_text(encoding="utf-8"), "html.parser")))
     out = tmp_path / "ei.pptx"
 
-    report = to_pptx(str(source), str(out))
+    report = to_pptx(str(source), str(out), paint=False)
 
     assert expected == 3
     assert report.slide_count == expected
@@ -281,7 +281,7 @@ def test_ibm_carbon_template_exports_nine_slides(tmp_path: Path) -> None:
     """The Carbon reference template has 9 slides and no data-type attribute."""
     out = tmp_path / "carbon.pptx"
 
-    report = to_pptx(str(REFERENCE_DIR / "ibm-carbon.html"), str(out))
+    report = to_pptx(str(REFERENCE_DIR / "ibm-carbon.html"), str(out), paint=False)
 
     assert report.slide_count == 9
 
@@ -290,7 +290,7 @@ def test_section_deck_does_not_regress(section_deck: Path, tmp_path: Path) -> No
     """The legacy <section> markup still exports one slide per section."""
     out = tmp_path / "out" / "deck.pptx"
 
-    report = to_pptx(str(section_deck), str(out))
+    report = to_pptx(str(section_deck), str(out), paint=False)
 
     prs = Presentation(str(out))
     assert report.slide_count == 4
@@ -302,7 +302,7 @@ def test_section_deck_does_not_regress(section_deck: Path, tmp_path: Path) -> No
 def test_slides_are_sixteen_by_nine(section_deck: Path, tmp_path: Path) -> None:
     """Slides use the 13.333 x 7.5 inch canvas of the templates."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(section_deck), str(out))
+    to_pptx(str(section_deck), str(out), paint=False)
 
     prs = Presentation(str(out))
     assert prs.slide_width == Inches(SLIDE_W_IN)
@@ -317,7 +317,7 @@ def test_slides_are_sixteen_by_nine(section_deck: Path, tmp_path: Path) -> None:
 def test_script_and_shell_are_never_exported(tmp_path: Path) -> None:
     """Navigation code and shell widgets stay out of the PPTX."""
     out = tmp_path / "carbon.pptx"
-    to_pptx(str(REFERENCE_DIR / "ibm-carbon.html"), str(out))
+    to_pptx(str(REFERENCE_DIR / "ibm-carbon.html"), str(out), paint=False)
 
     text = _all_text(Presentation(str(out)))
     for forbidden in ("const TOTAL", "function ", "addEventListener", "querySelector", "=>"):
@@ -334,7 +334,7 @@ def test_document_without_slides_warns_and_keeps_content(tmp_path: Path) -> None
     )
     out = tmp_path / "plain.pptx"
 
-    report = to_pptx(str(source), str(out))
+    report = to_pptx(str(source), str(out), paint=False)
 
     prs = Presentation(str(out))
     assert len(prs.slides) == 1
@@ -359,7 +359,7 @@ def test_base64_images_are_embedded(tmp_path: Path) -> None:
     )
     out = tmp_path / "img.pptx"
 
-    report = to_pptx(str(source), str(out))
+    report = to_pptx(str(source), str(out), paint=False)
 
     assert report.warnings == []
     assert len(_pictures(Presentation(str(out)))) == 1
@@ -380,7 +380,7 @@ def test_relative_images_resolve_against_the_html_file(tmp_path: Path, monkeypat
     monkeypatch.chdir(elsewhere)
     out = tmp_path / "rel.pptx"
 
-    report = to_pptx(str(source), str(out))
+    report = to_pptx(str(source), str(out), paint=False)
 
     assert report.warnings == []
     assert len(_pictures(Presentation(str(out)))) == 1
@@ -397,7 +397,7 @@ def test_missing_and_remote_images_are_reported(tmp_path: Path) -> None:
     )
     out = tmp_path / "missing.pptx"
 
-    report = to_pptx(str(source), str(out))
+    report = to_pptx(str(source), str(out), paint=False)
 
     assert not _pictures(Presentation(str(out)))
     assert any("introuvable" in warning for warning in report.warnings)
@@ -419,7 +419,7 @@ def test_annotations_are_positioned_inside_the_image(tmp_path: Path) -> None:
     )
     out = tmp_path / "annot.pptx"
 
-    to_pptx(str(source), str(out))
+    to_pptx(str(source), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     picture = next(s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE)
@@ -436,7 +436,7 @@ def test_annotations_are_positioned_inside_the_image(tmp_path: Path) -> None:
 def test_gantt_bars_are_shapes_not_a_table(section_deck: Path, tmp_path: Path) -> None:
     """Tasks become positioned bars; no fallback table is produced."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(section_deck), str(out))
+    to_pptx(str(section_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[1]
     assert not any(shape.has_table for shape in slide.shapes)
@@ -535,7 +535,7 @@ def test_inline_gantt_bars_are_positioned_shapes(inline_gantt_deck: Path, tmp_pa
     """A class-free Gantt is detected structurally: real bars, no fallback table,
     no giant flattened text block for the whole chart (the original bug)."""
     out = tmp_path / "deck.pptx"
-    report = to_pptx(str(inline_gantt_deck), str(out))
+    report = to_pptx(str(inline_gantt_deck), str(out), paint=False)
 
     assert report.warnings == []
     slide = Presentation(str(out)).slides[0]
@@ -550,7 +550,7 @@ def test_inline_gantt_stacked_bars_do_not_overlap(inline_gantt_deck: Path, tmp_p
     """Two bars sharing a row (different inline top offsets) land at distinct
     vertical bands instead of both centering on the row's mid-line."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(inline_gantt_deck), str(out))
+    to_pptx(str(inline_gantt_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     design = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text == "Design")
@@ -563,7 +563,7 @@ def test_inline_gantt_marker_line_is_a_thin_colored_rect(inline_gantt_deck: Path
     """A markerless absolutely positioned track child (no text) becomes a thin
     vertical rect at its left percentage, reusing the grid-line primitive."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(inline_gantt_deck), str(out))
+    to_pptx(str(inline_gantt_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     markers = [
@@ -584,7 +584,7 @@ def test_inline_gantt_hatch_marks_the_done_bar(inline_gantt_deck: Path, tmp_path
     """A CSS repeating-linear-gradient background becomes a real PPTX pattern
     fill, both on the bar and on the matching legend swatch."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(inline_gantt_deck), str(out))
+    to_pptx(str(inline_gantt_deck), str(out), paint=False)
 
     from pptx.enum.dml import MSO_FILL_TYPE
 
@@ -608,7 +608,7 @@ def test_inline_gantt_header_and_legend_render_once(inline_gantt_deck: Path, tmp
     DOM, are consumed before the generic block-flow walk reaches them: no
     duplicate flattened text block, no leftover generic paragraph."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(inline_gantt_deck), str(out))
+    to_pptx(str(inline_gantt_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     texts = [shape.text_frame.text for shape in slide.shapes if shape.has_text_frame]
@@ -631,7 +631,7 @@ def test_inline_gantt_long_label_is_truncated_not_overflowing(tmp_path: Path) ->
     source.write_text(deck, encoding="utf-8")
     out = tmp_path / "deck.pptx"
 
-    to_pptx(str(source), str(out))
+    to_pptx(str(source), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     label = next(s for s in slide.shapes if s.has_text_frame and s.text_frame.text.startswith("A very long"))
@@ -643,7 +643,7 @@ def test_inline_gantt_long_label_is_truncated_not_overflowing(tmp_path: Path) ->
 def test_arch_nodes_become_autoshapes(section_deck: Path, tmp_path: Path) -> None:
     """Diagram nodes are real shapes with an outline, and keep their label."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(section_deck), str(out))
+    to_pptx(str(section_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[2]
     shapes = [s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE]
@@ -677,7 +677,7 @@ def test_arch_edge_badge_exports_as_a_numbered_circle(tmp_path: Path) -> None:
     arch_layout.layout_file(html_path)
 
     out = tmp_path / "deck.pptx"
-    to_pptx(str(html_path), str(out))
+    to_pptx(str(html_path), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     badges = [
@@ -719,7 +719,7 @@ def test_arch_col_nested_nodes_export_at_the_right_place(tmp_path: Path) -> None
     arch_layout.layout_file(html_path)
 
     out = tmp_path / "deck.pptx"
-    to_pptx(str(html_path), str(out))
+    to_pptx(str(html_path), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     shapes = {s.text_frame.text: s for s in slide.shapes if s.has_text_frame}
@@ -737,7 +737,7 @@ def test_arch_col_nested_nodes_export_at_the_right_place(tmp_path: Path) -> None
 def test_arch_edges_become_segments_tips_and_labels(section_deck: Path, tmp_path: Path) -> None:
     """CSS connectors become thin rectangles, arrow heads and labels."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(section_deck), str(out))
+    to_pptx(str(section_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[2]
     shapes = [s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE]
@@ -807,7 +807,7 @@ def _text_shape(slide: Any, needle: str) -> Any:
 def test_flex_row_splits_into_two_independent_columns(flex_row_deck: Path, tmp_path: Path) -> None:
     """A display:flex row of 2+ sized columns lays out side by side, not stacked."""
     out = tmp_path / "flex-row.pptx"
-    report = to_pptx(str(flex_row_deck), str(out))
+    report = to_pptx(str(flex_row_deck), str(out), paint=False)
     assert report.warnings == []
 
     slide = Presentation(str(out)).slides[0]
@@ -821,7 +821,7 @@ def test_flex_row_splits_into_two_independent_columns(flex_row_deck: Path, tmp_p
 def test_flex_row_columns_flow_independently_top_to_bottom(flex_row_deck: Path, tmp_path: Path) -> None:
     """Each column stacks its own children top to bottom, not merged with the other."""
     out = tmp_path / "flex-row.pptx"
-    to_pptx(str(flex_row_deck), str(out))
+    to_pptx(str(flex_row_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     box_one = _text_shape(slide, "Box One")
@@ -838,7 +838,7 @@ def test_flex_row_columns_flow_independently_top_to_bottom(flex_row_deck: Path, 
 def test_flex_row_right_column_cards_do_not_overlap_or_overflow(flex_row_deck: Path, tmp_path: Path) -> None:
     """The four cards shrink to fit their own narrower column, never overlapping."""
     out = tmp_path / "flex-row.pptx"
-    to_pptx(str(flex_row_deck), str(out))
+    to_pptx(str(flex_row_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     panels = [
@@ -862,7 +862,7 @@ def test_flex_row_without_sizing_hints_falls_back_to_the_regular_flow(flex_row_d
     from an ordinary block stack, so it must flow exactly like one.
     """
     out = tmp_path / "flex-row.pptx"
-    to_pptx(str(flex_row_deck), str(out))
+    to_pptx(str(flex_row_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[1]
     texts = {s.text_frame.text for s in slide.shapes if s.has_text_frame}
@@ -901,7 +901,7 @@ def test_column_widths_returns_none_without_any_sizing_hint() -> None:
 def test_table_merges_spans(section_deck: Path, tmp_path: Path) -> None:
     """colspan and rowspan are converted to real PPTX merges."""
     out = tmp_path / "deck.pptx"
-    to_pptx(str(section_deck), str(out))
+    to_pptx(str(section_deck), str(out), paint=False)
 
     table = next(s.table for s in Presentation(str(out)).slides[3].shapes if s.has_table)
     assert len(table.rows) == 3
@@ -1075,7 +1075,7 @@ def test_style_resolver_applies_inline_overrides() -> None:
 def test_ei_charter_is_drawn(ei_deck: Path, tmp_path: Path) -> None:
     """Every EI slide type gets its frame, its band and its footer ring."""
     out = tmp_path / "ei.pptx"
-    report = to_pptx(str(ei_deck), str(out))
+    report = to_pptx(str(ei_deck), str(out), paint=False)
 
     prs = Presentation(str(out))
     assert report.slide_count == 3
@@ -1104,7 +1104,7 @@ def test_ei_charter_is_drawn(ei_deck: Path, tmp_path: Path) -> None:
 def test_ei_cover_places_every_logo(ei_deck: Path, tmp_path: Path) -> None:
     """Cover pictures are the image plus the three logos, none overlapping."""
     out = tmp_path / "ei.pptx"
-    to_pptx(str(ei_deck), str(out))
+    to_pptx(str(ei_deck), str(out), paint=False)
 
     slide = Presentation(str(out)).slides[0]
     pictures = [s for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE]
@@ -1118,7 +1118,7 @@ def test_ei_cover_places_every_logo(ei_deck: Path, tmp_path: Path) -> None:
 def test_ei_gantt_keeps_scale_labels_and_legend(ei_deck: Path, tmp_path: Path) -> None:
     """The Gantt scale, the dates column and the legend all reach the slide."""
     out = tmp_path / "ei.pptx"
-    to_pptx(str(ei_deck), str(out))
+    to_pptx(str(ei_deck), str(out), paint=False)
 
     texts = {shape.text_frame.text for shape in Presentation(str(out)).slides[2].shapes if shape.has_text_frame}
     assert {"T1", "T2", "Cadrage", "Jan a Fev", "Socle"} <= texts
@@ -1128,7 +1128,7 @@ def test_ei_gantt_keeps_scale_labels_and_legend(ei_deck: Path, tmp_path: Path) -
 def test_ei_tiles_keep_their_bullets(ei_deck: Path, tmp_path: Path) -> None:
     """List items inside a tile are exported with an explicit bullet marker."""
     out = tmp_path / "ei.pptx"
-    to_pptx(str(ei_deck), str(out))
+    to_pptx(str(ei_deck), str(out), paint=False)
 
     text = _all_text(Presentation(str(out)))
     assert "\u2022 un point" in text

@@ -23,6 +23,12 @@ NEW_EXPORT_MODULES = (
     "pptx_blocks.py",
     "pptx_flow.py",
     "pptx_chrome.py",
+    "pptx_paint.py",
+    "pptx_paint_js.py",
+    "pptx_paint_shapes.py",
+    "pptx_paint_style.py",
+    "pptx_paint_tables.py",
+    "pptx_paint_text.py",
 )
 EDITOR_SCRIPTS = (
     "editor.js",

@@ -290,6 +290,15 @@ on stderr), `2` conflicting options (`Error: --report-only cannot be used with -
 The MCP tool `render(file, slide=None, scale=0.5, report=False, report_only=False)` does the same
 and returns `{ok, path, width, height, problems}` with `problems` as a list of `{kind, slide, message}`.
 
+### PPTX fidelity measure
+
+`make pptx-fidelity` exports every presentation template to PPTX, converts it back to a picture with LibreOffice
+(`soffice`) and `pdftoppm`, and compares each slide with the HTML render: a 0 to 1 visual score, text recall, shape,
+picture and table counts. It writes `report.md`, `report.json` and one HTML | PPTX picture per slide to
+`<temporary directory>/pptx-fidelity` and prints a table. It measures only (exit 0); `ARGS='--only breathe'`
+restricts it, `ARGS='--min-score 0.6'` exits 1 below that mean. LibreOffice gets its own fontconfig so it embeds
+the real fonts. Details: `.agent_docs/pptx-fidelity.md`.
+
 ### Read, check and edit a file without touching its images
 
 ```bash
@@ -335,16 +344,18 @@ the union of the rows they declare. Diagrams with no `arch-row` (legacy, hand au
 
 The PPTX export writes one 16:9 slide (13.333 x 7.5 in) per element carrying
 `data-type="slide"`, with a fallback on `article.slide` for older templates. The
-navigation shell, `<script>` and `<style>` are never exported. It detects the
-charter of the document (Euro-Information, IBM Carbon, medical, Breathe, generic), draws the slide
-chrome (frames, footers, logo ring, header rule), then flows the content: text at
-the typographic scale of the template, tile grids, callouts, native tables with
-`colspan` / `rowspan` merges, real Gantt bars, diagram nodes as autoshapes with
-their connectors, annotated images with the annotations placed in the image frame.
-Base64 images are embedded and relative paths resolve against the HTML file. The
-command prints the slide count, lists every skipped item and exits non zero when
-no slide could be written. Full breakdown of what is faithful, approximated or
-lost: `skill/topics/export.md`.
+navigation shell, `<script>` and `<style>` are never exported. Every presentation, whatever its
+charter (Euro-Information, IBM Carbon, medical, Breathe, generic or unknown), is painted from the
+browser: Chromium measures each slide (geometry, computed style, line breaks) and the exporter writes
+editable text boxes (runs, real list bullets with hanging indent and bullet colour), boxes with fill,
+gradient, per side borders, radius, opacity and simple shadow, pictures with the `object-fit` crop,
+`<svg>` and `<canvas>` rasterised at 2x, native tables with `colspan` / `rowspan`, and the notes
+pages. There is no per charter extraction code. Without Chromium (`make install-browser`), without the
+render extra, or when a slide takes more than 30 s, the export still completes with the flow build
+(charter chrome, estimated heights, Gantt bars, diagram nodes and connectors as shapes) and one warning
+`Deck exported without the rendered finish (<reason>)`. Base64 images are embedded and relative paths
+resolve against the HTML file. The command prints the slide count, lists every skipped item and exits
+non zero when no slide could be written. What is kept, approximated or lost: `skill/topics/export.md`.
 
 ### Architecture diagram QA
 
@@ -499,12 +510,12 @@ mcp-htmleditor export pptx talk.html talk.pptx     # painted from the rendered s
   `assets/` folder, then the catalogue shipped with the editor. Asset names must be plain file names;
   a link in `assets/` that leads outside it is refused; nothing is written on a refusal; the previous
   deck goes to the history (`mcp-htmleditor history`). Template files are refused.
-- **PPTX.** The exporter builds the slides, then (Breathe only) opens the deck in Chromium, measures
-  every slide and repaints it: the background picture full bleed, boxes and borders as shapes, icons
-  and pictures at their rendered box, every text an editable text box with the browser's line breaks,
-  face, size, weight and colour. Notes stay on the notes pages. Without Chromium (`make install-browser`)
-  or the render extra, or if the render fails, the export still completes with the flowed slides over
-  their background pictures and one warning `Breathe deck exported without the rendered finish (<reason>)`.
+- **PPTX.** Like every presentation, the deck is opened in Chromium, measured slide by slide and repainted:
+  the background picture full bleed, boxes and borders as shapes, icons and pictures at their rendered
+  box, every text an editable text box with the browser's line breaks, face, size, weight and colour. Notes
+  stay on the notes pages. Without Chromium (`make install-browser`) or the render extra, or if the render
+  fails, the export still completes with the flowed slides over their background pictures and one warning
+  `Deck exported without the rendered finish (<reason>)`.
   Text boxes do not rewrap in PowerPoint: edit the HTML and export again.
 - **Maintenance.** `make breathe-assets` redraws the catalogue (`ARGS=--list` lists it);
   `make sync-breathe-layouts` re-embeds the shipped reference deck and starting point and regenerates

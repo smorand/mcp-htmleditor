@@ -20,6 +20,7 @@ make install-browser  # Chromium for `render` (needs the render extra)
 make run ARGS='export pptx in.html out.pptx'
 make docker-build / run-up / run-down
 make bootstrap-ei  # regenerate the EI bootstrap from the EI reference
+make pptx-fidelity  # score the PPTX export of every presentation template against the HTML (needs soffice, pdftoppm, Chromium; ARGS='--only breathe')
 make sync-medical-css  # propagate the medical charter CSS to the reference decks
 make breathe-assets    # redraw the Breathe decoration catalogue (ARGS=--list to list it)
 make sync-breathe-layouts  # re-embed the Breathe shipped files, regenerate the Breathe picker set
@@ -81,9 +82,13 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   vertical stack.
 - After editing anything under `templates/`, run `make install` or export
   `HTMLEDITOR_TEMPLATES_DIR=$PWD/templates`, otherwise the installed copy wins.
+- PPTX export (SPEC-0024): every presentation is painted from a Chromium measure (`export/pptx_paint*.py`, no charter
+  name in those modules, a test greps for it); the flow engine (`pptx_flow.py`, `pptx_chrome.py`...) is the degraded
+  result without Chromium (warning `Deck exported without the rendered finish (<reason>)`). Tests of the flow output call
+  `to_pptx(..., paint=False)`. Details: `.agent_docs/architecture.md` § Export pipeline, `.agent_docs/pptx-fidelity.md`.
 - `breathe` (SPEC-0023): own key and marker (`data-doc-template="breathe"` or `--breathe-ice` without a `medical`
   declaration; one rule `export/charters.py` `is_breathe`, mirrored in `slide-layouts.js`), keeps the `med-*` classes.
-  Its PPTX is painted from Chromium measures (`export/pptx_paint.py`), degraded with one warning without Chromium.
+  Its PPTX is painted like every presentation (below).
   Decoration lives in `templates/assets/breathe/` (git LFS, `make breathe-assets`); the reference deck
   `templates/reference/slides/breathe.html` is the source of the picker set (`make sync-breathe-layouts`, checked by
   `make check-generated`). Never edit `LAYOUT_SETS.breathe` by hand. See `.agent_docs/html-conventions.md` § Breathe.
@@ -139,6 +144,7 @@ Load only what the task needs.
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
 | `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 22 tool surface, scanner and renumbering rules, gotchas |
 | `.agent_docs/breathe.md` | Breathe template: map of the pieces, detection rule, decoration, painted PPTX, sync, gotchas (SPEC-0023) |
+| `.agent_docs/pptx-fidelity.md` | PPTX fidelity harness (`make pptx-fidelity`): pipeline, score definition, reference modes, output, gotchas; baseline in `sdlc/specs/SPEC-0024-pptx-generic-extraction/baseline.md` |
 | `.agent_docs/render.md` | Visual render: picture rules, output directory and cleanup, scale and size rounding, check order, fixtures and install |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`

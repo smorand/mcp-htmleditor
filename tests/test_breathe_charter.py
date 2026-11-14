@@ -196,7 +196,10 @@ def test_legacy_medical_deck_stays_medical(tmp_path: Path) -> None:
         "lint: FAIL (1 error, 0 warnings)",
     ]
     source = write_deck(tmp_path / "legacy.html", html)
-    report = to_pptx(source, str(tmp_path / "legacy.pptx"))
+    # SPEC-0024: the painted export draws what the HTML shows (the Breathe looking background included); the charter
+    # decision lives in the flow build, which is the degraded result, so it is asserted with the paint off.
+    assert to_pptx(source, str(tmp_path / "painted.pptx")).charter == "medical"
+    report = to_pptx(source, str(tmp_path / "legacy.pptx"), paint=False)
     assert report.charter == "medical"
     from pptx import Presentation
 

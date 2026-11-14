@@ -14,39 +14,35 @@ mcp-htmleditor export docx input.html output.docx
 |---|---|---|
 | Fichier de slides | oui | non |
 | Texte long | non | oui |
-| Gantt, schémas | formes natives éditables | perte de structure |
+| Gantt, schémas | peints en formes | perte de structure |
 
 ## Export PPTX
 
 Une slide de sortie par élément `data-type="slide"` (`<article>` ou `<section>`; repli sur `article.slide` / `section.slide`). Rien hors des slides n'est exporté (barre d'outils, `shell-header`, `status-bar`, `<script>`, `<style>`). Format 16:9, 13,333 x 7,5 pouces, canevas de référence 960 x 540 px: un pixel CSS vaut un point, `font-size: 28px` devient 28 pt.
 
-La charte est détectée (tokens `--med-*` médicale, `--ei-*` Euro-Information, `--ibm-*` / `--cds-*` Carbon, sinon générique); couleurs et tailles sont relues dans la feuille de style puis dans les `style=""` inline. Formes de règles CSS indexées: `.classe`, `.classe.variante`, `.slide.dark .classe`. Les sélecteurs à combinateur (`>`), d'attribut ou qualifiés par une balise (`ul.med-list li`) ne sont pas relus.
+### Converti fidèlement (peint depuis le navigateur, toutes les chartes)
 
-### Converti fidèlement
+Avec Chromium (`make install-browser`), chaque slide est mesurée dans le navigateur puis repeinte, sans code par charte:
 
 | Élément | Résultat |
 |---|---|
-| slides EI `content` / `agenda` / `diagram` / `section` / `title` | cadre bleu, zone arrondie, pied, fond plein, couverture |
-| charte médicale | bandeau gris, filet teal puis orange, bande de sources en bas à gauche, numéro de page à droite; `image` / `grid` / `compare` en `class="slide dark"` en fond `#0B0E11` |
-| charte `breathe` | slides repeintes depuis le rendu Chromium (fond, cadres, icônes, images, texte éditable aux retours de ligne du navigateur, notes); sans Chromium: fond plus contenu en flux et un avertissement. `skill --type breathe` |
-| slides Carbon | fond, filet bleu sous l'en-tête, pied gris |
-| titres, eyebrow, tuiles, encadrés | zones de texte à l'échelle de la charte |
-| `cds-grid` / `stat-grid` / `mention-wrap` | grille de tuiles |
-| `cds-notification` (+ `success` / `warning` / `error`) | panneau teinté à barre latérale |
-| `<table>` / `cds-structured-list` | table PPTX: en-tête à la couleur de charte, largeurs du `colgroup` ou `data-col-width`, `colspan` et `rowspan` fusionnés |
-| `data-type="gantt"` | barres positionnées (`left`/`width` inline, sinon `data-start`/`data-end`), échelle, légende |
-| `data-type="arch-node"` | forme native (`data-shape`: box, circle, diamond, cylinder, cloud) |
-| `data-type="arch-edge"` | segments, pointes, libellés |
-| `data-type="annotated-image"` | image + annotations dans le repère de l'image |
-| images | base64 décodé et embarqué; chemin relatif résolu par rapport au fichier HTML |
-| `cw-bar`, `<ul>` / `<ol>` | barre proportionnelle, puces et numéros |
+| texte | zones éditables aux retours de ligne du navigateur; runs (gras, italique, couleur, souligné), espacement des lettres; `<ul>` / `<ol>` en vraies puces et numéros (retrait, couleur de puce, `start`) |
+| boîtes | fond, dégradé linéaire, bordures par côté, rayon (rectangle arrondi, ellipse), opacité, ombre simple; fond de `<code>` ou de `<span>` en pastille arrondie |
+| images | `<img>` et fonds CSS avec crop `object-fit`; `<svg>`, `<canvas>` et image vectorielle en image 2x (leur texte reste en texte alternatif); fond de slide plein cadre |
+| `<table>` | table native (largeurs et hauteurs mesurées, `colspan`, `rowspan`, fonds, bordures); si une cellule contient un bloc, une image ou une pastille, la table est peinte en boîtes et en texte |
+| pseudo-éléments | `::before` / `::after` avec un texte ou un fond sont mesurés (puces maison, tirets); les compteurs CSS (`counter()`) restent perdus |
+| Gantt, schémas, image annotée | peints depuis le DOM rendu, pas d'objet natif |
+
+Mesure dans la fenêtre du rendu produit (1280 x 900). Ce qui sort de la boîte de la slide (défilement) n'est pas exporté.
 
 ### Approximé
 
-- Mise en page en flux vertical de blocs: hauteurs estimées, un contenu dense est réduit au lieu de déborder. Un conteneur `display:flex` en ligne avec 2 colonnes ou plus est reconnu si au moins un enfant porte une largeur (`flex`, `flex-basis` ou `width`); sans indice de largeur il reste une pile verticale.
-- Colonnes de `cds-grid` égales (`grid-template-columns` non lu); dégradés ramenés à leur première couleur; rayons et ombres simplifiés.
-- Polices non embarquées (Segoe UI pour EI, IBM Plex Sans pour Carbon, repli système).
-- Sélecteurs descendants indexés sur leur dernière classe.
+- Polices non installées: le nom est gardé, PowerPoint choisit un repli. Texte sans reflux: modifier le HTML puis réexporter.
+- Slide plus grande ou plus petite que 960 x 540: mise à l'échelle, polices comprises; le texte peut descendre de quelques points.
+
+### Mode dégradé
+
+Sans Chromium, sans l'extra `render`, ou si une slide dépasse 30 s, l'export se termine avec les slides en flux (charte détectée, hauteurs estimées, grandes lignes seulement) et un avertissement `Deck exported without the rendered finish (<raison>)`. Les avertissements sur les vecteurs ne valent que dans ce mode.
 
 ### Notes du présentateur
 
@@ -54,11 +50,10 @@ L'`<aside data-role="speaker-notes">` enfant direct d'une slide n'est jamais une
 
 ### Perdu
 
-- Animations et transitions CSS; compteurs CSS et pseudo-éléments (`::before`, `::after`).
-- SVG inline (aucune conversion vectorielle): utiliser un `<img>` PNG.
-- Fonds de `<span>` (`tag-blue`, `tag-green`, `.med-badge`): seule la couleur du texte reste.
-- Images distantes (`http://`, `https://`): signalées et ignorées, les télécharger ou passer en base64.
+- Animations et transitions CSS, filtres, `mix-blend-mode`, ombres avec étalement ou `inset`, dégradés radiaux.
 - Le `max-width` d'un texte (barre de largeur de l'éditeur): la zone de texte garde la largeur de son bloc.
+- SVG: pas de conversion vectorielle, l'image est un PNG (en mode dégradé, utiliser un `<img>` PNG).
+- Images distantes (`http://`, `https://`): signalées et ignorées, les télécharger ou passer en base64.
 
 ### Diagnostics et vérification
 
@@ -70,7 +65,7 @@ python3 -c "from pptx import Presentation; p=Presentation('/tmp/pres.pptx'); pri
 soffice --headless --convert-to pdf /tmp/pres.pptx --outdir /tmp/ && pdftoppm -jpeg -r 72 /tmp/pres.pdf /tmp/slide
 ```
 
-Après export: relire les slides denses dans PowerPoint ou LibreOffice, vérifier les avertissements; toutes les formes sont natives et éditables.
+Après export: relire dans PowerPoint ou LibreOffice, vérifier les avertissements. `make pptx-fidelity` note chaque modèle.
 
 ## Export DOCX
 

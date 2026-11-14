@@ -3,7 +3,7 @@
 
 .PHONY: sync run run-dev test test-cov lint lint-fix format format-check typecheck \
         security check build install install-browser install-skill uninstall docker-build docker-push \
-        docker run-up run-down bootstrap-ei sync-medical-css sync-deck-pointer breathe-assets sync-breathe-layouts check-generated clean clean-all info help
+        docker run-up run-down bootstrap-ei sync-medical-css sync-deck-pointer pptx-fidelity breathe-assets sync-breathe-layouts check-generated clean clean-all info help
 
 PROJECT_NAME=$(shell grep -m1 '^name' pyproject.toml 2>/dev/null | sed 's/.*= *"\([^"]*\)".*/\1/')
 PACKAGE := mcp_htmleditor
@@ -260,6 +260,10 @@ sync-medical-css:
 sync-deck-pointer:
 	@uv run python tools/sync_deck_pointer.py
 
+## pptx-fidelity: Measure PPTX export fidelity of every presentation template (needs soffice, pdftoppm, Chromium; ARGS='--only breathe --min-score 0.6')
+pptx-fidelity:
+	@uv run --extra render python tools/pptx_fidelity.py $(ARGS)
+
 ## breathe-assets: Redraw the Breathe decoration catalogue into templates/assets/breathe (ARGS='--list', '--out DIR', '--src DIR', '--only a.png,b.png')
 breathe-assets:
 	@uv run python tools/breathe_assets.py $(ARGS)
@@ -358,6 +362,7 @@ help:
 	@echo "  bootstrap-ei     - Regenerate the EI bootstrap from the EI reference"
 	@echo "  sync-medical-css - Propagate the medical charter CSS to the reference decks"
 	@echo "  sync-deck-pointer - Propagate the presentation pointer block to every presentation template"
+	@echo "  pptx-fidelity    - Score the PPTX export of every presentation template against the HTML render (ARGS='--only NAME')"
 	@echo "  breathe-assets   - Redraw the Breathe decoration catalogue (ARGS='--list' to list only)"
 	@echo "  sync-breathe-layouts - Re-embed the Breathe shipped files and regenerate the Breathe picker layouts"
 	@echo "  check-generated  - Verify the generated template files are fresh (writes nothing)"

@@ -43,7 +43,7 @@ TEMPLATES = (
 def slide_hashes(template: str, workdir: Path) -> dict[str, str]:
     """Export a template and return the SHA-256 of each slide XML part, keyed by part name."""
     output = workdir / "out.pptx"
-    to_pptx(str(REPO_ROOT / template), str(output))
+    to_pptx(str(REPO_ROOT / template), str(output), paint=False)
     with zipfile.ZipFile(output) as archive:
         names = sorted(n for n in archive.namelist() if n.startswith("ppt/slides/slide") and n.endswith(".xml"))
         return {name: hashlib.sha256(archive.read(name)).hexdigest() for name in names}
