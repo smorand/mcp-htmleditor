@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: L
 > Depth evidence: 6 areas touched (template catalogue, deck checking, PPTX export, editor page and its layout picker, editor server, agent skill), 36 requirements (25 new, 3 modified, 8 non functional), a new public command and a new kind of served file; no persisted concept
-> Status: specified
+> Status: designed
 > Generated on: 2026-11-14
 > Project: existing
 > From backlog: BL-0044
