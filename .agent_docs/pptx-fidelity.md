@@ -35,3 +35,18 @@ does not gate: exit 0 unless a tool failed (1) or a prerequisite is missing or t
 - `render_deck` deletes the other pictures of the same file stem at each call, so canvas mode copies each picture at once.
 - The overflow flag looks at shape boxes, not text height, and sees nothing on decks whose text visibly spills.
 - Tests: `tests/test_pptx_fidelity.py` (pure functions in the gate, one end to end `slow` test).
+
+## 2026-11-14 Phase 2b (Carbon)
+
+- H1b: a stack such as `'IBM Plex Sans', -apple-system` is drawn by Chromium in the system font when Plex is missing, while
+  LibreOffice draws the alias (Helvetica Neue): the score measured the font. The harness now renders and exports a copy of
+  each deck (`<name>.equalised.html` in the work dir, with a `<base>` to the original folder) that adds `@font-face` rules
+  mapping the missing faces to their substitute with `local()`. `--raw-fonts` gives the old behaviour (phase 2a numbers).
+  A variable system font as alias is not usable (LibreOffice picks the condensed bold instance).
+- The slide box itself (border, shadow ignored) is painted: the 1 px frame of a Carbon slide was worth 0.02 of SSIM.
+- Text boxes: exact line spacing in points, moved by `baseline_shift` (mean of the PowerPoint and LibreOffice baseline
+  models) so the glyphs sit where the browser draws them; table cells move the shift between top and bottom margin so the
+  row height is kept. Row heights grow in LibreOffice when the content is taller than the measured row.
+- Clipped footers of `ibm-carbon`: the catalogue slides were taller than the viewport cap (`max-height:100%` and
+  `overflow-y:auto`), so the browser scrolled the footer out. Fixed in the template (`dense` on slides 3, 5, 7, 9,
+  `compact` list on slide 7, narrower screenshot on slide 9), checked with the box measure of `render`.

@@ -404,7 +404,53 @@ def side_by_side(left: Image.Image, right: Image.Image, target: Path) -> None:
     canvas.save(target)
 
 
-def measure_template(name: str, path: Path, out: Path, reference: str = "slide") -> TemplateResult:
+FACE_VARIANTS = {
+    "Helvetica Neue": (
+        ("400", "normal", "Helvetica Neue", "HelveticaNeue"),
+        ("600", "normal", "Helvetica Neue Bold", "HelveticaNeue-Bold"),
+        ("700", "normal", "Helvetica Neue Bold", "HelveticaNeue-Bold"),
+        ("400", "italic", "Helvetica Neue Italic", "HelveticaNeue-Italic"),
+    ),
+    "Menlo": (
+        ("400", "normal", "Menlo", "Menlo-Regular"),
+        ("600", "normal", "Menlo Bold", "Menlo-Bold"),
+        ("700", "normal", "Menlo Bold", "Menlo-Bold"),
+        ("400", "italic", "Menlo Italic", "Menlo-Italic"),
+    ),
+}
+
+
+def equalised_fonts_css() -> str:
+    """``@font-face`` rules that make the faces this machine lacks resolve to their harness substitute in Chromium too.
+
+    Without them Chromium draws a stack such as ``'IBM Plex Sans', -apple-system`` in the system font while
+    LibreOffice draws the substitute, and the score measures the font, not the export (H1b). Harness only: the
+    product export is untouched and still names the first family of the stack.
+    """
+    rules = []
+    for name in FONT_SUBSTITUTES:
+        for weight, style, full, postscript in FACE_VARIANTS[FONT_SUBSTITUTES[name]]:
+            rules.append(
+                f'@font-face{{font-family:"{name}";font-weight:{weight};font-style:{style};'
+                f'src:local("{full}"),local("{postscript}")}}'
+            )
+    return "<style>" + "".join(rules) + "</style>"
+
+
+def with_equalised_fonts(path: Path, folder: Path) -> Path:
+    """A copy of the deck in ``folder`` with a ``<base>`` to the original folder and the equalised font rules."""
+    text = path.read_text(encoding="utf-8")
+    head = re.search(r"<head[^>]*>", text, re.IGNORECASE)
+    injected = f'<base href="{path.parent.as_uri()}/">' + equalised_fonts_css()
+    text = text[: head.end()] + injected + text[head.end() :] if head else injected + text
+    copy = folder / f"{path.stem}.equalised.html"
+    copy.write_text(text, encoding="utf-8")
+    return copy
+
+
+def measure_template(
+    name: str, path: Path, out: Path, reference: str = "slide", equalise: bool = True
+) -> TemplateResult:
     """Run the whole pipeline for one template."""
     from mcp_htmleditor.deck import load_deck
 
@@ -414,9 +460,10 @@ def measure_template(name: str, path: Path, out: Path, reference: str = "slide")
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True)
     try:
-        html_pictures = render_slides(path, folder, reference)
+        source = with_equalised_fonts(path, folder) if equalise else path
+        html_pictures = render_slides(source, folder, reference)
         pptx = folder / f"{name}.pptx"
-        result.export_warnings = export_deck(path, pptx)
+        result.export_warnings = export_deck(source, pptx)
         pages = rasterize(pptx, folder)
         facts = inspect_pptx(pptx)
         _score_slides(result, load_deck(str(path)).slides, (html_pictures, pages, facts), folder)
@@ -541,6 +588,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="slide: whole slide box; canvas: product 960x540 clip",
     )
     parser.add_argument(
+        "--raw-fonts",
+        action="store_true",
+        help="do not equalise the faces this machine lacks in the HTML render (the SPEC-0024 phase 2a numbers)",
+    )
+    parser.add_argument(
         "--jobs", type=int, default=3, help="templates measured in parallel (soffice has its own profile)"
     )
     return parser.parse_args(argv)
@@ -570,7 +622,10 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         results = list(
-            pool.map(lambda item: measure_template(item[0], item[1], args.out, args.reference), templates.items())
+            pool.map(
+                lambda item: measure_template(item[0], item[1], args.out, args.reference, not args.raw_fonts),
+                templates.items(),
+            )
         )
     write_reports(results, args.out)
     print(summary_table(results))

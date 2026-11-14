@@ -165,3 +165,12 @@ def test_unit_conversions() -> None:
     assert line_dash("dashed") == "dash"
     assert line_dash("dotted") == "sysDot"
     assert line_dash("solid") is None
+
+
+def test_baseline_shift_is_the_mean_of_the_two_engine_models() -> None:
+    from mcp_htmleditor.export.pptx_paint_style import baseline_shift
+
+    assert baseline_shift(20.0, 12.5) == pytest.approx(0.405 * 20 - 0.465 * 12.5)
+    assert baseline_shift(13.0, 12.0) < 0  # a tight line sits lower in the browser: the box moves down
+    assert baseline_shift(24.0, 12.0) > 3  # a roomy line: up by several points
+    assert baseline_shift(0.0, 0.0) == 0

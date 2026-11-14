@@ -186,6 +186,22 @@ def _first_line(exc: BaseException) -> str:
     return (lines[0] if lines else type(exc).__name__)[:REASON_MAX_CHARS]
 
 
+HIDE_TEXT_JS: Final = (
+    "([rid, hidden]) => document.querySelectorAll('[data-pptx-svgtext=\"' + rid + '\"]')"
+    ".forEach((n) => n.style.setProperty('visibility', hidden ? 'hidden' : ''))"
+)
+
+
+def _screenshot(page: Any, rid: str) -> bytes:
+    """PNG of one figure; the ``<text>`` of an svg are hidden first, they are written as editable text boxes."""
+    page.evaluate(HIDE_TEXT_JS, [rid, True])
+    try:
+        png: bytes = page.locator(f'[data-pptx-raster="{rid}"]').first.screenshot(type="png", timeout=TIMEOUT_MS)
+    finally:
+        page.evaluate(HIDE_TEXT_JS, [rid, False])
+    return png
+
+
 def _rasterise(page: Any, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Replace each ``raster`` item (svg, canvas, vector image) by the picture the browser draws of it, at 2x."""
     from playwright.sync_api import Error  # noqa: PLC0415 - optional render extra, already loaded by the caller
@@ -196,7 +212,7 @@ def _rasterise(page: Any, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             result.append(item)
             continue
         try:
-            png = page.locator(f'[data-pptx-raster="{item["rid"]}"]').first.screenshot(type="png", timeout=TIMEOUT_MS)
+            png = _screenshot(page, item["rid"])
         except Error as exc:
             logger.warning("Figure not rasterised: %s", _first_line(exc))
             result.append({"kind": "lost"})

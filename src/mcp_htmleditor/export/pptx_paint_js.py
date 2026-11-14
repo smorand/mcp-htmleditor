@@ -66,7 +66,14 @@ const rgba = (c) => {
 };
 const urlOf = (bg) => { const m = bg && bg.match(/url\("?([^")]+)"?\)/); return m ? m[1] : null; };
 const gradientOf = (bg) => (bg && /linear-gradient\(/.test(bg) ? bg : null);
-const isInline = (el) => { const d = getComputedStyle(el).display; return d === 'inline' || d === 'contents'; };
+// LOOSE: inside a table cell an inline-block pill is part of the text line
+let LOOSE = false;
+// CELL_CHIPS: pills of the cell being read when its fill is transparent, drawn under the table text
+let CELL_CHIPS = null;
+const isInline = (el) => {
+  const d = getComputedStyle(el).display;
+  return d === 'inline' || d === 'contents' || (LOOSE && (d === 'inline-block' || d === 'inline-flex'));
+};
 const radiusOf = (cs, w, h) => ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map((k) => {
   const v = cs['border' + k + 'Radius'];
   return v.indexOf('%') > 0 ? parseFloat(v) / 100 * Math.min(w, h) : px(v);
@@ -87,28 +94,9 @@ const isRaster = (el) => RASTER.has(el.tagName.toLowerCase()) || (el.tagName ===
 
 # Text of one block: words with their style and rectangles, grouped in the browser's own lines.
 TEXT_JS: Final = r"""
-const FACE_CACHE = new Map();
-const PROBE = document.createElement('canvas').getContext('2d');
-const probeWidth = (face, base) => { PROBE.font = '72px ' + face + ', ' + base; return PROBE.measureText('mmmmmmmmmmlliWQ@').width; };
-const GENERIC = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif', 'ui-serif']);
-// the first face of a font-family list the browser really has (a stack names fonts the machine may not ship)
-function resolveFace(list) {
-  if (FACE_CACHE.has(list)) return FACE_CACHE.get(list);
-  let found = null;
-  for (const raw of list.split(',')) {
-    const face = raw.trim().replace(/^['"]|['"]$/g, '');
-    if (!face) continue;
-    const quoted = JSON.stringify(face);
-    if (GENERIC.has(face) || face.startsWith('-')
-        || probeWidth(quoted, 'monospace') !== probeWidth('monospace', 'monospace')
-        || probeWidth(quoted, 'serif') !== probeWidth('serif', 'serif')) { found = face; break; }
-  }
-  FACE_CACHE.set(list, found || list);
-  return found || list;
-}
 const styleOf = (el) => {
   const c = getComputedStyle(el);
-  return {font: resolveFace(c.fontFamily), size: px(c.fontSize) * K.x, weight: parseInt(c.fontWeight, 10) || 400,
+  return {font: c.fontFamily, size: px(c.fontSize) * K.x, weight: parseInt(c.fontWeight, 10) || 400,
           italic: c.fontStyle === 'italic', color: rgba(c.color),
           ls: c.letterSpacing === 'normal' ? 0 : px(c.letterSpacing) * K.x, upper: c.textTransform === 'uppercase',
           under: c.textDecorationLine.indexOf('underline') >= 0, strike: c.textDecorationLine.indexOf('line-through') >= 0};
@@ -120,12 +108,10 @@ const hasOwnText = (el) => {
   }
   return false;
 };
-const hasChipOrBlock = (cell) => Array.from(cell.querySelectorAll('*')).some((n) => {
+const hasBlock = (cell) => Array.from(cell.querySelectorAll('*')).some((n) => {
   const c = getComputedStyle(n);
   if (c.display === 'none') return false;
-  if (!isInline(n) && n.tagName !== 'BR') return true;
-  return isRaster(n) || n.tagName === 'IMG' || (rgba(c.backgroundColor) || [0, 0, 0, 0])[3] > 0
-    || ['Top', 'Right', 'Bottom', 'Left'].some((s) => drawn(sideOf(c, s)));
+  return (!isInline(n) && n.tagName !== 'BR') || isRaster(n) || n.tagName === 'IMG';
 });
 function bulletOf(el, cs) {
   if (cs.display !== 'list-item' || cs.listStyleType === 'none') return null;
@@ -150,7 +136,7 @@ function chipsOf(n, c, op, chips) {
                 border: uniform && drawn(sides[0]) ? {w: sides[0].w * K.x, color: sides[0].color, style: sides[0].style} : null});
   }
 }
-function textItem(el, cs, op) {
+function textItem(el, cs, op, inCell) {
   const words = [];
   const chips = [];
   let pending = false;
@@ -177,8 +163,11 @@ function textItem(el, cs, op) {
         if (n.tagName === 'IMG' || isRaster(n) || !isInline(n)) continue;
         const c = getComputedStyle(n);
         if (c.display === 'none' || c.visibility === 'hidden') continue;
-        chipsOf(n, c, op, chips);
-        visit(n, styleOf(n));
+        const st = styleOf(n);
+        const bg = rgba(c.backgroundColor);
+        if (inCell && CELL_CHIPS) chipsOf(n, c, op, CELL_CHIPS);
+        else if (inCell) { if (bg && bg[3] > 0) st.hl = bg; } else chipsOf(n, c, op, chips);
+        visit(n, st);
       }
     }
   }
@@ -210,8 +199,12 @@ function textItem(el, cs, op) {
 # Native table: the grid is the union of the cell edges, so spans come out of the geometry.
 TABLE_JS: Final = r"""
 function tableItem(table, op) {
+  LOOSE = true;
+  try { return tableItemLoose(table, op); } finally { LOOSE = false; }
+}
+function tableItemLoose(table, op) {
   const cells = Array.from(table.querySelectorAll('td, th')).filter((c) => c.closest('table') === table);
-  if (!cells.length || cells.some(hasChipOrBlock)) return null;
+  if (!cells.length || cells.some(hasBlock)) return null;
   const edge = (v) => Math.round(v * 2) / 2;
   const xs = new Set(), ys = new Set();
   for (const c of cells) {
@@ -228,9 +221,12 @@ function tableItem(table, op) {
     return null;
   };
   const out = [];
+  const cellChips = [];
   for (const c of cells) {
     const q = c.getBoundingClientRect(), cs = getComputedStyle(c);
-    const text = hasOwnText(c) ? textItem(c, cs, op) : null;
+    CELL_CHIPS = fillOf(c) ? null : cellChips;
+    const text = hasOwnText(c) ? textItem(c, cs, op, true) : null;
+    CELL_CHIPS = null;
     const c0 = at(gx, q.left), c1 = at(gx, q.right), r0 = at(gy, q.top), r1 = at(gy, q.bottom);
     if (c0 < 0 || c1 <= c0 || r0 < 0 || r1 <= r0) return null;
     out.push({r: r0, c: c0, rs: r1 - r0, cs: c1 - c0, fill: fillOf(c), valign: cs.verticalAlign, text: text,
@@ -240,7 +236,7 @@ function tableItem(table, op) {
   }
   return {kind: 'table', op: op, box: rel(gx[0], gy[0], gx[gx.length - 1] - gx[0], gy[gy.length - 1] - gy[0]),
           cols: gx.slice(1).map((v, i) => (v - gx[i]) * K.x), rows: gy.slice(1).map((v, i) => (v - gy[i]) * K.y),
-          cells: out};
+          cells: out, chips: cellChips};
 }
 """
 
@@ -270,12 +266,15 @@ function boxItems(cs, r, op, items) {
     items.push({kind: 'pic', box: inner, src: img, op: op, position: cs.backgroundPosition,
                 fit: bs === 'cover' ? 'cover' : bs === 'contain' ? 'contain' : 'fill'});
   }
-  if (framed) return;
+  if (!framed) sideRects(cs, r, op, items);
+}
+function sideRects(cs, r, op, items) {
+  const sides = ['Top', 'Right', 'Bottom', 'Left'].map((s) => sideOf(cs, s));
   const side = (b, box) => { if (drawn(b)) items.push({kind: 'rect', box: box, color: b.color, radius: [0, 0, 0, 0], op: op}); };
-  side(sides[0], rel(r.left, r.top, r.width, bt));
-  side(sides[2], rel(r.left, r.bottom - bb, r.width, bb));
-  side(sides[3], rel(r.left, r.top, bl, r.height));
-  side(sides[1], rel(r.right - br, r.top, br, r.height));
+  side(sides[0], rel(r.left, r.top, r.width, sides[0].w));
+  side(sides[2], rel(r.left, r.bottom - sides[2].w, r.width, sides[2].w));
+  side(sides[3], rel(r.left, r.top, sides[3].w, r.height));
+  side(sides[1], rel(r.right - sides[1].w, r.top, sides[1].w, r.height));
 }
 function pictureItem(ch, cs, r, op) {
   const bl = px(cs.borderLeftWidth), bt = px(cs.borderTopWidth);
@@ -284,6 +283,30 @@ function pictureItem(ch, cs, r, op) {
   const h = r.height - bt - px(cs.borderBottomWidth) - px(cs.paddingTop) - px(cs.paddingBottom);
   return {kind: 'pic', box: rel(x, y, w, h), src: ch.currentSrc, fit: cs.objectFit, op: op,
           position: cs.objectPosition, natural: [ch.naturalWidth, ch.naturalHeight]};
+}
+function svgTexts(svg, op, items) {
+  const k = svg.getScreenCTM() ? svg.getScreenCTM().a : 1;
+  for (const t of svg.querySelectorAll('text')) {
+    const c = getComputedStyle(t);
+    if (c.display === 'none' || c.visibility === 'hidden') continue;
+    const parts = Array.from(t.querySelectorAll('tspan')).filter((n) => n.children.length === 0 && n.textContent.trim());
+    const nodes = parts.length ? parts : [t];
+    for (const n of nodes) {
+      const text = n.textContent.replace(/\s+/g, ' ').trim();
+      const q = n.getBoundingClientRect();
+      if (!text || q.width <= 0) continue;
+      const tc = getComputedStyle(n);
+      const fill = rgba(tc.fill) || rgba(c.fill) || [0, 0, 0, 1];
+      const fo = px(tc.fillOpacity === '' ? '1' : tc.fillOpacity);
+      const size = px(tc.fontSize) * k * K.x;
+      const st = {font: tc.fontFamily, size: size, weight: parseInt(tc.fontWeight, 10) || 400, italic: tc.fontStyle === 'italic',
+                  color: [fill[0], fill[1], fill[2], fill[3] * fo], ls: 0, upper: false, under: false, strike: false};
+      const words = text.split(' ').map((w, i) => ({t: w, s: st, sp: i > 0}));
+      const box = rel(q.left, q.top, q.width, q.height);
+      items.push({kind: 'text', align: 'left', lh: box[3], op: op, bullet: null, chips: [], box: box, content: box, lines: [words]});
+      n.setAttribute('data-pptx-svgtext', svg.getAttribute('data-pptx-raster'));
+    }
+  }
 }
 function walk(el, items) {
   for (const ch of el.children) {
@@ -300,6 +323,7 @@ function walk(el, items) {
         items.push({kind: 'raster', box: rel(r.left, r.top, r.width, r.height), rid: id, op: op,
                     alt: (ch.getAttribute('aria-label') || ch.getAttribute('alt') || ch.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 600)});
       }
+      if (ch.tagName.toLowerCase() === 'svg') svgTexts(ch, op, items);
       continue;
     }
     if (isInline(ch) && ch.tagName !== 'IMG') continue;  // its text belongs to the parent block
@@ -308,7 +332,7 @@ function walk(el, items) {
       if (ch.tagName === 'IMG' && ch.currentSrc) items.push(pictureItem(ch, cs, r, op));
       if (ch.tagName === 'TABLE') {
         const t = tableItem(ch, op);
-        if (t) { items.push(t); continue; }
+        if (t) { for (const chip of t.chips) items.push(chip); items.push(t); continue; }
       }
     }
     if (ch.tagName !== 'IMG' && hasOwnText(ch)) {
@@ -338,6 +362,7 @@ _TAIL: Final = r"""
   let base = rgba(scs.backgroundColor);
   for (let n = SLIDE.parentElement; n && !(base && base[3] > 0); n = n.parentElement) base = rgba(getComputedStyle(n).backgroundColor);
   items.push({kind: 'slide', color: base, gradient: gradientOf(scs.backgroundImage), image: urlOf(scs.backgroundImage)});
+  sideRects(scs, S, 1, items);
   walk(SLIDE, items);
   const inside = (b) => b[0] < 960 && b[1] < 540 && b[0] + b[2] > 0 && b[1] + b[3] > 0;
   return items.filter((i) => i.kind === 'slide' || inside(i.box));

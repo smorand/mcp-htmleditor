@@ -15,7 +15,7 @@ from pptx.oxml.ns import qn
 from pptx.util import Emu
 
 from .pptx_paint_shapes import add_alpha, srgb_element
-from .pptx_paint_style import EMU_PER_POINT, alpha_of, line_dash, rgb, table_span, to_emu
+from .pptx_paint_style import EMU_PER_POINT, alpha_of, baseline_shift, line_dash, rgb, table_span, to_emu
 from .pptx_paint_text import align_of, sizes, write_lines
 
 ANCHORS: Final = {"middle": MSO_ANCHOR.MIDDLE, "bottom": MSO_ANCHOR.BOTTOM}
@@ -53,6 +53,11 @@ class TablesMixin:
     @staticmethod
     def _style_cell(target: Any, cell: dict[str, Any], opacity: float) -> None:
         left, top, right, bottom = cell["pad"]
+        text = cell.get("text")
+        if text:
+            shift = baseline_shift(text["lh"], text["lines"][0][0]["s"]["size"])
+            shift = max(-top, min(shift, bottom))  # the cell keeps its height: what leaves the top enters the bottom
+            top, bottom = top - shift, bottom + shift
         target.margin_left, target.margin_top = Emu(round(left * EMU_PER_POINT)), Emu(round(top * EMU_PER_POINT))
         target.margin_right, target.margin_bottom = (
             Emu(round(right * EMU_PER_POINT)),
@@ -66,7 +71,6 @@ class TablesMixin:
         else:
             target.fill.background()
         _borders(target._tc.get_or_add_tcPr(), cell["borders"], opacity)
-        text = cell.get("text")
         if text:
             write_lines(target.text_frame, text, align_of(text["align"]))
         else:  # an empty cell must not stretch its row with the default 18 pt paragraph

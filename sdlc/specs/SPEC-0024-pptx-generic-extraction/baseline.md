@@ -168,3 +168,53 @@ What remains:
 - Remaining visual gap is the font (PowerPoint and LibreOffice draw Helvetica Neue or Arial where the HTML used an
   unavailable condensed face) and exact line spacing in LibreOffice (about 3 px lower text).
 - Breathe lost 0.002 (0.954 to 0.952): the 2x raster and the generic bullets, within noise.
+
+
+## Result of phase 2b (IBM Carbon)
+
+Targets on `ibm-carbon`, `example-carbon-complete` and `slides-empty`: mean >= 0.92, worst slide >= 0.85, recall >= 0.98, no
+other template down by more than 0.005. "Before" is the phase 2a run above (same code state as the end of 2a, raw fonts).
+Two harness readings of the new code: `--raw-fonts` (same harness as before) and the default, where the harness
+equalises the faces this machine lacks in the HTML render too (H1b, see `.agent_docs/pptx-fidelity.md`).
+
+| template | slides | before (2a) | after, raw fonts | after, equalised fonts | worst after (eq) | recall after | tables after |
+|---|---|---|---|---|---|---|---|
+| slides-breathe-empty | 1 | 0.941 | 0.961 | 0.961 | 0.96 | 1.00 | 0 |
+| slides-ei-empty | 1 | 0.968 | 0.960 | 0.970 | 0.97 | 1.00 | 0 |
+| slides-empty | 1 | 0.957 | 0.973 | 0.994 | 0.99 | 1.00 | 0 |
+| slides-medical-empty | 1 | 0.964 | 0.977 | 0.977 | 0.98 | 1.00 | 0 |
+| breathe | 23 | 0.952 | 0.975 | 0.975 | 0.95 | 1.00 | 2 |
+| euro-information | 3 | 0.982 | 0.974 | 0.984 | 0.97 | 1.00 | 1 |
+| example-carbon-complete | 9 | 0.878 | 0.903 | 0.952 | 0.93 | 1.00 | 3 |
+| example-ei-complete | 9 | 0.954 | 0.925 | 0.964 | 0.92 | 1.00 | 2 |
+| example-medical-complete | 15 | 0.915 | 0.948 | 0.948 | 0.88 | 1.00 | 2 |
+| ibm-carbon | 9 | 0.850 | 0.871 | 0.933 | 0.91 | 1.00 | 2 |
+| medical | 16 | 0.927 | 0.956 | 0.956 | 0.92 | 1.00 | 2 |
+| presentation-standard | 4 | 0.979 | 0.988 | 0.988 | 0.98 | 1.00 | 0 |
+| roadmap-one-pager | 1 | 0.989 | 0.991 | 0.991 | 0.99 | 1.00 | 0 |
+| all 93 slides | 93 | 0.928 | 0.946 | 0.961 | 0.88 | | |
+
+Carbon targets (equalised harness): ibm-carbon 0.933 / worst 0.91 / recall 1.00, example-carbon-complete 0.952 / 0.93 / 1.00,
+slides-empty 0.994 / 1.00. All met. In the raw harness ibm-carbon is 0.871 and example-carbon-complete 0.903: the HTML
+there is drawn in the system font (SF) while LibreOffice draws Helvetica Neue, which no export can close.
+Carbon slides under 0.93 (none under 0.88): ibm-carbon slide-2 0.906 and slide-4 0.906 (tables and card grids: the pills
+of a table cell are shapes under the text, code uses a monospace of different advance), slide-8 0.922 (screenshot svg
+rebuilt as picture plus text), slide-6 0.926, slide-1 0.927; example-carbon-complete slide-8 0.929.
+
+Regression check on the other ten (raw harness, after minus before): breathe-empty +0.020, medical-empty +0.012, breathe
++0.023, medical-complete +0.032, medical +0.030, presentation-standard +0.009, roadmap +0.002, and three EI files down:
+ei-empty -0.007, euro-information -0.008, example-ei-complete -0.028. Cause: since 2b the PPTX names the first family of
+the stack (`Segoe UI`, point 5 of the brief) while this Chromium draws the stack in Arial (Segoe UI and Calibri missing),
+and LibreOffice draws the Helvetica Neue alias. With the faces equalised the same three are up: 0.970, 0.984, 0.964
+(before 0.968, 0.982, 0.954). So the exceeding of the 0.005 bound is a font availability effect of the naming rule, not a
+layout regression; to be re-checked on a machine with Segoe UI.
+
+What changed (generic, no charter name): native tables also for cells with inline or inline-block pills (pill shape under
+the text when the cell has no fill, `a:highlight` when it has); `<text>` and `<tspan>` of an inline svg as editable text
+over the picture of the svg without its text (recall of ibm-carbon 0.93 to 1.00); slide box border painted; baseline
+shift for exact line spacing; text boxes clamped to the slide; first named family of the stack written as the face.
+Template: `ibm-carbon.html` slides 3, 5, 7, 9 were taller than the 900 x 716 box of the product render (footer scrolled
+out): `dense` on four slides, `compact` list on slide 7, narrower screenshot on slide 9; all nine slides now fit.
+Remaining: PowerPoint itself was not available here, the structure is checked with python-pptx and a schema order test
+(`tests/test_pptx_carbon_structure.py`); `a:highlight` needs PowerPoint 2019 or later (older versions show the text
+without the pill background when the cell has a fill).

@@ -297,7 +297,7 @@ and returns `{ok, path, width, height, problems}` with `problems` as a list of `
 picture and table counts. It writes `report.md`, `report.json` and one HTML | PPTX picture per slide to
 `<temporary directory>/pptx-fidelity` and prints a table. It measures only (exit 0); `ARGS='--only breathe'`
 restricts it, `ARGS='--min-score 0.6'` exits 1 below that mean. LibreOffice gets its own fontconfig so it embeds
-the real fonts. Details: `.agent_docs/pptx-fidelity.md`.
+the real fonts, and the faces the machine lacks are equalised in the HTML render too (`--raw-fonts` turns that off). Details: `.agent_docs/pptx-fidelity.md`.
 
 ### Read, check and edit a file without touching its images
 

@@ -324,3 +324,17 @@ def table_span(cell: dict[str, int]) -> tuple[int, int, int, int]:
 def line_dash(style: str | None) -> str | None:
     """The OOXML preset dash of a CSS border style; None for a solid line."""
     return {"dashed": "dash", "dotted": "sysDot"}.get(style or "")
+
+
+BASELINE_LINE_SHARE: Final = 0.405
+BASELINE_SIZE_SHARE: Final = 0.465
+
+
+def baseline_shift(line_height: float, size: float) -> float:
+    """Points to move a text box up so an exact line spacing puts the baseline where the browser puts it.
+
+    The browser centres the glyphs in the line box (half leading). PowerPoint puts the baseline at about 0.81 of an
+    exact line height, LibreOffice keeps the descent and moves the ascent; both sit lower than the browser as the line
+    grows. The shift is the mean of the two models: ``0.405 line height - 0.465 size`` (negative below 1.15 size).
+    """
+    return BASELINE_LINE_SHARE * line_height - BASELINE_SIZE_SHARE * size

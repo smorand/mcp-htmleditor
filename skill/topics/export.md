@@ -28,8 +28,8 @@ Avec Chromium (`make install-browser`), chaque slide est mesurée dans le naviga
 |---|---|
 | texte | zones éditables aux retours de ligne du navigateur; runs (gras, italique, couleur, souligné), espacement des lettres; `<ul>` / `<ol>` en vraies puces et numéros (retrait, couleur de puce, `start`) |
 | boîtes | fond, dégradé linéaire, bordures par côté, rayon (rectangle arrondi, ellipse), opacité, ombre simple; fond de `<code>` ou de `<span>` en pastille arrondie |
-| images | `<img>` et fonds CSS avec crop `object-fit`; `<svg>`, `<canvas>` et image vectorielle en image 2x (leur texte reste en texte alternatif); fond de slide plein cadre |
-| `<table>` | table native (largeurs et hauteurs mesurées, `colspan`, `rowspan`, fonds, bordures); si une cellule contient un bloc, une image ou une pastille, la table est peinte en boîtes et en texte |
+| images | `<img>` et fonds CSS avec crop `object-fit`; `<svg>`, `<canvas>` et image vectorielle en image 2x; les `<text>` d'un svg restent du texte éditable posé sur l'image sans texte; fond de slide plein cadre |
+| `<table>` | table native (largeurs et hauteurs mesurées, `colspan`, `rowspan`, fonds, bordures); pastille d'une cellule sans fond: forme arrondie sous le texte; cellule avec fond: surlignage du texte (`a:highlight`, PowerPoint 2019 ou plus). Si une cellule contient un bloc ou une image, la table est peinte en boîtes et en texte |
 | pseudo-éléments | `::before` / `::after` avec un texte ou un fond sont mesurés (puces maison, tirets); les compteurs CSS (`counter()`) restent perdus |
 | Gantt, schémas, image annotée | peints depuis le DOM rendu, pas d'objet natif |
 
@@ -37,7 +37,7 @@ Mesure dans la fenêtre du rendu produit (1280 x 900). Ce qui sort de la boîte 
 
 ### Approximé
 
-- Polices non installées: le nom est gardé, PowerPoint choisit un repli. Texte sans reflux: modifier le HTML puis réexporter.
+- Police écrite = première famille de la pile (`IBM Plex Sans` en Carbon, `IBM Plex Mono` pour le code), jamais le repli de la machine. Sans elle PowerPoint choisit un repli: les zones sont sans retour automatique et sans ajustement, une police plus large déborde à droite au lieu de rétrécir; installer la police pour un rendu identique. Texte sans reflux: modifier le HTML puis réexporter.
 - Slide plus grande ou plus petite que 960 x 540: mise à l'échelle, polices comprises; le texte peut descendre de quelques points.
 
 ### Mode dégradé

@@ -15,11 +15,21 @@ from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
 from .pptx_paint_shapes import add_alpha, srgb_element
-from .pptx_paint_style import EMU_PER_POINT, alpha_of, bullet_for, first_face, hanging_indent, rgb, to_emu
+from .pptx_paint_style import (
+    EMU_PER_POINT,
+    alpha_of,
+    baseline_shift,
+    bullet_for,
+    first_face,
+    hanging_indent,
+    rgb,
+    to_emu,
+)
 
 CENTER_ALIGN: Final = frozenset({"center", "-webkit-center"})
 RIGHT_ALIGN: Final = frozenset({"right", "end"})
 BOLD_WEIGHT: Final = 600
+SLIDE_WIDTH: Final = 960
 MIN_SLACK: Final = 6
 SLACK_SHARE: Final = 0.08
 ALIGNS: Final = {"center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT, "left": PP_ALIGN.LEFT}
@@ -68,6 +78,8 @@ class TextMixin:
         else:
             bx -= hang
             bw += slack + hang
+        bw = max(min(bw, SLIDE_WIDTH - bx), 1.0)  # a box never leaves the slide: the slack is for the fallback font
+        by -= baseline_shift(item["lh"], first["size"])
         frame = self.slide.shapes.add_textbox(*to_emu([bx, by, bw, bh])).text_frame
         frame.margin_left = frame.margin_right = frame.margin_top = frame.margin_bottom = 0
         frame.vertical_anchor = MSO_ANCHOR.TOP
@@ -131,6 +143,14 @@ def write_run(paragraph: Any, text: str, style: dict[str, Any], opacity: float =
         colour = run._r.get_or_add_rPr().find(qn("a:solidFill")).find(qn("a:srgbClr"))
         add_alpha(colour, alpha_of(style["color"], opacity))
     properties = run._r.get_or_add_rPr()
+    if style.get("hl"):  # a simple inline background (pill, code chip) inside a table cell
+        solid = properties.find(qn("a:solidFill"))
+        mark = properties.makeelement(qn("a:highlight"), {})
+        srgb_element(mark, style["hl"], opacity)
+        if solid is not None:
+            solid.addnext(mark)
+        else:
+            properties.insert(0, mark)
     if style["ls"]:
         properties.set("spc", str(round(style["ls"] * 100)))
     if style.get("strike"):
