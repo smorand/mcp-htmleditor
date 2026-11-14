@@ -82,6 +82,8 @@ the PPTX resolver ignores them. Editor relay of the keys: `architecture.md` § F
   `make check-generated` checks both. It defines `togglePresenter`, `openPresenter`, `closePresenter`, `isPresenterOpen` and owns the
   key handler for F P S E: the per template `f` line is gone, the `L` line stays, `P` calls `togglePointer()`. In a
   `deck-preview` window it installs nothing.
+* **Help overlay** (`?`, 2026-11-14): the block toggles `#deck-help` (lazy, id CSS rules only since the PPTX exporter reads class rules,
+  hidden in print, Esc or `?` closes); framed it posts `deck-key` `?` and shows nothing. Keep `HELP_ROWS` in step with the keys.
 * **Messages** (`postMessage`, target `*`, sender checked by `event.source`): deck to presenter `deck-state`
   `{index,total,titles,notes}`; presenter to deck `deck-cmd` `next|prev|goto|close`; framed deck to editor shell `deck-key`
   `{key:'e'}`; preview iframes (`srcdoc`, name `deck-preview`) follow `preview-goto`.

@@ -1446,6 +1446,15 @@
      Aucun sélecteur de classe ici: l'export PPTX ne lit que les règles à classe. */
   [data-role="speaker-notes"] { display:none !important; }
   @media print { [data-role="speaker-notes"] { display:none !important; } }
+  /* Aide des raccourcis (touche ?), deck ouvert seul: identifiants uniquement, jamais visible à l'impression. */
+  #deck-help { position:fixed; inset:0; z-index:2147483000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.55); font:15px system-ui,sans-serif; }
+  #deck-help[hidden] { display:none !important; }
+  #deck-help-box { background:#262626; color:#f4f4f4; border:1px solid #525252; border-radius:8px; padding:16px 22px; box-shadow:0 8px 30px rgba(0,0,0,.6); }
+  #deck-help-box b { display:block; margin-bottom:8px; font-size:17px; }
+  #deck-help-box table { border-collapse:collapse; }
+  #deck-help-box td { padding:4px 14px 4px 0; white-space:nowrap; }
+  #deck-help-box kbd { display:inline-block; min-width:22px; padding:1px 6px; border:1px solid #6f6f6f; border-radius:4px; background:#161616; font:inherit; text-align:center; }
+  @media print { #deck-help { display:none !important; } }
 </style>
 <script id="deck-presenter-script">
   (function () {
@@ -1607,7 +1616,7 @@
         + '<tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First / last slide</td></tr>'
         + '<tr><td><kbd>S</kbd></td><td>Close the presenter window</td></tr>'
         + '<tr><td><kbd>?</kbd> <kbd>Esc</kbd></td><td>Show / hide this help</td></tr>'
-        + '<tr><td colspan="2" style="padding-top:8px;color:#c6c6c6">On the slides window: <kbd>F</kbd> full screen, <kbd>P</kbd> pointer, <kbd>S</kbd> presenter, <kbd>E</kbd> edit</td></tr>'
+        + '<tr><td colspan="2" style="padding-top:8px;color:#c6c6c6">On the slides window: <kbd>F</kbd> full screen, <kbd>P</kbd> or <kbd>L</kbd> pointer, <kbd>S</kbd> presenter, <kbd>E</kbd> edit, <kbd>?</kbd> help</td></tr>'
         + '</table></div></span><span id="p-count"></span><span id="p-title"></span><span style="flex:1"></span>'
         + '<span id="p-timer">00:00:00</span><button id="p-reset" type="button">Reset</button><span id="p-clock"></span>'
         + '<button id="p-prev" type="button">&#9664; Prev</button><button id="p-next" type="button">Next &#9654;</button>'
@@ -1678,10 +1687,40 @@
 
     window.addEventListener('pagehide', function () { if (isOpen()) presenter.close(); });
 
+    // Aide des raccourcis (touche ?): encadré par l'éditeur, c'est son panneau qui s'affiche; ouvert seul, calque propre.
+    var HELP_ROWS = [['<kbd>F</kbd>', 'Full screen'], ['<kbd>P</kbd> <kbd>L</kbd>', 'Pointer'], ['<kbd>S</kbd>', 'Presenter window'],
+      ['<kbd>&#8592;</kbd> <kbd>&#8594;</kbd> <kbd>Space</kbd> <kbd>Home</kbd> <kbd>End</kbd>', 'Navigate'],
+      ['<kbd>Esc</kbd>', 'Leave full screen or close this help'], ['<kbd>?</kbd>', 'Show / hide this help']];
+
+    function helpLayer() {
+      var layer = document.getElementById('deck-help');
+      if (layer) return layer;
+      layer = document.createElement('div');
+      layer.id = 'deck-help';
+      layer.hidden = true;
+      layer.setAttribute('role', 'dialog');
+      layer.setAttribute('aria-label', 'Keyboard shortcuts');
+      layer.innerHTML = '<div id="deck-help-box"><b>Keyboard shortcuts</b><table>' + HELP_ROWS.map(function (r) {
+        return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>';
+      }).join('') + '</table></div>';
+      layer.addEventListener('click', function (e) { if (e.target === layer) layer.hidden = true; });
+      document.body.appendChild(layer);
+      return layer;
+    }
+
+    function toggleHelp() {
+      if (window.parent !== window) { window.parent.postMessage({ type: 'deck-key', key: '?' }, '*'); return; }
+      var layer = helpLayer();
+      layer.hidden = !layer.hidden;
+    }
+
     document.addEventListener('keydown', function (e) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       var ae = document.activeElement;
       if (ae && (ae.isContentEditable || ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return;
+      if (e.key === '?') { e.preventDefault(); toggleHelp(); return; }
+      var layer = document.getElementById('deck-help');
+      if (e.key === 'Escape' && layer && !layer.hidden) { layer.hidden = true; return; }
       var key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
       if (key === 'f') {
         if (document.fullscreenElement) { if (typeof exitPresentation === 'function') exitPresentation(); }

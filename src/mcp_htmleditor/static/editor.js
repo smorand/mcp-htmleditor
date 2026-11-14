@@ -200,6 +200,8 @@ function onShellKey(e) {
   if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
   const t = e.target;
   if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  if (e.key === '?') { e.preventDefault(); toggleHelp(); return; }
+  if (e.key === 'Escape' && !helpPanel.hidden) { setHelpOpen(false); return; }
   const key = (e.key || '').toLowerCase();
   const win = frame.contentWindow;
   if (key === 'e') {
@@ -226,8 +228,30 @@ function onShellKey(e) {
 function onDeckMessage(event) {
   const data = event.data;
   if (event.source !== frame.contentWindow || !data || data.type !== 'deck-key') return;
-  if (String(data.key).toLowerCase() === 'e') toggleEditMode();
+  if (data.key === '?') toggleHelp();
+  else if (String(data.key).toLowerCase() === 'e') toggleEditMode();
 }
+
+/* Keyboard shortcuts help: the icon button and the ? key (shell or deck) toggle the panel. */
+const helpBtn = document.getElementById('help-btn');
+const helpPanel = document.getElementById('help-panel');
+
+function setHelpOpen(open) {
+  helpPanel.hidden = !open;
+  helpBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function toggleHelp() {
+  if (document.fullscreenElement) return;
+  setHelpOpen(helpPanel.hidden);
+}
+
+helpBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleHelp(); });
+document.addEventListener('click', (e) => {
+  if (!helpPanel.hidden && !helpPanel.contains(e.target)) setHelpOpen(false);
+});
+// A click inside the deck iframe never reaches this document: the window loses focus instead.
+window.addEventListener('blur', () => { if (!helpPanel.hidden && document.activeElement === frame) setHelpOpen(false); });
 
 /* ============================================================
    Present

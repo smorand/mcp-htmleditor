@@ -51,3 +51,14 @@ with Ctrl; FR-5 through `file://` page and through `serve_deck`, focus in iframe
 round trip, PPTX notes text equals the aside text; FR-7 popup opens, shows notes and next slide title, navigation both
 ways, `S` closes; FR-8 typing in the textarea changes the file on disk and the open presenter; all 11 templates carry the block
 (guard test). `make check` passes.
+
+## Amendment 2026-11-14: shortcuts help
+
+- Editor shell: an icon button `#help-btn` (SVG, title and aria-label "Raccourcis clavier") sits at the far right of the toolbar, after the
+  DOCX and PPTX buttons. It toggles `#help-panel` (role dialog, `aria-expanded` and `aria-controls` kept in sync; Escape, a second click and
+  a click outside close it). The table lists Deck, Editor, Presenter window keys and the Requests, Notes and Ask AI buttons.
+- Key `?` (`event.key === '?'`, any layout) toggles it, with the same filters as the other keys (ignored in input, textarea, select,
+  contenteditable and with Ctrl, Meta or Alt). A framed deck posts `{type:'deck-key', key:'?'}`; the shell checks `event.source`.
+- A deck opened alone shows its own overlay `#deck-help` on `?` (ids only, hidden in print, Esc or a second `?` closes); framed, the deck
+  block shows none. The presenter window help gains the `L` pointer line and the `?` entry.
+- Tests: `tests/test_help_shortcuts_e2e.py`.

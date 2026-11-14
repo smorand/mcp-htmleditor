@@ -29,8 +29,9 @@ STUB_JS = (
 def _open(page: Page, deck: ServedDeck) -> None:
     page.goto(f"http://127.0.0.1:{deck.port}/")
     page.wait_for_function(
-        "() => { const d = document.getElementById('content-frame').contentDocument;"
-        " return d && d.querySelector('[data-type=\"slide\"]') && document.getElementById('edit-mode-btn'); }"
+        "() => { const f = document.getElementById('content-frame'); const d = f.contentDocument;"
+        " return d && d.readyState === 'complete' && d.querySelector('[data-type=\"slide\"]')"
+        " && typeof f.contentWindow.togglePresenter === 'function' && document.getElementById('edit-mode-btn'); }"
     )
 
 

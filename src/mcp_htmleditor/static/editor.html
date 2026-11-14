@@ -53,6 +53,38 @@
       <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 11H7v-2h6zm2-4H7V7h8z"/></svg>
       DOCX
     </button>
+    <button id="help-btn" type="button" aria-expanded="false" aria-controls="help-panel" aria-haspopup="dialog" title="Raccourcis clavier" aria-label="Raccourcis clavier">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zm2 0v12h14V6zm2 2h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2zM7 12h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2zM8 15.5h8V17H8z"/></svg>
+    </button>
+  </div>
+
+  <div id="help-panel" role="dialog" aria-label="Raccourcis clavier" hidden>
+    <h2>Raccourcis clavier</h2>
+    <table>
+      <tbody>
+        <tr><th colspan="2">Deck</th></tr>
+        <tr><td><kbd>F</kbd></td><td>Full screen</td></tr>
+        <tr><td><kbd>P</kbd> <kbd>L</kbd></td><td>Pointer</td></tr>
+        <tr><td><kbd>S</kbd></td><td>Presenter window</td></tr>
+        <tr><td><kbd>E</kbd></td><td>Edit mode</td></tr>
+        <tr><td><kbd>&#8592;</kbd> <kbd>&#8594;</kbd> <kbd>Space</kbd> <kbd>Home</kbd> <kbd>End</kbd></td><td>Navigate</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Leave full screen</td></tr>
+        <tr><th colspan="2">Editor</th></tr>
+        <tr><td><kbd>Ctrl/Cmd</kbd> <kbd>Z</kbd></td><td>Undo</td></tr>
+        <tr><td><kbd>Ctrl/Cmd</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></td><td>Redo</td></tr>
+        <tr><td><kbd>?</kbd></td><td>This help</td></tr>
+        <tr><th colspan="2">Presenter window</th></tr>
+        <tr><td><kbd>N</kbd> <kbd>Space</kbd> <kbd>&#8594;</kbd> <kbd>&#8595;</kbd> <kbd>PgDn</kbd></td><td>Next slide</td></tr>
+        <tr><td><kbd>&#8592;</kbd> <kbd>&#8593;</kbd> <kbd>PgUp</kbd></td><td>Previous slide</td></tr>
+        <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>First / last slide</td></tr>
+        <tr><td><kbd>S</kbd></td><td>Close the presenter window</td></tr>
+        <tr><td><kbd>?</kbd> <kbd>Esc</kbd></td><td>Show / hide its help</td></tr>
+        <tr><th colspan="2">Buttons (no key)</th></tr>
+        <tr><td>Requests</td><td>List of queued requests</td></tr>
+        <tr><td>Notes</td><td>Speaker notes of the current slide</td></tr>
+        <tr><td>Ask AI</td><td>Queue a change request</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <!-- Save notices (SPEC-0009): never focused by script, no autofocus; only the two conflict buttons are focusable -->

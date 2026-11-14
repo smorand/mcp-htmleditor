@@ -152,6 +152,9 @@ so a deck made before the pointer has none), the L key forwarded to `togglePoint
   (created when missing, removed when emptied) and schedules the normal save; relays the change to an open presenter.
 * `#presenter-btn` calls the deck's `togglePresenter()`. The shell accepts `{type:'deck-key', key:'e'}` only when
   `event.source === frame.contentWindow`; keys typed in the shell itself are forwarded to the deck for F P S.
+* Shortcuts help (2026-11-14): `#help-btn` (icon, last toolbar control) toggles `#help-panel` (static table in `editor.html`, code in
+  `editor.js`: `toggleHelp`, `setHelpOpen`). `?` from the shell (`onShellKey`) or `{type:'deck-key', key:'?'}` from the framed deck
+  (`onDeckMessage`, `event.source` checked) toggles it; hidden in full screen. A new shortcut means a row in that table.
 * The iframe `sandbox` gains `allow-popups allow-popups-to-escape-sandbox` so the presenter and its previews can open.
 * PPTX export of the notes: `.agent_docs/html-conventions.md` § Speaker notes.
 

@@ -207,6 +207,53 @@ html, body {
   cursor: not-allowed;
 }
 
+/* ── Keyboard shortcuts help (icon button at the far right, panel under it) ── */
+#help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  background: #262626;
+  color: #8d8d8d;
+  border: 1px solid #393939;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 90ms, color 90ms, border-color 90ms;
+}
+#help-btn:hover,
+#help-btn[aria-expanded="true"] { background: #0f62fe; color: #ffffff; border-color: #0f62fe; }
+#help-panel[hidden] { display: none; }
+#help-panel {
+  position: fixed;
+  top: 28px; right: 12px;
+  z-index: 9995;
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 10px 14px;
+  background: #262626;
+  color: #f4f4f4;
+  border: 1px solid #525252;
+  font-size: 12px;
+}
+#help-panel h2 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+#help-panel table { border-collapse: collapse; }
+#help-panel th { text-align: left; padding: 8px 0 3px; color: #c6c6c6; font-weight: 600; border-bottom: 1px solid #393939; }
+#help-panel td { padding: 3px 14px 3px 0; white-space: nowrap; }
+#help-panel kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 5px;
+  border: 1px solid #6f6f6f;
+  border-radius: 3px;
+  background: #161616;
+  font: inherit;
+  text-align: center;
+}
+body:has(#content-frame:fullscreen) #help-panel { display: none; }
+
 /* ── Iframe: full remaining height ───────────────────────────── */
 #content-frame {
   display: block;
