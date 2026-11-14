@@ -115,7 +115,7 @@
 | US-0113 | SPEC-0019 | state loader and serve poll cleanup | main | 2 | landed | story/US-0113-state-loader-and-serve-poll-cleanup | story/US-0112-agent-docs-consolidation |
 | US-0114 | SPEC-0019 | single editor artifact strip | main | 1 | landed | story/US-0114-single-editor-artifact-strip | story/US-0113-state-loader-and-serve-poll-cleanup |
 | US-0115 | SPEC-0019 | presentation guards and span privacy | US-0112, US-0113, US-0114 | 2 | landed | story/US-0115-presentation-guards-and-span-privacy | story/US-0114-single-editor-artifact-strip |
-| US-0116 | SPEC-0023 | breathe decoration catalogue and generator | main | 1 | todo | feat/breathe-template | |
+| US-0116 | SPEC-0023 | breathe decoration catalogue and generator | main | 1 | done | feat/breathe-template | main |
 | US-0117 | SPEC-0023 | breathe charter key, detection, starting point, lint | US-0116 | 1 | todo | feat/breathe-template | |
 | US-0118 | SPEC-0023 | breathe-inline command | US-0117 | 1 | todo | feat/breathe-template | |
 | US-0119 | SPEC-0023 | breathe reference deck and picker layouts | US-0118 | 1 | todo | feat/breathe-template | |

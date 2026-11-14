@@ -1112,6 +1112,7 @@ render = [
 dev = [
     { name = "bandit" },
     { name = "mypy" },
+    { name = "pillow" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1141,6 +1142,7 @@ provides-extras = ["render"]
 dev = [
     { name = "bandit", specifier = ">=1.7" },
     { name = "mypy", specifier = ">=1.11" },
+    { name = "pillow", specifier = ">=11" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=0.24" },

@@ -41,6 +41,7 @@ dev = [
     "pre-commit>=4.0",
     "types-beautifulsoup4",
     "pytest-timeout>=2.4.0",
+    "pillow>=11",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -135,6 +136,9 @@ ignore = [
     "S104",    # asserting on the 0.0.0.0 container bind address is the point
     "S314",    # parses locally generated DOCX parts
 ]
+# The Breathe catalogue generator draws geometry: its helpers take coordinates, sizes and colours as plain
+# positional numbers, like the PIL calls they wrap.
+"tools/breathe_assets.py" = ["PLR0912", "PLR0913", "PLR0917", "PLC0415", "PLR2004", "T201"]
 "tools/**" = [
     "PLC0415", # playwright is an optional, tool-only dependency
     "PLR2004",
