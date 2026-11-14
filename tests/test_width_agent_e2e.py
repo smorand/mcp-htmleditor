@@ -39,8 +39,8 @@ REPO = Path(__file__).resolve().parents[1]
 SKILL_DIR = REPO / "skill"
 SLIDE_2 = "slide-1"
 PALETTE_PROBLEM = "colour #123456 is not in the carbon palette"
-# SPEC-0023 changed the core on purpose (breathe key and topic)
-CORE_SHA256 = "fa8f88771b059694713c640b34081159874584849bb8e41ffa2fae778bbee152"
+# SPEC-0023 changed the core on purpose (breathe key and topic), after the request loop tools of main
+CORE_SHA256 = "805bff82b1c152c44cf5762da8d64433e59f3cad7f542f1c077ce3c813916e02"
 TOPIC_BUDGET_BYTES = 8000
 CREATE_LINE = (
     "- Largeur d'un texte: barre sur son bord droit (glisser par pas de 10px, Alt au pixel, flèches; "

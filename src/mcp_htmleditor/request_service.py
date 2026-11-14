@@ -25,6 +25,7 @@ __all__ = [
     "Snapshot",
     "build_request_service",
     "is_blank",
+    "positioned_to_dict",
     "request_to_dict",
     "require_file",
     "snapshot_to_dict",
@@ -39,6 +40,8 @@ REVIEW_MAX = 6
 BODY_MAX_BYTES = 1_048_576
 QUEUED_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 COMPLETE_STATUSES = ("done", "skipped")
+LIST_STATUSES = ("pending", *COMPLETE_STATUSES)
+CLEAR_SCOPES = ("finished", "all")
 SUGGESTION_FIELDS = ("id", "slide", "title", "why", "change")
 
 # The Unicode White_Space set: \t \n \v \f \r, space, U+0085, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029,
@@ -88,6 +91,42 @@ class RequestService:
     def list_requests(self, file: Path) -> list[Request]:
         """Every request of ``file`` whatever its status, oldest first."""
         return list(self._store.read(file).requests)
+
+    def list_positioned(
+        self, file: Path, slide: str | None = None, status: str | None = None
+    ) -> list[tuple[Request, int | None]]:
+        """Requests with the 1-based position of their slide in ``file`` as it is now (None when none or gone).
+
+        ``slide`` and ``status`` are exact match filters; an invalid ``status`` is refused before any read.
+        """
+        if status is not None and status not in LIST_STATUSES:
+            raise RequestError("invalid", "Status must be pending, done or skipped")
+        found = [
+            request
+            for request in self._store.read(file).requests
+            if (slide is None or request.slide == slide) and (status is None or request.status == status)
+        ]
+        positions = _slide_positions(file) if any(request.slide for request in found) else {}
+        return [(request, positions.get(request.slide) if request.slide else None) for request in found]
+
+    def clear(self, file: Path, scope: str) -> int:
+        """Remove the done and skipped requests (``finished``) or every request (``all``); return the count."""
+        if scope not in CLEAR_SCOPES:
+            raise RequestError("invalid", "Scope must be finished or all")
+        removed = 0
+
+        def wipe(record: Record) -> None:
+            nonlocal removed
+            kept = [r for r in record.requests if scope == "finished" and r.status == "pending"]
+            removed = len(record.requests) - len(kept)
+            if removed:
+                record.requests = kept
+
+        try:
+            self._store.update(file, "clear", wipe)
+        except OSError as exc:
+            raise RequestError("storage", f"Could not clear the requests: {exc}") from exc
+        return removed
 
     def complete(self, file: Path, request_id: str, status: str, reason: str | None) -> Request:
         """Mark a request ``done`` or ``skipped``; the checks and the write share one store update."""
@@ -184,6 +223,20 @@ class RequestService:
         return request
 
 
+def _slide_positions(file: Path) -> dict[str, int]:
+    """Slide id to 1-based position in the file now; empty when the file cannot be read as a deck."""
+    from .deck import DeckError, load_deck, slide_id  # noqa: PLC0415 - the deck stack is heavy
+
+    try:
+        deck = load_deck(str(file))
+    except DeckError:
+        return {}
+    positions: dict[str, int] = {}
+    for index, tag in enumerate(deck.slides):
+        positions.setdefault(slide_id(tag) or f"slide-{index}", index + 1)
+    return positions
+
+
 def _check_length(instruction: str) -> None:
     if len(instruction) > INSTRUCTION_MAX:
         raise RequestError("invalid", f"Request too long (max {INSTRUCTION_MAX} characters)")
@@ -261,6 +314,12 @@ def build_request_service() -> RequestService:
 
 def request_to_dict(request: Request) -> dict[str, Any]:
     return asdict(request)
+
+
+def positioned_to_dict(request: Request, position: int | None) -> dict[str, Any]:
+    fields = asdict(request)
+    slide = fields.pop("slide")
+    return {"id": fields.pop("id"), "slide": slide, "position": position, **fields}
 
 
 def suggestion_to_dict(suggestion: Suggestion) -> dict[str, Any]:

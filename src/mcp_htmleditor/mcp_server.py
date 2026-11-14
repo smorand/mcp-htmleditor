@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 21 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 22 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -34,7 +34,7 @@ from .http_server import (
 from .render.options import DEFAULT_SCALE
 from .render.problems import result_to_dict
 from .render.service import render_deck
-from .request_service import RequestError, build_request_service, request_to_dict, require_file
+from .request_service import RequestError, build_request_service, positioned_to_dict, require_file
 from .skill_content import SkillError, build_library
 from .state import get_state
 from .textcheck import UNENCODABLE_BIND_ADDRESS, UNENCODABLE_FILE_NAME, is_utf8_encodable
@@ -453,28 +453,55 @@ def restore(file: str, id: str) -> dict[str, Any]:  # noqa: A002 - argument name
 
 
 @mcp.tool()
-def list_requests(file: str) -> dict[str, Any]:
+def list_requests(file: str, slide: str | None = None, status: str | None = None) -> dict[str, Any]:
     """List the requests the person queued in the editor for a file, oldest first.
 
-    Every status is listed (pending, done, skipped); deleted requests are gone.
+    Every status is listed (pending, done, skipped) unless filtered; deleted requests are gone.
+    ``position`` is the 1-based index of the request's slide in the file as it is now, null when the request
+    has no slide or the slide no longer exists.
 
     Args:
         file: Path to the file.
+        slide: Keep only the requests of this slide id (exact match).
+        status: Keep only this status: pending, done or skipped.
 
     Returns:
-        Dict with keys: file (absolute path), requests (list of ``{id, slide, title, queued, instruction,
-        status, reason}``).
+        Dict with keys: file (absolute path), requests (list of ``{id, slide, position, title, queued,
+        instruction, status, reason}``).
 
     Raises:
-        ToolError: the file is missing or its request record is unreadable.
+        ToolError: the file is missing, the status is invalid or the request record is unreadable.
     """
     with trace_span("mcp.list_requests", {"file.path": _span_path(file)}):
         try:
             path = require_file(file)
-            requests = build_request_service().list_requests(path)
+            found = build_request_service().list_positioned(path, slide, status)
         except RequestError as exc:
             raise ToolError(exc.message) from exc
-        return {"file": str(path), "requests": [request_to_dict(request) for request in requests]}
+        return {"file": str(path), "requests": [positioned_to_dict(request, position) for request, position in found]}
+
+
+@mcp.tool()
+def clear_requests(file: str, scope: str = "finished") -> dict[str, Any]:
+    """Remove requests from the queue of a file: the done and skipped ones, or all of them.
+
+    Args:
+        file: Path to the file.
+        scope: ``finished`` removes done and skipped requests; ``all`` removes every request, pending included.
+
+    Returns:
+        Dict with keys: ok, removed (count).
+
+    Raises:
+        ToolError: the file is missing or the scope is not ``finished`` or ``all``.
+    """
+    with trace_span("mcp.clear_requests", {"file.path": _span_path(file), "requests.scope": scope}):
+        try:
+            path = require_file(file)
+            removed = build_request_service().clear(path, scope)
+        except RequestError as exc:
+            raise ToolError(exc.message) from exc
+        return {"ok": True, "removed": removed}
 
 
 @mcp.tool()
