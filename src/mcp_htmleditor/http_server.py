@@ -6,7 +6,9 @@ file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
 ``/export/pptx``, ``/export/docx`` and ``POST /arch-layout`` (recompute every
 declarative diagram in place, used by the browser after a structural edit),
 ``GET /requests``, ``POST /requests``, ``POST /requests/delete`` (the request queue of the loaded file) and
-``POST /review/apply`` (a suggestion of the review becomes a pending request).
+``POST /review/apply`` (a suggestion of the review becomes a pending request). Any other GET path answers the
+picture, media, font or style file it names next to the open deck, contained in its folder (``deck_files.py``,
+SPEC-0023), else ``Not found``.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from bs4 import BeautifulSoup, Tag
 
 from . import http_deadline
 from .config import PORT_RANGE_END, PORT_RANGE_START, default_host, default_port
+from .deck_files import SVG, SVG_POLICY, deck_file, media_type
 from .fileio import WriteError, atomic_write, is_template_path
 from .http_connections import ConnectionRegistry
 from .request_service import (
@@ -295,7 +298,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         elif path == "/requests":
             self._list_requests()
         else:
-            self._not_found()
+            self._serve_deck_file(parsed.path)
 
     # ------------------------------------------------------------------
     # POST dispatch
@@ -340,6 +343,29 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             return
         mime = self._guess_mime(safe_name)
         self._send_file(file_path, mime)
+
+    def _serve_deck_file(self, raw_path: str) -> None:
+        """A picture, media, font or style file next to the open deck (SPEC-0023 FR-NEW-009), else ``Not found``."""
+        target = deck_file(get_state().current_file, raw_path)
+        if target is None:
+            logger.warning("Refused %s %s: not served", self.command, raw_path)
+            self._not_found()
+            return
+        with trace_span("http.deck_file", {"file.suffix": target.suffix.lower()}):
+            try:
+                data = target.read_bytes()
+            except OSError:
+                self._not_found()
+                return
+        self.send_response(200)
+        self.send_header("Content-Type", media_type(target))
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        if target.suffix.lower() == SVG:
+            self.send_header("Content-Security-Policy", SVG_POLICY)
+        self._send_no_store_headers()
+        self.end_headers()
+        self.wfile.write(data)
 
     def _serve_content(self) -> None:
         """Return the raw HTML of the current file (for POST saves)."""
