@@ -675,7 +675,11 @@ def test_ut_a09_lists_oldest_first(
     service.queue(deck, "Shorten the title", "slide-3")
     service.queue(deck, "Fix footer", None)
     out, err, code = run_cli("requests", "deck.html")
-    assert (out, err, code) == ("R-0001  pending  slide-3  Shorten the title\nR-0002  pending  -  Fix footer\n", "", 0)
+    assert (out, err, code) == (
+        "R-0001  pending  slide-3  -  Shorten the title\nR-0002  pending  -  -  Fix footer\n",
+        "",
+        0,
+    )
 
 
 def test_ut_a09_other_file_and_missing_file(
@@ -696,7 +700,7 @@ def test_ut_a09_symlink_shares_the_record_and_a_rename_starts_empty(
     service.queue(deck, "Fix footer", None)
     (tmp_path / "alias.html").symlink_to(deck)
     out, _, code = run_cli("requests", "alias.html")
-    assert (out, code) == ("R-0001  pending  slide-3  Shorten the title\nR-0002  pending  -  Fix footer\n", 0)
+    assert (out, code) == ("R-0001  pending  slide-3  -  Shorten the title\nR-0002  pending  -  -  Fix footer\n", 0)
     deck.rename(tmp_path / "moved.html")
     assert run_cli("requests", "moved.html")[0] == "No requests for moved.html\n"
 
@@ -707,7 +711,7 @@ def test_the_command_shows_every_status_and_a_storage_error(
     monkeypatch.chdir(tmp_path)
     service.queue(deck, "a\nb", "s1")
     set_status(store, deck, 0, "done")
-    assert run_cli("requests", "deck.html")[0] == "R-0001  done  s1  a b\n"
+    assert run_cli("requests", "deck.html")[0] == "R-0001  done  s1  -  a b\n"
     (store.record_dir(deck) / "record.json").write_bytes(b"{not json")
     out, err, code = run_cli("requests", "deck.html")
     assert out == ""

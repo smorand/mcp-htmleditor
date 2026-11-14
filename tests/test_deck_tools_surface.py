@@ -39,6 +39,7 @@ FINAL_TOOLS = {
     "history",
     "restore",
     "list_requests",
+    "clear_requests",
     "complete_request",
     "write_review",
     "render",
@@ -204,7 +205,7 @@ def test_the_server_core_and_audit_agree_on_the_final_tools() -> None:
     names = registered_tool_names()
     stdout, _, status = run_cli("skill-audit")
 
-    assert len(names) == 21
+    assert len(names) == 22
     assert set(names) == FINAL_TOOLS
     assert _core_tool_names() == FINAL_TOOLS
     assert status == 0, stdout

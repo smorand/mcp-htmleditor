@@ -62,12 +62,13 @@ def test_e2e_002_list_requests_returns_the_queued_request(served_deck: ServedDec
     assert request == {
         "id": "R-0001",
         "slide": "slide-3",
+        "position": 4,
         "title": "Shorten the title",
         "instruction": "Shorten the title",
         "status": "pending",
         "reason": None,
     }
-    assert list(request) == ["id", "slide", "title", "instruction", "status", "reason"]
+    assert list(request) == ["id", "slide", "position", "title", "instruction", "status", "reason"]
 
 
 def test_e2e_013_invalid_status_is_the_product_message_not_a_schema_error(served_deck: ServedDeck) -> None:

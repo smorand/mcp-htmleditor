@@ -46,13 +46,13 @@ def deck(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_e2e_005_command_line_parity(served_deck: ServedDeck, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(served_deck.path.parent)
     assert queue_over_http(served_deck, "Shorten the title", "slide-3")[0] == 200
-    assert run_cli("requests", "deck.html") == ("R-0001  pending  slide-3  Shorten the title\n", "", 0)
+    assert run_cli("requests", "deck.html") == ("R-0001  pending  slide-3  4  Shorten the title\n", "", 0)
     assert run_cli("request-skip", "deck.html", "R-0001", "--reason", "Not needed") == (
         "Request R-0001 marked skipped\n",
         "",
         0,
     )
-    assert run_cli("requests", "deck.html") == ("R-0001  skipped  slide-3  Shorten the title\n", "", 0)
+    assert run_cli("requests", "deck.html") == ("R-0001  skipped  slide-3  4  Shorten the title\n", "", 0)
     assert queue_over_http(served_deck, "Fix footer")[0] == 200
     assert run_cli("request-done", "deck.html", "R-0002") == ("Request R-0002 marked done\n", "", 0)
 

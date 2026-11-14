@@ -41,7 +41,8 @@ mcp-htmleditor arch-checklist               # print the editable arch-diagram QA
 mcp-htmleditor skill                       # skill core (rules, tools, topic index)
 mcp-htmleditor skill --type <topic>        # one of the 15 topics
 mcp-htmleditor skill --all                 # core then every topic
-mcp-htmleditor requests file.html          # requests queued from the editor, oldest first
+mcp-htmleditor requests file.html [--slide ID] [--status pending|done|skipped]  # queued requests, oldest first, with slide position
+mcp-htmleditor request-clear file.html [--all]   # remove done and skipped requests (--all: pending too)
 mcp-htmleditor request-done file.html R-0001
 mcp-htmleditor request-skip file.html R-0002 --reason "why"
 mcp-htmleditor review file.html [--write list.json]   # AI suggestions; --write replaces them
@@ -124,14 +125,14 @@ Load only what the task needs.
 | `.agent_docs/testing.md` | Test file map, time limits and slow marker, browser waits and pacing rule, stdio sessions, port range and lifecycle tests, coverage decisions, export regression set |
 | `.agent_docs/docker.md` | Image, compose, prod overlay, container checks |
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
-| `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 21 tool surface, scanner and renumbering rules, gotchas |
+| `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 22 tool surface, scanner and renumbering rules, gotchas |
 | `.agent_docs/render.md` | Visual render: picture rules, output directory and cleanup, scale and size rounding, check order, fixtures and install |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`
 (sources in `skill/core.md`, `skill/topics/`, `skill/checks/`). `docs/skill-archive/` keeps the
 previous monolithic skill, reference only.
 
-The MCP server exposes twenty one tools, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`, `history`, `restore`, `list_requests`, `complete_request`, `write_review` and `render` included. A story that registers a tool adds
+The MCP server exposes twenty two tools, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`, `history`, `restore`, `list_requests`, `clear_requests`, `complete_request`, `write_review` and `render` included. A story that registers a tool adds
 one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
 story (`skill-audit` fails otherwise); see `.agent_docs/architecture.md`.
 

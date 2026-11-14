@@ -419,18 +419,34 @@ def restore_cmd(file: str, version_id: str) -> None:
 
 @main.command("requests")
 @click.argument("file")
-def requests_cmd(file: str) -> None:
-    """List the requests queued for FILE, oldest first."""
+@click.option("--slide", default=None, help="Only the requests of this slide id.")
+@click.option("--status", default=None, help="Only this status: pending, done or skipped.")
+def requests_cmd(file: str, slide: str | None, status: str | None) -> None:
+    """List the requests queued for FILE, oldest first, with the position of their slide."""
     from .request_service import RequestError, build_request_service, require_file
 
     try:
-        found = build_request_service().list_requests(require_file(file))
+        found = build_request_service().list_positioned(require_file(file), slide, status)
     except RequestError as exc:
         _request_fail(exc.message)
-    for request in found:
-        click.echo(f"{request.id}  {request.status}  {request.slide or '-'}  {request.title}")
+    for request, position in found:
+        click.echo(f"{request.id}  {request.status}  {request.slide or '-'}  {position or '-'}  {request.title}")
     if not found:
         click.echo(f"No requests for {file}")
+
+
+@main.command("request-clear")
+@click.argument("file")
+@click.option("--all", "is_all", is_flag=True, help="Also remove the pending requests (default: done and skipped).")
+def request_clear_cmd(file: str, is_all: bool) -> None:
+    """Remove the done and skipped requests of FILE, or every request with --all."""
+    from .request_service import RequestError, build_request_service, require_file
+
+    try:
+        removed = build_request_service().clear(require_file(file), "all" if is_all else "finished")
+    except RequestError as exc:
+        _request_fail(exc.message)
+    click.echo(f"removed {removed}")
 
 
 @main.command("request-done")

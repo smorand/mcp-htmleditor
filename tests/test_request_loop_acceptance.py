@@ -93,7 +93,7 @@ def test_ut_h01_full_loop_in_process(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert ok
     assert [(r["id"], r["title"]) for r in listed["requests"]] == [("R-0001", "Shorten the title")]
     out, err, code = run_cli("requests", "deck.html")
-    assert (out, err, code) == ("R-0001  pending  slide-1  Shorten the title\n", "", 0)
+    assert (out, err, code) == ("R-0001  pending  slide-1  -  Shorten the title\n", "", 0)
     assert call_tool("complete_request", file=str(deck), id="R-0001", status="done")[0]
     assert call_tool("write_review", file=str(deck), suggestions=TWO_SUGGESTIONS) == (True, {"ok": True, "count": 2})
     assert service.apply_suggestion(deck, "s1").id == "R-0002"

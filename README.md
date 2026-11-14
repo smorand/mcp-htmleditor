@@ -180,16 +180,22 @@ The person asks the agent for a change from the editor, and the agent reads, doe
   stores it. Up to 50 requests can be pending, 4 000 characters each.
 - The side list **Requests (n)** shows every request of the open file with its status (`pending`, `done`,
   `skipped`); a request can be deleted from the list. `n` counts the pending ones.
-- The agent works with the tools `list_requests(file)`, `complete_request(file, id, status, reason=None)` and
+- The agent works with the tools `list_requests(file, slide=None, status=None)`, `clear_requests(file, scope="finished")`, `complete_request(file, id, status, reason=None)` and
   `write_review(file, suggestions)`, or the same operations by command:
 
 ```bash
-mcp-htmleditor requests deck.html                          # <id>  <status>  <slide>  <title>, oldest first
+mcp-htmleditor requests deck.html                          # <id>  <status>  <slide>  <position>  <title>, oldest first
+mcp-htmleditor requests deck.html --slide slide-3 --status pending   # exact match filters (status: pending, done, skipped)
+mcp-htmleditor request-clear deck.html                     # prints "removed N": drops done and skipped (--all: pending too)
 mcp-htmleditor request-done deck.html R-0001               # mark done
 mcp-htmleditor request-skip deck.html R-0002 --reason "Out of scope"   # a reason is required
 mcp-htmleditor review deck.html                            # <id>  <slide>  <title> of each suggestion
 mcp-htmleditor review deck.html --write review.json        # replace the review (- reads stdin, at most 6)
 ```
+
+`position` is the 1 based index of the request's slide in the file as it is now (computed at list time, never
+stored); it is `null` (`-` on the command line) when the request has no slide or the slide no longer exists.
+`clear_requests` scope is `finished` (done and skipped) or `all`; it returns `{ok, removed}`.
 
 A tool error carries the text of the command line `error:` line without its prefix.
 
@@ -382,7 +388,8 @@ figures must be PNG, never SVG.
 | `export(file, format, output)` | Export a presentation to `pptx` or a document to `docx`. Returns `{ok, output, warnings}`. |
 | `history(file)` | List the saved previous versions of a file, newest first: `{file, versions: [{id, bytes, reason}]}`. Same list as `mcp-htmleditor history`. |
 | `restore(file, id)` | Put a previous version back by id; the replaced content is kept in the history. Returns `{ok, file, id}`. Refuses templates. |
-| `list_requests(file)` | The requests the person queued in the editor, oldest first: `{file, requests: [{id, slide, title, queued, instruction, status, reason}]}`. Same list as `mcp-htmleditor requests`. |
+| `list_requests(file, slide=None, status=None)` | The requests the person queued in the editor, oldest first: `{file, requests: [{id, slide, position, title, queued, instruction, status, reason}]}`. `position` is the 1 based index of the slide now, null when none or gone; `slide` and `status` are exact match filters. Same list as `mcp-htmleditor requests`. |
+| `clear_requests(file, scope="finished")` | Remove the done and skipped requests (`finished`) or every request (`all`). Returns `{ok, removed}`. Same as `mcp-htmleditor request-clear`. |
 | `complete_request(file, id, status, reason=None)` | Mark a request `done`, or `skipped` with a reason. Returns `{ok, id, status}`. |
 | `write_review(file, suggestions)` | Replace the AI suggestions shown in the editor (at most 6). Returns `{ok, count}`. |
 | `render(file, slide=None, scale=0.5, report=False, report_only=False)` | PNG of one slide plus, on request, its layout problems (see [Visual render](#visual-render)). Needs Chromium. Returns `{ok, path, width, height, problems}`. |
@@ -551,7 +558,7 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 21 tools
+├── mcp_server.py    FastMCP server with 22 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)
 ├── history.py       HistoryStore, list_versions, restore_version (history and restore)

@@ -163,7 +163,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
   alive): `call_tool` uses its own thread.
 - Nothing may reach the process stdout in the MCP process: it carries the protocol frames. Log to stderr only.
 
-## Tool surface (21 tools, US-0037, US-0041, US-0046, US-0051, US-0053, US-0057, US-0066)
+## Tool surface (22 tools, US-0037, US-0041, US-0046, US-0051, US-0053, US-0057, US-0066)
 
 | Tool | Service call | Result |
 |---|---|---|
@@ -191,7 +191,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
   exclusive creation (`File already exists: <file>`, never overwrites even when the file appears late). The
   exporters are imported lazily. `new` and `export` errors are the English `error: ...` lines since US-0045.
 - Tests: `tests/deck_support.py` `call_tool` (in process `fastmcp.Client`, own thread) and `run_cli`;
-  `tests/test_deck_tools_surface.py` holds E2E-010, 011, 028, tool vs CLI equality, the 21 name equality between
+  `tests/test_deck_tools_surface.py` holds E2E-010, 011, 028, tool vs CLI equality, the 22 name equality between
   server and core, stdout cleanliness of a real `mcp-htmleditor mcp` process, and the spec closure test.
 - Closure test: acceptance ids E2E-001 to E2E-041 are read by `ast` from `tests/test_deck_*.py`, in the test
   function name, its docstring or the comment lines right above it (the older tests carry the id in a docstring or
