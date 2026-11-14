@@ -73,26 +73,27 @@ def catalogue_dir() -> Path:
     return _repo_templates_dir() / ASSETS / "breathe"
 
 
-def embed_assets(file: str, *, link: bool = False, allow_template: bool = False) -> InlineOutcome:
+def embed_assets(file: str, *, link: bool = False) -> InlineOutcome:
     """Embed (or link) every decoration class and named picture of the deck at ``file``; see the module doc.
 
-    ``allow_template`` is for the maintainer tool that refreshes the shipped Breathe files. Time O(n + k·s) for a
+    The shipped Breathe files are template files, refused here: ``tools/sync_breathe_layouts.py`` embeds a copy.
+    Time O(n + k·s) for a
     deck of n characters and k needed assets of s bytes; the deck is held once in memory.
     """
     with trace_span("breathe.inline", {"file.path": file, "breathe.link": link}) as span:
-        outcome = _embed(file, link, allow_template)
+        outcome = _embed(file, link)
         span.set_attribute("breathe.classes", outcome.classes)
         span.set_attribute("breathe.pictures", outcome.pictures)
     logger.debug("breathe-inline %s: %s", file, outcome.summary())
     return outcome
 
 
-def _embed(file: str, link: bool, allow_template: bool) -> InlineOutcome:
+def _embed(file: str, link: bool) -> InlineOutcome:
     require_encodable_path(file)
     deck = Path(file)
     if not deck.is_file():
         raise DeckError(f"File not found: {file}")
-    if not allow_template and _is_template(deck):
+    if _is_template(deck):
         raise DeckError(f"Refusing to modify a template: {file}")
     try:
         text = deck.read_bytes().decode("utf-8")

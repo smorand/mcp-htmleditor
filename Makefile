@@ -3,7 +3,7 @@
 
 .PHONY: sync run run-dev test test-cov lint lint-fix format format-check typecheck \
         security check build install install-browser install-skill uninstall docker-build docker-push \
-        docker run-up run-down bootstrap-ei sync-medical-css sync-deck-pointer breathe-assets check-generated clean clean-all info help
+        docker run-up run-down bootstrap-ei sync-medical-css sync-deck-pointer breathe-assets sync-breathe-layouts check-generated clean clean-all info help
 
 PROJECT_NAME=$(shell grep -m1 '^name' pyproject.toml 2>/dev/null | sed 's/.*= *"\([^"]*\)".*/\1/')
 PACKAGE := mcp_htmleditor
@@ -264,9 +264,13 @@ sync-deck-pointer:
 breathe-assets:
 	@uv run python tools/breathe_assets.py $(ARGS)
 
+## sync-breathe-layouts: Re-embed the Breathe reference and starting point, regenerate the Breathe picker layouts
+sync-breathe-layouts:
+	@uv run python tools/sync_breathe_layouts.py
+
 ## check-generated: Verify generated template files are fresh (writes nothing)
 check-generated:
-	@rc=0; uv run python tools/gen_ei_bootstrap.py --check || rc=1; uv run python tools/sync_medical_css.py --check || rc=1; uv run python tools/sync_deck_pointer.py --check || rc=1; exit $$rc
+	@rc=0; uv run python tools/gen_ei_bootstrap.py --check || rc=1; uv run python tools/sync_medical_css.py --check || rc=1; uv run python tools/sync_deck_pointer.py --check || rc=1; uv run python tools/sync_breathe_layouts.py --check || rc=1; exit $$rc
 
 # ============================================================================
 # CLEANUP
@@ -355,6 +359,7 @@ help:
 	@echo "  sync-medical-css - Propagate the medical charter CSS to the reference decks"
 	@echo "  sync-deck-pointer - Propagate the presentation pointer block to every presentation template"
 	@echo "  breathe-assets   - Redraw the Breathe decoration catalogue (ARGS='--list' to list only)"
+	@echo "  sync-breathe-layouts - Re-embed the Breathe shipped files and regenerate the Breathe picker layouts"
 	@echo "  check-generated  - Verify the generated template files are fresh (writes nothing)"
 	@echo ""
 	@echo "Cleanup:"
