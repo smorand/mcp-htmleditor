@@ -16,7 +16,7 @@ from tests.conftest import SKILL_CORE_TITLE, SKILL_TOPICS, SkillTree
 TOPIC_NAMES = [name for name, _ in SKILL_TOPICS]
 UNKNOWN_MESSAGE = (
     'Unknown skill topic "foo". Valid topics: create, export, templates, slides-carbon, slides-ei, medical, '
-    "medical-sources, breathe, document, mail, website, gantt, arch-diagram, arch-qa, annotated-image, tables"
+    "medical-sources, breathe, document, mail, website, gantt, arch-diagram, arch-qa, annotated-image, tables, editor"
 )
 BOTH_MESSAGE = "Error: --type and --all cannot be used together"
 
@@ -63,7 +63,7 @@ def test_e2e_003_all_is_core_then_topics(skill_tree: SkillTree) -> None:
     assert result.stdout.endswith("\n")
     assert not result.stdout.endswith("\n\n")
     assert result.stdout.startswith(SKILL_CORE_TITLE)
-    assert result.stdout.count("\n\n# Skill topic: ") == 16
+    assert result.stdout.count("\n\n# Skill topic: ") == 17
     assert result.stdout.count("checklist item") == 1
 
 

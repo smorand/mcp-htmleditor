@@ -51,7 +51,7 @@ def test_unknown_topic_lists_breathe() -> None:
     stdout, stderr, code = run_cli("skill", "--type", "breath")
     assert (stdout, code) == ("", 2)
     assert stderr.strip() == f'Unknown skill topic "breath". Valid topics: {", ".join(TOPIC_NAMES)}'
-    assert len(TOPIC_NAMES) == 16
+    assert len(TOPIC_NAMES) == 17
 
 
 def test_topic_within_budget() -> None:

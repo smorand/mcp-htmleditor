@@ -247,7 +247,9 @@ def test_bt_020_header_check_details(gate: Gate) -> None:
 
     health = gate.send("GET", "/health", [f"Host: {local}", "Host: evil.example"])
     assert health.status == 200
-    assert sorted(json_body(health)) == ["file", "port", "status", "version"]
+    assert sorted(json_body(health)) == sorted(
+        ["ok", "status", "pid", "file", "page", "port", "version", "started", "uptime_seconds"]
+    )
     options = gate.send("OPTIONS", "/content", [f"Host: {local}", "Host: evil.example"])
     assert options.status == 405
     assert options.headers["allow"] == "GET, POST"

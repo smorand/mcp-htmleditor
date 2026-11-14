@@ -43,7 +43,7 @@ mcp-htmleditor export docx in.html out.docx
 mcp-htmleditor arch-layout in.html         # compute arch-diagram positions from topology
 mcp-htmleditor arch-checklist               # print the editable arch-diagram QA checklist
 mcp-htmleditor skill                       # skill core (rules, tools, topic index)
-mcp-htmleditor skill --type <topic>        # one of the 16 topics
+mcp-htmleditor skill --type <topic>        # one of the 17 topics
 mcp-htmleditor skill --all                 # core then every topic
 mcp-htmleditor requests file.html [--slide ID] [--status pending|done|skipped]  # queued requests, oldest first, with slide position
 mcp-htmleditor request-clear file.html [--all]   # remove done and skipped requests (--all: pending too)

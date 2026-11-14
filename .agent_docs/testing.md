@@ -172,7 +172,7 @@ slide; for DOCX compare the `<w:t>` runs and the `w:pStyle` sequence of `word/do
 
 ### Skill fixtures and data
 
-`skill_tree` (`tests/conftest.py`) builds a temporary skill tree (core, 16 topics, checklist), sets
+`skill_tree` (`tests/conftest.py`) builds a temporary skill tree (core, 17 topics, checklist), sets
 `HTMLEDITOR_SKILL_DIR`, isolates `HTMLEDITOR_ARCH_CHECKS_DIR`; tests mutate it through `SkillTree`.
 `tests/data/skill_anchors.json`: per topic, the strings the shipped text keeps (`arch-qa`: `tests/test_arch_checks.py`).
 

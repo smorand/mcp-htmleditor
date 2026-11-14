@@ -39,8 +39,9 @@ REPO = Path(__file__).resolve().parents[1]
 SKILL_DIR = REPO / "skill"
 SLIDE_2 = "slide-1"
 PALETTE_PROBLEM = "colour #123456 is not in the carbon palette"
-# SPEC-0023 changed the core on purpose (breathe key and topic), after the request loop tools of main
-CORE_SHA256 = "805bff82b1c152c44cf5762da8d64433e59f3cad7f542f1c077ce3c813916e02"
+# The core changed on purpose: SPEC-0023 (breathe key and topic), then the editor interface section (shortcuts,
+# presenter, notes, Requests panel, /health, SPEC-0022) so agents know them
+CORE_SHA256 = "dbdf013367b6bbb35272bd7e6fdfd6d0ab1f28a0bc60d94e02bd94976d2412c8"
 TOPIC_BUDGET_BYTES = 8000
 CREATE_LINE = (
     "- Largeur d'un texte: barre sur son bord droit (glisser par pas de 10px, Alt au pixel, flèches; "

@@ -320,7 +320,7 @@ def test_health_open_to_any_origin(served: Served) -> None:
     reply = _request(served, "GET", "/health", {"Origin": EVIL_ORIGIN, "Host": f"attacker.example:{served.port}"})
     assert reply.status == 200
     payload = json.loads(reply.body)
-    assert set(payload) == {"status", "version", "file", "port"}
+    assert {"status", "version", "file", "port", "ok", "pid", "page", "started", "uptime_seconds"} == set(payload)
     assert payload["status"] == "ok"
 
 

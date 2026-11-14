@@ -2,7 +2,7 @@
 
 Serves the editor shell and proxies HTML content reads/writes to the current
 file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
-``/content-frame``, ``/status`` (polling), ``/health`` (status + version),
+``/content-frame``, ``/status`` (polling), ``/health`` (liveness, pid, loaded file, version, start, uptime; any host),
 ``/export/pptx``, ``/export/docx`` and ``POST /arch-layout`` (recompute every
 declarative diagram in place, used by the browser after a structural edit),
 ``GET /requests``, ``POST /requests``, ``POST /requests/delete`` (the request queue of the loaded file) and
@@ -21,8 +21,10 @@ import re
 import socket
 import tempfile
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, TypeGuard, cast
@@ -845,15 +847,26 @@ def _mtime_or_zero(target: Path) -> float:
 def health_payload() -> dict[str, Any]:
     """Return the ``/health`` body: liveness plus the running version.
 
+    Cheap: it reads no file and writes nothing. ``file`` (absolute) and ``page`` (its base name) are null
+    when no file is loaded. ``status`` stays next to ``ok`` for older callers.
+
     Returns:
-        Dict with keys ``status``, ``version``, ``file`` and ``port``.
+        Dict with keys ``ok``, ``status``, ``pid``, ``file``, ``page``, ``port``, ``version``, ``started``
+        (UTC ISO) and ``uptime_seconds``.
     """
     state = get_state()
+    file = state.current_file
+    now = time.time()
     return {
+        "ok": True,
         "status": "ok",
-        "version": __version__,
-        "file": state.current_file,
+        "pid": os.getpid(),
+        "file": file,
+        "page": Path(file).name if file else None,
         "port": state.port,
+        "version": __version__,
+        "started": datetime.fromtimestamp(_started_at, tz=UTC).isoformat(timespec="seconds"),
+        "uptime_seconds": max(0, int(now - _started_at)),
     }
 
 
@@ -1022,6 +1035,7 @@ def _is_same_origin(origin: str, host_name: str, host_port: int | None) -> bool:
 
 
 _server_instance: _EditorServer | None = None
+_started_at: float = time.time()  # reset when the server starts; the import time before that
 _server_thread: threading.Thread | None = None
 _server_lock = threading.Lock()
 
@@ -1095,7 +1109,7 @@ def start_http_server(
         running in this process (no-op); `port` is the TCP port actually
         bound.
     """
-    global _server_instance, _server_thread
+    global _server_instance, _server_thread, _started_at
 
     state = get_state()
     bind_host = host if host is not None else default_host()
@@ -1113,6 +1127,7 @@ def start_http_server(
         state.port = resolved_port
         state.server_pid = os.getpid()
         state.save()
+        _started_at = time.time()
 
         try:
             server = _EditorServer(bind_host, resolved_port)

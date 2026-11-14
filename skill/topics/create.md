@@ -11,7 +11,7 @@ Une valeur, un texte ou une structure différents de ce que l'agent avait écrit
 - Traiter la version actuelle du fichier comme la vérité.
 - Ne jamais diffuser un "correctif" silencieux qui rétablit une ancienne valeur.
 - Poser la question si le changement contredit la demande en cours (slide supprimée à modifier, chiffre qui casse un tableau). Ne pas deviner.
-- Toujours relire le fichier avant d'écrire, ne jamais réutiliser un HTML gardé en mémoire d'avant une édition humaine.
+- Toujours relire le fichier avant d'écrire.
 
 ## Partir d'un template
 
@@ -33,13 +33,13 @@ Tout contenu que l'humain doit pouvoir modifier visuellement porte un `data-edit
 
 ## Ce que l'humain peut faire
 
-- Texte (barre flottante sur sélection): gras, italique, souligné, barré, exposant, indice, alignement, taille 10 à 48px, couleurs, effacer le formatage.
-- Insertion: image (sélecteur ou glisser-déposer, embarquée en base64), tableau N x M, séparateur HR, lien.
-- Slides (mode présentation): **＋ Slide avant** / **Slide après ＋** (types title, agenda, section, content, diagram) et **🗑 Slide**; ids, TOTAL, slideNames, eyebrow, footer et dropdown sont renumérotés automatiquement.
+- Texte (barre flottante sur sélection): gras, italique, souligné, barré, exposant, indice, alignement, taille 10 à 48px, couleurs.
+- Insertion: image (base64), tableau N x M, séparateur HR, lien.
+- Slides (mode présentation): **＋ Slide avant** / **Slide après ＋** (types title, agenda, section, content, diagram) et **🗑 Slide**; la numérotation suit seule.
 - Blocs document: **＋ Bloc avant** / **Bloc après ＋** (titre, sous-titre, h1 à h5, paragraphe, tableau, liste) et poignée de drag ⠿; après le drop l'ordre du DOM est l'ordre visuel, sans attribut ni style ajouté.
-- Schéma d'architecture: les `arch-node` se déplacent à la souris (écrit `data-x` / `data-y` en %).
 - Clic droit: `table` (ligne, colonne, supprimer), `gantt-task` (agrandir, réduire, renommer, supprimer), `gantt` (ajouter une tâche), `arch-node`, `arch-diagram`, `annotation`.
 - Largeur d'un texte: barre sur son bord droit (glisser par pas de 10px, Alt au pixel, flèches; double clic: largeur du modèle). Écrit `max-width:Npx` dans son `style`.
+- Notes du présentateur: bouton Notes (mode Édition d'une présentation), panneau en bas lié à la slide courante; il écrit ou supprime l'`<aside data-role="speaker-notes">` de la slide.
 
 ## Workflows de l'agent
 
@@ -56,9 +56,11 @@ Modifier du texte:
 6. update_end()
 ```
 
+Notes du présentateur (présentation): `<aside data-role="speaker-notes">texte brut, retours à la ligne gardés</aside>`, enfant direct de la `<section>`/`<article>` slide, jamais dans un conteneur interne. Invisible à l'écran et à l'impression, exporté dans les notes PPTX. Une par slide, texte brut; relire avant d'écrire, l'humain peut l'avoir éditée.
+
 Ajouter une slide: `update_start()`, lire le fichier, ajouter un `<article class="slide" id="slide-N" data-type="slide" data-id="slide-N" data-title="…">` dans `.slide-frame`, mettre à jour `TOTAL` et `slideNames` dans le `<script>`, mettre à jour le `slide-eyebrow` et le `slide-footer-right` de la nouvelle slide, réécrire le fichier complet, `update_end()`.
 
-Créer et exporter un document: `mcp-htmleditor new doc-perso mon-doc.html`, `start_server`, `update_start()`, ajouter `<h1 class="doc-h1">` à `<h5 class="doc-h5">`, `<p>`, `<ul>` / `<ol>`, `<table data-type="table">` avec `data-editable="text"` (balises sémantiques uniquement, pas de `<div>` stylés), réécrire le fichier complet en conservant le `<style>`, `update_end()`, puis `mcp-htmleditor export docx mon-doc.html mon-doc.docx` (voir `mcp-htmleditor skill --type export`).
+Document: `mcp-htmleditor new doc-perso mon-doc.html`, `start_server`, `update_start()`, ajouter `<h1 class="doc-h1">` à `<h5 class="doc-h5">`, `<p>`, `<ul>` / `<ol>`, `<table data-type="table">` avec `data-editable="text"` (balises sémantiques uniquement, pas de `<div>` stylés), réécrire le fichier complet en conservant le `<style>`, `update_end()`, puis `mcp-htmleditor export docx mon-doc.html mon-doc.docx` (voir `mcp-htmleditor skill --type export`).
 
 ## Images: toujours base64
 
@@ -74,11 +76,11 @@ img = f'<img src="data:{mime};base64,{b64}" data-editable="resize,reposition" st
 
 ## Nommage des fichiers
 
-Kebab-case (`mon-rapport-q1-2025.html`), pas d'espaces ni d'accents. Préfixes suggérés: `slides-`, `doc-`, `report-`, `roadmap-`.
+Kebab-case (`mon-rapport-q1-2025.html`), sans espaces ni accents.
 
 ## presentation ou document
 
-`data-doc-type="presentation"`: slides multiples, navigation prev/next, export PPTX optimal, gabarit `ibm-carbon.html`. `data-doc-type="document"`: scroll continu, export DOCX optimal, gabarit `report-standard.html`.
+`data-doc-type="presentation"`: slides multiples, export PPTX. `data-doc-type="document"`: scroll continu, export DOCX.
 
 ## Validation visuelle obligatoire
 
@@ -92,7 +94,7 @@ Après chaque modification substantielle, valider le rendu avec `agent-browser` 
 | Alignement | flèches décalées, barres de Gantt hors colonnes, tuiles inégales |
 | Slide dense | plus de 3 niveaux imbriqués, grille 4 colonnes |
 
-Procédure: `start_server`, ouvrir l'URL, parcourir chaque slide (touches ou prev/next), capturer les slides douteuses, corriger (`update_start` / écrire / `update_end`), revalider. Ne pas se fier au HTML seul: hauteurs et positions ne se voient qu'une fois rendus.
+Procédure: `start_server`, ouvrir l'URL, parcourir chaque slide, capturer les douteuses, corriger (`update_start` / écrire / `update_end`), revalider. Le HTML seul ne montre pas hauteurs et positions.
 
 ## Apply the requests
 

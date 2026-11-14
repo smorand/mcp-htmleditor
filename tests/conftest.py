@@ -134,13 +134,14 @@ SKILL_TOPICS: tuple[tuple[str, str], ...] = (
     ("arch-qa", "Visual quality review of architecture diagrams and its checklist"),
     ("annotated-image", "Rules for annotated images"),
     ("tables", "Rules for tables"),
+    ("editor", "Editor interface: shortcuts, presenter window, speaker notes, Requests panel, /health"),
 )
 
 SKILL_CORE_TITLE = "# mcp-htmleditor skill (core)"
 
 
 class SkillTree:
-    """A generated skill tree (core, 16 topics, checklist) rooted in a temporary directory."""
+    """A generated skill tree (core, 17 topics, checklist) rooted in a temporary directory."""
 
     def __init__(self, root: Path) -> None:
         self.root = root

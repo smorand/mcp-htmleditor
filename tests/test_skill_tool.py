@@ -17,7 +17,7 @@ from .conftest import SkillTree
 
 UNKNOWN_FOO = (
     'Unknown skill topic "foo". Valid topics: create, export, templates, slides-carbon, slides-ei, medical, '
-    "medical-sources, breathe, document, mail, website, gantt, arch-diagram, arch-qa, annotated-image, tables"
+    "medical-sources, breathe, document, mail, website, gantt, arch-diagram, arch-qa, annotated-image, tables, editor"
 )
 
 

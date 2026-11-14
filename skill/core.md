@@ -77,3 +77,4 @@ arch-diagram: Rules for architecture diagrams. Load: mcp-htmleditor skill --type
 arch-qa: Visual quality review of architecture diagrams and its checklist. Load: mcp-htmleditor skill --type arch-qa
 annotated-image: Rules for annotated images. Load: mcp-htmleditor skill --type annotated-image
 tables: Rules for tables. Load: mcp-htmleditor skill --type tables
+editor: Editor interface: shortcuts, presenter window, speaker notes, Requests panel, /health. Load: mcp-htmleditor skill --type editor

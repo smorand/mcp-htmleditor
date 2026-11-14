@@ -1,4 +1,4 @@
-"""Gates on the shipped skill tree: the core, the routing skill and all 16 topic files (SPEC-0006)."""
+"""Gates on the shipped skill tree: the core, the routing skill and all 17 topic files (SPEC-0006)."""
 
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ def real_tree(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 def test_core_by_default(real_tree: None) -> None:
-    """SPEC-0006/E2E-001: `skill` on the real tree prints the core with tools and the 16 topic lines."""
+    """SPEC-0006/E2E-001: `skill` on the real tree prints the core with tools and the 17 topic lines."""
     from mcp_htmleditor.cli import main
     from mcp_htmleditor.mcp_server import registered_tool_names
     from mcp_htmleditor.skill_audit import listed_tools
@@ -226,7 +226,7 @@ def _run_audit(monkeypatch: pytest.MonkeyPatch, skill_dir: Path) -> Result:
 
 def test_every_topic_file_exists() -> None:
     """All 16 topic files ship; a missing one is a failure, never skipped."""
-    assert len(TOPIC_NAMES) == 16
+    assert len(TOPIC_NAMES) == 17
     missing = [name for name in TOPIC_NAMES if not (SKILL_DIR / "topics" / f"{name}.md").is_file()]
     assert missing == []
 
@@ -264,7 +264,7 @@ def test_anchors_cover_every_topic_but_arch_qa() -> None:
 
 
 def test_all_equals_core_plus_topics(real_tree: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """E2E-003 on the real tree: core then the 16 topics, one empty line between parts."""
+    """E2E-003 on the real tree: core then the 17 topics, one empty line between parts."""
     from mcp_htmleditor import config as config_module
     from mcp_htmleditor.cli import main
 
@@ -289,7 +289,7 @@ def test_legacy_files_gone_and_archive_present() -> None:
 
 
 def test_e2e_006_clean_audit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """SPEC-0006/E2E-006: the real tree audit prints 16 OK lines and a clean verdict."""
+    """SPEC-0006/E2E-006: the real tree audit prints 17 OK lines and a clean verdict."""
     result = _run_audit(monkeypatch, SKILL_DIR)
     out = result.stdout.splitlines()
     assert result.exit_code == 0, result.stdout

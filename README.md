@@ -218,14 +218,14 @@ Connect your LLM agent via stdin/stdout (e.g. Claude Desktop, Cursor, pi).
 
 ```bash
 mcp-htmleditor skill                 # the core: rules, workflow, tools and the topic index
-mcp-htmleditor skill --type <topic>  # one of the 16 topics (arch-qa also prints the resolved checklist)
+mcp-htmleditor skill --type <topic>  # one of the 17 topics (arch-qa also prints the resolved checklist)
 mcp-htmleditor skill --all           # the core then every topic
 mcp-htmleditor skill-audit [--json]  # sizes, budgets, tool list and stale statements; exit 0 when clean
 ```
 
 The skill is progressive: the core (`skill/core.md`, at most 7000 bytes) is read first,
 then the agent loads only the topics its task needs (`skill/topics/<topic>.md`, at most
-8000 bytes each). `skill-audit` prints one line per item (core, then the 16 topics in index
+8000 bytes each). `skill-audit` prints one line per item (core, then the 17 topics in index
 order), one `PROBLEM` line per issue, and `skill-audit: OK` or `skill-audit: FAIL (N problems)`.
 The same content is available to agents through the `get_skill` MCP tool. The previous
 monolithic skill is kept for reference in `docs/skill-archive/`.
@@ -573,7 +573,8 @@ it can trust as coming from its own editor page:
 
 Anything else answers `403 {"error": "forbidden host"}`, `403 {"error": "forbidden origin"}` or
 `415 {"error": "unsupported content type"}`, and is logged as a warning. `GET /health` stays open
-for health checks. Limitation: in a container bound to `0.0.0.0`, a client on the network that sets
+for health checks: it answers `{"ok": true, "status": "ok", "pid", "file", "page", "port", "version", "started" (UTC ISO), "uptime_seconds"}`
+(`file` and `page` are null when no file is loaded), reads no file and writes nothing. Limitation: in a container bound to `0.0.0.0`, a client on the network that sets
 `Host: localhost` is not stopped; do not publish the port beyond the machine (tracked as BL-0019).
 
 The server also protects itself from malformed or stalled requests. A request with a duplicated or

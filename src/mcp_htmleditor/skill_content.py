@@ -41,6 +41,7 @@ TOPICS: tuple[Topic, ...] = (
     Topic("arch-qa", "Visual quality review of architecture diagrams and its checklist"),
     Topic("annotated-image", "Rules for annotated images"),
     Topic("tables", "Rules for tables"),
+    Topic("editor", "Editor interface: shortcuts, presenter window, speaker notes, Requests panel, /health"),
 )
 TOPIC_NAMES: tuple[str, ...] = tuple(topic.name for topic in TOPICS)
 

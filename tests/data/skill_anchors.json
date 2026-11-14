@@ -204,5 +204,15 @@
     "make install-browser",
     "Breathe deck exported without the rendered finish",
     "Georgia"
+  ],
+  "editor": [
+    "speaker-notes",
+    "GET /health",
+    "clear_requests",
+    "list_requests",
+    "write_review",
+    "Requests (n)",
+    "`?`",
+    "`S`"
   ]
 }

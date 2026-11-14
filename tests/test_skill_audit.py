@@ -55,11 +55,11 @@ def test_clean_tree_is_ok(skill_tree: SkillTree) -> None:
     result = audit()
     assert result.exit_code == 0
     out = lines(result)
-    assert len(out) == 18
+    assert len(out) == 19
     assert out[-1] == "skill-audit: OK"
     assert out[0].startswith("core: ")
     assert out[0].endswith(" OK")
-    assert [line.split(":")[0] for line in out[1:17]] == TOPIC_NAMES
+    assert [line.split(":")[0] for line in out[1:18]] == TOPIC_NAMES
     assert not any(line.startswith("PROBLEM") for line in out)
     core_size = len(CliRunner().invoke(main, ["skill"]).stdout_bytes)
     assert out[0] == f"core: {core_size} bytes, ~{-(-core_size // 4)} tokens (budget 7000) OK"
@@ -76,7 +76,7 @@ def test_e2e_009_topic_over_budget(skill_tree: SkillTree) -> None:
     assert out[-1] == "skill-audit: FAIL (1 problem)"
     assert result.exit_code == 1
     items = [line for line in out if ": " in line and "bytes" in line]
-    assert len(items) == 17
+    assert len(items) == 18
     assert all(line.endswith(" OK") for line in items if not line.startswith("gantt:"))
 
 
@@ -132,7 +132,7 @@ def test_e2e_020_json(skill_tree: SkillTree) -> None:
     assert result.stdout.count("\n") == 1
     data = json.loads(result.stdout)
     assert list(data) == ["items", "problems", "verdict"]
-    assert len(data["items"]) == 17
+    assert len(data["items"]) == 18
     assert data["items"][0]["name"] == "core"
     assert all(set(item) == {"name", "bytes", "tokens", "budget", "status"} for item in data["items"])
     mail = next(item for item in data["items"] if item["name"] == "mail")
@@ -162,7 +162,7 @@ def test_e2e_023_missing_topic(skill_tree: SkillTree) -> None:
     out = lines(result)
     assert 'PROBLEM topic "website" is not installed' in out
     assert "website: MISSING" in out
-    assert len([line for line in out if "bytes" in line]) == 16
+    assert len([line for line in out if "bytes" in line]) == 17
     assert out[-1] == "skill-audit: FAIL (1 problem)"
     assert result.exit_code == 1
 
@@ -184,7 +184,7 @@ def test_e2e_028_core_not_installed(skill_tree: SkillTree) -> None:
     out = lines(result)
     assert out[0] == "core: MISSING"
     assert "PROBLEM core is not installed" in out
-    assert len([line for line in out if "bytes" in line]) == 16
+    assert len([line for line in out if "bytes" in line]) == 17
     assert out[-1] == "skill-audit: FAIL (1 problem)"
     assert result.exit_code == 1
 
