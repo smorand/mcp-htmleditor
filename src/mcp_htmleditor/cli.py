@@ -504,6 +504,17 @@ def _request_fail(message: str) -> NoReturn:
     raise SystemExit(1)
 
 
+@main.command("breathe-inline")
+@click.argument("file", type=click.Path(dir_okay=False))
+@click.option("--link", is_flag=True, help="Refer to assets/<file> next to the deck instead of embedding the pictures.")
+@deck_command
+def breathe_inline_cmd(file: str, link: bool) -> None:
+    """Embed the Breathe decoration and pictures FILE uses (or link them with --link)."""
+    from .breathe.inline import embed_assets
+
+    click.echo(embed_assets(file, link=link).summary())
+
+
 @main.command("export")
 @click.argument("format")
 @click.argument("input_file", type=click.Path(dir_okay=False))
