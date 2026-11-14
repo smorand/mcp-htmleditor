@@ -259,9 +259,11 @@ def test_degraded_without_chromium(tmp_path: Path) -> None:
     assert result.stdout.splitlines()[-1] == "Done. 1 slide(s) exportee(s)."
     lines = [line for line in result.stderr.splitlines() if line.startswith("Attention: ")]
     assert lines == [f"Attention: {DEGRADED.format('Chromium is not installed')}"]
-    first = next(iter(Presentation(str(out)).slides[0].shapes))
     shapes = list(Presentation(str(out)).slides[0].shapes)
-    assert any(is_full_slide_picture(s) for s in shapes), first
+    assert is_full_slide_picture(shapes[0])
+    assert not any(s.width >= 959 * PX for s in shapes[1:])  # no band or footer of another charter
+    faces = {r.font.name for s in shapes if s.has_text_frame for p in s.text_frame.paragraphs for r in p.runs}
+    assert faces == {"Trebuchet MS"}
 
 
 def test_degraded_without_the_render_extra(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -276,7 +278,7 @@ def test_degraded_without_the_render_extra(tmp_path: Path, monkeypatch: pytest.M
 def failing_render(monkeypatch: pytest.MonkeyPatch) -> None:
     """Chromium starts but the render of a slide fails (E2E-062)."""
 
-    def boom(browser: Any, html_path: Path, count: int) -> list[list[dict[str, Any]]]:
+    def boom(browser: Any, html_path: Path, count: int, events: Any) -> list[list[dict[str, Any]]]:
         raise RuntimeError("slide 2 could not be rendered\nsecond line")
 
     monkeypatch.setattr(pptx_paint, "_measure_pages", boom)
@@ -379,3 +381,127 @@ def test_wcbip_switched_is_painted_with_its_notes(tmp_path: Path) -> None:
     assert len(slides) == 14
     assert all(is_full_slide_picture(next(iter(s.shapes))) for s in slides)
     assert sum(1 for s in slides if s.has_notes_slide and s.notes_slide.notes_text_frame.text.strip()) == 14
+
+
+@needs_chromium
+def test_a_slide_over_the_bound_takes_the_degraded_export(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """FR-NEW-016: a slide whose render exceeds the bound (30 s, 1 s here) degrades the whole export."""
+    monkeypatch.setattr(pptx_paint, "SLIDE_TIMEOUT_S", 1, raising=False)
+    measure_slide = pptx_paint._measure_slide
+
+    def slow(page: Any, index: int) -> list[dict[str, Any]]:
+        if index == 1:
+            time.sleep(3)
+        return measure_slide(page, index)
+
+    monkeypatch.setattr(pptx_paint, "_measure_slide", slow)
+    deck = key_figures_deck(tmp_path)
+    started = time.monotonic()
+    report = to_pptx(str(deck), str(tmp_path / "slow.pptx"))
+    assert report.warnings == [DEGRADED.format("the render failed: slide 2 did not render within 1 seconds")]
+    assert time.monotonic() - started < 30
+    for slide in Presentation(str(tmp_path / "slow.pptx")).slides:
+        assert any(is_full_slide_picture(s) for s in slide.shapes)
+
+
+BOXES_AND_TEXTS = """(index) => {
+  const slide = document.querySelectorAll('[data-type="slide"]')[index];
+  const S = slide.getBoundingClientRect();
+  const n = (v) => parseFloat(v) || 0;
+  const boxes = Array.from(slide.querySelectorAll('*')).filter((el) => {
+    const c = getComputedStyle(el), m = c.backgroundColor.match(/rgba?\\(([^)]+)\\)/);
+    const alpha = m ? (m[1].split(/[\\s,\\/]+/).filter(Boolean)[3] ?? '1') : '0';
+    return el.getClientRects().length && parseFloat(alpha) > 0 && c.display !== 'inline';
+  }).map((el) => {
+    const r = el.getBoundingClientRect(), c = getComputedStyle(el);
+    const bl = n(c.borderLeftWidth), bt = n(c.borderTopWidth);
+    const br = n(c.borderRightWidth), bb = n(c.borderBottomWidth);
+    return [r.left - S.left + bl, r.top - S.top + bt, r.width - bl - br, r.height - bt - bb];
+  });
+  const texts = Array.from(slide.querySelectorAll('.med-title, .med-kicker')).filter((el) => el.getClientRects().length
+    && getComputedStyle(el).textAlign !== 'center').map((el) => {
+    const range = document.createRange(); range.selectNodeContents(el);
+    const t = range.getBoundingClientRect(), r = el.getBoundingClientRect(), c = getComputedStyle(el);
+    return {text: el.textContent.trim().split(/\\s+/).join(' '), left: t.left - S.left, width: t.width,
+            top: r.top - S.top + n(c.borderTopWidth) + n(c.paddingTop)};
+  });
+  return {boxes, texts};
+}"""
+
+
+def _boxes_and_texts(deck: Path, count: int) -> list[dict[str, Any]]:
+    def work() -> list[dict[str, Any]]:
+        with sync_playwright() as driver:
+            browser = driver.chromium.launch()
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            page.goto(deck.resolve().as_uri(), wait_until="load")
+            page.add_style_tag(content=".slide{scale:1!important}*{animation:none!important;transition:none!important}")
+            found = []
+            for index in range(count):
+                page.evaluate(pptx_paint.UNHIDE_JS)
+                page.evaluate(SHOW_SLIDE_JS, index)
+                found.append(page.evaluate(BOXES_AND_TEXTS, index))
+            browser.close()
+            return found
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(work).result()
+
+
+@needs_chromium
+def test_painted_boxes_text_crop_and_spacing(tmp_path: Path) -> None:
+    """FR-NEW-014: coloured boxes within 1 point, left aligned text boxes start at their text and are wide enough,
+    cover pictures cropped like the browser, letter spacing kept."""
+    deck = write(tmp_path / "ref.html", REFERENCE.read_text(encoding="utf-8"))
+    to_pptx(str(deck), str(tmp_path / "ref.pptx"))
+    slides = list(Presentation(str(tmp_path / "ref.pptx")).slides)
+    expected = _boxes_and_texts(deck, len(slides))
+    checked_boxes = checked_texts = 0
+    for index, (slide, wanted) in enumerate(zip(slides, expected, strict=True)):
+        shapes = list(slide.shapes)
+        rects = [
+            [s.left / PX, s.top / PX, s.width / PX, s.height / PX]
+            for s in shapes
+            if s.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE
+        ]
+        for box in wanted["boxes"]:
+            assert any(all(abs(a - b) <= 1 for a, b in zip(box, rect, strict=True)) for rect in rects), (index, box)
+            checked_boxes += 1
+        frames = [s for s in shapes if s.shape_type == MSO_SHAPE_TYPE.TEXT_BOX]
+        for text in wanted["texts"]:
+            matches = [f for f in frames if " ".join(f.text_frame.text.split()).casefold() == text["text"].casefold()]
+            assert matches, (index, text, [f.text_frame.text for f in frames])
+            frame = matches[0]
+            assert abs(frame.left / PX - text["left"]) <= 1, (index, text)
+            assert abs(frame.top / PX - text["top"]) <= 1, (index, text)
+            assert frame.width / PX >= text["width"] - 1, (index, text)
+            checked_texts += 1
+    assert checked_boxes > 20
+    assert checked_texts > 20
+    # framed photo: 300 x 300 with a 6 px border, a 288 x 288 content box: the 1200 x 900 sample loses its sides
+    photo = next(s for s in slides[22].shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE and round(s.width / PX) == 288)
+    assert (round(photo.crop_left, 3), round(photo.crop_right, 3), photo.crop_top) == (0.125, 0.125, 0)
+    kicker_runs = [
+        r
+        for s in slides[0].shapes
+        if s.has_text_frame
+        for p in s.text_frame.paragraphs
+        for r in p.runs
+        if r.text.isupper()
+    ]
+    assert kicker_runs
+    assert all(int(r._r.get_or_add_rPr().get("spc")) > 0 for r in kicker_runs)
+
+
+@needs_chromium
+def test_missing_and_vector_pictures_skipped(tmp_path: Path) -> None:
+    """FR-NEW-014: a missing linked picture and a vector picture are skipped with the exporter's warnings."""
+    svg = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnLz4="
+    body = f'<img src="assets/missing.png" alt="m"><img src="{svg}" alt="v" style="width:40px;height:40px">'
+    deck = write(tmp_path / "p.html", breathe_deck(breathe_slide("P", body)))
+    assert run_cli("breathe-inline", str(deck))[2] == 0
+    report = to_pptx(str(deck), str(tmp_path / "p.pptx"))
+    slide = Presentation(str(tmp_path / "p.pptx")).slides[1]
+    assert sum(1 for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE) == 1  # the background only
+    assert any(w.startswith("Image introuvable, ignoree: ") and w.endswith("missing.png") for w in report.warnings)
+    assert any("SVG" in w or "svg" in w for w in report.warnings)

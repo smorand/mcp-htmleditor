@@ -39,8 +39,12 @@ agents: `skill/topics/breathe.md`. Spec and design: `sdlc/specs/SPEC-0023-breath
   block instead of its own `flex`: pushed (`margin-top:auto`) and centred content moves up. The painter clears the
   inline `display` before each show (`UNHIDE_JS`); the reference geometry test fails without it. The render's
   `--report-only` measures slides the same way: its overflow numbers on flex slides may be off (not fixed here).
-- Playwright's sync API refuses a thread holding an asyncio loop: the painter measures in its own worker thread,
-  tests that open their own browser next to a `page` fixture do the same.
+- Playwright's sync API refuses a thread holding an asyncio loop: the painter measures in its own daemon thread and
+  reads its progress from a queue, one slide at a time: a slide silent for `SLIDE_TIMEOUT_S` (30 s) degrades the
+  export instead of blocking it (a hung worker dies with the process). Tests that open their own browser next to a
+  `page` fixture use a worker thread too.
+- The degraded slide puts its colour in the slide background fill, so the background picture stays the first shape.
+- `breathe-inline` treats an `assets` folder that is itself a link as leading outside (copies would land elsewhere).
 - A data URI holds `;` (`data:image/png;base64,`): the declaration parser splits on it, so `_chrome_breathe` reads the
   background `url()` with its own pattern from `StyleResolver.stylesheet`.
 - The painter keeps the browser's line breaks (no wrap) and widens text boxes by 8 % (centred boxes on both sides):

@@ -322,7 +322,9 @@ class ChromeMixin(_BuilderBase):
         canvas = Box.slide()
         props = style_props(self.article)
         fill = parse_color(props.get("background-color") or props.get("background"), self.res.css_vars)
-        self._rect(canvas, fill=fill or self._element_color(self.article) or "FFFFFF")
+        background = self.slide.background.fill  # the slide's own fill: the picture stays the first shape
+        background.solid()
+        background.fore_color.rgb = RGBColor.from_string(fill or self._element_color(self.article) or "FFFFFF")
         for name in classes(self.article):
             if name.startswith("med-bg-"):
                 rule = re.search(

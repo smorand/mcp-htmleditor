@@ -378,3 +378,17 @@ def test_wcbip_switches_and_switches_back(tmp_path: Path) -> None:
     to_pptx(str(tmp_path / "a.html"), str(tmp_path / "a.pptx"))
     to_pptx(str(tmp_path / "b.html"), str(tmp_path / "b.pptx"))
     assert _slide_parts(tmp_path / "a.pptx") == _slide_parts(tmp_path / "b.pptx")
+
+
+def test_french_then_english_placeholder(tmp_path: Path) -> None:
+    """E2E-070: both placeholders on one medical slide, the English one checked after the French texts."""
+    html = build_deck("medical", ("Cover", "Second")).replace(
+        '<h1 class="slide-h1" data-editable="text">Second</h1>',
+        '<h1 class="slide-h1" data-editable="text">Titre de la présentation</h1><p>Title of the presentation</p>',
+        1,
+    )
+    lines = [line for line in lint_lines(tmp_path, html) if "L006" in line]
+    assert lines == [
+        'error L006 slide-1 template text left: "Titre de la présentation"',
+        'error L006 slide-1 template text left: "Title of the presentation"',
+    ]

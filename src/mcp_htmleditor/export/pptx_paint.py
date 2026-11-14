@@ -19,9 +19,10 @@ import base64
 import binascii
 import io
 import logging
+import queue
 import re
+import threading
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import unquote, urlparse
@@ -45,6 +46,8 @@ SLIDE_W: Final = 960
 SLIDE_H: Final = 540
 VIEWPORT: Final = {"width": 1600, "height": 1000}
 TIMEOUT_MS: Final = 30_000
+SLIDE_TIMEOUT_S = 30  # FR-NEW-016: a slide rendering longer degrades the export (module level for the tests)
+READY_TIMEOUT_S = 90  # launch plus the deck load (its own 30 s bound)
 MISSING_EXECUTABLE: Final = "Executable doesn't exist"
 REASON_MAX_CHARS: Final = 200
 DEGRADED: Final = (
@@ -230,14 +233,49 @@ def paint_presentation(prs: Any, html_path: Path, report: ExportReport) -> bool:
 def measure(html_path: Path, count: int) -> list[list[dict[str, Any]]]:
     """The paint list of the first ``count`` slides, measured in Chromium; ``PaintUnavailable`` when it cannot run.
 
-    Runs in a worker thread of its own: Playwright's sync API refuses a thread that already holds an asyncio loop
-    (an embedding application, a test session), and the export must not depend on its caller's thread.
+    Runs in a daemon thread of its own: Playwright's sync API refuses a thread that already holds an asyncio loop
+    (an embedding application, a test session), and a slide that renders for longer than ``SLIDE_TIMEOUT_S`` must
+    degrade the export instead of blocking it (FR-NEW-016). The worker reports each measured slide on a queue; the
+    caller stops waiting at the first missed deadline (a hung worker is left to die with the process).
     """
-    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="breathe-paint") as pool:
-        return pool.submit(_measure_in_browser, html_path, count).result()
+    events: queue.Queue[tuple[str, Any]] = queue.Queue()
+    worker = threading.Thread(
+        target=_measure_worker, args=(html_path, count, events), name="breathe-paint", daemon=True
+    )
+    worker.start()
+    measured = 0
+    bound = READY_TIMEOUT_S
+    while True:
+        try:
+            kind, value = events.get(timeout=bound)
+        except queue.Empty:
+            if measured == 0 and bound == READY_TIMEOUT_S:
+                raise PaintUnavailable(
+                    f"the render failed: the deck did not load within {READY_TIMEOUT_S} seconds"
+                ) from None
+            raise PaintUnavailable(
+                f"the render failed: slide {measured + 1} did not render within {SLIDE_TIMEOUT_S} seconds"
+            ) from None
+        if kind == "error":
+            raise value
+        if kind == "done":
+            return list(value)
+        if kind == "slide":
+            measured += 1
+        bound = SLIDE_TIMEOUT_S
 
 
-def _measure_in_browser(html_path: Path, count: int) -> list[list[dict[str, Any]]]:
+def _measure_worker(html_path: Path, count: int, events: queue.Queue[tuple[str, Any]]) -> None:
+    """Thread body: the pages measured, or the reason they could not be."""
+    try:
+        events.put(("done", _measure_in_browser(html_path, count, events)))
+    except PaintUnavailable as exc:
+        events.put(("error", exc))
+
+
+def _measure_in_browser(
+    html_path: Path, count: int, events: queue.Queue[tuple[str, Any]]
+) -> list[list[dict[str, Any]]]:
     try:
         from playwright.sync_api import Error, sync_playwright  # noqa: PLC0415 - optional render extra
     except ImportError:
@@ -251,7 +289,7 @@ def _measure_in_browser(html_path: Path, count: int) -> list[list[dict[str, Any]
                     raise PaintUnavailable(NO_CHROMIUM) from None
                 raise PaintUnavailable(f"Chromium could not start: {_first_line(exc)}") from None
             try:
-                return _measure_pages(browser, html_path, count)
+                return _measure_pages(browser, html_path, count, events)
             finally:
                 browser.close()
     except PaintUnavailable:
@@ -260,7 +298,9 @@ def _measure_in_browser(html_path: Path, count: int) -> list[list[dict[str, Any]
         raise PaintUnavailable(f"the render failed: {_first_line(exc)}") from None
 
 
-def _measure_pages(browser: Any, html_path: Path, count: int) -> list[list[dict[str, Any]]]:
+def _measure_pages(
+    browser: Any, html_path: Path, count: int, events: queue.Queue[tuple[str, Any]]
+) -> list[list[dict[str, Any]]]:
     page = browser.new_page(viewport=VIEWPORT, device_scale_factor=1)
     page.set_default_timeout(TIMEOUT_MS)
     page.route(REMOTE, lambda route: route.abort())
@@ -273,14 +313,22 @@ def _measure_pages(browser: Any, html_path: Path, count: int) -> list[list[dict[
     )
     if found != count:
         raise PaintUnavailable(f"the render failed: {found} slides rendered for {count} exported")
+    events.put(("ready", None))
     pages = []
     for index in range(count):
-        # SHOW_SLIDE_JS hides the other slides with an inline display: clear it first, or the next slide shown
-        # keeps an inline "block" instead of its own (flex) display and its pushed or centred content moves.
-        page.evaluate(UNHIDE_JS)
-        page.evaluate(SHOW_SLIDE_JS, index)
-        pages.append(page.evaluate(MEASURE_JS, index))
+        pages.append(_measure_slide(page, index))
+        events.put(("slide", index))
     return pages
+
+
+def _measure_slide(page: Any, index: int) -> list[dict[str, Any]]:
+    """Show slide ``index`` alone and return its paint list."""
+    # SHOW_SLIDE_JS hides the other slides with an inline display: clear it first, or the next slide shown
+    # keeps an inline "block" instead of its own (flex) display and its pushed or centred content moves.
+    page.evaluate(UNHIDE_JS)
+    page.evaluate(SHOW_SLIDE_JS, index)
+    result: list[dict[str, Any]] = page.evaluate(MEASURE_JS, index)
+    return result
 
 
 def _first_line(exc: BaseException) -> str:

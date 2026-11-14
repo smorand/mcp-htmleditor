@@ -124,8 +124,9 @@ def test_nothing_is_served_with_no_deck_open() -> None:
     assert deck_file(None, "/assets/photo.png") is None
 
 
-def test_editor_pages_win(folder: Path, serve_deck: Serve) -> None:
+def test_editor_pages_win(folder: Path, serve_deck: Serve, caplog: pytest.LogCaptureFixture) -> None:
     """E2E-025."""
+    caplog.set_level(logging.WARNING)
     served = serve_deck(folder / "talk.html")
     (folder / "static").mkdir()
     (folder / "static" / "editor.js").write_text("DECK COPY")
@@ -136,6 +137,12 @@ def test_editor_pages_win(folder: Path, serve_deck: Serve) -> None:
     assert b"DECK COPY" not in reply.body
     assert b"function" in reply.body
     assert refused(get(served, "/review/fig.png"))
+    assert get(served, "/static/nope.js").status == 404
+    assert not_served(caplog, "/review/fig.png") == 1
+    assert not_served(caplog, "/static/nope.js") == 1
+    for path in ("/static/..", "/static/."):  # a folder, never a file of the editor
+        assert get(served, path).status == 404, path
+        assert not_served(caplog, path) == 1, path
 
 
 @needs_chromium

@@ -214,3 +214,16 @@ def test_repository_is_fresh() -> None:
         assert module.sync(check=True) == 0
     finally:
         sys.path.remove(str(REPO / "tools"))
+
+
+@needs_chromium
+def test_inserted_layout_keeps_the_picture_name(tmp_path: Path, page: Page, serve_deck: Serve) -> None:
+    """FR-NEW-005: an inserted layout's picture is empty and keeps its asset name, so breathe-inline fills it."""
+    deck = tmp_path / "talk.html"
+    shutil.copyfile(BOOTSTRAP, deck)
+    open_picker(page, serve_deck(deck))
+    page.click("#slide-picker .picker-card:has(.picker-card-label:text-is('Content with picture'))")
+    wait_until(page, lambda: len(slides_on_disk(deck)), lambda n: n == 2, what="the inserted slide saved")
+    picture = slides_on_disk(deck)[1].find("img")  # type: ignore[attr-defined]
+    assert picture.get("data-asset") == "sample-clinical-b.jpg"
+    assert picture.get("src") == ""

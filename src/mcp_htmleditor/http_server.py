@@ -338,7 +338,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         # Security: prevent path traversal
         safe_name = Path(filename).name
         file_path = _static_dir() / safe_name
-        if not file_path.exists():
+        if not file_path.is_file():  # "..", "." name the static folder itself
+            logger.warning("Refused %s %s: not served", self.command, urlparse(self.path).path)
             self._not_found()
             return
         mime = self._guess_mime(safe_name)

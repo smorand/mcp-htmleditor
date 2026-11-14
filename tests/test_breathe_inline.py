@@ -15,7 +15,9 @@ import pytest
 from bs4 import BeautifulSoup
 from playwright.sync_api import Page
 
+from mcp_htmleditor.breathe import inline as inline_module
 from mcp_htmleditor.breathe.inline import catalogue_dir
+from mcp_htmleditor.fileio import WriteError
 from tests.breathe_support import (
     BOOTSTRAP,
     CATALOGUE,
@@ -354,3 +356,56 @@ def test_sec_012_dangling_link_in_link_mode(secret_deck: Path) -> None:
         1,
     )
     assert not (secret_deck.parent.parent / "written.png").exists()
+
+
+# -- US-0123 (converge): write failures and marker cases ------------------------------------------------------
+
+
+def test_write_failure_leaves_the_deck_and_its_folder_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR-NEW-008, NFR-007: the copies of link mode and the assets folder they needed are removed."""
+    deck = deck_with(tmp_path, reference_slide("Key figures"))
+    before = deck.read_bytes()
+    listed = listing(deck.parent)
+
+    def refuse(path: object, data: object, **kwargs: object) -> bool:
+        raise WriteError(path, "No space left on device")  # type: ignore[arg-type]
+
+    monkeypatch.setattr(inline_module, "atomic_write", refuse)
+    for args in ((str(deck),), (str(deck), "--link")):
+        _, stderr, code = inline(*args)
+        assert (stderr, code) == (f"error: Cannot write {deck.resolve()}: No space left on device", 1)
+        assert deck.read_bytes() == before
+        assert listing(deck.parent) == listed
+
+
+def test_one_marker_or_markers_reversed_is_no_block(tmp_path: Path) -> None:
+    """FR-NEW-008: a deck holding only one marker, or the end marker before the begin marker, has no block."""
+    html = BOOTSTRAP.read_text(encoding="utf-8")
+    begin, end = "/* breathe:assets:begin */", "/* breathe:assets:end */"
+    only_begin = html.replace(end, "/* end */", 1)
+    start = html.index(begin)
+    stop = html.index(end) + len(end)
+    block = html[start:stop]
+    reversed_markers = html[:start] + block.replace(begin, "@@").replace(end, begin).replace("@@", end) + html[stop:]
+    for name, text in (("only.html", only_begin), ("reversed.html", reversed_markers)):
+        path = tmp_path / name
+        path.write_text(text, encoding="utf-8")
+        _, stderr, code = inline(str(path))
+        assert (stderr, code) == (f"error: {path} has no breathe:assets block in its <style>", 1), name
+        assert path.read_text(encoding="utf-8") == text
+
+
+def test_assets_folder_leading_outside_is_refused(tmp_path: Path) -> None:
+    """FR-NEW-025: an assets folder that is a link to another folder is outside the deck's folder."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    deck = deck_with(tmp_path, reference_slide("Key figures"))
+    (deck.parent / "assets").symlink_to(outside)
+    before = deck.read_bytes()
+    _, stderr, code = inline(str(deck), "--link")
+    assert code == 1
+    assert stderr.startswith("error: asset ") and stderr.endswith(f"leads outside {deck.resolve().parent / 'assets'}")
+    assert deck.read_bytes() == before
+    assert list(outside.iterdir()) == []

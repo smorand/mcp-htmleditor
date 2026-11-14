@@ -116,12 +116,12 @@ def _embed(file: str, link: bool) -> InlineOutcome:
     block = BEGIN + "\n" + "\n".join(rules) + "\n  " + END
     html = text[:begin] + block + text[end + len(END) :]
     html = _fill_pictures(html, sources, link)
-    copied = _copy_missing(sources, folder) if link else []
+    created = link and not folder.exists()
+    copied = _copy_missing(sources, folder, created) if link else []
     try:
         atomic_write(deck, html, reason=HISTORY_REASON)
     except DeckError:
-        for path in copied:
-            path.unlink(missing_ok=True)
+        _undo_copies(copied, folder, created)
         raise
     size = len(html.encode("utf-8")) // 1024
     return InlineOutcome(file, link, len(classes), len(pictures), len(copied), folder, size)
@@ -152,8 +152,14 @@ def _check_names(needs: list[_Need]) -> None:
 
 
 def _check_links(needs: list[_Need], folder: Path) -> None:
-    """A file of the deck's assets folder (or a link there, dangling or not) must resolve inside that folder."""
-    root = folder.resolve()
+    """A file of the deck's assets folder (or a link there, dangling or not) must resolve inside that folder.
+
+    ``folder`` is the deck's resolved folder plus ``assets``, unresolved: an ``assets`` that is itself a link to
+    another place leads outside, for the files read and for the copies of link mode alike.
+    """
+    root = folder
+    if needs and (folder.is_symlink() or (folder.exists() and folder.resolve() != root)):
+        raise DeckError(f"asset {needs[0].file_name} leads outside {folder}")
     for need in needs:
         candidate = folder / need.file_name
         if (candidate.is_symlink() or candidate.exists()) and not candidate.resolve().is_relative_to(root):
@@ -200,7 +206,15 @@ def _fill_pictures(html: str, sources: dict[str, Path], link: bool) -> str:
     return ASSET_IMG.sub(fill, html)
 
 
-def _copy_missing(sources: dict[str, Path], folder: Path) -> list[Path]:
+def _undo_copies(copied: list[Path], folder: Path, created: bool) -> None:
+    """Remove the files this run copied, and the assets folder when this run created it (NFR-007)."""
+    for path in copied:
+        path.unlink(missing_ok=True)
+    if created and folder.is_dir() and not any(folder.iterdir()):
+        folder.rmdir()
+
+
+def _copy_missing(sources: dict[str, Path], folder: Path, created: bool) -> list[Path]:
     """Copy into the deck's assets folder every needed file found only in the catalogue; never overwrite."""
     copied: list[Path] = []
     for name, source in sources.items():
@@ -211,8 +225,7 @@ def _copy_missing(sources: dict[str, Path], folder: Path) -> list[Path]:
             folder.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
         except OSError as exc:
-            for path in copied:
-                path.unlink(missing_ok=True)
+            _undo_copies(copied, folder, created)
             raise DeckError(f"Cannot write {target}: {exc.strerror or exc}") from None
         copied.append(target)
     return copied

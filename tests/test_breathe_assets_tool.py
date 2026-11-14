@@ -18,7 +18,16 @@ from PIL import Image
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TOOL = REPO_ROOT / "tools" / "breathe_assets.py"
 CATALOGUE = REPO_ROOT / "templates" / "assets" / "breathe"
-SUBSET = ("bg-cover-s0.png", "bg-divider-s2.png", "icon-scope-now.png", "icon-lungs-dark.png", "logo-disc.png")
+SUBSET = (
+    "bg-cover-s0.png",
+    "bg-divider-s2.png",
+    "icon-scope-now.png",
+    "icon-lungs-dark.png",
+    "logo-disc.png",
+    "wiip-strong-logo-alpha.png",
+    "sample-video-b.jpg",
+    "sample-annotated-b.jpg",
+)
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess[str]:
@@ -88,4 +97,18 @@ def test_unknown_subset_name_is_refused(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert "unknown catalogue file bg-nowhere-s9.png" in result.stderr
+    assert not out.exists()
+
+
+def test_logo_source_missing_stops_before_writing(tmp_path: Path) -> None:
+    """E2E-054."""
+    src = tmp_path / "src"
+    src.mkdir()
+    for name in ("filigrane-stethoscope-poumons.png", "wiip-strong-logo.png"):
+        shutil.copy(CATALOGUE / name, src / name)
+    out = tmp_path / "out"
+    result = run_tool("--src", str(src), "--out", str(out))
+
+    assert result.returncode == 1
+    assert result.stderr.strip() == f"error: source picture logo-2026-botanical-transparent.png not found in {src}"
     assert not out.exists()
