@@ -67,6 +67,7 @@ slides-carbon: Rules for IBM Carbon slides. Load: mcp-htmleditor skill --type sl
 slides-ei: Rules for Euro-Information slides. Load: mcp-htmleditor skill --type slides-ei
 medical: Rules for medical slides: layouts, light and dark surfaces, widths, readability, height budget. Load: mcp-htmleditor skill --type medical
 medical-sources: Medical slides: citing sources and anonymising patient images. Load: mcp-htmleditor skill --type medical-sources
+breathe: Rules for Breathe slides: layouts, airway stages, icons, sizing, notes, embedding, PPTX export. Load: mcp-htmleditor skill --type breathe
 document: Rules for Word-like documents and their DOCX export. Load: mcp-htmleditor skill --type document
 mail: Rules for HTML mails. Load: mcp-htmleditor skill --type mail
 website: Rules for single page websites. Load: mcp-htmleditor skill --type website

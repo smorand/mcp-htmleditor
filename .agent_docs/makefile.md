@@ -91,7 +91,9 @@ MAKE_DOCKER_PREFIX=ghcr.io/smorand/ DOCKER_TAG=v1.0.0 make docker
 |--------|--------------|
 | `bootstrap-ei` | Regenerates `templates/bootstrap/slides-ei-empty.html` from the EI reference |
 | `sync-medical-css` | Copies the medical charter CSS from its bootstrap into the two reference decks |
-| `check-generated` | Runs both generators with `--check` (always both), prints one `fresh`/`stale`/`missing` line per file, fails if either fails, writes nothing. First step of `check` |
+| `breathe-assets` | Redraws the Breathe decoration catalogue into `templates/assets/breathe` (`ARGS='--list'`, `'--out DIR'`, `'--src DIR'`, `'--only a.png,b.png'`); needs Pillow (dev group) and git LFS for the committed files |
+| `sync-breathe-layouts` | Re-embeds the Breathe reference deck and starting point from the catalogue and regenerates `LAYOUT_SETS.breathe` in `slide-layouts.js` from the reference deck |
+| `check-generated` | Runs every generator with `--check` (EI bootstrap, medical CSS, deck pointer and presenter, Breathe files and picker set), prints one `fresh`/`stale`/`missing` line per file, fails if either fails, writes nothing. First step of `check` |
 
 ## Cleanup and info
 

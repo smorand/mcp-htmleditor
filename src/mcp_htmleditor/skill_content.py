@@ -32,6 +32,7 @@ TOPICS: tuple[Topic, ...] = (
         "Rules for medical slides: layouts, light and dark surfaces, widths, readability, height budget",
     ),
     Topic("medical-sources", "Medical slides: citing sources and anonymising patient images"),
+    Topic("breathe", "Rules for Breathe slides: layouts, airway stages, icons, sizing, notes, embedding, PPTX export"),
     Topic("document", "Rules for Word-like documents and their DOCX export"),
     Topic("mail", "Rules for HTML mails"),
     Topic("website", "Rules for single page websites"),

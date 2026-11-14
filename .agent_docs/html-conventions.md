@@ -36,6 +36,7 @@ invariants the Python side depends on: break one of them and an export or the ed
   generates the bootstrap. For `medical`, `templates/bootstrap/slides-medical-empty.html` is the source and
   `make sync-medical-css` copies its `<style>` block into `reference/slides/medical.html` and
   `reference/slides/example-medical-complete.html` (both standalone); a reference `<style>` edited by hand diverges.
+* **Breathe** shares the `med-` vocabulary with its own charter: `.agent_docs/breathe.md` (SPEC-0023).
 
 ## Fullscreen presentation mode (mandatory on every slide template)
 

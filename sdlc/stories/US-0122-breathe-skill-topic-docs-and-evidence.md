@@ -6,7 +6,7 @@
 > Depends on: US-0120, US-0121
 > min_tier: 1
 > Files touched: 8
-> Closes spec: yes
+> Closes spec: no (moved to US-0123, inserted by the converge on 2026-11-14)
 
 ## Objective
 Teach agents the Breathe rules through a skill topic, update the documentation, and record the visual evidence of the reference deck in HTML and PPTX. Closes SPEC-0023 (converge).

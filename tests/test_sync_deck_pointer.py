@@ -152,7 +152,7 @@ def test_makefile_wires_the_tool_into_sync_and_check_generated() -> None:
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 
     assert "sync-deck-pointer:\n\t@uv run python tools/sync_deck_pointer.py\n" in makefile
-    assert "uv run python tools/sync_deck_pointer.py --check || rc=1; exit $$rc" in makefile
+    assert "uv run python tools/sync_deck_pointer.py --check || rc=1;" in makefile  # SPEC-0023 adds a check after it
 
 
 PRESENTER = "<!-- deck-presenter:begin -->\n<style>/* new */</style>\n<!-- deck-presenter:end -->"

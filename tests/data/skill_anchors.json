@@ -188,5 +188,21 @@
     "data-doc-type=\"presentation\"",
     "templates/reference/slides/",
     "base64"
+  ],
+  "breathe": [
+    "data-doc-template=\"breathe\"",
+    "--breathe-ice",
+    "mcp-htmleditor new breathe",
+    "mcp-htmleditor breathe-inline",
+    "--link",
+    "med-bg-<preset>-s<N>",
+    "med-rail-label",
+    "med-ico-<glyph>-<variant>",
+    "make breathe-assets",
+    "data-asset",
+    "data-role=\"speaker-notes\"",
+    "make install-browser",
+    "Breathe deck exported without the rendered finish",
+    "Georgia"
   ]
 }

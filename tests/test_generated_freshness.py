@@ -32,12 +32,26 @@ EI_EDIT_LINE = 120
 MEDICAL_EDIT_LINE = 40  # inside the style block, which starts at line 31
 
 
+# SPEC-0023: make check-generated also checks the Breathe shipped files and the Breathe picker set.
+BREATHE_FILES = (
+    "templates/reference/slides/breathe.html",
+    "templates/bootstrap/slides-breathe-empty.html",
+    "src/mcp_htmleditor/static/slide-layouts.js",
+)
+
+
 @pytest.fixture
 def repo_copy(tmp_path: Path) -> Path:
     """Copy tools/ and the five template files with the same relative layout."""
-    for tool in (EI_TOOL, MEDICAL_TOOL, "tools/sync_deck_pointer.py", "tools/freshness.py"):
+    for tool in (
+        EI_TOOL,
+        MEDICAL_TOOL,
+        "tools/sync_deck_pointer.py",
+        "tools/freshness.py",
+        "tools/sync_breathe_layouts.py",
+    ):
         _copy(REPO_ROOT / tool, tmp_path / tool)
-    for rel in TEMPLATE_FILES:
+    for rel in (*TEMPLATE_FILES, *BREATHE_FILES):
         _copy(REPO_ROOT / rel, tmp_path / rel)
     for rel in ("Makefile", "pyproject.toml"):
         _copy(REPO_ROOT / rel, tmp_path / rel)

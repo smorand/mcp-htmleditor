@@ -17,7 +17,7 @@ mcp-htmleditor skill
 Lis le cœur (règles absolues, workflow, outils, index des sujets), puis charge les
 sujets utiles à la tâche, un par un, avec `mcp-htmleditor skill --type <sujet>`:
 `create`, `export`, `templates`, `slides-carbon`, `slides-ei`, `medical`,
-`medical-sources`, `document`, `mail`, `website`, `gantt`, `arch-diagram`, `arch-qa`,
+`medical-sources`, `breathe`, `document`, `mail`, `website`, `gantt`, `arch-diagram`, `arch-qa`,
 `annotated-image`, `tables`. Ne charge pas tout: l'index du cœur dit quel sujet
 correspond à quelle tâche.
 

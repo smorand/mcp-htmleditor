@@ -77,9 +77,11 @@ mcp-htmleditor --version      # or: curl localhost:7842/health
 ### Create from a template (recommended)
 
 ```bash
-mcp-htmleditor templates                          # list templates: ei, carbon, medical, doc, doc-perso, doc-ei, mail, website
+mcp-htmleditor templates                          # list templates: ei, carbon, medical, breathe, doc, doc-perso, doc-ei, mail, website
 mcp-htmleditor new ei ma-presentation.html --serve # create + open editor
 mcp-htmleditor new medical talk.html --serve       # medical deck (congress, staff, teaching)
+mcp-htmleditor new breathe talk.html               # Breathe congress deck (see "Breathe template" below)
+mcp-htmleditor breathe-inline talk.html [--link]   # embed (or link) the Breathe decoration and pictures
 ```
 
 ### Visual editor
@@ -103,7 +105,7 @@ Edit mode toggle (top-right "Édition"): in-place rich-text editing, format tool
 on selection (bold/italic/underline/strike, superscript/subscript, align, size,
 color), insert image (local file picker or drag-drop, embedded as base64), insert
 table, slide insert/delete (presentation mode) with a template-aware picker (5 layouts for
-the `carbon` and `ei` charters, 16 for `medical`), and
+the `carbon` and `ei` charters, 16 for `medical`, 23 for `breathe`), and
 document block insert before/after (document mode) via "＋ Bloc avant / Bloc après"
 pickers (title, subtitle, h1-h5, paragraph, table, list). Drag-and-drop editing:
 reorder top-level document blocks with a left-side grip handle (DOM order = visual
@@ -210,14 +212,14 @@ Connect your LLM agent via stdin/stdout (e.g. Claude Desktop, Cursor, pi).
 
 ```bash
 mcp-htmleditor skill                 # the core: rules, workflow, tools and the topic index
-mcp-htmleditor skill --type <topic>  # one of the 15 topics (arch-qa also prints the resolved checklist)
+mcp-htmleditor skill --type <topic>  # one of the 16 topics (arch-qa also prints the resolved checklist)
 mcp-htmleditor skill --all           # the core then every topic
 mcp-htmleditor skill-audit [--json]  # sizes, budgets, tool list and stale statements; exit 0 when clean
 ```
 
 The skill is progressive: the core (`skill/core.md`, at most 7000 bytes) is read first,
 then the agent loads only the topics its task needs (`skill/topics/<topic>.md`, at most
-8000 bytes each). `skill-audit` prints one line per item (core, then the 15 topics in index
+8000 bytes each). `skill-audit` prints one line per item (core, then the 16 topics in index
 order), one `PROBLEM` line per issue, and `skill-audit: OK` or `skill-audit: FAIL (N problems)`.
 The same content is available to agents through the `get_skill` MCP tool. The previous
 monolithic skill is kept for reference in `docs/skill-archive/`.
@@ -326,7 +328,7 @@ the union of the rows they declare. Diagrams with no `arch-row` (legacy, hand au
 The PPTX export writes one 16:9 slide (13.333 x 7.5 in) per element carrying
 `data-type="slide"`, with a fallback on `article.slide` for older templates. The
 navigation shell, `<script>` and `<style>` are never exported. It detects the
-charter of the document (Euro-Information, IBM Carbon, medical, generic), draws the slide
+charter of the document (Euro-Information, IBM Carbon, medical, Breathe, generic), draws the slide
 chrome (frames, footers, logo ring, header rule), then flows the content: text at
 the typographic scale of the template, tile grids, callouts, native tables with
 `colspan` / `rowspan` merges, real Gantt bars, diagram nodes as autoshapes with
@@ -410,11 +412,13 @@ templates/
 │   ├── slides-ei-empty.html       key: ei        (Euro-Information)
 │   ├── slides-empty.html          key: carbon    (IBM Carbon)
 │   ├── slides-medical-empty.html  key: medical   (medical deck, single source of the charter CSS)
+│   ├── slides-breathe-empty.html  key: breathe   (Breathe congress deck: one cover, decoration inline)
 │   ├── document-empty.html        key: doc       (Word-like document)
 │   ├── document-perso-empty.html  key: doc-perso (Perso charter, Arial)
 │   ├── document-ei-empty.html     key: doc-ei    (Euro-Information, Segoe UI)
 │   ├── mail-empty.html            key: mail      (HTML email, light Carbon charter)
 │   └── website-empty.html         key: website   (Carbon website: nav, hero, tabs, cards, footer)
+├── assets/breathe/                Breathe decoration catalogue (backgrounds, icons, logo disc, samples; git LFS)
 └── reference/                     rich examples to clone (read-only via server)
     ├── slides/
     │   ├── euro-information.html   EI: title + agenda + content, embedded logos (CSS source of the `ei` bootstrap)
@@ -422,6 +426,7 @@ templates/
     │   ├── ibm-carbon.html         IBM Carbon: 9 slides, all components
     │   ├── medical.html            medical charter catalogue, one slide per `data-slide-type` (16)
     │   ├── example-medical-complete.html medical: full talk, dark imaging slides, clinical case, bibliography
+    │   ├── breathe.html            Breathe: 23 slides, every layout (source of the Breathe picker set)
     │   ├── presentation-standard.html
     │   └── roadmap-one-pager.html
     ├── documents/
@@ -458,6 +463,53 @@ under the title, bibliographic source band in the footer, dark surface for imagi
 and 16 insertable slide layouts (the other slide charters expose 5). Every third party image
 must carry a source line and every patient image must be anonymized: see
 `skill/topics/medical.md`.
+
+### Breathe template
+
+`breathe` is the congress template of Dr Lamya CHRIF MORAND (direction B, "Editorial, airway as a
+story line"): ice and navy panels, Georgia titles, Trebuchet MS body, circled line icons, and one
+airway line across the top of every slide that marks the stage of the patient pathway. Its
+decoration lives in pictures: a background PNG per slide (class `med-bg-<preset>-s<N>`) and icon
+PNGs (`med-ico-<glyph>-<variant>`) from the catalogue `templates/assets/breathe/`.
+
+```bash
+mcp-htmleditor new breathe talk.html               # one cover slide, decoration inline
+# add layouts from the editor's picker or from templates/reference/slides/breathe.html, then:
+mcp-htmleditor breathe-inline talk.html            # one CSS rule per decoration class used, pictures as data URIs
+mcp-htmleditor breathe-inline talk.html --link     # or refer to assets/<file> next to the deck (copied there)
+mcp-htmleditor lint talk.html                      # Breathe palette, foreign classes, L008 rows, L009 sources
+mcp-htmleditor export pptx talk.html talk.pptx     # painted from the rendered slides, notes included
+```
+
+- **Detection.** `data-doc-template="breathe"` on `<html>`, or the token `--breathe-ice` in the styles
+  when the page does not declare `medical`. Decks built from the earlier Breathe template declare
+  `medical` and stay medical, unchanged; change the declaration to `breathe` to switch one. The layouts
+  keep the `med-` class vocabulary.
+- **Embedding.** `breathe-inline` writes the block between `/* breathe:assets:begin */` and
+  `/* breathe:assets:end */` and fills every `<img data-asset="name">`. Files come from the deck's
+  `assets/` folder, then the catalogue shipped with the editor. Asset names must be plain file names;
+  a link in `assets/` that leads outside it is refused; nothing is written on a refusal; the previous
+  deck goes to the history (`mcp-htmleditor history`). Template files are refused.
+- **PPTX.** The exporter builds the slides, then (Breathe only) opens the deck in Chromium, measures
+  every slide and repaints it: the background picture full bleed, boxes and borders as shapes, icons
+  and pictures at their rendered box, every text an editable text box with the browser's line breaks,
+  face, size, weight and colour. Notes stay on the notes pages. Without Chromium (`make install-browser`)
+  or the render extra, or if the render fails, the export still completes with the flowed slides over
+  their background pictures and one warning `Breathe deck exported without the rendered finish (<reason>)`.
+  Text boxes do not rewrap in PowerPoint: edit the HTML and export again.
+- **Maintenance.** `make breathe-assets` redraws the catalogue (`ARGS=--list` lists it);
+  `make sync-breathe-layouts` re-embeds the shipped reference deck and starting point and regenerates
+  the Breathe picker set from the reference deck; `make check-generated` fails when they are stale.
+- Rules for agents: `mcp-htmleditor skill --type breathe`.
+
+### Files next to the deck
+
+`mcp-htmleditor serve` answers, besides its own pages, the picture, media, font and style files
+(`.png .jpg .jpeg .gif .webp .avif .bmp .ico .svg .mp4 .webm .ogg .mp3 .wav .m4a .woff .woff2 .ttf
+.otf .css`) stored in the folder of the open deck, so a deck can link `assets/photo.jpg` instead of
+inlining it. The request gate runs first; a path outside the folder (`..`, encoded or not, a link
+leaving it), a hidden file, another type or a reserved editor path answers `Not found` and logs
+`Refused GET <path>: not served`. Served files carry `nosniff`; an SVG never runs scripts.
 
 ## HTML data-types
 
@@ -552,12 +604,14 @@ src/mcp_htmleditor/
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
 ├── mcp_server.py    FastMCP server with 21 tools
-├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health)
+├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health, files next to the deck)
+├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
+├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)
 ├── history.py       HistoryStore, list_versions, restore_version (history and restore)
 ├── state.py         singleton state + records in the state directory
 ├── export/
-│   ├── charters.py  REGISTRY of CharterSpec: the eight charters (templates, detectors, DOCX keys)
+│   ├── charters.py  REGISTRY of CharterSpec: the nine charters (templates, detectors, DOCX keys), is_breathe
 │   ├── to_pptx.py   HTML to PPTX entry: to_pptx, find_slides, ExportReport re-export, composed _SlideBuilder
 │   ├── pptx_model.py      shared model: ExportReport, block types, _BuilderBase (mixin base class)
 │   ├── pptx_text.py       text and paragraph rendering, rectangle and textbox primitives
@@ -566,7 +620,8 @@ src/mcp_htmleditor/
 │   ├── pptx_gantt.py      Gantt renderer, inline Gantt detection
 │   ├── pptx_blocks.py     block measurement and renderers (grid, panel, rule, hbar, table)
 │   ├── pptx_flow.py       block flow and flex row logic
-│   ├── pptx_chrome.py     per charter chrome (EI, Carbon, medical, generic)
+│   ├── pptx_chrome.py     per charter chrome (EI, Carbon, medical, Breathe degraded, generic)
+│   ├── pptx_paint.py      Breathe painted finish: Chromium measures, slides repainted, degraded fallback
 │   ├── pptx_style.py      Box geometry, CSS/colour parsing, themes, typographic scale
 │   ├── pptx_components.py table grid (spans), Gantt maths, low level pptx helpers
 │   ├── to_docx.py   HTML to DOCX via pandoc (single title, charter, diagnostics)
@@ -584,7 +639,7 @@ src/mcp_htmleditor/
     ├── editor-blocks.js document block picker and insert
     ├── editor-drag.js   drag-reorder of document blocks, mouse move of arch nodes
     ├── editor.js        state, start up, polling (loaded last)
-    ├── slide-layouts.js per-template slide layouts (carbon / ei / medical)
+    ├── slide-layouts.js per-template slide layouts (carbon / ei / medical / breathe, the last generated)
     ├── doc-blocks.js    document block definitions (title, subtitle, h1-h5, paragraph, table, list)
     └── editor.css       toolbar, overlay, picker styles
 templates/          versioned templates (bootstrap + reference)
@@ -594,7 +649,9 @@ tools/              maintenance scripts
                     check_ei_insert.py   browser check of EI slide insertion (logo + numbering)
                     sync_medical_css.py  propagate the medical charter CSS to the reference decks
                     gen_medical_placeholders.py  synthetic placeholder images for the medical decks
-skill/              core.md, topics/ (15), checks/ (served by `mcp-htmleditor skill`)
+                    breathe_assets.py    Breathe decoration catalogue generator (make breathe-assets)
+                    sync_breathe_layouts.py  Breathe shipped files and picker set (make sync-breathe-layouts)
+skill/              core.md, topics/ (16), checks/ (served by `mcp-htmleditor skill`)
 docs/skill-archive/ previous monolithic skill, reference only
 dynamic-skills/     dynamic Pi skill + routing doc (installed to ~/.pi/agent/dynamic-skills)
 .agent_docs/        detailed docs for AI agents (python, makefile, architecture, ...)

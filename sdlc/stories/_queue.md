@@ -121,4 +121,4 @@
 | US-0119 | SPEC-0023 | breathe reference deck and picker layouts | US-0118 | 1 | done | feat/breathe-template | US-0118 |
 | US-0120 | SPEC-0023 | painted PPTX export of breathe decks | US-0119 | 1 | done | feat/breathe-template | US-0119 |
 | US-0121 | SPEC-0023 | serve files next to the open deck | US-0117 | 1 | done | feat/breathe-template | US-0120 |
-| US-0122 | SPEC-0023 | breathe skill topic, docs and evidence | US-0120, US-0121 | 1 | todo | feat/breathe-template | |
+| US-0122 | SPEC-0023 | breathe skill topic, docs and evidence | US-0120, US-0121 | 1 | done | feat/breathe-template | US-0121 |

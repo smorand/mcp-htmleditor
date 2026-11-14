@@ -1,4 +1,4 @@
-"""Gates on the shipped skill tree: the core, the routing skill and all 15 topic files (SPEC-0006)."""
+"""Gates on the shipped skill tree: the core, the routing skill and all 16 topic files (SPEC-0006)."""
 
 from __future__ import annotations
 
@@ -53,6 +53,7 @@ REFERENCES = {
     "slides-carbon": "templates/reference/slides/ibm-carbon.html",
     "slides-ei": "templates/reference/slides/example-ei-complete.html",
     "medical": "templates/reference/slides/medical.html",
+    "breathe": "templates/reference/slides/breathe.html",
     "document": "templates/reference/documents/report-standard.html",
     "mail": "templates/reference/documents/mail-carbon-example.html",
     "website": "templates/reference/websites/ibm-carbon.html",
@@ -100,7 +101,7 @@ def real_tree(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 def test_core_by_default(real_tree: None) -> None:
-    """SPEC-0006/E2E-001: `skill` on the real tree prints the core with tools and the 15 topic lines."""
+    """SPEC-0006/E2E-001: `skill` on the real tree prints the core with tools and the 16 topic lines."""
     from mcp_htmleditor.cli import main
     from mcp_htmleditor.mcp_server import registered_tool_names
     from mcp_htmleditor.skill_audit import listed_tools
@@ -224,8 +225,8 @@ def _run_audit(monkeypatch: pytest.MonkeyPatch, skill_dir: Path) -> Result:
 
 
 def test_every_topic_file_exists() -> None:
-    """All 15 topic files ship; a missing one is a failure, never skipped."""
-    assert len(TOPIC_NAMES) == 15
+    """All 16 topic files ship; a missing one is a failure, never skipped."""
+    assert len(TOPIC_NAMES) == 16
     missing = [name for name in TOPIC_NAMES if not (SKILL_DIR / "topics" / f"{name}.md").is_file()]
     assert missing == []
 
@@ -253,7 +254,7 @@ def test_reference_line_only_on_reference_topics() -> None:
         t for t in TOPIC_NAMES if (SKILL_DIR / "topics" / f"{t}.md").read_text("utf-8").count("\nReference:")
     }
     assert with_reference == set(REFERENCES)
-    assert len(REFERENCES) == 6
+    assert len(REFERENCES) == 7
 
 
 def test_anchors_cover_every_topic_but_arch_qa() -> None:
@@ -263,7 +264,7 @@ def test_anchors_cover_every_topic_but_arch_qa() -> None:
 
 
 def test_all_equals_core_plus_topics(real_tree: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """E2E-003 on the real tree: core then the 15 topics, one empty line between parts."""
+    """E2E-003 on the real tree: core then the 16 topics, one empty line between parts."""
     from mcp_htmleditor import config as config_module
     from mcp_htmleditor.cli import main
 

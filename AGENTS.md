@@ -21,6 +21,8 @@ make run ARGS='export pptx in.html out.pptx'
 make docker-build / run-up / run-down
 make bootstrap-ei  # regenerate the EI bootstrap from the EI reference
 make sync-medical-css  # propagate the medical charter CSS to the reference decks
+make breathe-assets    # redraw the Breathe decoration catalogue (ARGS=--list to list it)
+make sync-breathe-layouts  # re-embed the Breathe shipped files, regenerate the Breathe picker set
 make check-generated  # verify both generated template families are fresh (writes nothing)
 make help        # every target
 ```
@@ -29,9 +31,11 @@ CLI (same after `make install`):
 
 ```bash
 mcp-htmleditor --version
-mcp-htmleditor templates                   # ei, carbon, medical, doc, doc-perso, doc-ei, mail, website
+mcp-htmleditor templates                   # ei, carbon, medical, breathe, doc, doc-perso, doc-ei, mail, website
 mcp-htmleditor new ei pres.html --serve
 mcp-htmleditor new medical talk.html --serve
+mcp-htmleditor new breathe talk.html
+mcp-htmleditor breathe-inline talk.html [--link]   # embed (or link) the Breathe decoration and pictures
 mcp-htmleditor serve file.html [-v|-q] [--host] [--port] [--poll] [--no-browser]
 mcp-htmleditor mcp                         # MCP server (stdio)
 mcp-htmleditor export pptx in.html out.pptx
@@ -39,7 +43,7 @@ mcp-htmleditor export docx in.html out.docx
 mcp-htmleditor arch-layout in.html         # compute arch-diagram positions from topology
 mcp-htmleditor arch-checklist               # print the editable arch-diagram QA checklist
 mcp-htmleditor skill                       # skill core (rules, tools, topic index)
-mcp-htmleditor skill --type <topic>        # one of the 15 topics
+mcp-htmleditor skill --type <topic>        # one of the 16 topics
 mcp-htmleditor skill --all                 # core then every topic
 mcp-htmleditor requests file.html          # requests queued from the editor, oldest first
 mcp-htmleditor request-done file.html R-0001
@@ -76,6 +80,14 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   vertical stack.
 - After editing anything under `templates/`, run `make install` or export
   `HTMLEDITOR_TEMPLATES_DIR=$PWD/templates`, otherwise the installed copy wins.
+- `breathe` (SPEC-0023): own key and marker (`data-doc-template="breathe"` or `--breathe-ice` without a `medical`
+  declaration; one rule `export/charters.py` `is_breathe`, mirrored in `slide-layouts.js`), keeps the `med-*` classes.
+  Its PPTX is painted from Chromium measures (`export/pptx_paint.py`), degraded with one warning without Chromium.
+  Decoration lives in `templates/assets/breathe/` (git LFS, `make breathe-assets`); the reference deck
+  `templates/reference/slides/breathe.html` is the source of the picker set (`make sync-breathe-layouts`, checked by
+  `make check-generated`). Never edit `LAYOUT_SETS.breathe` by hand. See `.agent_docs/html-conventions.md` § Breathe.
+- The editor server answers files next to the open deck (`deck_files.py`): containment rules there, exploit tests in
+  `tests/test_http_deck_files_e2e.py`.
 - Every slide template (current and future) must ship fullscreen support (`:fullscreen`
   CSS, `#btn-present` button, `enterPresentation`/`exitPresentation`/
   `updateFullscreenScale` JS): see `.agent_docs/html-conventions.md` § Fullscreen. A
@@ -125,6 +137,7 @@ Load only what the task needs.
 | `.agent_docs/docker.md` | Image, compose, prod overlay, container checks |
 | `.agent_docs/html-conventions.md` | Invariants the exporters and the editor depend on |
 | `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 21 tool surface, scanner and renumbering rules, gotchas |
+| `.agent_docs/breathe.md` | Breathe template: map of the pieces, detection rule, decoration, painted PPTX, sync, gotchas (SPEC-0023) |
 | `.agent_docs/render.md` | Visual render: picture rules, output directory and cleanup, scale and size rounding, check order, fixtures and install |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`

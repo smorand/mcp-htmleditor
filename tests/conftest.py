@@ -125,6 +125,7 @@ SKILL_TOPICS: tuple[tuple[str, str], ...] = (
         "Rules for medical slides: layouts, light and dark surfaces, widths, readability, height budget",
     ),
     ("medical-sources", "Medical slides: citing sources and anonymising patient images"),
+    ("breathe", "Rules for Breathe slides: layouts, airway stages, icons, sizing, notes, embedding, PPTX export"),
     ("document", "Rules for Word-like documents and their DOCX export"),
     ("mail", "Rules for HTML mails"),
     ("website", "Rules for single page websites"),
@@ -139,7 +140,7 @@ SKILL_CORE_TITLE = "# mcp-htmleditor skill (core)"
 
 
 class SkillTree:
-    """A generated skill tree (core, 15 topics, checklist) rooted in a temporary directory."""
+    """A generated skill tree (core, 16 topics, checklist) rooted in a temporary directory."""
 
     def __init__(self, root: Path) -> None:
         self.root = root

@@ -28,6 +28,7 @@ La charte est détectée (tokens `--med-*` médicale, `--ei-*` Euro-Information,
 |---|---|
 | slides EI `content` / `agenda` / `diagram` / `section` / `title` | cadre bleu, zone arrondie, pied, fond plein, couverture |
 | charte médicale | bandeau gris, filet teal puis orange, bande de sources en bas à gauche, numéro de page à droite; `image` / `grid` / `compare` en `class="slide dark"` en fond `#0B0E11` |
+| charte `breathe` | slides repeintes depuis le rendu Chromium (fond, cadres, icônes, images, texte éditable aux retours de ligne du navigateur, notes); sans Chromium: fond plus contenu en flux et un avertissement. `skill --type breathe` |
 | slides Carbon | fond, filet bleu sous l'en-tête, pied gris |
 | titres, eyebrow, tuiles, encadrés | zones de texte à l'échelle de la charte |
 | `cds-grid` / `stat-grid` / `mention-wrap` | grille de tuiles |
