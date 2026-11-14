@@ -101,6 +101,8 @@ An explicit `--port` is used as-is and fails with a clear error if it is already
 Global options come before the subcommand: `-v` / `--verbose` raises the log level,
 `-q` / `--quiet` keeps errors only, `-V` / `--version` prints the version.
 
+Every toolbar control is an icon without visible text: its name (and shortcut) shows in a tooltip after one second of hover or keyboard focus, and is also its `aria-label`. The last two icons are **Download** (`GET /download`: the HTML file on disk, unmodified, saved under its own name; every document type) and the shortcuts help.
+
 Edit mode toggle (top-right "Édition"): in-place rich-text editing, format toolbar
 on selection (bold/italic/underline/strike, superscript/subscript, align, size,
 color), insert image (local file picker or drag-drop, embedded as base64), insert
@@ -137,9 +139,9 @@ Open a deck with the **Présenter** button (or press F) to show it full screen; 
 End move between slides and Escape leaves. While presenting full screen, press L or start with the **Pointeur** button beside the present button to turn the mouse into a red dot; a click rings the box under it (a tile, a table, else the headline or paragraph); the pointer starts off at every presentation and nothing of it is ever written to the file.
 It works the same in a deck opened directly and in the editor (not while edit mode is on).
 
-Keys (ignored with Ctrl, Meta or Alt, and while typing in an input, textarea, select or editable text): **F** toggles fullscreen, **P** toggles the pointer (L still works, no effect in edit mode), **S** opens or closes the presenter window, **E** toggles edit mode (editor only; a deck opened directly has no editor, so E does nothing). They work from a `file://` deck (F, P, S) and in the editor whether focus is in the slide frame or in the editor shell (E, F, P, S). **?** shows the shortcuts: in the editor, a keyboard icon button at the far right of the toolbar (or the **?** key, from the shell or the slide frame; Esc, a second click or a click outside closes it) opens a panel listing every key (deck, editor, presenter window) and the buttons without a key (Requests, Notes, Ask AI); a deck opened alone shows its own small overlay on **?** (Esc or **?** closes it).
+Keys (ignored with Ctrl, Meta or Alt, and while typing in an input, textarea, select or editable text): **F** toggles fullscreen, **P** toggles the pointer (L still works, no effect in edit mode), **S** opens or closes the presenter window, **E** toggles edit mode (editor only; a deck opened directly has no editor, so E does nothing). They work from a `file://` deck (F, P, S) and in the editor whether focus is in the slide frame or in the editor shell (E, F, P, S). **?** shows the shortcuts: in the editor, a keyboard icon button at the far right of the toolbar (or the **?** key, from the shell or the slide frame; Esc, a second click or a click outside closes it) opens a panel listing every key (deck, editor, presenter window) and the buttons without a key (Requests, Notes, Ask AI, Download); a deck opened alone shows its own small overlay on **?** (Esc or **?** closes it).
 
-The toolbar **Requests** button (label `Requests (n)` with the pending count) opens and closes the right panel holding the requests and the AI suggestions; it starts closed.
+The toolbar **Requests** icon button (a corner badge `(n)` shows the pending count; its `aria-label` is `Requests (n)`) opens and closes the right panel holding the requests and the AI suggestions; it starts closed.
 
 #### Speaker notes and presenter mode (SPEC-0022)
 
@@ -612,7 +614,7 @@ src/mcp_htmleditor/
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
 ├── mcp_server.py    FastMCP server with 22 tools
-├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /health, files next to the deck)
+├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

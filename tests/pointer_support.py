@@ -262,7 +262,8 @@ POINTER_CONTROL = """
   const r = btn.getBoundingClientRect(), p = present.getBoundingClientRect();
   return {exists: true, shown: getComputedStyle(btn).display !== 'none' && r.width > 0,
           afterPresent: present.nextElementSibling === btn, left: r.left, presentRight: p.right,
-          title: btn.title, label: btn.getAttribute('aria-label'), text: btn.textContent.trim()};
+          tip: btn.dataset.tip, title: btn.getAttribute('title'),
+          label: btn.getAttribute('aria-label'), text: btn.innerText.trim()};
 }
 """
 

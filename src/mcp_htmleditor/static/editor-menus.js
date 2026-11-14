@@ -372,3 +372,42 @@ function removeLastTableCol(tbl) {
     if (cells.length > 1) cells[cells.length - 1].remove();
   });
 }
+
+/* ============================================================
+   Toolbar tooltips
+   The one second delay lives in editor.css (#tb-tip.armed, transition-delay).
+   Here: fill the shared #tb-tip from data-tip / data-keys, place it under the
+   control (clamped inside the viewport), arm it on hover or keyboard focus,
+   disarm it on leave, click or Escape. A click keeps it off until the pointer
+   leaves the control. No native title attribute is used.
+   ============================================================ */
+function initToolbarTips() {
+  const tip = document.getElementById('tb-tip');
+  const name = tip.querySelector('.tip-name');
+  const keys = tip.querySelector('.tip-keys');
+  let current = null;
+
+  function disarm() { tip.classList.remove('armed'); current = null; }
+  function arm(el) {
+    if (current === el) return;
+    name.textContent = el.dataset.tip || '';
+    keys.textContent = el.dataset.keys || '';
+    keys.hidden = !el.dataset.keys;
+    const r = el.getBoundingClientRect();
+    const w = tip.offsetWidth;
+    const left = Math.max(4, Math.min(r.left + r.width / 2 - w / 2, document.documentElement.clientWidth - w - 4));
+    tip.style.left = left + 'px';
+    tip.style.top = (r.bottom + 6) + 'px';
+    current = el;
+    tip.classList.add('armed');
+  }
+  let dismissed = null;
+  document.querySelectorAll('#toolbar [data-tip]').forEach((el) => {
+    el.addEventListener('mouseenter', () => { dismissed = null; arm(el); });
+    el.addEventListener('mouseleave', () => { dismissed = null; if (current === el) disarm(); });
+    el.addEventListener('click', () => { dismissed = el; if (current === el) disarm(); });
+    el.addEventListener('focus', () => { if (el.matches(':focus-visible') && dismissed !== el) arm(el); });
+    el.addEventListener('blur', () => { if (current === el) disarm(); });
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') disarm(); });
+}

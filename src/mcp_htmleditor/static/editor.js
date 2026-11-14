@@ -93,6 +93,7 @@ const docActions   = document.getElementById('toolbar-doc-actions');
   }
 
   initNotices();
+  initToolbarTips();
 
   editBtn.addEventListener('click', toggleEditMode);
   presenterBtn.addEventListener('click', () => {
@@ -112,9 +113,12 @@ const docActions   = document.getElementById('toolbar-doc-actions');
     // Re-assert focus on every transition into fullscreen (covers the case
     // where the user re-enters via the iframe's own 'f' shortcut too).
     if (document.fullscreenElement) frame.focus();
-    presentBtn.title = document.fullscreenElement
-      ? 'Quitter la présentation (ESC)'
+    const presentName = document.fullscreenElement
+      ? 'Quitter la présentation'
       : 'Mode présentation plein écran';
+    presentBtn.dataset.tip = presentName;
+    presentBtn.dataset.keys = document.fullscreenElement ? 'Esc' : 'F';
+    presentBtn.setAttribute('aria-label', presentName);
   });
 
   // Safety net: some browsers never move keyboard focus into the iframe's
@@ -402,9 +406,8 @@ function updateDocActionsVisibility() {
  */
 function triggerExport(format) {
   const btn = format === 'pptx' ? exportPptxBtn : exportDocxBtn;
-  const label = btn.textContent.trim();
   btn.disabled = true;
-  btn.textContent = '...';
+  btn.setAttribute('aria-busy', 'true');
   fetch('/export/' + format)
     .then(r => {
       if (!r.ok) return r.json().then(j => { throw new Error(j.error || r.statusText); });
@@ -420,7 +423,7 @@ function triggerExport(format) {
       URL.revokeObjectURL(url);
     })
     .catch(err => alert('Export ' + format.toUpperCase() + ' échoué : ' + err.message))
-    .finally(() => { btn.disabled = false; btn.textContent = label; });
+    .finally(() => { btn.disabled = false; btn.removeAttribute('aria-busy'); });
 }
 async function pollStatus() {
   const savesBefore = saveCount;

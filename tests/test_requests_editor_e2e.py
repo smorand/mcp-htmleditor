@@ -296,7 +296,9 @@ def test_requests_toggle_opens_and_closes_the_side_list(page: Page, served_deck:
     page.set_viewport_size({"width": 1600, "height": 900})
     _open(page, served_deck)
     _wait_heading(page, "Requests (2)")
-    assert page.text_content("#requests-toggle") == "Requests (2)"
+    assert page.text_content("#requests-badge") == "(2)"
+    assert page.get_attribute("#requests-toggle", "aria-label") == "Requests (2)"
+    assert page.inner_text("#requests-toggle").strip() == "(2)"
     assert page.get_attribute("#requests-toggle", "aria-controls") == "requests-side"
     assert page.get_attribute("#requests-toggle", "aria-expanded") == "false"
     assert not page.is_visible("#requests-side")
@@ -314,7 +316,7 @@ def test_requests_toggle_opens_and_closes_the_side_list(page: Page, served_deck:
     page.click("#ask-ai-btn")
     page.fill("#ask-ai-text", "three")
     page.click("#ask-ai-queue")
-    page.wait_for_function("() => document.getElementById('requests-toggle').textContent === 'Requests (3)'")
+    page.wait_for_function("() => document.getElementById('requests-badge').textContent === '(3)'")
 
 
 @needs_chromium

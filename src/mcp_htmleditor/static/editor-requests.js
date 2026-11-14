@@ -21,6 +21,7 @@
   const requestsList    = document.getElementById('requests-list');
   const requestsSide    = document.getElementById('requests-side');
   const requestsToggle  = document.getElementById('requests-toggle');
+  const requestsBadge   = document.getElementById('requests-badge');
   const suggestionsHeading = document.createElement('h2');
   const suggestionsList    = document.createElement('ul');
 
@@ -204,7 +205,9 @@
 
   function requestsRender(snapshot) {
     requestsHeading.textContent = 'Requests (' + snapshot.pending + ')';
-    requestsToggle.textContent = requestsHeading.textContent;
+    requestsBadge.textContent = '(' + snapshot.pending + ')';
+    requestsToggle.setAttribute('aria-label', requestsHeading.textContent);
+    requestsToggle.dataset.tip = requestsHeading.textContent;
     requestsList.replaceChildren(...snapshot.requests.map(requestsRenderLine));
     const suggestions = Array.isArray(snapshot.suggestions) ? snapshot.suggestions : [];
     suggestionsHeading.textContent = 'AI suggestions (' + suggestions.length + ')';

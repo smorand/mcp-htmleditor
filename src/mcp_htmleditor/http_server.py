@@ -2,7 +2,8 @@
 
 Serves the editor shell and proxies HTML content reads/writes to the current
 file on disk. Routes: ``/`` (shell), ``/static/*``, ``/content``,
-``/content-frame``, ``/status`` (polling), ``/health`` (liveness, pid, loaded file, version, start, uptime; any host),
+``/content-frame``, ``/download`` (the file on disk, unmodified, as an attachment under its own name),
+``/status`` (polling), ``/health`` (liveness, pid, loaded file, version, start, uptime; any host),
 ``/export/pptx``, ``/export/docx`` and ``POST /arch-layout`` (recompute every
 declarative diagram in place, used by the browser after a structural edit),
 ``GET /requests``, ``POST /requests``, ``POST /requests/delete`` (the request queue of the loaded file) and
@@ -293,6 +294,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._serve_content_frame()
         elif path == "/status":
             self._serve_status()
+        elif path == "/download":
+            self._serve_download()
         elif path == "/export/pptx":
             self._export_pptx()
         elif path == "/export/docx":
@@ -402,6 +405,29 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._send_json({"error": str(exc)}, status=500)
             return
         self._send_bytes(html.encode("utf-8"), "text/html")
+
+    def _serve_download(self) -> None:
+        """Send the loaded file byte for byte as an attachment named like the file; writes no state."""
+        state = get_state()
+        if not state.current_file:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return
+        file = Path(state.current_file)
+        try:
+            data = file.read_bytes()
+        except OSError as exc:
+            logger.warning("Download of %s failed: %s", file.name, exc)
+            self._send_json({"error": str(exc)}, status=500)
+            return
+        ascii_name = re.sub(r"[^A-Za-z0-9._ -]", "_", file.name)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        encoded = quote(file.name, safe="")
+        self.send_header("Content-Disposition", f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}")
+        self.send_header("Content-Length", str(len(data)))
+        self._send_no_store_headers()
+        self.end_headers()
+        self.wfile.write(data)
 
     def _export_pptx(self) -> None:
         """Generate a PPTX from the current file and return it as a download."""

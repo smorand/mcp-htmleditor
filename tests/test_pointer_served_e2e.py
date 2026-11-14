@@ -265,8 +265,9 @@ def test_pointer_served_pointeur_control(pointer_file_page: Page, served_p: Serv
     control = wait_pointer_control(page)
     assert control["exists"], control
     assert control["afterPresent"] and control["left"] > control["presentRight"], control
-    assert control["title"] == control["label"] == "Présenter avec le pointeur (L)"
-    assert control["text"] == "Pointeur"
+    assert control["tip"] == control["label"] == "Présenter avec le pointeur"
+    assert control["title"] is None
+    assert control["text"] == ""
 
     present_with(page, "#pointer-btn")
     wait_state(page, lambda s: s["on"], "Pointeur presented with the pointer on", FRAME_DOC)

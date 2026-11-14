@@ -52,13 +52,15 @@ def test_icon_button_is_last_visible_control_at_the_right_edge(page: Page, serve
           const visible = [...document.querySelectorAll('#toolbar button')].filter(b => b.offsetParent !== null);
           const r = btn.getBoundingClientRect();
           return {last: visible[visible.length - 1].id, gap: bar.right - r.right, text: btn.textContent.trim(),
-                  svg: !!btn.querySelector('svg'), title: btn.title, label: btn.getAttribute('aria-label')};
+                  svg: !!btn.querySelector('svg'), title: btn.getAttribute('title'), tip: btn.dataset.tip,
+                  label: btn.getAttribute('aria-label')};
         }"""
     )
     assert info["last"] == "help-btn"
     assert 0 <= info["gap"] <= 20
     assert info["text"] == "" and info["svg"]
-    assert info["title"] == info["label"] == "Raccourcis clavier"
+    assert info["title"] is None
+    assert info["tip"] == info["label"] == "Raccourcis clavier"
 
 
 @needs_chromium

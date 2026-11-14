@@ -6,7 +6,7 @@ Ce que la personne voit et fait dans l'éditeur, et ce qu'un agent doit en savoi
 
 ## Fenêtre présentateur
 
-`S` ou le bouton Presenter ouvre une fenêtre: slide courante, slide suivante, notes de la slide en grand (taille réglable), compteur, minuteur avec remise à zéro, horloge, boutons précédent et suivant. Elle suit le deck et le deck la suit; `S` ou sa fermeture la ferme. Elle lit le HTML du deck: ne rien ajouter pour elle.
+`S` ou l'icône Présentateur ouvre une fenêtre: slide courante, slide suivante, notes de la slide en grand (taille réglable), compteur, minuteur avec remise à zéro, horloge, boutons précédent et suivant. Elle suit le deck et le deck la suit; `S` ou sa fermeture la ferme. Elle lit le HTML du deck: ne rien ajouter pour elle.
 
 ## Notes du présentateur
 
@@ -14,12 +14,16 @@ Ce que la personne voit et fait dans l'éditeur, et ce qu'un agent doit en savoi
 
 ## Panneau Requests
 
-Le bouton `Requests (n)` (n = demandes en attente) ouvre ou ferme le panneau des demandes et des suggestions, fermé par défaut. Boucle de l'agent:
+L'icône `Requests (n)` (pastille, n = demandes en attente) ouvre ou ferme le panneau des demandes et des suggestions, fermé par défaut. Boucle de l'agent:
 
 1. `list_requests` (filtres `slide` et `status`; chaque demande porte la position de sa slide).
 2. Faire le travail, puis `complete_request` en `done` ou `skipped` avec une raison.
 3. `clear_requests` retire les demandes finies (`scope` `finished`, défaut) ou toutes (`all`, en attente comprises: à n'utiliser que sur demande).
 4. `write_review` remplace les suggestions (6 au plus).
+
+## Barre d'outils et téléchargement
+
+Les contrôles sont des icônes sans texte; le nom et la touche s'affichent après 1 s de survol (nom accessible: `aria-label`). L'icône Télécharger (`GET /download`) renvoie le fichier HTML tel qu'il est sur disque, sans injection de l'éditeur, sous son nom d'origine.
 
 ## GET /health
 

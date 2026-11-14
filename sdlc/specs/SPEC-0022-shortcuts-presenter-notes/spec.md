@@ -62,3 +62,15 @@ ways, `S` closes; FR-8 typing in the textarea changes the file on disk and the o
 - A deck opened alone shows its own overlay `#deck-help` on `?` (ids only, hidden in print, Esc or a second `?` closes); framed, the deck
   block shows none. The presenter window help gains the `L` pointer line and the `?` entry.
 - Tests: `tests/test_help_shortcuts_e2e.py`.
+
+## Amendment 2026-11-14: icon toolbar, tooltips, download
+
+- Every control of the black toolbar is an icon without visible text (Ask AI, Édition, undo, redo, Present, Pointeur, Présentateur, Notes,
+  Requests, PPTX, DOCX, slide and block actions, Download, help). Ids are unchanged; each has an `aria-label` equal to its tooltip name.
+  `Requests (n)` moved to the corner badge `#requests-badge` (`(n)`) and to the `aria-label`. `#edit-mode-btn` keeps `aria-pressed` and its dot.
+- The native `title` is removed from these controls. A shared `#tb-tip` shows `data-tip` and an optional `data-keys` (kbd) below the control
+  after exactly 1 s (CSS `transition-delay`) of hover or `:focus-visible`; it hides at once on leave, blur, click and Escape, never overflows the
+  right edge, and has `pointer-events: none`.
+- New `GET /download`: the loaded file unmodified as an attachment under its own name (ASCII `filename` plus `filename*`), `no-store`, no state
+  write, same gates as `/status`, 404 without a file. The `#download-btn` anchor sits just before `#help-btn`, which stays last.
+- The help panel keeps its Buttons group and gains the Download line. Tests: `tests/test_toolbar_icons_e2e.py`.
