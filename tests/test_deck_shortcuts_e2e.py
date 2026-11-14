@@ -273,3 +273,26 @@ def test_served_deck_s_opens_the_presenter_through_the_sandboxed_frame(served_fr
     wait_until(popup, lambda: popup_text(popup, "p-notes"), lambda t: t == NOTES[0], what="notes in the popup")
     dispatch_in_frame(page, "s")
     wait_until(page, popup.is_closed, bool, what="popup closed")
+
+
+@pytest.mark.parametrize("key", ["n", "N"])
+def test_presenter_n_goes_to_the_next_slide(file_page: Page, key: str) -> None:
+    popup = open_presenter(file_page)
+    wait_until(popup, lambda: popup_text(popup, "p-count"), lambda t: t.startswith("1 /"), what="first slide")
+    popup.keyboard.press(key)
+    wait_until(popup, lambda: popup_text(popup, "p-count"), lambda t: t.startswith("2 /"), what="next slide on N")
+
+
+def test_presenter_help_menu_is_leftmost_and_lists_the_shortcuts(file_page: Page) -> None:
+    popup = open_presenter(file_page)
+    first = popup.evaluate("document.getElementById('p-bar').firstElementChild.id")
+    assert first == "p-help"
+    hidden = "getComputedStyle(document.getElementById('p-help-menu')).display"
+    assert popup.evaluate(hidden) == "none"
+    popup.click("#p-help-btn")
+    assert popup.evaluate(hidden) != "none"
+    text = popup_text(popup, "p-help-menu")
+    for item in ("N", "Space", "Home", "End", "S"):
+        assert item in text
+    popup.keyboard.press("Escape")
+    assert popup.evaluate(hidden) == "none"
