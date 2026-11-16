@@ -437,7 +437,10 @@ address required). `HTMLEDITOR_GOOGLE_CREDENTIALS_FILE` names the OAuth client f
 `<HTMLEDITOR_LIBRARY_ORIGIN>/auth/callback` (for example `https://slides.scm-platform.org/auth/callback`) as an
 authorized redirect address in that console first. Without the file, or with the address missing, the server still
 starts, logs an error or a warning, and every sign in shows `Sign-in is unavailable. Try again later.` A session lasts
-30 days from the sign in; `Sign out` ends it in that browser only. The home page lists the folders where the account
+exactly 30 days from the sign in, never extended by use, and survives closing the browser and restarting `webserve`;
+`Sign out` ends it in that browser only. While `library.db` cannot be read every library page answers `503` with
+`The library is unavailable. Try again later.` and nothing else; it works again, with no restart, as soon as the file
+is readable. The home page lists the folders where the account
 holds a role (`Read and write` or `Read only`), ordered without regard to case or accents (digits, then Latin letters,
 then other alphabets); an account with none sees `Access denied.`, and so does a signed in person at any address that
 names no page. seb.morand@gmail.com, in any letter case, is the administrator: every folder labelled `Admin`, the

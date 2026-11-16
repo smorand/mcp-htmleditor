@@ -9,11 +9,11 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | Module | Holds |
 |---|---|
 | `__init__.py` | package docstring |
-| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, `home_page(folders, is_admin=)`, every English text constant (DEC-055: `SIGN_IN_UNAVAILABLE`, `ADMIN_LABEL`, `ADMINISTRATION_LABEL`, `NO_FOLDER_YET`, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` |
+| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, `library_unavailable()`, `home_page(folders, is_admin=)`, every English text constant (DEC-055: `SIGN_IN_UNAVAILABLE`, `LIBRARY_UNAVAILABLE`, `ADMIN_LABEL`, `ADMINISTRATION_LABEL`, `NO_FOLDER_YET`, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` |
 | `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029) |
 | `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route`, `Context`, `Answer`, `SetCookie` (DEC-021) |
-| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()` seam, `MIGRATIONS`), `Library` (`folders_for(email)`, `is_admin(email)`, `role_in(email, folder_id)`), `normalize_email`, `FolderView` |
-| `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
+| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library` (`folders_for(email)`, `is_admin(email)`, `role_in(email, folder_id)`), `normalize_email`, `FolderView` |
+| `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `purge`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
 | `routes_library.py` | `ROUTES`: `GET /lib/library.css`, `GET /lib/library.js` (PUBLIC, `static_file`, `STATIC_DIR`), `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN) |
 | `server.py` | `load_routes`, `cookie_name`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_origin_ok`, `_send_answer`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
 
@@ -55,6 +55,24 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
    path in no row without the library `Origin` gets `Access denied.`; with it, the sign in page for a visitor.
    The token call uses an opener with no proxy and no redirect (`signin.py`).
    The JSON `Content-Type` part of DEC-022 arrives with the first JSON route (US-0130).
+7. `_library_answer` (route, session, handler) runs inside `except (sqlite3.Error, OSError)`: `503`
+   `pages.library_unavailable()` (`The library is unavailable. Try again later.`, no name, no list, no Sign out form),
+   one ERROR line naming the exception type. Writing the answer is outside the guard (a closed socket is not the
+   library). Nothing is cached: the next request opens a new connection and works as soon as the file is readable.
+
+## Lifetime (US-0128, DEC-017, DEC-024, DEC-032)
+
+- Clock: `LibraryServer(settings, clock=time.time)` hands `clock` to `Accounts`; no `library/` module reads the wall
+  clock or contains `UPDATE sessions` (grep test). `Library` reads no time yet, so it takes no clock.
+- A session is alive while `clock() < expires_at`; at `expires_at` exactly it is over. `expires_at` is written once.
+  `Accounts.purge()` (called by `begin_login` and by `finish_login` after it took the attempt) deletes session rows
+  ended more than 86 400 s ago (kept a day for US-0137) and attempts of 600 s or more. Tickets join it with US-0133.
+- Restart: no state in memory; a new `LibraryServer` on the same `library_dir` serves the same sessions and folders.
+- Unreadable library: tests set `Database.connect_hook` (class attribute, called before each new connection) to
+  raise `sqlite3.OperationalError`, or swap a junk `library.db` in (`running.unreadable_database()`). A connection
+  whose PRAGMAs fail (junk file) is closed before the error goes up.
+- Home page scale: `folders_for` is one statement (checked with `set_trace_callback`); 200 rows answer in under 1 s on
+  loopback (bound 2 s). Keyboard: only `a` and `button`, each with visible text; Tab reaches `Folder 200` in page order.
 
 ## Sign in (US-0126, DEC-012 to DEC-017)
 
@@ -141,6 +159,10 @@ Sign in support (US-0126): `start(google=fake, google_registered=True)` writes a
 cookies, claims, PKCE, database.
 `tests/test_library_home_http.py`: E2E-014, 018, 087, 149, 165, `role_in`, empty home, escaping, `/lib/*`.
 `tests/test_library_names.py`: `order_key`, `name_key`, 100 random names.
+`tests/test_library_sessions_http.py`: E2E-008, 012, 016, 166, new period on a new sign in, corrupted file, 200 folders
+(time and one query), keyboard in Chromium, purge, the clock and `UPDATE sessions` grep. Support: `running.restart()`,
+`running.unreadable_database()`, `Browser.reopened()` (only cookies set with `Max-Age` survive),
+`builder.numbered_folders(count, email, role)`.
 `tests/test_library_gate_http.py`: E2E-135, 136, 146, 147, 186, headers, settings, CLI refusal, a real `webserve`
 child stopped by SIGTERM.
 

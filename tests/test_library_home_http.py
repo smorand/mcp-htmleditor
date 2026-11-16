@@ -197,16 +197,17 @@ def test_e2e_018_folders_are_ordered_without_regard_to_case_or_accents(
     assert '<html lang="en">' in reply.text
 
 
+@pytest.mark.parametrize("eclair", ["\u00c9clair", "E\u0301clair"], ids=["composed", "decomposed"])
 def test_e2e_165_folders_are_ordered_digits_latin_letters_other_alphabets(
-    library_server: START, fake_google: FakeGoogle
+    library_server: START, fake_google: FakeGoogle, eclair: str
 ) -> None:
-    """E2E-165: digits, then Latin letters (accents ignored), then the Cyrillic name."""
+    """E2E-165: digits, then Latin letters (accents ignored, in either Unicode form), then the Cyrillic name."""
     running = library_server(fake_google)
-    running.builder.folders("Кардиология", "Zeta", "Éclair", "2027 Review", "alpha", "Été")
+    running.builder.folders("Кардиология", "Zeta", eclair, "2027 Review", "alpha", "Été")
 
     _, reply = signed_in(running, fake_google, ADMIN)
 
-    expected = ["2027 Review", "alpha", "Éclair", "Été", "Zeta", "Кардиология"]
+    expected = ["2027 Review", "alpha", eclair, "Été", "Zeta", "Кардиология"]
     assert [name for name, _ in names_and_roles(reply)] == expected
 
 
@@ -304,6 +305,23 @@ def test_e2e_149_any_other_page_is_the_sign_in_page_signed_out_and_access_denied
     browser, _ = signed_in(running, fake_google, DAN)
     assert_access_denied(browser.open(path))
     assert browser.open("/").folder_rows()  # the same session still reaches its home page
+
+
+def test_the_administration_refusal_and_an_unknown_address_have_the_same_headers(
+    library_server: START, fake_google: FakeGoogle
+) -> None:
+    """DEC-023: ``/admin`` refused to Dan answers with the headers of a made up address (``Date`` aside)."""
+    running = library_server(fake_google)
+    running.builder.standard()
+    browser, _ = signed_in(running, fake_google, DAN)
+
+    admin, unknown = browser.open("/admin"), browser.open("/made-up/page")
+
+    assert (admin.status, admin.body) == (unknown.status, unknown.body) == (403, pages.access_denied())
+    assert admin.set_cookies == unknown.set_cookies == ()
+    assert {k: v for k, v in admin.headers.items() if k != "date"} == {
+        k: v for k, v in unknown.headers.items() if k != "date"
+    }
 
 
 # ---------------------------------------------------------------------------

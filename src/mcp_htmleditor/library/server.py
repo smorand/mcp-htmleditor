@@ -6,8 +6,9 @@ only; a ``Host`` other than the netloc of one of the two configured origins gets
 ``X-Forwarded-Proto: http`` gets ``308`` to the configured origin of that host; every request on the content
 origin gets a ``302`` to the library origin (DEC-011); on the library origin the route table decides (DEC-021):
 a state changing request needs its ``Origin`` (DEC-022) before the route or the session is looked up, a path in no row
-or a non public route gives the sign in page to a visitor and ``Access denied.`` to a signed in person. Every answer
-carries the protection headers of DEC-009 (``end_headers``).
+or a non public route gives the sign in page to a visitor and ``Access denied.`` to a signed in person; a
+``sqlite3.Error`` or ``OSError`` while reading the library gives ``503`` and the unavailable page (DEC-024). Every
+answer carries the protection headers of DEC-009 (``end_headers``).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import importlib
 import logging
 import pkgutil
 import re
+import sqlite3
 import threading
 import time
 from collections.abc import Callable
@@ -153,19 +155,30 @@ class LibraryHandler(_EditorHandler):
         self._serve_library(origin, self._request_path(target.path), target.query)
 
     def _serve_library(self, origin: str, path: str, query: str) -> None:
-        """Route, ``Origin`` rule, session, permission, then the handler; no body is read before the handler."""
-        server = self._library_server()
-        route = server.find_route("library", self.command, path)
+        """``Origin`` rule, then the answer; a library that cannot be read is the unavailable page (DEC-024).
+
+        Only the reads are guarded: an error while writing the answer is the connection's, not the library's.
+        """
         if self.command not in SAFE_METHODS and not self._origin_ok(origin):
             logger.warning("Refused %s %s: origin", self.command, path)
             self._send_answer(origin, Answer(403, pages.access_denied()))
             return
+        try:
+            answer = self._library_answer(origin, path, query)
+        except (sqlite3.Error, OSError) as exc:
+            logger.error("Library unavailable for %s %s: %s", self.command, path, type(exc).__name__)
+            answer = Answer(503, pages.library_unavailable())
+        self._send_answer(origin, answer)
+
+    def _library_answer(self, origin: str, path: str, query: str) -> Answer:
+        """Route, session, permission, then the handler; no body is read before the handler."""
+        server = self._library_server()
+        route = server.find_route("library", self.command, path)
         cookies = parse_cookies(self.headers.get_all("Cookie") or [])
         token = cookies.get(cookie_name(origin, SESSION_COOKIE))
         session = server.accounts.session_for(token)
         if route is None or (route.permission is not Permission.PUBLIC and session is None):
-            self._send_refusal(origin, path, signed_in=session is not None)
-            return
+            return self._refusal(path, signed_in=session is not None)
         context = Context(
             person_email=session.email if session is not None else None,
             query=dict(reversed(parse_qsl(query, keep_blank_values=True))),
@@ -174,19 +187,19 @@ class LibraryHandler(_EditorHandler):
             accounts=server.accounts,
             library=server.library,
         )
-        self._send_answer(origin, route.handler(context))
+        return route.handler(context)
 
     def _origin_ok(self, origin: str) -> bool:
         """DEC-022: ``Origin`` exactly the receiving origin, ``Sec-Fetch-Site`` absent, ``same-origin`` or ``none``."""
         fetch_site = self.headers.get("Sec-Fetch-Site")
         return self.headers.get("Origin") == origin and (fetch_site is None or fetch_site in FETCH_SITES_ALLOWED)
 
-    def _send_refusal(self, origin: str, path: str, *, signed_in: bool) -> None:
+    @staticmethod
+    def _refusal(path: str, *, signed_in: bool) -> Answer:
         """``Access denied.`` for a signed in person, the sign in page keeping ``path`` for a visitor."""
         if signed_in:
-            self._send_answer(origin, Answer(403, pages.access_denied()))
-        else:
-            self._send_answer(origin, Answer(200, pages.sign_in_page(safe_destination(path), None)))
+            return Answer(403, pages.access_denied())
+        return Answer(200, pages.sign_in_page(safe_destination(path), None))
 
     def _send_answer(self, origin: str, answer: Answer) -> None:
         """Status, ``Location``, cookies of the origin, body; a page body carries the page policy."""

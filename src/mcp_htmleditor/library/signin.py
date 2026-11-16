@@ -34,6 +34,7 @@ SESSION_COOKIE: Final = "lib"
 BROWSER_COOKIE: Final = "lib-b"
 SESSION_SECONDS: Final = 2_592_000  # 30 days exactly, never extended (DEC-017)
 LOGIN_SECONDS: Final = 600
+ENDED_SESSION_KEPT_SECONDS: Final = 86_400  # an ended row stays one day, for the editor's notice (US-0137)
 TOKEN_TIMEOUT_SECONDS: Final = 10.0
 MAX_TOKEN_ANSWER_BYTES: Final = 1_048_576
 GOOGLE_ISSUERS: Final = frozenset({"accounts.google.com", "https://accounts.google.com"})
@@ -179,9 +180,9 @@ class Accounts:
         state, nonce, verifier = secrets.token_urlsafe(24), secrets.token_urlsafe(24), secrets.token_urlsafe(48)
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
         url = self._google.authorization_url(state, nonce, challenge)  # raises before anything is stored
+        self.purge()
         now = self._clock()
         with self._database.transaction(immediate=True) as connection:
-            connection.execute("DELETE FROM logins WHERE created_at <= ?", (now - LOGIN_SECONDS,))
             connection.execute(
                 "INSERT INTO logins(state_hash, nonce, verifier, destination, browser_hash, created_at)"
                 " VALUES (?, ?, ?, ?, ?, ?)",
@@ -197,6 +198,7 @@ class Accounts:
                 " created_at",
                 (token_hash(state),),
             ).fetchall()
+        self.purge()  # after the attempt is taken: an expired attempt is reported as expired, not unknown
         if not rows:
             raise SignInUnavailable("unknown or already used sign in answer")
         nonce, verifier, destination, browser_hash, created_at = rows[0]
@@ -208,8 +210,16 @@ class Accounts:
         email = validate_claims(claims, self._google.client_id, nonce, self._clock())
         return NewSession(*self._create_session(email), destination=destination)
 
+    def purge(self) -> None:
+        """Delete the session rows ended more than a day ago and the attempts of 10 minutes or more."""
+        now = self._clock()
+        with self._database.transaction(immediate=True) as connection:
+            connection.execute("DELETE FROM sessions WHERE expires_at < ?", (now - ENDED_SESSION_KEPT_SECONDS,))
+            connection.execute("DELETE FROM logins WHERE created_at <= ?", (now - LOGIN_SECONDS,))
+
     def session_for(self, token: str | None) -> Session | None:
-        """The live session of a cookie token (``now < expires_at``), else None."""
+        """The live session of a cookie token: alive while ``now < expires_at``, over at ``expires_at`` exactly.
+        ``expires_at`` is written once at the sign in and never updated, so use never moves the end (DEC-017)."""
         if not token:
             return None
         row = (

@@ -10,6 +10,10 @@ choice, ``/token`` checks PKCE and returns an unsigned ID token); ``Browser`` ke
 redirects across the library, Google and any host given to its resolver (like ``--host-resolver-rules``), and records
 every address it visited; ``RecordingListener`` counts visits to a hostile site; ``StoredLibrary`` is the operator view
 (tables read directly); ``LibraryBuilder`` writes folders and members.
+
+Lifetime (US-0128): ``RunningLibrary.restart()`` stops the server and starts a new one on the same port, directory
+and clock; ``RunningLibrary.unreadable_database()`` swaps a corrupted ``library.db`` in and the real one back out;
+``Browser.reopened()`` is the same browser closed and opened again (only cookies with a ``Max-Age`` survive).
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ import sqlite3
 import threading
 from collections import deque
 from collections.abc import Callable, Iterator
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -404,6 +408,20 @@ class LibraryBuilder:
                 "INSERT OR REPLACE INTO members(folder_id, email, role) VALUES (?, ?, ?)", (folder_id, email, role)
             )
 
+    def numbered_folders(self, count: int, email: str, role: str) -> dict[str, str]:
+        """``Folder 1`` to ``Folder <count>`` in one transaction, ``email`` a member of each; returns name to id."""
+        ids = {f"Folder {number}": secrets.token_hex(16) for number in range(1, count + 1)}
+        with self.database.transaction(immediate=True) as connection:
+            connection.executemany(
+                "INSERT INTO folders(id, name, name_key, created_at) VALUES (?, ?, ?, ?)",
+                [(folder_id, name, name_key(name), self.clock()) for name, folder_id in ids.items()],
+            )
+            connection.executemany(
+                "INSERT INTO members(folder_id, email, role) VALUES (?, ?, ?)",
+                [(folder_id, email, role) for folder_id in ids.values()],
+            )
+        return ids
+
     def standard(self) -> dict[str, str]:
         """The folders and members of the spec's standard library (section 9); returns name to id."""
         ids = {name: self.folder(name) for name in (WCBIP, CARDIOLOGY, PNEUMO)}
@@ -456,6 +474,28 @@ class RunningLibrary:
         """A fresh browser (no cookie); ``resolver`` maps other host names to loopback ports."""
         return Browser(self, dict(resolver or {}))
 
+    def restart(self) -> LibraryServer:
+        """Stop the server and start a new ``LibraryServer`` on the same settings (port, directory) and clock."""
+        self.server.stop()
+        self.server = LibraryServer(self.settings, clock=self.clock)
+        self.server.start()
+        return self.server
+
+    @contextmanager
+    def unreadable_database(self) -> Iterator[None]:
+        """Inside the block ``library.db`` is a file of junk; the real file, untouched, is put back at the end."""
+        self.database.release()
+        path = self.library_dir / "library.db"
+        aside = path.with_name("library.db.aside")
+        with closing(sqlite3.connect(path)) as connection:  # every committed page into the main file
+            connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        path.replace(aside)
+        path.write_bytes(b"this is not a database " * 512)
+        try:
+            yield
+        finally:
+            aside.replace(path)
+
 
 @dataclass
 class Browser:
@@ -464,6 +504,7 @@ class Browser:
     running: RunningLibrary
     resolver: dict[str, int]
     cookies: dict[str, str] = field(default_factory=dict)
+    persistent: set[str] = field(default_factory=set)  # names of the cookies set with a Max-Age
     visited: list[str] = field(default_factory=list)
     replies: list[LibraryReply] = field(default_factory=list)
     url: str = ""
@@ -485,6 +526,11 @@ class Browser:
         """The ``Sign out`` form: a same origin POST, with the ``Origin`` a browser sends under ``same-origin``."""
         headers = {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin"}
         return self._navigate("POST", "/auth/logout", headers, follow=True)
+
+    def reopened(self) -> Browser:
+        """The browser closed and opened again: the cookies without ``Max-Age`` are gone, the others kept."""
+        kept = {name: value for name, value in self.cookies.items() if name in self.persistent}
+        return Browser(self.running, dict(self.resolver), cookies=kept, persistent=set(kept))
 
     def callback_addresses(self) -> list[str]:
         return [address for address in self.visited if urlsplit(address).path == "/auth/callback"]
@@ -525,10 +571,16 @@ class Browser:
         for header in reply.set_cookies:
             pair, _, attributes = header.partition(";")
             name, _, value = pair.strip().partition("=")
-            if "max-age=0" in attributes.replace(" ", "").lower().split(";"):
+            attribute_names = attributes.replace(" ", "").lower().split(";")
+            if "max-age=0" in attribute_names:
                 self.cookies.pop(name, None)
+                self.persistent.discard(name)
+                continue
+            self.cookies[name] = value
+            if any(attribute.startswith("max-age=") for attribute in attribute_names):
+                self.persistent.add(name)
             else:
-                self.cookies[name] = value
+                self.persistent.discard(name)
 
 
 def free_port() -> int:
@@ -545,7 +597,7 @@ def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
     ``<library origin>/auth/callback`` is registered in its console and listed in the file, unless
     ``google_registered`` is False (then neither lists it).
     """
-    started: list[tuple[LibraryServer, Database]] = []
+    started: list[RunningLibrary] = []
 
     def start(
         google: FakeGoogle | None = None, *, google_registered: bool = True, **settings_overrides: Any
@@ -574,9 +626,7 @@ def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
         settings = Settings(**values)
         database = Database(library_dir / "library.db")
         server = LibraryServer(settings, clock=clock)
-        started.append((server, database))
-        server.start()
-        return RunningLibrary(
+        running = RunningLibrary(
             server=server,
             settings=settings,
             clock=clock,
@@ -584,11 +634,14 @@ def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
             state_dir=state_dir,
             database=database,
         )
+        started.append(running)
+        server.start()
+        return running
 
     yield start
-    for server, database in started:
-        server.stop()
-        database.release()
+    for running in started:  # ``running.server`` is the last one a restart started
+        running.server.stop()
+        running.database.release()
 
 
 @pytest.fixture

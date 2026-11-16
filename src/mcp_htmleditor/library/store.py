@@ -10,11 +10,11 @@ from __future__ import annotations
 import os
 import sqlite3
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import ClassVar, Final
 
 from .access import ADMIN_EMAIL, Role
 from .names import order_key
@@ -52,6 +52,10 @@ class FolderView:
 class Database:
     """The library database file; created ``0600`` in a ``0700`` directory, migrated at construction."""
 
+    # Test seam (DEC-032, like ``fileio.replace_file``): called before every new connection, a test sets it to raise
+    # ``sqlite3.OperationalError`` to simulate an unreadable library. Production never sets it.
+    connect_hook: ClassVar[Callable[[], None] | None] = None
+
     def __init__(self, path: Path) -> None:
         self.path = path
         self._local = threading.local()
@@ -63,11 +67,18 @@ class Database:
             self.release()
 
     def connect(self) -> sqlite3.Connection:
-        """A new configured connection; the test seam that simulates an unreadable library (DEC-032)."""
+        """A new configured connection; one that fails while being configured (a file that is not a database) is
+        closed before the error goes up, so nothing of it stays open or cached."""
+        if Database.connect_hook is not None:
+            Database.connect_hook()
         connection = sqlite3.connect(self.path, isolation_level=None)
-        connection.execute("PRAGMA journal_mode=WAL")
-        connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+        try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("PRAGMA foreign_keys=ON")
+            connection.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+        except sqlite3.Error:
+            connection.close()
+            raise
         return connection
 
     def connection(self) -> sqlite3.Connection:

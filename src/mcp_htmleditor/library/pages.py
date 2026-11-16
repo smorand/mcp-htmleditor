@@ -17,6 +17,7 @@ SIGN_IN_UNAVAILABLE: Final = "Sign-in is unavailable. Try again later."
 ADMIN_LABEL: Final = "Admin"
 ADMINISTRATION_LABEL: Final = "Administration"
 NO_FOLDER_YET: Final = "You have no access to any folder yet."
+LIBRARY_UNAVAILABLE: Final = "The library is unavailable. Try again later."
 ROLE_LABELS: Final = {"Admin": ADMIN_LABEL, "RW": "Read and write", "RO": "Read only"}  # keyed by ``Role`` value
 ADMINISTRATION_PATH: Final = "/admin"
 STYLESHEET_PATH: Final = "/lib/library.css"
@@ -42,6 +43,11 @@ def sign_in_page(destination: str, message: str | None) -> bytes:
 def access_denied() -> bytes:
     """The one refusal of a missing or forbidden target (DEC-023): the text and the ``Sign out`` form only."""
     return _page(f"<p>{esc(ACCESS_DENIED_TEXT)}</p>{_sign_out_form()}")
+
+
+def library_unavailable() -> bytes:
+    """The page while the stored library cannot be read (DEC-024): the message only, no name, no list, no form."""
+    return _page(f'<h1>{esc(PRODUCT_NAME)}</h1><p role="alert">{esc(LIBRARY_UNAVAILABLE)}</p>')
 
 
 def home_page(folders: Sequence[FolderView], *, is_admin: bool) -> bytes:
