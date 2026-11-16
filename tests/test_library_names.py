@@ -1,4 +1,5 @@
-"""US-0127: ``library/names.py`` (SPEC-0025, DEC-029): composed form, the unique key and the folder order."""
+"""US-0127, US-0129: ``library/names.py`` (SPEC-0025, DEC-029, DEC-031): composed form, the unique key, the folder
+order and the size text."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ import unicodedata
 
 import pytest
 
+from mcp_htmleditor.library import names
 from mcp_htmleditor.library.names import compose, name_key, order_key
 
 CAFE_COMPOSED = "Caf\u00e9"
@@ -91,3 +93,24 @@ def test_name_key_is_the_same_for_a_name_and_its_composed_form() -> None:
         assert unicodedata.is_normalized("NFC", name_key(name)), ascii(name)
         assert name_key(name) == name_key(unicodedata.normalize("NFD", name)), ascii(name)
     assert decomposed_seen > RANDOM_NAMES // 4  # the loop exercised names that are not already composed
+
+
+@pytest.mark.parametrize(
+    ("count", "expected"),
+    [
+        (0, "0 bytes"),
+        (1, "1 byte"),
+        (900, "900 bytes"),
+        (1_023, "1023 bytes"),
+        (1_024, "1.0 KB"),
+        (1_075, "1.0 KB"),  # 1.0498: below the half
+        (1_076, "1.1 KB"),  # 1.0508: rounded half up from the exact value
+        (1_280, "1.3 KB"),  # exactly 1.25: half up, where round() would give 1.2
+        (1_048_575, "1024.0 KB"),  # one byte short of 1 MB stays in KB
+        (1_048_576, "1.0 MB"),
+        (26_214_400, "25.0 MB"),
+    ],
+)
+def test_format_size_chooses_the_unit_from_the_exact_byte_count(count: int, expected: str) -> None:
+    """FR-NEW-018, DEC-031: bytes below 1 024, then KB, then MB, one decimal rounded half up from the exact value."""
+    assert names.format_size(count) == expected

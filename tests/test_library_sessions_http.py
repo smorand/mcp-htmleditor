@@ -16,18 +16,16 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Playwright
 
 from mcp_htmleditor.library import pages, server
 from mcp_htmleditor.library.store import Database, Library
 from tests import library_support
-from tests.conftest import needs_chromium
 from tests.library_support import (
+    BOB,
     CARDIOLOGY,
     CAROL,
     DAN,
     LAMYA,
-    LIBRARY_HOST,
     PNEUMO,
     WCBIP,
     Browser,
@@ -46,7 +44,6 @@ DAY = 86_400
 SESSION_SECONDS = 2_592_000  # 30 days, DEC-017
 LIBRARY_UNAVAILABLE = "The library is unavailable. Try again later."
 READY_SECONDS = 2.0  # FR-NEW-060
-LOOPBACK_MARGIN_SECONDS = 1.0  # design: the 2 second bound with a 1 second margin on loopback
 SIGN_OUT = "Sign out"
 LIBRARY_DIR = Path(server.__file__).parent
 # Every way a module could read the wall clock itself instead of the injected one.
@@ -226,7 +223,7 @@ def test_e2e_016_the_stored_library_cannot_be_read(
     during = dan.open("/")
 
     assert attempts, "the request never opened the library"
-    assert_library_unavailable(during, CARDIOLOGY, PNEUMO, "Folder 1", "Folder 197")
+    assert_library_unavailable(during, CARDIOLOGY, PNEUMO, "Folder 001", "Folder 197")
 
     monkeypatch.setattr(Database, "connect_hook", None, raising=False)
     after = dan.open("/")
@@ -270,7 +267,7 @@ def test_the_unavailable_page_holds_only_the_message() -> None:
 
 
 # ---------------------------------------------------------------------------
-# FR-NEW-060, FR-NEW-064: 200 folders, keyboard and names
+# FR-NEW-060: 200 folders (keyboard and names: E2E-017 in test_library_folders_e2e.py)
 # ---------------------------------------------------------------------------
 
 
@@ -286,7 +283,7 @@ def test_the_home_page_with_200_folders_answers_within_2_seconds_from_one_query(
     reply = dan.open("/")
     elapsed = time.monotonic() - started
 
-    assert elapsed < READY_SECONDS - LOOPBACK_MARGIN_SECONDS, elapsed
+    assert elapsed < READY_SECONDS, elapsed  # the spec bound: a tighter one flaked at high load (US-0128 review)
     assert {folder_id for folder_id, _, _ in reply.folder_rows()} == set(ids.values())
     statements: list[str] = []
     running.database.connection().set_trace_callback(statements.append)
@@ -298,47 +295,6 @@ def test_the_home_page_with_200_folders_answers_within_2_seconds_from_one_query(
     assert len(statements) == 2, statements
 
 
-@needs_chromium
-def test_folder_200_is_reached_with_tab_and_opened_with_enter(
-    library_server: START, fake_google: FakeGoogle, playwright: Playwright
-) -> None:
-    """FR-NEW-064: only links and buttons, each with a visible name; Tab walks them in page order to ``Folder 200``,
-    whose ``Enter`` opens its address."""
-    running = library_server(fake_google)
-    ids = running.builder.numbered_folders(200, DAN, "RW")
-    dan, _ = signed_in(running, fake_google, DAN)
-    target = f"/f/{ids['Folder 200']}"
-    chromium = playwright.chromium.launch(args=[f"--host-resolver-rules=MAP {LIBRARY_HOST} 127.0.0.1"])
-    try:
-        context = chromium.new_context()
-        context.add_cookies([{"name": "lib", "value": dan.cookies["lib"], "url": running.origin}])
-        page = context.new_page()
-        page.goto(f"{running.origin}/")
-        controls = page.eval_on_selector_all(
-            "a, button, input, select, textarea, [onclick], [tabindex]",
-            "elements => elements.map(element => ({tag: element.tagName, href: element.getAttribute('href'),"
-            " name: element.innerText.trim() || element.getAttribute('aria-label') || '',"
-            " handler: element.hasAttribute('onclick'), tabindex: element.getAttribute('tabindex')}))",
-        )
-        assert len(controls) == 201  # the 200 folders and Sign out
-        assert {control["tag"] for control in controls} == {"A", "BUTTON"}
-        assert all(control["name"] and not control["handler"] and control["tabindex"] is None for control in controls)
-        order = [control["href"] or control["name"] for control in controls]
-
-        focused: list[str] = []
-        while not focused or (focused[-1] != target and len(focused) < len(order)):
-            page.keyboard.press("Tab")
-            focused.append(
-                page.evaluate("document.activeElement.getAttribute('href') || document.activeElement.innerText")
-            )
-        assert focused == order[: order.index(target) + 1]
-
-        page.keyboard.press("Enter")
-        page.wait_for_url(f"{running.origin}{target}")
-    finally:
-        chromium.close()
-
-
 # ---------------------------------------------------------------------------
 # Purge (design: rows kept one day after their end) and the clock rule
 # ---------------------------------------------------------------------------
@@ -347,13 +303,16 @@ def test_folder_200_is_reached_with_tab_and_opened_with_enter(
 def test_an_ended_session_row_is_purged_one_day_after_its_end_at_the_next_sign_in(
     library_server: START, fake_google: FakeGoogle
 ) -> None:
-    """``Accounts.purge`` at ``begin_login`` and ``finish_login``: a row is kept until exactly one day after its end."""
+    """``Accounts.purge`` at ``begin_login`` and ``finish_login``: a row is kept until exactly one day after its end;
+    a live session (Bob, signed in two days before) is never touched and still opens the library."""
     running = library_server(fake_google)
     running.builder.standard()
     signed_in(running, fake_google, CAROL)
     running.clock.advance(1)
     signed_in(running, fake_google, LAMYA)
     _, lamya_end = session_of(running, LAMYA)
+    running.clock.advance(lamya_end - DAY - running.clock())  # nobody has ended yet: Bob's sign in purges nothing
+    bob, _ = signed_in(running, fake_google, BOB)
     running.clock.advance(lamya_end + DAY - running.clock())  # Carol ended a day and a second ago, Lamya a day ago
 
     fake_google.choose(DAN)
@@ -363,8 +322,9 @@ def test_an_ended_session_row_is_purged_one_day_after_its_end_at_the_next_sign_i
     running.clock.advance(1)
     dan.open(to_google.headers["location"])
 
-    assert after_begin == {LAMYA}
-    assert {owner for _, owner, _, _ in running.stored.sessions()} == {DAN}
+    assert after_begin == {LAMYA, BOB}
+    assert {owner for _, owner, _, _ in running.stored.sessions()} == {BOB, DAN}
+    assert bob.open("/").body == pages.access_denied()  # signed in (no role), not sent to the sign in page
 
 
 def test_no_library_module_reads_the_wall_clock_or_updates_a_session() -> None:

@@ -28,7 +28,7 @@ from mcp_htmleditor import tracing
 from mcp_htmleditor.library import pages
 from mcp_htmleditor.library.server import cookie_header, cookie_name
 from mcp_htmleditor.library.signin import GoogleClient, SignInUnavailable, safe_destination, validate_claims
-from mcp_htmleditor.library.store import Database
+from mcp_htmleditor.library.store import MIGRATIONS, Database
 from tests import library_support
 from tests.library_support import (
     ADMIN,
@@ -867,17 +867,18 @@ def test_cookie_names_and_headers_for_an_https_origin() -> None:
 
 
 def test_the_database_is_private_and_migrated_once(library_server: START) -> None:
-    """DEC-025: ``library.db`` is 0600 in a 0700 directory, at schema version 1; opening it again changes nothing."""
+    """DEC-025: ``library.db`` is 0600 in a 0700 directory, at the last schema version; opening it again changes
+    nothing."""
     running = library_server()
     path = running.library_dir / "library.db"
 
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert stat.S_IMODE(running.library_dir.stat().st_mode) == 0o700
-    assert running.stored.rows("PRAGMA user_version") == [(1,)]
+    assert running.stored.rows("PRAGMA user_version") == [(len(MIGRATIONS),)]
     tables = {row[0] for row in running.stored.rows("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    assert tables == {"meta", "folders", "members", "logins", "sessions"}
+    assert tables == {"meta", "folders", "members", "logins", "sessions", "presentations"}
     folder = running.builder.folder(CARDIOLOGY)
     again = Database(path)
-    assert running.stored.rows("PRAGMA user_version") == [(1,)]
+    assert running.stored.rows("PRAGMA user_version") == [(len(MIGRATIONS),)]
     assert running.stored.folder_names() == [CARDIOLOGY] and folder
     again.release()

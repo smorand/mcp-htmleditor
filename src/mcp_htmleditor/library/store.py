@@ -8,6 +8,7 @@ appends one entry and never edits an earlier one.
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import threading
 from collections.abc import Callable, Iterator
@@ -22,6 +23,10 @@ from .names import order_key
 DIRECTORY_MODE: Final = 0o700
 FILE_MODE: Final = 0o600
 BUSY_TIMEOUT_MS: Final = 30_000
+FILES_DIRECTORY: Final = "files"
+PRESENTATION_SUFFIX: Final = ".html"
+ID_PATTERN: Final = re.compile(r"[0-9a-f]{32}")
+SECONDS_PER_MINUTE: Final = 60
 
 MIGRATIONS: Final[tuple[str, ...]] = (
     # 1 (US-0126): folders, members, login attempts, sessions
@@ -37,6 +42,13 @@ MIGRATIONS: Final[tuple[str, ...]] = (
     CREATE TABLE sessions(id_hash TEXT PRIMARY KEY, email TEXT NOT NULL, created_at REAL NOT NULL,
                           expires_at REAL NOT NULL);
     """,
+    # 2 (US-0129): presentations; the bytes live in files/<folder id>/<presentation id>.html
+    """
+    CREATE TABLE presentations(id TEXT PRIMARY KEY,
+                               folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+                               name TEXT NOT NULL, name_key TEXT NOT NULL, created_at REAL NOT NULL,
+                               UNIQUE (folder_id, name_key));
+    """,
 )
 
 
@@ -47,6 +59,16 @@ class FolderView:
     id: str
     name: str
     role: Role
+
+
+@dataclass(frozen=True, slots=True)
+class PresentationView:
+    """One row of a folder page: id, name (without ``.html``), and the file's ``st_mtime`` and size in bytes."""
+
+    id: str
+    name: str
+    modified: float
+    size: int
 
 
 class Database:
@@ -126,6 +148,7 @@ class Library:
 
     def __init__(self, database: Database) -> None:
         self._database = database
+        self._files = database.path.parent / FILES_DIRECTORY
 
     def folders_for(self, email: str) -> list[FolderView]:
         """The folders ``email`` can open with its role, in ``order_key`` order: every folder (Admin) for the
@@ -141,9 +164,36 @@ class Library:
         views = [FolderView(id=row[0], name=row[1], role=Role(row[2])) for row in rows.fetchall()]
         return sorted(views, key=lambda view: order_key(view.name))
 
+    def folder_name(self, folder_id: str) -> str | None:
+        """The name of the folder, None when no folder has this id."""
+        row = self._database.connection().execute("SELECT name FROM folders WHERE id = ?", (folder_id,)).fetchone()
+        return str(row[0]) if row is not None else None
+
     def is_admin(self, email: str) -> bool:
         """True for the administrator's address in any letter case; a look alike address is another address."""
         return normalize_email(email) == ADMIN_EMAIL
+
+    def presentation_path(self, folder_id: str, presentation_id: str) -> Path:
+        """``files/<folder id>/<presentation id>.html``, built from two ids that each match ``^[0-9a-f]{32}$``
+        (DEC-025); any other value raises ``ValueError`` before a path exists."""
+        for value in (folder_id, presentation_id):
+            if not ID_PATTERN.fullmatch(value):
+                raise ValueError("not a library id")
+        return self._files / folder_id / f"{presentation_id}{PRESENTATION_SUFFIX}"
+
+    def presentations_in(self, folder_id: str) -> list[PresentationView]:
+        """The presentations of a folder from one query and one ``stat`` each, newest minute first, then
+        ``order_key`` (accents and case ignored, then the exact name, DEC-031); a missing file is an ``OSError``."""
+        rows = (
+            self._database.connection()
+            .execute("SELECT id, name FROM presentations WHERE folder_id = ?", (folder_id,))
+            .fetchall()
+        )
+        views = []
+        for presentation_id, name in rows:
+            status = self.presentation_path(folder_id, presentation_id).stat()
+            views.append(PresentationView(presentation_id, name, status.st_mtime, status.st_size))
+        return sorted(views, key=lambda view: (-(int(view.modified) // SECONDS_PER_MINUTE), order_key(view.name)))
 
     def role_in(self, email: str, folder_id: str) -> Role | None:
         """Admin first whatever the member rows hold, else the member row of that folder, else None."""

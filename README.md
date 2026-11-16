@@ -428,7 +428,8 @@ session per presentation if you need several displayed simultaneously.
 name gets `403 {"error": "forbidden host"}`, a request that reached nginx in plain http
 (`X-Forwarded-Proto: http`) gets `308` to the same path on the secure origin, and `GET /health` answers
 `{"ok": true, "status": "ok", "version"}` on any host name, nothing more. `HTMLEDITOR_LIBRARY_DIR` (default
-`<state dir>/library`) holds the library database `library.db` (folders, members, sign in attempts, sessions). It
+`<state dir>/library`) holds the library database `library.db` (folders, members, presentations, sign in attempts,
+sessions) and the presentation files `files/<folder id>/<presentation id>.html` (random ids, never names). It
 stops on SIGINT or SIGTERM. The local `serve` is unchanged and never shows a library page.
 
 Sign in is `Sign in with Google` (OpenID Connect code flow with PKCE, the account chooser every time, a verified
@@ -444,8 +445,12 @@ is readable. The home page lists the folders where the account
 holds a role (`Read and write` or `Read only`), ordered without regard to case or accents (digits, then Latin letters,
 then other alphabets); an account with none sees `Access denied.`, and so does a signed in person at any address that
 names no page. seb.morand@gmail.com, in any letter case, is the administrator: every folder labelled `Admin`, the
-`Administration` entry, and `You have no access to any folder yet.` when no folder exists. `/lib/library.css` and
-`/lib/library.js` are the only files served without a session.
+`Administration` entry, and `You have no access to any folder yet.` when no folder exists. A folder (`/f/<folder id>`)
+lists its presentations, newest first (same minute: by name), each with its name, its last modified date in the
+browser's time zone (`16 Nov 2026 14:32`) and its size (`1 byte`, `900 bytes`, `1.5 KB`, `2.0 MB`), with `All
+folders` back to the home page, or `This folder has no presentations yet.`; a folder that does not exist and a folder
+where the person holds no role give the same `Access denied.` page, byte for byte. No library page can be shown inside
+a page of another site. `/lib/library.css` and `/lib/library.js` are the only files served without a session.
 
 ## Templates
 
@@ -660,10 +665,10 @@ src/mcp_htmleditor/
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
 ├── library/signin.py  Google sign in (GoogleClient, claims), login attempts and sessions (Accounts)
-├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin)
-├── library/names.py   compose, name_key, order_key (folder order)
+├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path)
+├── library/names.py   compose, name_key, order_key (folder order), format_size
 ├── library/pages.py   every page and English text of the library mode, esc()
-├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page
+├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page, folder page
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

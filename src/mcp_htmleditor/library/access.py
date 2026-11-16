@@ -52,7 +52,11 @@ class SetCookie:
 
 @dataclass(frozen=True, slots=True)
 class Context:
-    """What the dispatcher hands a route handler once the route is authorized."""
+    """What the dispatcher hands a route handler once the route is authorized.
+
+    ``folder_id`` is the ``fid`` of the route's pattern (None for a route that names no folder) and ``role`` the
+    person's role in it, both already checked by ``authorize`` (DEC-021).
+    """
 
     person_email: str | None
     query: Mapping[str, str]  # first value of each query parameter
@@ -60,6 +64,8 @@ class Context:
     browser_id: str | None
     accounts: Accounts
     library: Library
+    folder_id: str | None = None
+    role: Role | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +81,10 @@ class Answer:
 
 @dataclass(frozen=True, slots=True)
 class Route:
-    """One row of the table every later route joins: matched on origin, method and ``pattern.fullmatch(path)``."""
+    """One row of the table every later route joins: matched on origin, method and ``pattern.fullmatch(path)``.
+
+    A pattern naming a folder captures its id as the group ``fid``; the dispatcher reads the role there.
+    """
 
     origin: Literal["library", "content"]
     method: str

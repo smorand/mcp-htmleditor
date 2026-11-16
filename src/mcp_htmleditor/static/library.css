@@ -34,13 +34,15 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-ul.folders {
+ul.folders,
+ul.presentations {
   margin: 0 0 1.5rem;
   padding: 0;
   list-style: none;
 }
 
-ul.folders li {
+ul.folders li,
+ul.presentations li {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 1rem;
@@ -49,12 +51,15 @@ ul.folders li {
   border-block-end: 1px solid var(--library-line);
 }
 
-ul.folders a {
+ul.folders a,
+ul.presentations .name {
   unicode-bidi: plaintext;
   overflow-wrap: anywhere;
 }
 
-ul.folders span {
+ul.folders span,
+ul.presentations time,
+ul.presentations .size {
   color: var(--library-muted);
 }
 

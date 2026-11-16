@@ -1,4 +1,4 @@
-"""Library origin routes: public files, sign in, sign out, home page (SPEC-0025, DEC-011 to DEC-017, DEC-021)."""
+"""Library origin routes: public files, sign in, sign out, home and folder pages (SPEC-0025, DEC-011 to DEC-021)."""
 
 from __future__ import annotations
 
@@ -80,6 +80,16 @@ def home(context: Context) -> Answer:
     return Answer(200, pages.home_page(folders, is_admin=is_admin))
 
 
+def folder(context: Context) -> Answer:
+    """The folder page (``VIEW`` already authorized on ``fid``); a folder that does not exist, which the
+    administrator's role does not rule out, is the same ``Access denied.`` as a forbidden one (DEC-023)."""
+    folder_id = context.folder_id or ""
+    name = context.library.folder_name(folder_id)
+    if name is None:
+        return Answer(403, pages.access_denied())
+    return Answer(200, pages.folder_page(name, context.library.presentations_in(folder_id)))
+
+
 ROUTES: tuple[Route, ...] = (
     Route(
         "library", "GET", re.compile(r"/lib/library\.css"), Permission.PUBLIC, static_file("library.css", "text/css")
@@ -95,4 +105,5 @@ ROUTES: tuple[Route, ...] = (
     Route("library", "GET", re.compile(r"/auth/callback"), Permission.PUBLIC, sign_in_callback),
     Route("library", "POST", re.compile(r"/auth/logout"), Permission.SIGNED_IN, sign_out),
     Route("library", "GET", re.compile(r"/"), Permission.SIGNED_IN, home),
+    Route("library", "GET", re.compile(r"/f/(?P<fid>[0-9a-f]{32})"), Permission.VIEW, folder),
 )

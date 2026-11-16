@@ -14,6 +14,12 @@ every address it visited; ``RecordingListener`` counts visits to a hostile site;
 Lifetime (US-0128): ``RunningLibrary.restart()`` stops the server and starts a new one on the same port, directory
 and clock; ``RunningLibrary.unreadable_database()`` swaps a corrupted ``library.db`` in and the real one back out;
 ``Browser.reopened()`` is the same browser closed and opened again (only cookies with a ``Max-Age`` survive).
+
+Folder page (US-0129): ``LibraryBuilder.presentation`` writes a generated deck of an exact byte count at
+``Library.presentation_path`` with an exact modified time (``os.utime``) and its row; ``standard_presentations`` the
+five decks of the standard library; ``LibraryReply.presentation_rows()`` reads the rows of a folder page;
+``launch_chromium`` maps both library host names to loopback and ``person_context`` is a context holding one session
+cookie in a fixed time zone.
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ import base64
 import hashlib
 import http.client
 import json
+import os
 import re
 import secrets
 import socket
@@ -31,23 +38,28 @@ from collections import deque
 from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from html import escape as html_escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 import pytest
+from playwright.sync_api import Browser as Chromium
+from playwright.sync_api import BrowserContext, Playwright
 
 from mcp_htmleditor.config import Settings
 from mcp_htmleditor.library.names import name_key
 from mcp_htmleditor.library.server import LibraryServer
-from mcp_htmleditor.library.store import Database
+from mcp_htmleditor.library.store import Database, Library
 
 LIBRARY_HOST = "slides.test"
 CONTENT_HOST = "slides-content.test"
 CLOCK_START = 1_000_000_000.0
 GOOGLE_CLIENT_ID = "slides-test.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET = "test-client-secret-7d1c"  # noqa: S105 - a fake client of the fake provider
+EVIL_HOST = "evil.example"
 UNREGISTERED_REDIRECT = "https://elsewhere.example/auth/callback"
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 MAX_REDIRECTS = 10
@@ -60,6 +72,25 @@ CAROL = "carol.ro@example.org"
 BOB = "bob.nobody@gmail.com"
 ADMIN = "seb.morand@gmail.com"
 FOLDER_ROW = re.compile(r'<li><a href="/f/([0-9a-f]{32})">([^<]*)</a> <span>([^<]*)</span></li>')
+PRESENTATION_ROW = re.compile(
+    r'<li><span class="name">([^<]*)</span> <time datetime="([^"]*)">([^<]*)</time> <span class="size">([^<]*)</span>'
+    r"</li>"
+)
+HEART_FAILURE = "Heart Failure Update"
+ARRHYTHMIA = "Arrhythmia Basics"
+STATINS = "Statins Review"
+CHALLENGES = "From Challenges to Change"
+BRIDGING = "Bridging the Gap"
+# The presentations of the standard library (spec section 9): folder, name, bytes, slides, modified (UTC).
+STANDARD_PRESENTATIONS = (
+    (WCBIP, CHALLENGES, 3_901_499, 18, datetime(2026, 11, 15, 19, 57, tzinfo=UTC)),
+    (WCBIP, BRIDGING, 3_278_888, 15, datetime(2026, 11, 15, 19, 57, tzinfo=UTC)),
+    (CARDIOLOGY, HEART_FAILURE, 2_097_152, 8, datetime(2026, 11, 10, 9, 15, tzinfo=UTC)),
+    (CARDIOLOGY, ARRHYTHMIA, 524_288, 5, datetime(2026, 11, 12, 16, 40, tzinfo=UTC)),
+    (CARDIOLOGY, STATINS, 1_572_864, 6, datetime(2026, 11, 12, 16, 40, tzinfo=UTC)),
+)
+PADDING_OPEN = b"<!--"
+PADDING_CLOSE = b"-->"
 
 
 @dataclass
@@ -91,6 +122,10 @@ class LibraryReply:
     def folder_rows(self) -> list[tuple[str, str, str]]:
         """``(folder id, name as written in the HTML, role label)`` of each row of a home page, in page order."""
         return FOLDER_ROW.findall(self.text)
+
+    def presentation_rows(self) -> list[tuple[str, str, str, str]]:
+        """``(name as written in the HTML, UTC ISO date, fallback date text, size)`` of each row of a folder page."""
+        return PRESENTATION_ROW.findall(self.text)
 
     def json(self) -> Any:
         return json.loads(self.body)
@@ -314,11 +349,18 @@ def unsigned_jwt(claims: dict[str, Any]) -> str:
     return ".".join([*encoded, "c2lnbmF0dXJl"])
 
 
-def _answer(handler: BaseHTTPRequestHandler, status: int, body: bytes, *, location: str | None = None) -> None:
+def _answer(
+    handler: BaseHTTPRequestHandler,
+    status: int,
+    body: bytes,
+    *,
+    location: str | None = None,
+    content_type: str = "application/json",
+) -> None:
     handler.send_response(status)
     if location is not None:
         handler.send_header("Location", location)
-    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Type", content_type)
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     handler.wfile.write(body)
@@ -329,17 +371,23 @@ class _RecordingHandler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self) -> None:
-        cast(RecordingListener, self.server).visits.append(f"{self.headers.get('Host')}{self.path}")
+        listener = cast(RecordingListener, self.server)
+        listener.visits.append(f"{self.headers.get('Host')}{self.path}")
+        if listener.page is not None:
+            _answer(self, 200, listener.page.encode(), content_type="text/html; charset=utf-8")
+            return
         _answer(self, 200, b'{"phished": true}')
 
 
 class RecordingListener(ThreadingHTTPServer):
-    """A hostile site on a loopback port: ``visits`` lists every request it received."""
+    """A hostile site on a loopback port: ``visits`` lists every request it received; with ``page`` set every GET
+    answers that HTML (a page Chromium reaches through ``launch_chromium(..., EVIL_HOST)``)."""
 
     daemon_threads = True
 
     def __init__(self) -> None:
         self.visits: list[str] = []
+        self.page: str | None = None
         super().__init__(("127.0.0.1", 0), _RecordingHandler)
         self.port = int(self.server_address[1])
         threading.Thread(target=self.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
@@ -383,8 +431,18 @@ class StoredLibrary:
 
 
 @dataclass(frozen=True)
+class Presentation:
+    """A presentation the builder wrote: ids, name and the file at ``Library.presentation_path``."""
+
+    id: str
+    folder_id: str
+    name: str
+    path: Path
+
+
+@dataclass(frozen=True)
 class LibraryBuilder:
-    """Folders and members written straight into the library database."""
+    """Folders, members and presentations written straight into the library database and its files."""
 
     database: Database
     clock: Callable[[], float]
@@ -408,19 +466,44 @@ class LibraryBuilder:
                 "INSERT OR REPLACE INTO members(folder_id, email, role) VALUES (?, ?, ?)", (folder_id, email, role)
             )
 
-    def numbered_folders(self, count: int, email: str, role: str) -> dict[str, str]:
-        """``Folder 1`` to ``Folder <count>`` in one transaction, ``email`` a member of each; returns name to id."""
-        ids = {f"Folder {number}": secrets.token_hex(16) for number in range(1, count + 1)}
+    def numbered_folders(self, count: int, email: str | None = None, role: str = "RW") -> dict[str, str]:
+        """``Folder 001`` to ``Folder <count>`` in one transaction, ``email`` (when given) a member of each; returns
+        name to id."""
+        ids = {f"Folder {number:03d}": secrets.token_hex(16) for number in range(1, count + 1)}
         with self.database.transaction(immediate=True) as connection:
             connection.executemany(
                 "INSERT INTO folders(id, name, name_key, created_at) VALUES (?, ?, ?, ?)",
                 [(folder_id, name, name_key(name), self.clock()) for name, folder_id in ids.items()],
             )
-            connection.executemany(
-                "INSERT INTO members(folder_id, email, role) VALUES (?, ?, ?)",
-                [(folder_id, email, role) for folder_id in ids.values()],
-            )
+            if email is not None:
+                connection.executemany(
+                    "INSERT INTO members(folder_id, email, role) VALUES (?, ?, ?)",
+                    [(folder_id, email, role) for folder_id in ids.values()],
+                )
         return ids
+
+    def presentation(  # noqa: PLR0913 - signature set by the design contract
+        self, folder_id: str, name: str, *, size: int, modified: datetime, slides: int = 1, title: str | None = None
+    ) -> Presentation:
+        """A deck of ``slides`` slides padded to exactly ``size`` bytes, modified at ``modified``, and its row."""
+        presentation_id = secrets.token_hex(16)
+        path = Library(self.database).presentation_path(folder_id, presentation_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(deck_bytes(title if title is not None else name, slides, size))
+        os.utime(path, (modified.timestamp(), modified.timestamp()))
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute(
+                "INSERT INTO presentations(id, folder_id, name, name_key, created_at) VALUES (?, ?, ?, ?, ?)",
+                (presentation_id, folder_id, name, name_key(name), self.clock()),
+            )
+        return Presentation(presentation_id, folder_id, name, path)
+
+    def standard_presentations(self, ids: dict[str, str]) -> dict[str, Presentation]:
+        """The five presentations of the standard library in the folders of ``ids``; returns name to presentation."""
+        return {
+            name: self.presentation(ids[folder], name, size=size, slides=slides, modified=modified)
+            for folder, name, size, slides, modified in STANDARD_PRESENTATIONS
+        }
 
     def standard(self) -> dict[str, str]:
         """The folders and members of the spec's standard library (section 9); returns name to id."""
@@ -483,7 +566,13 @@ class RunningLibrary:
 
     @contextmanager
     def unreadable_database(self) -> Iterator[None]:
-        """Inside the block ``library.db`` is a file of junk; the real file, untouched, is put back at the end."""
+        """Inside the block ``library.db`` is a file of junk; the real file, untouched, is put back at the end.
+
+        No server connection to the real file survives the swap: ``HttpClient`` sends each request on its own TCP
+        connection (``Connection: close`` semantics, the handler closes after each answer), so each request runs on a
+        new handler thread that opens a new SQLite connection (released by ``LibraryHandler.finish``) and meets the
+        junk. Only this process's own connection is released here.
+        """
         self.database.release()
         path = self.library_dir / "library.db"
         aside = path.with_name("library.db.aside")
@@ -581,6 +670,43 @@ class Browser:
                 self.persistent.add(name)
             else:
                 self.persistent.discard(name)
+
+
+def deck_bytes(title: str, slides: int, size: int) -> bytes:
+    """A presentation (``data-doc-type="presentation"``, ``slides`` slides) padded by an HTML comment to ``size``
+    bytes; a size below the smallest deck is the start of one, only its size matters then."""
+    sections = "".join(
+        f'<section class="slide" data-type="slide" data-id="slide-{number}" data-title="Slide {number}">'
+        f'<h1 data-editable="text">{html_escape(title) if number == 1 else f"Slide {number}"}</h1></section>'
+        for number in range(1, slides + 1)
+    )
+    head = (
+        f'<!DOCTYPE html><html lang="en" data-doc-type="presentation"><head><meta charset="utf-8">'
+        f"<title>{html_escape(title)}</title></head><body>{sections}"
+    ).encode()
+    tail = b"</body></html>\n"
+    padding = size - len(head) - len(tail) - len(PADDING_OPEN) - len(PADDING_CLOSE)
+    if padding < 0:
+        return (head + tail + b" " * size)[:size]
+    return head + PADDING_OPEN + b"x" * padding + PADDING_CLOSE + tail
+
+
+def launch_chromium(playwright: Playwright, *other_hosts: str) -> Chromium:
+    """Chromium resolving both library host names and ``other_hosts`` to loopback (``--host-resolver-rules``,
+    DEC-049). A hostile page must be served from loopback too: Chromium refuses a public page that frames or fetches
+    a loopback address (Private Network Access), which would hide what the library itself does."""
+    rules = ", ".join(f"MAP {host} 127.0.0.1" for host in (LIBRARY_HOST, CONTENT_HOST, *other_hosts))
+    return playwright.chromium.launch(args=[f"--host-resolver-rules={rules}"])
+
+
+def person_context(
+    chromium: Chromium, running: RunningLibrary, session: str | None, *, zone: str = "UTC"
+) -> BrowserContext:
+    """A browser context in the time zone ``zone`` holding the library session cookie ``session`` (None: none)."""
+    context = chromium.new_context(timezone_id=zone)
+    if session is not None:
+        context.add_cookies([{"name": "lib", "value": session, "url": running.origin}])
+    return context
 
 
 def free_port() -> int:

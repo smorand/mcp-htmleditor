@@ -29,7 +29,7 @@ from ..config import Settings, is_origin
 from ..http_server import _EditorHandler, _EditorServer
 from ..version import __version__
 from . import pages
-from .access import Answer, Context, Permission, Route
+from .access import Answer, Context, Permission, Route, authorize
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, Accounts, GoogleClient, safe_destination
 from .store import Database, Library
 
@@ -50,6 +50,7 @@ PLAIN_SCHEME = "http"
 SECURE_SCHEME = "https"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 FETCH_SITES_ALLOWED = frozenset({"same-origin", "none"})
+FOLDER_GROUP = "fid"
 HOST_PREFIX = "__Host-"
 DATABASE_NAME = "library.db"
 CALLBACK_PATH = "/auth/callback"
@@ -171,7 +172,7 @@ class LibraryHandler(_EditorHandler):
         self._send_answer(origin, answer)
 
     def _library_answer(self, origin: str, path: str, query: str) -> Answer:
-        """Route, session, permission, then the handler; no body is read before the handler."""
+        """Route, session, role and permission (DEC-021), then the handler; no body is read before the handler."""
         server = self._library_server()
         route = server.find_route("library", self.command, path)
         cookies = parse_cookies(self.headers.get_all("Cookie") or [])
@@ -179,6 +180,10 @@ class LibraryHandler(_EditorHandler):
         session = server.accounts.session_for(token)
         if route is None or (route.permission is not Permission.PUBLIC and session is None):
             return self._refusal(path, signed_in=session is not None)
+        folder_id = _folder_id(route, path)
+        role = server.library.role_in(session.email, folder_id) if session is not None and folder_id else None
+        if not authorize(role, route.permission):
+            return Answer(403, pages.access_denied())
         context = Context(
             person_email=session.email if session is not None else None,
             query=dict(reversed(parse_qsl(query, keep_blank_values=True))),
@@ -186,6 +191,8 @@ class LibraryHandler(_EditorHandler):
             browser_id=cookies.get(cookie_name(origin, BROWSER_COOKIE)),
             accounts=server.accounts,
             library=server.library,
+            folder_id=folder_id,
+            role=role,
         )
         return route.handler(context)
 
@@ -313,6 +320,12 @@ class LibraryServer(_EditorServer):
         self.connections.close_idle()
         self.database.release()
         logger.info("Library server stopped")
+
+
+def _folder_id(route: Route, path: str) -> str | None:
+    """The folder id the route's pattern captures as ``fid`` in ``path``, None when it names no folder."""
+    match = route.pattern.fullmatch(path)
+    return match.groupdict().get(FOLDER_GROUP) if match is not None else None
 
 
 def _origins_by_host(settings: Settings) -> dict[str, str]:

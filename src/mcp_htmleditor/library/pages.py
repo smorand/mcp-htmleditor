@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import html
+import time
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Final
 
+from .names import format_size
+
 if TYPE_CHECKING:
-    from .store import FolderView
+    from .store import FolderView, PresentationView
 
 PRODUCT_NAME: Final = "Slides"
 SIGN_IN_LABEL: Final = "Sign in with Google"
@@ -18,9 +21,14 @@ ADMIN_LABEL: Final = "Admin"
 ADMINISTRATION_LABEL: Final = "Administration"
 NO_FOLDER_YET: Final = "You have no access to any folder yet."
 LIBRARY_UNAVAILABLE: Final = "The library is unavailable. Try again later."
+NO_PRESENTATION_YET: Final = "This folder has no presentations yet."
+ALL_FOLDERS_LABEL: Final = "All folders"
+MONTHS: Final = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 ROLE_LABELS: Final = {"Admin": ADMIN_LABEL, "RW": "Read and write", "RO": "Read only"}  # keyed by ``Role`` value
 ADMINISTRATION_PATH: Final = "/admin"
 STYLESHEET_PATH: Final = "/lib/library.css"
+SCRIPT_PATH: Final = "/lib/library.js"
+HOME_PATH: Final = "/"
 SIGN_IN_START_PATH: Final = "/auth/start"
 SIGN_OUT_PATH: Final = "/auth/logout"
 HTML_CONTENT_TYPE: Final = "text/html; charset=utf-8"
@@ -62,6 +70,30 @@ def home_page(folders: Sequence[FolderView], *, is_admin: bool) -> bytes:
     return _page(f"<h1>{esc(PRODUCT_NAME)}</h1>{administration}{listing}{_sign_out_form()}")
 
 
+def folder_page(name: str, presentations: Sequence[PresentationView]) -> bytes:
+    """The folder name, ``All folders`` back to the home page, the rows in the given order (name, date, size) or
+    ``This folder has no presentations yet.``, and the ``Sign out`` form (FR-NEW-018, FR-NEW-019).
+
+    The date is ``<time datetime="<UTC ISO>">`` holding the UTC text; ``library.js`` rewrites it in the browser's
+    zone (DEC-031), so the server never guesses the person's zone.
+    """
+    rows = "".join(
+        f'<li><span class="name">{esc(presentation.name)}</span> {_time(presentation.modified)} '
+        f'<span class="size">{esc(format_size(presentation.size))}</span></li>'
+        for presentation in presentations
+    )
+    listing = f'<ul class="presentations">{rows}</ul>' if rows else f"<p>{esc(NO_PRESENTATION_YET)}</p>"
+    back = f'<nav><a href="{HOME_PATH}">{esc(ALL_FOLDERS_LABEL)}</a></nav>'
+    return _page(f"{back}<h1>{esc(name)}</h1>{listing}{_sign_out_form()}")
+
+
+def _time(modified: float) -> str:
+    """``<time>`` of a modified time: UTC ISO 8601 to the second, the text ``D Mon YYYY HH:MM`` in UTC."""
+    utc = time.gmtime(modified)
+    text = f"{utc.tm_mday} {MONTHS[utc.tm_mon - 1]} {utc.tm_year} {utc.tm_hour:02d}:{utc.tm_min:02d}"
+    return f'<time datetime="{time.strftime("%Y-%m-%dT%H:%M:%SZ", utc)}">{text}</time>'
+
+
 def _sign_out_form() -> str:
     return f'<form method="post" action="{SIGN_OUT_PATH}"><button type="submit">{esc(SIGN_OUT_LABEL)}</button></form>'
 
@@ -70,6 +102,6 @@ def _page(body: str) -> bytes:
     title = esc(PRODUCT_NAME)
     return (
         f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>{title}</title>'
-        f'<link rel="stylesheet" href="{STYLESHEET_PATH}"></head>'
+        f'<link rel="stylesheet" href="{STYLESHEET_PATH}"><script src="{SCRIPT_PATH}" defer></script></head>'
         f"<body>{body}</body></html>"
     ).encode()
