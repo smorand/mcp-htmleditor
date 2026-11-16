@@ -1,5 +1,5 @@
-"""US-0127, US-0129, US-0130: ``library/names.py`` (SPEC-0025, DEC-029, DEC-031): composed form, the unique key, the
-folder order, the size text and the folder name rule."""
+"""US-0127, US-0129, US-0130, US-0132: ``library/names.py`` (SPEC-0025, DEC-029, DEC-031): composed form, the unique
+key, the folder order, the size text, the folder name rule and the address rule."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import unicodedata
 import pytest
 
 from mcp_htmleditor.library import names
-from mcp_htmleditor.library.names import NameRefused, check_folder_name, compose, name_key, order_key
+from mcp_htmleditor.library.names import NameRefused, check_email, check_folder_name, compose, name_key, order_key
 
 CAFE_COMPOSED = "Caf\u00e9"
 CAFE_DECOMPOSED = "Cafe\u0301"
@@ -169,3 +169,46 @@ def test_check_folder_name_refuses_everything_else(raw: str) -> None:
     """FR-NEW-041: empty, over 60 composed characters, or a character outside ``L*``, ``M*``, ``Nd``, space, hyphen."""
     with pytest.raises(NameRefused):
         check_folder_name(raw)
+
+
+@pytest.mark.parametrize(
+    ("raw", "stored"),
+    [
+        ("dan.rw@example.org", "dan.rw@example.org"),
+        ("DAN.RW@Example.org", "dan.rw@example.org"),  # E2E-113
+        (" bob.nobody@gmail.com ", "bob.nobody@gmail.com"),  # E2E-115
+        ("Bob.Nobody@Gmail.com ", "bob.nobody@gmail.com"),
+        ("dan+rw@example.org", "dan+rw@example.org"),  # E2E-176
+        ("a_b%c-d@mail-1.example.co.uk", "a_b%c-d@mail-1.example.co.uk"),
+    ],
+)
+def test_check_email_returns_the_trimmed_lower_case_address(raw: str, stored: str) -> None:
+    """FR-NEW-045, DEC-029: trimmed, stored in lower case."""
+    assert check_email(raw) == stored
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "not-an-email",  # E2E-110
+        "carol@",  # E2E-110
+        "",  # E2E-110
+        "   ",
+        "dan.rw@example.org, carol.ro@example.org",  # E2E-111
+        "dan.rw@example.org carol.ro@example.org",
+        "<b>x</b>@example.org",  # E2E-111
+        "o'brien@example.org",  # E2E-176
+        "dan@localhost",  # E2E-176
+        "dan rw@example.org",  # E2E-176
+        "dan@@example.org",
+        "dan@example..org",
+        "dan@example.org.",
+        "dan@example.org\ncarol@example.org",  # Python's ``$`` would match before a newline
+        "d\u00e1n@example.org",  # a letter outside ASCII
+        "dan@ex\u0430mple.org",  # a Cyrillic a that looks like the Latin one
+    ],
+)
+def test_check_email_refuses_anything_but_one_address(raw: str) -> None:
+    """FR-NEW-046: one ``local@domain`` with the allowed characters and a dot in the domain, nothing else."""
+    with pytest.raises(NameRefused):
+        check_email(raw)

@@ -147,7 +147,7 @@ Load only what the task needs.
 | `.agent_docs/breathe.md` | Breathe template: map of the pieces, detection rule, decoration, painted PPTX, sync, gotchas (SPEC-0023) |
 | `.agent_docs/pptx-fidelity.md` | PPTX fidelity harness (`make pptx-fidelity`): pipeline, score definition, reference modes, output, gotchas; baseline in `sdlc/specs/SPEC-0024-pptx-generic-extraction/baseline.md` |
 | `.agent_docs/library.md` | Web library mode (`webserve`, SPEC-0025): module map, settings, gate order, sign in flow, cookies, database, headers, test support (FakeGoogle, Browser) |
-| `.agent_docs/library-pages.md` | Web library pages: home page and roles, folder page, administration (folders, activity), folder deletion order |
+| `.agent_docs/library-pages.md` | Web library pages: home page and roles, folder page, administration (folders, activity), folder deletion order, members and their check order |
 | `.agent_docs/render.md` | Visual render: picture rules, output directory and cleanup, scale and size rounding, check order, fixtures and install |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`

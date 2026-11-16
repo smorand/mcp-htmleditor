@@ -374,9 +374,9 @@ def test_sign_ins_and_refusals_write_no_activity_line(library_server: START, fak
 
 
 def test_the_administration_page_names_its_controls(library_server: START, fake_google: FakeGoogle) -> None:
-    """FR-NEW-067: All folders, the Folders section with every folder in home page order and its Delete folder
-    button, the field Folder name and its Create folder button, the deletion prompt (US-0131), the Activity section,
-    Sign out."""
+    """FR-NEW-067: All folders, the Folders section with every folder in home page order, its Delete folder button and
+    its Members (US-0132), the field Folder name and its Create folder button, the deletion prompt (US-0131), the
+    Activity section, Sign out."""
     running = library_server(fake_google)
     running.builder.standard()
     admin = signed_in(running, fake_google, ADMIN)
@@ -388,15 +388,11 @@ def test_the_administration_page_names_its_controls(library_server: START, fake_
         "All folders",
         "Administration",
         "Folders",
-        CARDIOLOGY,
-        "Admin",
-        "Delete folder",
-        PNEUMO,
-        "Admin",
-        "Delete folder",
-        WCBIP,
-        "Admin",
-        "Delete folder",
+        *folder_texts(
+            CARDIOLOGY, [CAROL, "Read and write", "Read only", "Remove", DAN, "Read and write", "Read only", "Remove"]
+        ),
+        *folder_texts(PNEUMO, []),
+        *folder_texts(WCBIP, [LAMYA, "Read and write", "Read only", "Remove"]),
         "Folder name",
         "Create folder",
         "Type the folder name to confirm.",
@@ -411,12 +407,18 @@ def test_the_administration_page_names_its_controls(library_server: START, fake_
     assert '<a href="/">All folders</a>' in page.text and '<section id="activity">' in page.text
 
 
+def folder_texts(name: str, member_texts: list[str]) -> list[str]:
+    """The texts of one folder row of the administration: name, role, Delete folder, then its Members section."""
+    add_form = ["Email address", "Role", "Read and write", "Read only", "Add member"]
+    return [name, "Admin", "Delete folder", "Members", *member_texts, *add_form]
+
+
 def test_the_administration_page_escapes_names_addresses_and_lines() -> None:
     """DEC-029: every dynamic value of the page goes through ``esc``."""
     folder = FolderView(id="a" * 32, name="<b>Bold</b>", role=Role.ADMIN)
     line = ActivityLine(at=0.0, actor="<i>@example.org", text='Created folder "<script>"')
 
-    page = pages.admin_page([folder], [line]).decode()
+    page = pages.admin_page([folder], [line], members={}).decode()
 
     assert "<b>" not in page and "<i>" not in page and "<script>" not in page
     assert "&lt;b&gt;Bold&lt;/b&gt;" in page and "&lt;i&gt;@example.org" in page

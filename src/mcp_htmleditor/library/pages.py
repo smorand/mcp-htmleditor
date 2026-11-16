@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import html
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Final
 
 from .names import format_size
 
 if TYPE_CHECKING:
-    from .store import ActivityLine, FolderView, PresentationView
+    from .store import ActivityLine, FolderView, MemberView, PresentationView
 
 PRODUCT_NAME: Final = "Slides"
 SIGN_IN_LABEL: Final = "Sign in with Google"
@@ -33,10 +33,18 @@ DELETE_FOLDER_PROMPT: Final = "Type the folder name to confirm."
 CANCEL_LABEL: Final = "Cancel"
 NAME_MISMATCH: Final = "The name does not match. Nothing was deleted."
 FOLDER_NAME_REFUSED: Final = "Folder names use 1 to 60 letters, digits, spaces or hyphens."
+MEMBERS_LABEL: Final = "Members"
+EMAIL_ADDRESS_LABEL: Final = "Email address"
+ROLE_LABEL: Final = "Role"
+ADD_MEMBER_LABEL: Final = "Add member"
+REMOVE_LABEL: Final = "Remove"
+INVALID_EMAIL: Final = "This is not a valid email address."
+INVALID_ROLE: Final = "This is not a valid role."
 INVALID_REQUEST_BODY: Final = "Invalid request body"
 REQUEST_TOO_LARGE: Final = "Request too large"
 MONTHS: Final = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 ROLE_LABELS: Final = {"Admin": ADMIN_LABEL, "RW": "Read and write", "RO": "Read only"}  # keyed by ``Role`` value
+MEMBER_ROLES: Final = ("RW", "RO")  # the only roles a member can be given, in the order of the choosers (FR-NEW-012)
 ADMINISTRATION_PATH: Final = "/admin"
 STYLESHEET_PATH: Final = "/lib/library.css"
 SCRIPT_PATH: Final = "/lib/library.js"
@@ -85,6 +93,26 @@ def deleted_folder_line(name: str) -> str:
     return f'Deleted folder "{name}"'
 
 
+def added_member_line(email: str, role: str, folder: str) -> str:
+    """The activity line of a new member (FR-NEW-049)."""
+    return f'Added {email} as {role} to "{folder}"'
+
+
+def changed_member_line(email: str, role: str, folder: str) -> str:
+    """The activity line of a member given the other role (FR-NEW-049)."""
+    return f'Changed {email} to {role} in "{folder}"'
+
+
+def removed_member_line(email: str, folder: str) -> str:
+    """The activity line of a removed member (FR-NEW-049)."""
+    return f'Removed {email} from "{folder}"'
+
+
+def member_role_label(email: str) -> str:
+    """The name of a member's role chooser (DEC-053); ``Role`` alone names the chooser of the add form."""
+    return f"{ROLE_LABEL} of {email}"
+
+
 def home_page(folders: Sequence[FolderView], *, is_admin: bool) -> bytes:
     """The folders in the given order, each a link by id with the person's role; ``Administration`` for the
     administrator; ``You have no access to any folder yet.`` when there is none; the ``Sign out`` form."""
@@ -94,16 +122,19 @@ def home_page(folders: Sequence[FolderView], *, is_admin: bool) -> bytes:
     return _page(f"<h1>{esc(PRODUCT_NAME)}</h1>{administration}{listing}{_sign_out_form()}")
 
 
-def admin_page(folders: Sequence[FolderView], activity: Sequence[ActivityLine]) -> bytes:
+def admin_page(
+    folders: Sequence[FolderView], activity: Sequence[ActivityLine], *, members: Mapping[str, Sequence[MemberView]]
+) -> bytes:
     """``All folders``, the section ``Folders`` (the folders as on the home page, each with a ``Delete folder``
-    button, the field ``Folder name`` and the button ``Create folder``, an alert ``library.js`` fills with a refusal),
+    button and its ``Members`` from ``members`` keyed by folder id, the field ``Folder name`` and the button ``Create
+    folder``, an alert ``library.js`` fills with a refusal),
     the deletion prompt, the section ``Activity`` (the lines in the given order or ``No activity yet.``) and the
     ``Sign out`` form (FR-NEW-050, FR-NEW-067).
 
     Each alert carries the texts ``library.js`` shows for an answer that is not JSON (a refusal page, the unavailable
     page), so every text stays here.
     """
-    rows = _folder_rows(folders, has_delete=True)
+    rows = "".join(_admin_row(folder, members.get(folder.id, ())) for folder in folders)
     listing = f'<ul class="folders">{rows}</ul>' if rows else ""
     create = (
         f'<form id="create-folder"><label for="folder-name">{esc(FOLDER_NAME_LABEL)}</label> '
@@ -139,20 +170,48 @@ def folder_page(name: str, presentations: Sequence[PresentationView]) -> bytes:
     return _page(f"{_back_link()}<h1>{esc(name)}</h1>{listing}{_sign_out_form()}")
 
 
-def _folder_rows(folders: Sequence[FolderView], *, has_delete: bool = False) -> str:
-    """One row per folder: a link by id holding the name, then the person's role, then (administration) the
-    ``Delete folder`` button naming the folder by id."""
-    return "".join(
-        f'<li><a href="/f/{esc(folder.id)}">{esc(folder.name)}</a> <span>{esc(ROLE_LABELS[folder.role])}</span>'
-        f"{_delete_button(folder.id) if has_delete else ''}</li>"
-        for folder in folders
+def _folder_rows(folders: Sequence[FolderView]) -> str:
+    """One row per folder: a link by id holding the name, then the person's role."""
+    return "".join(f"<li>{_folder_link(folder)}</li>" for folder in folders)
+
+
+def _folder_link(folder: FolderView) -> str:
+    return f'<a href="/f/{esc(folder.id)}">{esc(folder.name)}</a> <span>{esc(ROLE_LABELS[folder.role])}</span>'
+
+
+def _admin_row(folder: FolderView, members: Sequence[MemberView]) -> str:
+    """A folder row of the administration: the link and role, ``Delete folder``, then its ``Members`` section (the
+    members in the given order, each with its role chooser and ``Remove``, then the add form and its alert)."""
+    folder_id = esc(folder.id)
+    rows = "".join(
+        f'<li><span class="email">{esc(member.email)}</span> '
+        f'<select class="member-role" aria-label="{esc(member_role_label(member.email))}" data-folder-id="{folder_id}"'
+        f' data-email="{esc(member.email)}">{_role_options(member.role)}</select> '
+        f'<button type="button" class="remove-member" data-folder-id="{folder_id}" data-email="{esc(member.email)}">'
+        f"{esc(REMOVE_LABEL)}</button></li>"
+        for member in members
+    )
+    add = (
+        f'<form class="add-member" data-folder-id="{folder_id}">'
+        f'<label for="member-email-{folder_id}">{esc(EMAIL_ADDRESS_LABEL)}</label> '
+        f'<input id="member-email-{folder_id}" name="email" type="text" autocomplete="off"> '
+        f'<label for="member-role-{folder_id}">{esc(ROLE_LABEL)}</label> '
+        f'<select id="member-role-{folder_id}" name="role">{_role_options(None)}</select> '
+        f'<button type="submit">{esc(ADD_MEMBER_LABEL)}</button></form>'
+    )
+    return (
+        f'<li>{_folder_link(folder)} <button type="button" class="delete-folder" data-folder-id="{folder_id}">'
+        f'{esc(DELETE_FOLDER_LABEL)}</button><section class="members" id="members-{folder_id}">'
+        f'<h3>{esc(MEMBERS_LABEL)}</h3><ul class="members">{rows}</ul>{add}{_alert(f"members-alert-{folder_id}")}'
+        "</section></li>"
     )
 
 
-def _delete_button(folder_id: str) -> str:
-    return (
-        f' <button type="button" class="delete-folder" data-folder-id="{esc(folder_id)}">'
-        f"{esc(DELETE_FOLDER_LABEL)}</button>"
+def _role_options(selected: str | None) -> str:
+    """The two roles a member can be given; ``selected`` marks the member's current one."""
+    return "".join(
+        f'<option value="{role}"{" selected" if role == selected else ""}>{esc(ROLE_LABELS[role])}</option>'
+        for role in MEMBER_ROLES
     )
 
 

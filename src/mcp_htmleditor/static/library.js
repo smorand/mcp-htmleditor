@@ -8,7 +8,10 @@
    JSON "error", else the alert's own text for a page answer: data-denied for 403, data-unavailable otherwise).
    Delete folder (US-0131): each row's button opens the one <dialog> (modal, focus in its field); Cancel or Escape
    closes it without a request and focus returns to that button; Delete folder sends {"confirm": typed text} for the
-   button's folder id, reloads on success, writes a refusal into the dialog's alert as above. */
+   button's folder id, reloads on success, writes a refusal into the dialog's alert as above.
+   Members (US-0132): per folder, Add member sends {"email", "role"} to /api/folders/<id>/members, a member's role
+   chooser sends the same on change, Remove sends {"email"} to .../members/remove; each reloads on success and writes
+   a refusal into the alert of that folder's Members section. */
 (function () {
   "use strict";
 
@@ -102,12 +105,41 @@
     });
   }
 
+  function membersPath(control) {
+    return "/api/folders/" + control.dataset.folderId + "/members";
+  }
+
+  function membersAlert(control) {
+    return control.closest("section.members").querySelector("p[role=alert]");
+  }
+
+  function bindMembers() {
+    document.querySelectorAll("form.add-member").forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        sendJson(membersPath(form), {email: form.elements.email.value, role: form.elements.role.value},
+          membersAlert(form));
+      });
+    });
+    document.querySelectorAll("select.member-role").forEach(function (chooser) {
+      chooser.addEventListener("change", function () {
+        sendJson(membersPath(chooser), {email: chooser.dataset.email, role: chooser.value}, membersAlert(chooser));
+      });
+    });
+    document.querySelectorAll("button.remove-member").forEach(function (button) {
+      button.addEventListener("click", function () {
+        sendJson(membersPath(button) + "/remove", {email: button.dataset.email}, membersAlert(button));
+      });
+    });
+  }
+
   function bindAdministration() {
     var form = document.getElementById("create-folder");
     if (form) {
       form.addEventListener("submit", createFolder);
     }
     bindFolderDeletion();
+    bindMembers();
   }
 
   document.addEventListener("DOMContentLoaded", localizeTimes);

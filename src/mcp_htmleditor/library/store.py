@@ -90,6 +90,14 @@ class FolderView:
 
 
 @dataclass(frozen=True, slots=True)
+class MemberView:
+    """One member of a folder on the administration page: the stored lower case address and its role (RW or RO)."""
+
+    email: str
+    role: Role
+
+
+@dataclass(frozen=True, slots=True)
 class ActivityLine:
     """One line of the activity list: when (``at``, the injected clock), who (lower case address), what."""
 
@@ -228,16 +236,14 @@ class Library:
         if not ID_PATTERN.fullmatch(folder_id):  # no folder has it, and it never becomes a path
             raise FolderMissing
         with self._database.transaction(immediate=True) as connection:
-            row = connection.execute("SELECT name FROM folders WHERE id = ?", (folder_id,)).fetchone()
-            if row is None:
-                raise FolderMissing
-            if compose(confirm) != row[0]:
+            name = _folder_name_in(connection, folder_id)
+            if compose(confirm) != name:
                 raise NameMismatch
             presentation_ids = [
                 found[0]
                 for found in connection.execute("SELECT id FROM presentations WHERE folder_id = ?", (folder_id,))
             ]
-            self.record(connection, actor, pages.deleted_folder_line(row[0]))
+            self.record(connection, actor, pages.deleted_folder_line(name))
             connection.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
         with trace_span("library.delete_folder", {"presentations": len(presentation_ids)}):
             record_dirs = [self._record_dir(folder_id, presentation_id) for presentation_id in presentation_ids]
@@ -266,6 +272,15 @@ class Library:
     def is_admin(self, email: str) -> bool:
         """True for the administrator's address in any letter case; a look alike address is another address."""
         return normalize_email(email) == ADMIN_EMAIL
+
+    def members_by_folder(self) -> dict[str, list[MemberView]]:
+        """The members of every folder from one query, each folder's list in address order by code point (SQLite's
+        ``BINARY`` collation compares the UTF-8 bytes, the same order); a folder without member has no key."""
+        rows = self._database.connection().execute("SELECT folder_id, email, role FROM members ORDER BY email")
+        listing: dict[str, list[MemberView]] = {}
+        for folder_id, email, role in rows:
+            listing.setdefault(folder_id, []).append(MemberView(email, Role(role)))
+        return listing
 
     def presentation_path(self, folder_id: str, presentation_id: str) -> Path:
         """``files/<folder id>/<presentation id>.html``, built from two ids that each match ``^[0-9a-f]{32}$``
@@ -313,6 +328,17 @@ class Library:
             return None
         return self._records.record_dir(path).parent
 
+    def remove_member(self, folder_id: str, email: str, actor: str) -> None:
+        """Delete the member row and write ``Removed <email> from "<folder>"``; an address that is not listed changes
+        nothing and writes no line; ``FolderMissing`` for no folder (FR-NEW-047, FR-NEW-049)."""
+        with self._database.transaction(immediate=True) as connection:
+            name = _folder_name_in(connection, folder_id)
+            removed = connection.execute(
+                "DELETE FROM members WHERE folder_id = ? AND email = ?", (folder_id, email)
+            ).rowcount
+            if removed:
+                self.record(connection, actor, pages.removed_member_line(email, name))
+
     def role_in(self, email: str, folder_id: str | None) -> Role | None:
         """Admin first whatever the member rows hold and whatever the route (a route naming no folder has
         ``folder_id`` None), else the member row of that folder, else None."""
@@ -326,6 +352,38 @@ class Library:
             .fetchone()
         )
         return Role(row[0]) if row is not None else None
+
+    def set_member(self, folder_id: str, email: str, role: Role, actor: str) -> None:
+        """Give ``email`` (already checked, lower case) the role RW or RO in the folder: one row per address and
+        folder (upsert on the primary key). A new row writes ``Added <email> as <role> to "<folder>"``, another role
+        ``Changed <email> to <role> in "<folder>"``, the same role nothing at all; ``FolderMissing`` for no folder.
+        The table's ``CHECK`` refuses any other role (FR-NEW-012, FR-NEW-045)."""
+        with self._database.transaction(immediate=True) as connection:
+            name = _folder_name_in(connection, folder_id)
+            row = connection.execute(
+                "SELECT role FROM members WHERE folder_id = ? AND email = ?", (folder_id, email)
+            ).fetchone()
+            if row is not None and row[0] == role.value:
+                return
+            connection.execute(
+                "INSERT INTO members(folder_id, email, role) VALUES (?, ?, ?)"
+                " ON CONFLICT(folder_id, email) DO UPDATE SET role = excluded.role",
+                (folder_id, email, role.value),
+            )
+            if row is None:
+                line = pages.added_member_line(email, role.value, name)
+            else:
+                line = pages.changed_member_line(email, role.value, name)
+            self.record(connection, actor, line)
+
+
+def _folder_name_in(connection: sqlite3.Connection, folder_id: str) -> str:
+    """The folder's name read inside the caller's write transaction, so it cannot vanish before the commit;
+    ``FolderMissing`` when no folder has this id."""
+    row = connection.execute("SELECT name FROM folders WHERE id = ?", (folder_id,)).fetchone()
+    if row is None:
+        raise FolderMissing
+    return str(row[0])
 
 
 def _remove_directory(directory: Path) -> None:

@@ -131,7 +131,7 @@
 | US-0129 | SPEC-0025 | The folder page lists presentations | US-0127 | 1 | done | feat/0049-web-library-mode | US-0128 |
 | US-0130 | SPEC-0025 | Administration: create folders and read the activity list | US-0127, US-0129 | 1 | done | feat/0049-web-library-mode | US-0129 |
 | US-0131 | SPEC-0025 | Administration: delete a folder after retyping its name | US-0130 | 1 | done | feat/0049-web-library-mode | US-0130 |
-| US-0132 | SPEC-0025 | Administration: members and roles of a folder | US-0130 | 1 | todo | feat/0049-web-library-mode | |
+| US-0132 | SPEC-0025 | Administration: members and roles of a folder | US-0130 | 1 | done | feat/0049-web-library-mode | US-0131 |
 | US-0133 | SPEC-0025 | Open a presentation: ticket, grant, deck frame, status, HTML download | US-0129, US-0131 | 1 | todo | feat/0049-web-library-mode | |
 | US-0134 | SPEC-0025 | The editor shell opens on the content origin | US-0133 | 2 | todo | feat/0049-web-library-mode | |
 | US-0135 | SPEC-0025 | Read only editor, presenter window, full screen, hostile script isolation | US-0134, US-0132 | 2 | todo | feat/0049-web-library-mode | |

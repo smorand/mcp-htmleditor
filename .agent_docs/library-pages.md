@@ -1,6 +1,6 @@
 # Web library pages (SPEC-0025)
 
-Home page, folder page, administration and folder deletion of the web library mode; the module map, gate order,
+Home page, folder page, administration, folder deletion and members of the web library mode; the module map, gate order,
 storage and test support are in `.agent_docs/library.md`.
 
 ## Home page and roles (US-0127, DEC-018, DEC-029, DEC-023)
@@ -78,3 +78,23 @@ storage and test support are in `.agent_docs/library.md`.
   reused, so a leftover is unreachable. Former members get `Access denied.` at their next request (no row).
 - Cost: one transaction (primary key read, one indexed select of the ids, one delete with cascade), then O(files)
   removal (E2E-104: 100 presentations with history and requests).
+
+## Members (US-0132, DEC-018, DEC-019, DEC-029, DEC-030)
+
+- Admin page: each folder row (`_admin_row`) ends with `<section class="members" id="members-<fid>">`: `<h3>Members`,
+  `<ul class="members">` rows `<li><span class="email">..</span> <select class="member-role" aria-label="Role of <email>"
+  data-folder-id data-email>` (options `RW` `Read and write`, `RO` `Read only`, the member's `selected`) `<button
+  class="remove-member">Remove</button></li>`, then `form.add-member` (`Email address`, `Role` with the same two options,
+  `Add member`) and the alert `members-alert-<fid>`. `members_by_folder()` is one `SELECT ... ORDER BY email` (BINARY
+  collation: code point order, the `members_email` index) grouped in Python: O(m) for the whole page, no query per folder.
+- `POST /api/folders/<fid>/members {"email", "role"}` and `.../members/remove {"email"}` (ADMINISTER, so a RW member
+  posting `Admin` gets `Access denied.` before the role is read). Handler order: `folder_name` None is `Access denied.`;
+  `check_email` (`strip()`, fullmatch `[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+`, ASCII only, `lower()`; not a
+  string too) else 400 `This is not a valid email address.`; the role exactly `RW` or `RO` (`pages.MEMBER_ROLES`) else
+  400 `This is not a valid role.`. Success `200 {"ok": true}`.
+- `set_member`: one `BEGIN IMMEDIATE` (folder name, current role, upsert `ON CONFLICT(folder_id, email) DO UPDATE`, line
+  `Added <email> as RW to "<folder>"` or `Changed <email> to RO in "<folder>"`); the same role returns before writing.
+  `remove_member` writes `Removed <email> from "<folder>"` only when a row went. A folder deleted between the handler's
+  read and the transaction is `FolderMissing`, `Access denied.`. The `CHECK (role IN ('RW','RO'))` is the last guard.
+- The administrator's address may be stored as a member: `role_in` answers Admin before reading `members` (DEC-006).
+  Roles are read at every request, so a change applies to the person's next page without a new sign in (DEC-018).

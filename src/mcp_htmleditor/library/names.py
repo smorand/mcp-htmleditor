@@ -1,11 +1,12 @@
 """Folder and presentation names (SPEC-0025, DEC-029): composed form, the unique key, the display order, the folder
-name rule; the size text of a presentation (DEC-031).
+name rule, the member address rule; the size text of a presentation (DEC-031).
 
 ``lower()`` and never ``casefold()``: ``ß`` and ``SS`` stay two names, as "without regard to case" reads in the spec.
 """
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from typing import Final
 
@@ -21,6 +22,7 @@ LETTER: Final = "L"
 MARK: Final = "M"
 VARIATION_SELECTORS: Final = frozenset(map(chr, range(0xFE00, 0xFE10)))  # Mn, but they only select an emoji look
 DECIMAL_DIGIT: Final = "Nd"
+EMAIL_PATTERN: Final = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+")  # DEC-029, ASCII only
 
 
 class NameRefused(ValueError):  # noqa: N818 - name fixed by the design (section 5.8)
@@ -63,6 +65,16 @@ def check_folder_name(raw: str) -> str:
             raise NameRefused
         previous = category
     return name
+
+
+def check_email(raw: str) -> str:
+    """The trimmed lower case address when the trimmed text is one ``local@domain`` address (FR-NEW-046): letters,
+    digits and ``. _ % + -`` before the ``@``, ASCII letters, digits and hyphens in dot separated labels after it, at
+    least one dot; ``NameRefused`` otherwise (two addresses, a space, an apostrophe, a missing dot)."""
+    address = raw.strip()
+    if EMAIL_PATTERN.fullmatch(address) is None:
+        raise NameRefused
+    return address.lower()
 
 
 def format_size(count: int) -> str:

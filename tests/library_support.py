@@ -28,6 +28,10 @@ same-origin``, ``Content-Type: application/json``), or the headers a test gives 
 Folder deletion (US-0131): ``StoredLibrary.entries()`` walks ``library_dir`` and ``state_dir``;
 ``LibraryBuilder.records(presentation)`` gives a presentation history versions, requests and AI suggestions and
 returns its state directory ``<state_dir>/files/<key>``.
+
+Members (US-0132): ``Browser.add_member`` and ``Browser.remove_member`` send what the ``Members`` controls send;
+``LibraryReply.member_rows(folder_id)`` reads the members of one folder on the administration page;
+``StoredLibrary.members()`` the table; ``signed_in`` and ``visible_texts`` are shared by the member modules.
 """
 
 from __future__ import annotations
@@ -92,6 +96,9 @@ ACTIVITY_ROW = re.compile(
     r'<li><time datetime="([^"]*)">[^<]*</time> <span class="actor">([^<]*)</span> <span class="text">([^<]*)</span>'
     r"</li>"
 )
+MEMBER_ROW = re.compile(
+    r'<li><span class="email">([^<]*)</span> <select[^>]*>.*?<option value="R[WO]" selected>([^<]*)<'
+)
 HEART_FAILURE = "Heart Failure Update"
 ARRHYTHMIA = "Arrhythmia Basics"
 STATINS = "Statins Review"
@@ -149,6 +156,15 @@ class LibraryReply:
         return [
             (when, html_unescape(actor), html_unescape(text)) for when, actor, text in ACTIVITY_ROW.findall(self.text)
         ]
+
+    def member_rows(self, folder_id: str) -> list[tuple[str, str]]:
+        """``(address, role label shown by its chooser)`` of each member of a folder on the administration page, in
+        page order, unescaped; an ``AssertionError`` when the page has no ``Members`` section for that folder."""
+        section = re.search(f'<section class="members" id="members-{folder_id}">(.*?)</section>', self.text)
+        assert section is not None, f"no Members section for {folder_id}"
+        listing = re.search(r'<ul class="members">(.*?)</ul>', section.group(1))
+        rows = MEMBER_ROW.findall(listing.group(1)) if listing is not None else []
+        return [(html_unescape(email), html_unescape(role)) for email, role in rows]
 
     def json(self) -> Any:
         return json.loads(self.body)
@@ -457,6 +473,10 @@ class StoredLibrary:
     def folder_names(self) -> list[str]:
         return [row[0] for row in self.rows("SELECT name FROM folders ORDER BY name")]
 
+    def members(self) -> list[tuple[Any, ...]]:
+        """``(folder_id, email, role)`` of every member row."""
+        return self.rows("SELECT folder_id, email, role FROM members ORDER BY folder_id, email")
+
     def activity(self) -> list[tuple[Any, ...]]:
         """The activity lines, empty while the table does not exist (it arrives with US-0130)."""
         if not self.rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'activity'"):
@@ -681,6 +701,14 @@ class Browser:
         self.replies.append(reply)
         return reply
 
+    def add_member(self, folder_id: str, email: Any, role: Any) -> LibraryReply:
+        """What ``Add member`` (or a member's role chooser) sends for the typed address and the chosen role."""
+        return self.post_json(f"/api/folders/{folder_id}/members", {"email": email, "role": role})
+
+    def remove_member(self, folder_id: str, email: Any) -> LibraryReply:
+        """What a member's ``Remove`` button sends."""
+        return self.post_json(f"/api/folders/{folder_id}/members/remove", {"email": email})
+
     def page_post_headers(self) -> dict[str, str]:
         """What Chromium sends with a ``fetch`` POST of JSON from a library page."""
         return {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json"}
@@ -758,6 +786,19 @@ def deck_bytes(title: str, slides: int, size: int) -> bytes:
     if padding < 0:
         return (head + tail + b" " * size)[:size]
     return head + PADDING_OPEN + b"x" * padding + PADDING_CLOSE + tail
+
+
+def signed_in(running: RunningLibrary, google: FakeGoogle, email: str) -> Browser:
+    """A fresh browser signed in as ``email`` through ``google``."""
+    browser = running.browser()
+    browser.sign_in(google, email)
+    return browser
+
+
+def visible_texts(reply: LibraryReply) -> list[str]:
+    """The text nodes of the page body, unescaped, in order."""
+    body = reply.text.split("<body>", 1)[1]
+    return [html_unescape(text).strip() for text in re.split(r"<[^>]*>", body) if text.strip()]
 
 
 def launch_chromium(playwright: Playwright, *other_hosts: str) -> Chromium:

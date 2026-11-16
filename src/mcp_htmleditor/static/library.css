@@ -29,7 +29,9 @@ a {
 }
 
 a:focus-visible,
-button:focus-visible {
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--library-accent);
   outline-offset: 2px;
 }
@@ -79,7 +81,8 @@ ol.activity .text {
   unicode-bidi: isolate;
 }
 
-#create-folder {
+#create-folder,
+form.add-member {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -96,6 +99,38 @@ ul.presentations .size {
 p[role="alert"] {
   padding: 0.75rem 1rem;
   border-inline-start: 4px solid #da1e28;
+}
+
+/* Members (US-0132): each folder row of the administration ends with its own section, on a line of its own. */
+section.members {
+  flex-basis: 100%;
+}
+
+section.members h3 {
+  margin-block: 0.25rem;
+  font-size: 1rem;
+}
+
+ul.folders ul.members {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+ul.folders ul.members li {
+  justify-content: flex-start;
+  align-items: center;
+  padding-block: 0.2rem;
+  border: 0;
+}
+
+ul.members .email {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+form.add-member input {
+  max-inline-size: 100%;
 }
 
 button {

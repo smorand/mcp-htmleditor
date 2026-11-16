@@ -467,6 +467,15 @@ history, requests and AI suggestions, and its members, for good. Any other text 
 Nothing was deleted.`; `Cancel` closes the prompt. A folder created later with the same name is empty and has no
 member; former members get `Access denied.`.
 
+Each folder of the administration has its `Members`: the field `Email address`, the chooser `Role` (`Read and write` or
+`Read only`, nothing else) and `Add member`; each member, listed by address, has a role chooser and `Remove`. The address
+is trimmed and stored in lower case; it must be one address `local@domain` (letters, digits and `. _ % + -` before the
+`@`, a dot in the domain), else `This is not a valid email address.`; any role but the two is `This is not a valid
+role.`. An address already listed, in any letter case, keeps one entry: the same role changes nothing, the other role
+updates it. A change applies to that folder only, at the person's next page, with no new sign in; the activity list
+reads `Added <email> as RW to "<folder>"`, `Changed <email> to RO in "<folder>"`, `Removed <email> from "<folder>"`.
+The administrator's rights never come from a member list.
+
 ## Templates
 
 Templates are resolved in priority order:
@@ -680,11 +689,11 @@ src/mcp_htmleditor/
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
 ├── library/signin.py  Google sign in (GoogleClient, claims), login attempts and sessions (Accounts)
-├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path, create_folder, delete_folder, activity, record)
-├── library/names.py   compose, name_key, order_key (folder order), check_folder_name, format_size
+├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path, create_folder, delete_folder, set_member, remove_member, members_by_folder, activity, record)
+├── library/names.py   compose, name_key, order_key (folder order), check_folder_name, check_email, format_size
 ├── library/pages.py   every page and English text of the library mode, esc()
 ├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page, folder page
-├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder), POST /api/folders/<id>/delete
+├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder), POST /api/folders/<id>/delete, POST /api/folders/<id>/members (add or change), POST /api/folders/<id>/members/remove
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

@@ -11,13 +11,13 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | `__init__.py` | package docstring |
 | `pages.py` | `esc`, `sign_in_page`, `access_denied()`, `library_unavailable()`, `home_page(folders, is_admin=)`, `folder_page`, `admin_page(folders, activity)` (with the `Delete folder` buttons and the `<dialog>`), `folder_exists(name)`,
 `created_folder_line(name)`, `deleted_folder_line(name)`, every English text constant (DEC-055, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` and loads `/lib/library.js` (`defer`) |
-| `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029), `check_folder_name` / `NameRefused`, `format_size` (DEC-031) |
+| `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029), `check_folder_name`, `check_email` / `NameRefused`, `format_size` (DEC-031) |
 | `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route` (`is_json`), `Context` (`folder_id`, `role`, `payload` filled by the dispatcher), `Answer`, `json_answer`, `JSON_CONTENT_TYPE`, `SetCookie` (DEC-021) |
-| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library(database, clock, *, state_dir)` (`folders_for`, `is_admin`, `role_in(email, folder_id or None)`, `folder_name`, `presentation_path`, `presentations_in`, `create_folder(name, actor)`, `delete_folder(folder_id, confirm, actor)`, `activity()`, `record(connection, actor, text)`), `NameTaken`, `NameMismatch`, `FolderMissing`, `normalize_email`, `FolderView`, `PresentationView`, `ActivityLine` |
-| `routes_admin.py` | `GET /admin` (ADMINISTER, `administration`), `POST /api/folders` (ADMINISTER, JSON, `create_folder`), `POST /api/folders/<fid>/delete` (ADMINISTER, JSON, `delete_folder`) |
+| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library(database, clock, *, state_dir)` (`folders_for`, `is_admin`, `role_in(email, folder_id or None)`, `folder_name`, `presentation_path`, `presentations_in`, `create_folder(name, actor)`, `delete_folder(folder_id, confirm, actor)`, `set_member(folder_id, email, role, actor)`, `remove_member(folder_id, email, actor)`, `members_by_folder()`, `activity()`, `record(connection, actor, text)`), `NameTaken`, `NameMismatch`, `FolderMissing`, `normalize_email`, `FolderView`, `MemberView`, `PresentationView`, `ActivityLine` |
+| `routes_admin.py` | `GET /admin` (ADMINISTER, `administration`), `POST /api/folders` (ADMINISTER, JSON, `create_folder`), `POST /api/folders/<fid>/delete` (`delete_folder`), `POST /api/folders/<fid>/members` (`set_member`), `POST /api/folders/<fid>/members/remove` (`remove_member`), all ADMINISTER and JSON |
 | `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `purge`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
 | `routes_library.py` | `ROUTES`: `GET /lib/library.css`, `GET /lib/library.js` (PUBLIC, `static_file`, `STATIC_DIR`), `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN), `GET /f/(?P<fid>[0-9a-f]{32})` (VIEW, `folder`) |
-| `static/library.js` | every page: `time[datetime]` rewritten in the browser's zone, `pageshow` with `persisted` reloads (DEC-009, DEC-031); administration: `sendJson` (fetch, reload on success, refusal into an alert), `Create folder`, the deletion `<dialog>` |
+| `static/library.js` | every page: `time[datetime]` rewritten in the browser's zone, `pageshow` with `persisted` reloads (DEC-009, DEC-031); administration: `sendJson` (fetch, reload on success, refusal into an alert), `Create folder`, the deletion `<dialog>`, the `Members` controls |
 | `server.py` | `load_routes`, `cookie_name`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_origin_ok`, `_send_answer`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
 
 A route handler is a plain function `(Context) -> Answer` (a `routes_*` module never imports `server.py`, which loads
@@ -56,7 +56,8 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
    sign in page for a visitor (`200`, `next` = `safe_destination(path)`), `Access denied.` for a signed in person.
    Then `role_in(email, fid or None)` (Admin for the administrator on any route) and `authorize`; false is `Access
    denied.`. Only then the JSON body (`_read_library_json`: `parse_content_length`, 413 above 65 536 bytes before
-   reading, 400 `Invalid request body` unless a JSON object) into `Context.payload`, then the handler.
+   reading, 400 `Invalid request body` unless a JSON object) into `Context.payload`, then the handler, which
+   validates the payload (members: the folder exists, then the address, then the role; US-0132).
 7. `_library_answer` (route, session, handler) runs inside `except (sqlite3.Error, OSError)`: `503`
    `pages.library_unavailable()` (`The library is unavailable. Try again later.`, no name, no list, no Sign out form),
    one ERROR line naming the exception type. Writing the answer is outside the guard (a closed socket is not the
@@ -100,7 +101,7 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
 
 ## Pages
 
-Home page, folder page, administration and folder deletion (US-0127, US-0129 to US-0131): `.agent_docs/library-pages.md`.
+Home page, folder page, administration, folder deletion and members (US-0127, US-0129 to US-0132): `.agent_docs/library-pages.md`.
 
 ## Storage (DEC-025)
 
@@ -158,10 +159,12 @@ deck padded with an HTML comment to exactly `size` bytes, below the smallest dec
 US-0131: `StoredLibrary(library_dir, state_dir).entries()` (every path under both directories as `library/...` and
 `state/...`), `LibraryBuilder(database, clock, state_dir).records(presentation)` (two history versions, two requests, one
 AI suggestion through `HistoryStore`, `RequestService`; returns `<state_dir>/files/<key>`).
+US-0132: `Browser.add_member(fid, email, role)`, `Browser.remove_member(fid, email)`, `LibraryReply.member_rows(fid)`
+(address, role label; asserts the folder's `Members` section exists), `StoredLibrary.members()`, `signed_in`, `visible_texts`.
 US-0130: `Browser.post_json(path, payload, headers=None)` (default `page_post_headers()`: `Origin`, `Sec-Fetch-Site:
 same-origin`, JSON type), `LibraryReply.activity_lines()` (unescaped `(UTC ISO, actor, text)`).
 Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for the areas `visitor`, `auth`, `home`,
-`sessions`, `gate`, `folders`, `admin`, `foldel`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
+`sessions`, `gate`, `folders`, `admin`, `foldel`, `members`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
 
 ## Gotchas
 
