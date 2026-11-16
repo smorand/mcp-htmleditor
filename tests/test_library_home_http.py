@@ -144,7 +144,7 @@ def test_role_in_puts_the_administrator_first_and_reads_members_otherwise(librar
     running = library_server()
     ids = running.builder.standard()
     running.builder.member(ids[CARDIOLOGY], ADMIN, "RO")
-    library = Library(running.database, running.clock)
+    library = Library(running.database, running.clock, state_dir=running.state_dir)
     unknown_folder = "0" * 32
 
     for folder_id in (ids[CARDIOLOGY], ids[WCBIP], unknown_folder):

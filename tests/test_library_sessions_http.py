@@ -288,8 +288,15 @@ def test_the_home_page_with_200_folders_answers_within_2_seconds_from_one_query(
     statements: list[str] = []
     running.database.connection().set_trace_callback(statements.append)
     try:
-        assert len(Library(running.database, running.clock).folders_for(DAN)) == 200
-        assert len(Library(running.database, running.clock).folders_for("seb.morand@gmail.com")) == 200
+        assert len(Library(running.database, running.clock, state_dir=running.state_dir).folders_for(DAN)) == 200
+        assert (
+            len(
+                Library(running.database, running.clock, state_dir=running.state_dir).folders_for(
+                    "seb.morand@gmail.com"
+                )
+            )
+            == 200
+        )
     finally:
         running.database.connection().set_trace_callback(None)
     assert len(statements) == 2, statements

@@ -28,6 +28,10 @@ ACTIVITY_LABEL: Final = "Activity"
 FOLDER_NAME_LABEL: Final = "Folder name"
 CREATE_FOLDER_LABEL: Final = "Create folder"
 NO_ACTIVITY_YET: Final = "No activity yet."
+DELETE_FOLDER_LABEL: Final = "Delete folder"
+DELETE_FOLDER_PROMPT: Final = "Type the folder name to confirm."
+CANCEL_LABEL: Final = "Cancel"
+NAME_MISMATCH: Final = "The name does not match. Nothing was deleted."
 FOLDER_NAME_REFUSED: Final = "Folder names use 1 to 60 letters, digits, spaces or hyphens."
 INVALID_REQUEST_BODY: Final = "Invalid request body"
 REQUEST_TOO_LARGE: Final = "Request too large"
@@ -76,6 +80,11 @@ def created_folder_line(name: str) -> str:
     return f'Created folder "{name}"'
 
 
+def deleted_folder_line(name: str) -> str:
+    """The activity line of a folder deletion (FR-NEW-049)."""
+    return f'Deleted folder "{name}"'
+
+
 def home_page(folders: Sequence[FolderView], *, is_admin: bool) -> bytes:
     """The folders in the given order, each a link by id with the person's role; ``Administration`` for the
     administrator; ``You have no access to any folder yet.`` when there is none; the ``Sign out`` form."""
@@ -86,21 +95,20 @@ def home_page(folders: Sequence[FolderView], *, is_admin: bool) -> bytes:
 
 
 def admin_page(folders: Sequence[FolderView], activity: Sequence[ActivityLine]) -> bytes:
-    """``All folders``, the section ``Folders`` (the folders as on the home page, the field ``Folder name`` and the
-    button ``Create folder``, an alert ``library.js`` fills with a refusal), the section ``Activity`` (the lines in
-    the given order or ``No activity yet.``) and the ``Sign out`` form (FR-NEW-050, FR-NEW-067).
+    """``All folders``, the section ``Folders`` (the folders as on the home page, each with a ``Delete folder``
+    button, the field ``Folder name`` and the button ``Create folder``, an alert ``library.js`` fills with a refusal),
+    the deletion prompt, the section ``Activity`` (the lines in the given order or ``No activity yet.``) and the
+    ``Sign out`` form (FR-NEW-050, FR-NEW-067).
 
-    The alert carries the texts ``library.js`` shows for an answer that is not JSON (a refusal page, the unavailable
+    Each alert carries the texts ``library.js`` shows for an answer that is not JSON (a refusal page, the unavailable
     page), so every text stays here.
     """
-    rows = _folder_rows(folders)
+    rows = _folder_rows(folders, has_delete=True)
     listing = f'<ul class="folders">{rows}</ul>' if rows else ""
     create = (
         f'<form id="create-folder"><label for="folder-name">{esc(FOLDER_NAME_LABEL)}</label> '
         '<input id="folder-name" name="name" type="text" autocomplete="off"> '
-        f'<button type="submit">{esc(CREATE_FOLDER_LABEL)}</button></form>'
-        f'<p role="alert" id="create-folder-alert" data-denied="{esc(ACCESS_DENIED_TEXT)}" '
-        f'data-unavailable="{esc(LIBRARY_UNAVAILABLE)}" hidden></p>'
+        f'<button type="submit">{esc(CREATE_FOLDER_LABEL)}</button></form>{_alert("create-folder-alert")}'
     )
     lines = "".join(
         f'<li>{_time(line.at)} <span class="actor">{esc(line.actor)}</span> <span class="text">{esc(line.text)}</span>'
@@ -110,7 +118,7 @@ def admin_page(folders: Sequence[FolderView], activity: Sequence[ActivityLine]) 
     log = f'<ol class="activity">{lines}</ol>' if lines else f"<p>{esc(NO_ACTIVITY_YET)}</p>"
     return _page(
         f"{_back_link()}<h1>{esc(ADMINISTRATION_LABEL)}</h1>"
-        f'<section id="folders"><h2>{esc(FOLDERS_LABEL)}</h2>{listing}{create}</section>'
+        f'<section id="folders"><h2>{esc(FOLDERS_LABEL)}</h2>{listing}{create}{_delete_folder_dialog()}</section>'
         f'<section id="activity"><h2>{esc(ACTIVITY_LABEL)}</h2>{log}</section>{_sign_out_form()}'
     )
 
@@ -131,11 +139,41 @@ def folder_page(name: str, presentations: Sequence[PresentationView]) -> bytes:
     return _page(f"{_back_link()}<h1>{esc(name)}</h1>{listing}{_sign_out_form()}")
 
 
-def _folder_rows(folders: Sequence[FolderView]) -> str:
-    """One row per folder: a link by id holding the name, then the person's role."""
+def _folder_rows(folders: Sequence[FolderView], *, has_delete: bool = False) -> str:
+    """One row per folder: a link by id holding the name, then the person's role, then (administration) the
+    ``Delete folder`` button naming the folder by id."""
     return "".join(
-        f'<li><a href="/f/{esc(folder.id)}">{esc(folder.name)}</a> <span>{esc(ROLE_LABELS[folder.role])}</span></li>'
+        f'<li><a href="/f/{esc(folder.id)}">{esc(folder.name)}</a> <span>{esc(ROLE_LABELS[folder.role])}</span>'
+        f"{_delete_button(folder.id) if has_delete else ''}</li>"
         for folder in folders
+    )
+
+
+def _delete_button(folder_id: str) -> str:
+    return (
+        f' <button type="button" class="delete-folder" data-folder-id="{esc(folder_id)}">'
+        f"{esc(DELETE_FOLDER_LABEL)}</button>"
+    )
+
+
+def _alert(alert_id: str) -> str:
+    """A hidden alert ``library.js`` fills with a refusal, holding the texts of the answers that are not JSON."""
+    return (
+        f'<p role="alert" id="{alert_id}" data-denied="{esc(ACCESS_DENIED_TEXT)}" '
+        f'data-unavailable="{esc(LIBRARY_UNAVAILABLE)}" hidden></p>'
+    )
+
+
+def _delete_folder_dialog() -> str:
+    """The prompt of ``Delete folder``: the field labelled ``Type the folder name to confirm.``, ``Delete folder``
+    and ``Cancel``, and its alert; ``library.js`` opens it for the folder of the pressed button."""
+    return (
+        '<dialog id="delete-folder"><form id="delete-folder-form">'
+        f'<p><label for="delete-folder-name">{esc(DELETE_FOLDER_PROMPT)}</label></p>'
+        '<p><input id="delete-folder-name" name="confirm" type="text" autocomplete="off"></p>'
+        f"{_alert('delete-folder-alert')}"
+        f'<p><button type="submit">{esc(DELETE_FOLDER_LABEL)}</button> '
+        f'<button type="button" id="delete-folder-cancel">{esc(CANCEL_LABEL)}</button></p></form></dialog>'
     )
 
 

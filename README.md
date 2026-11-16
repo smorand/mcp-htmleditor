@@ -457,9 +457,15 @@ a page of another site. `/lib/library.css` and `/lib/library.js` are the only fi
 holds 1 to 60 letters of any alphabet, digits, spaces or hyphens (`Folder names use 1 to 60 letters, digits, spaces or
 hyphens.` otherwise); a name equal to an existing one without regard to case is refused with `A folder named "<name>"
 already exists.` (an accent makes another name). The activity list shows the 500 newest successful actions, newest
-first (`Created folder "Oncology 2030"`, who, when), or `No activity yet.`; sign ins and refused attempts are not
+first (`Created folder "Oncology 2030"`, `Deleted folder "Pneumo Été"`, who, when), or `No activity yet.`; sign ins and refused attempts are not
 listed. Every request that changes the library must come from the library's own pages (`Origin` equal to the library
 origin; JSON calls with `Content-Type: application/json`), else `Access denied.`, even with a valid session.
+
+`Delete folder` next to a folder asks `Type the folder name to confirm.`; only the exact name (case, accents and spaces
+count; accents typed as separate marks are composed first) deletes the folder, all its presentations with their
+history, requests and AI suggestions, and its members, for good. Any other text shows `The name does not match.
+Nothing was deleted.`; `Cancel` closes the prompt. A folder created later with the same name is empty and has no
+member; former members get `Access denied.`.
 
 ## Templates
 
@@ -674,11 +680,11 @@ src/mcp_htmleditor/
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
 ├── library/signin.py  Google sign in (GoogleClient, claims), login attempts and sessions (Accounts)
-├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path, create_folder, activity, record)
+├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path, create_folder, delete_folder, activity, record)
 ├── library/names.py   compose, name_key, order_key (folder order), check_folder_name, format_size
 ├── library/pages.py   every page and English text of the library mode, esc()
 ├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page, folder page
-├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder)
+├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder), POST /api/folders/<id>/delete
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

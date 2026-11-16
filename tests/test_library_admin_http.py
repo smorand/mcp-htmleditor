@@ -374,8 +374,9 @@ def test_sign_ins_and_refusals_write_no_activity_line(library_server: START, fak
 
 
 def test_the_administration_page_names_its_controls(library_server: START, fake_google: FakeGoogle) -> None:
-    """FR-NEW-067: All folders, the Folders section with every folder in home page order, the field Folder name and
-    its Create folder button, the Activity section, Sign out."""
+    """FR-NEW-067: All folders, the Folders section with every folder in home page order and its Delete folder
+    button, the field Folder name and its Create folder button, the deletion prompt (US-0131), the Activity section,
+    Sign out."""
     running = library_server(fake_google)
     running.builder.standard()
     admin = signed_in(running, fake_google, ADMIN)
@@ -389,12 +390,18 @@ def test_the_administration_page_names_its_controls(library_server: START, fake_
         "Folders",
         CARDIOLOGY,
         "Admin",
+        "Delete folder",
         PNEUMO,
         "Admin",
+        "Delete folder",
         WCBIP,
         "Admin",
+        "Delete folder",
         "Folder name",
         "Create folder",
+        "Type the folder name to confirm.",
+        "Delete folder",
+        "Cancel",
         "Activity",
         NO_ACTIVITY,
         "Sign out",

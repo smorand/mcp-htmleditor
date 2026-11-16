@@ -7,10 +7,12 @@ appends one entry and never edits an earlier one.
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import threading
 from collections.abc import Callable, Iterator
@@ -19,9 +21,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Final
 
+from ..request_store import RequestStore
+from ..tracing import trace_span
 from . import pages
 from .access import ADMIN_EMAIL, Role
-from .names import name_key, order_key
+from .names import compose, name_key, order_key
+
+logger = logging.getLogger(__name__)
 
 DIRECTORY_MODE: Final = 0o700
 FILE_MODE: Final = 0o600
@@ -64,6 +70,14 @@ MIGRATIONS: Final[tuple[str, ...]] = (
 
 class NameTaken(Exception):  # noqa: N818 - a domain outcome, not an error of the program
     """A folder whose name is the same without regard to case already exists (the ``name_key`` constraint)."""
+
+
+class NameMismatch(Exception):  # noqa: N818 - a domain outcome, not an error of the program
+    """The retyped name, composed, differs from the folder name in some character (FR-NEW-044)."""
+
+
+class FolderMissing(Exception):  # noqa: N818 - a domain outcome, not an error of the program
+    """No folder has this id."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,10 +185,11 @@ class Library:
     rows and lines.
     """
 
-    def __init__(self, database: Database, clock: Callable[[], float]) -> None:
+    def __init__(self, database: Database, clock: Callable[[], float], *, state_dir: Path) -> None:
         self._database = database
         self._clock = clock
         self._files = database.path.parent / FILES_DIRECTORY
+        self._records = RequestStore(state_dir)
 
     def activity(self) -> list[ActivityLine]:
         """The 500 newest lines, newest first (FR-NEW-050)."""
@@ -200,6 +215,34 @@ class Library:
         except sqlite3.IntegrityError as exc:
             raise NameTaken from exc
         return folder_id
+
+    def delete_folder(self, folder_id: str, confirm: str, actor: str) -> None:
+        """Delete the folder when ``compose(confirm)`` equals its name character by character (FR-NEW-043).
+
+        One ``BEGIN IMMEDIATE`` transaction checks the name, collects the presentation ids, writes the line
+        ``Deleted folder "<name>"`` and deletes the folder row (members and presentations cascade); only then, the
+        rows gone, ``files/<folder id>/`` and the state directory of each presentation (history, requests, AI
+        suggestions) are removed (DEC-026). A directory that cannot be removed is a warning, never an error: nothing
+        reaches it any more and ids are never reused. ``FolderMissing`` or ``NameMismatch`` write nothing.
+        """
+        if not ID_PATTERN.fullmatch(folder_id):  # no folder has it, and it never becomes a path
+            raise FolderMissing
+        with self._database.transaction(immediate=True) as connection:
+            row = connection.execute("SELECT name FROM folders WHERE id = ?", (folder_id,)).fetchone()
+            if row is None:
+                raise FolderMissing
+            if compose(confirm) != row[0]:
+                raise NameMismatch
+            presentation_ids = [
+                found[0]
+                for found in connection.execute("SELECT id FROM presentations WHERE folder_id = ?", (folder_id,))
+            ]
+            self.record(connection, actor, pages.deleted_folder_line(row[0]))
+            connection.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
+        with trace_span("library.delete_folder", {"presentations": len(presentation_ids)}):
+            record_dirs = [self._record_dir(folder_id, presentation_id) for presentation_id in presentation_ids]
+            for directory in (self._files / folder_id, *filter(None, record_dirs)):
+                _remove_directory(directory)
 
     def folders_for(self, email: str) -> list[FolderView]:
         """The folders ``email`` can open with its role, in ``order_key`` order: every folder (Admin) for the
@@ -260,6 +303,16 @@ class Library:
         )
         connection.execute("DELETE FROM activity WHERE id <= (SELECT MAX(id) FROM activity) - ?", (ACTIVITY_KEPT,))
 
+    def _record_dir(self, folder_id: str, presentation_id: str) -> Path | None:
+        """``<state_dir>/files/<key>`` of a presentation, the key of its resolved path (history, requests, AI
+        suggestions); None for a malformed id, which no path is ever built from."""
+        try:
+            path = self.presentation_path(folder_id, presentation_id)
+        except ValueError:
+            logger.warning("Skipped a malformed presentation id of a deleted folder")
+            return None
+        return self._records.record_dir(path).parent
+
     def role_in(self, email: str, folder_id: str | None) -> Role | None:
         """Admin first whatever the member rows hold and whatever the route (a route naming no folder has
         ``folder_id`` None), else the member row of that folder, else None."""
@@ -273,6 +326,16 @@ class Library:
             .fetchone()
         )
         return Role(row[0]) if row is not None else None
+
+
+def _remove_directory(directory: Path) -> None:
+    """``shutil.rmtree`` of a directory of a deleted folder; already absent is fine, any other failure a warning."""
+    try:
+        shutil.rmtree(directory)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        logger.warning("Could not remove a directory of a deleted folder: %s", type(exc).__name__)
 
 
 def normalize_email(email: str) -> str:

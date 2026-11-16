@@ -47,6 +47,7 @@ Names follow `category.operation`.
 | `file.write` | editor save, `new` from a template, PPTX save, `fileio.atomic_write` (`patch`) | `file.path`, `file.size`, `export.format`, `template.key` |
 | `auth.google_token` | `library/signin.GoogleClient.exchange`, the code exchange at Google's `token_uri` | `http.status_code` (absent when Google was unreachable) |
 | `session.create` | `library/signin.Accounts`, the session row of a successful sign in | none |
+| `library.delete_folder` | `library/store.Library.delete_folder`, the removal of the files and state directories once the rows are gone (no span for a refusal) | `presentations` (count) |
 
 The deck service (`src/mcp_htmleditor/deck/`) opens no span of its own (no `deck.*` span exists yet); a `patch`
 shows up as `mcp.patch` around one `file.write` from `fileio.atomic_write`, absent for a dry run or a no change patch.
@@ -62,7 +63,9 @@ secret in a log line or a span attribute. A refused sign in logs `Sign in refuse
 `library.routes_library`); a refused state change logs `Refused <METHOD> <path>: origin` (or `: content type` for a
 JSON route without `application/json`). Administration (US-0130, no new span: one SQLite transaction, no external
 call): `Created a folder` (INFO), `Refused POST /api/folders: folder name` and `: duplicate folder name` (WARNING,
-`library.routes_admin`), never the name.
+`library.routes_admin`), never the name. Folder deletion (US-0131): `Deleted a folder` (INFO), `Refused POST
+/api/folders/<fid>/delete: name mismatch` (WARNING), `Could not remove a directory of a deleted folder: <ExcType>` and
+`Skipped a malformed presentation id of a deleted folder` (WARNING, `library.store`).
 
 ## Exporting somewhere else
 

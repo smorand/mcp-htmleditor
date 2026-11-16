@@ -9,14 +9,15 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | Module | Holds |
 |---|---|
 | `__init__.py` | package docstring |
-| `pages.py` | `esc`, `sign_in_page`, `access_denied()`, `library_unavailable()`, `home_page(folders, is_admin=)`, `folder_page`, `admin_page(folders, activity)`, `folder_exists(name)`, `created_folder_line(name)`, every English text constant (DEC-055, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` and loads `/lib/library.js` (`defer`) |
+| `pages.py` | `esc`, `sign_in_page`, `access_denied()`, `library_unavailable()`, `home_page(folders, is_admin=)`, `folder_page`, `admin_page(folders, activity)` (with the `Delete folder` buttons and the `<dialog>`), `folder_exists(name)`,
+`created_folder_line(name)`, `deleted_folder_line(name)`, every English text constant (DEC-055, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` and loads `/lib/library.js` (`defer`) |
 | `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029), `check_folder_name` / `NameRefused`, `format_size` (DEC-031) |
 | `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route` (`is_json`), `Context` (`folder_id`, `role`, `payload` filled by the dispatcher), `Answer`, `json_answer`, `JSON_CONTENT_TYPE`, `SetCookie` (DEC-021) |
-| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library(database, clock)` (`folders_for`, `is_admin`, `role_in(email, folder_id or None)`, `folder_name`, `presentation_path`, `presentations_in`, `create_folder(name, actor)`, `activity()`, `record(connection, actor, text)`), `NameTaken`, `normalize_email`, `FolderView`, `PresentationView`, `ActivityLine` |
-| `routes_admin.py` | `GET /admin` (ADMINISTER, `administration`), `POST /api/folders` (ADMINISTER, JSON, `create_folder`) |
+| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library(database, clock, *, state_dir)` (`folders_for`, `is_admin`, `role_in(email, folder_id or None)`, `folder_name`, `presentation_path`, `presentations_in`, `create_folder(name, actor)`, `delete_folder(folder_id, confirm, actor)`, `activity()`, `record(connection, actor, text)`), `NameTaken`, `NameMismatch`, `FolderMissing`, `normalize_email`, `FolderView`, `PresentationView`, `ActivityLine` |
+| `routes_admin.py` | `GET /admin` (ADMINISTER, `administration`), `POST /api/folders` (ADMINISTER, JSON, `create_folder`), `POST /api/folders/<fid>/delete` (ADMINISTER, JSON, `delete_folder`) |
 | `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `purge`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
 | `routes_library.py` | `ROUTES`: `GET /lib/library.css`, `GET /lib/library.js` (PUBLIC, `static_file`, `STATIC_DIR`), `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN), `GET /f/(?P<fid>[0-9a-f]{32})` (VIEW, `folder`) |
-| `static/library.js` | every page: `time[datetime]` rewritten in the browser's zone, `pageshow` with `persisted` reloads (DEC-009, DEC-031) |
+| `static/library.js` | every page: `time[datetime]` rewritten in the browser's zone, `pageshow` with `persisted` reloads (DEC-009, DEC-031); administration: `sendJson` (fetch, reload on success, refusal into an alert), `Create folder`, the deletion `<dialog>` |
 | `server.py` | `load_routes`, `cookie_name`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_origin_ok`, `_send_answer`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
 
 A route handler is a plain function `(Context) -> Answer` (a `routes_*` module never imports `server.py`, which loads
@@ -97,59 +98,9 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
 - The credentials file is read once at `LibraryServer` construction: missing or unreadable is one ERROR line, a return
   address absent from `redirect_uris` one WARNING line; the server starts either way.
 
-## Home page and roles (US-0127, DEC-018, DEC-029, DEC-023)
+## Pages
 
-- The administrator is decided in `store.py` only: `Library.is_admin(email)` compares `normalize_email(email)`
-  (`strip().lower()`, nothing else: no dot removal, no `googlemail.com` rewriting) with `access.ADMIN_EMAIL`;
-  `role_in` returns `Role.ADMIN` before reading `members`, so a member row (even RO for the administrator) never
-  changes it (FR-NEW-014), and `members.role` is `CHECK (role IN ('RW','RO'))` (FR-NEW-012). Roles are read at every
-  request, so a role given later shows at the next page.
-- `folders_for(email)`: every folder with `Role.ADMIN` for the administrator, the member rows otherwise, sorted in
-  Python by `names.order_key(name)`: NFD, drop `Mn`, `lower()`, NFC, compared by code point (digits, Latin letters,
-  other alphabets), then the exact name (`Cafe` before `Café`). Never `casefold`: `ß` is not `ss`. O(n log n) per page.
-- `GET /`: `home_page(folders, is_admin=)`: `<nav><a href="/admin">Administration</a></nav>` for the administrator
-  only; rows `<li><a href="/f/<id>">name</a> <span>role label</span></li>` in a `ul.folders`; no folder: the
-  administrator gets `<p>You have no access to any folder yet.</p>` (200), anyone else `403` `Access denied.`
-  (FR-NEW-003).
-- Any path in no row: `Access denied.` for a signed in person, the sign in page for a visitor (`next` = the path).
-- `/lib/library.css` (`text/css`) and `/lib/library.js` (`application/javascript`) are the two public rows; a missing
-  file is `404 {"error": "Not found"}`; any other `/lib/...` is no row.
-  `static/library.css` uses logical properties only (RTL names) and `unicode-bidi: plaintext` on folder links.
-
-## Folder page (US-0129, DEC-020, DEC-023, DEC-031, DEC-052)
-
-- `GET /f/<fid>`: VIEW checked by the dispatcher; the handler `folder` reads `folder_name` (None: `Access denied.`,
-  the administrator's role does not prove the folder exists) then `presentations_in`. Unknown id, no role and a
-  malformed id (no row) give the same bytes, status and headers (only `Date` differs).
-- Page: `<nav><a href="/">All folders</a></nav><h1>name</h1>`, then `<ul class="presentations">` rows
-  `<li><span class="name">n</span> <time datetime="2026-11-12T16:40:59Z">12 Nov 2026 16:40</time> <span
-  class="size">1.1 KB</span></li>` or `<p>This folder has no presentations yet.</p>` (no list at all), then Sign out.
-  The `<time>` text is UTC, computed with `time.gmtime` (no wall clock read); `library.js` rewrites it from `Date`
-  getters, so the zone is the browser's (Playwright `timezone_id`).
-- Order: `-(math.floor(st_mtime) // 60)` (a time before 1970 rounds down), then `order_key(name)` (accents and case ignored, then the exact name), sorted in
-  Python. `format_size`: integer half up `(count * 20 + unit) // (2 * unit)` tenths (`round` is half even: 1 280 bytes
-  would read 1.2 KB).
-- Cost: `role_in` (primary key), `folder_name` (primary key), one `SELECT id, name FROM presentations WHERE folder_id`
-  (prefix of the `UNIQUE (folder_id, name_key)` index), one `stat` per row, O(n log n) sort. A row whose file is gone
-  is an `OSError`, a row whose id is malformed a `sqlite3.DatabaseError`: the whole page is the unavailable page.
-
-## Administration (US-0130, DEC-019, DEC-029, DEC-030)
-
-- `GET /admin`: `admin_page(folders_for(admin), activity())`: `All folders`, `<h1>Administration</h1>`, `<section
-  id="folders">` (rows as on the home page, `ul.folders`; the form `#create-folder` with `<label for="folder-name">`,
-  the input and `Create folder`; a hidden `p#create-folder-alert role="alert"` carrying `data-denied` and
-  `data-unavailable` so the JS fallbacks stay in `pages.py`), `<section id="activity">` (`ol.activity` rows `<li><time
-  datetime>..</time> <span class="actor">..</span> <span class="text">..</span></li>` or `No activity yet.`), Sign out.
-- `POST /api/folders {"name"}`: a name that is not a string is `Invalid request body`; `check_folder_name`
-  (`compose(raw.strip())`, 1 to 60 characters, each `L*`, `M*`, `Nd`, U+0020 or U+002D) else 400 with the name rule;
-  `create_folder` inserts the row and the line in one `BEGIN IMMEDIATE`; the `name_key` unique constraint
-  (`IntegrityError`) is `NameTaken`, 400 `A folder named "<trimmed composed name>" already exists.`; success `201
-  {"ok": true, "id"}`. `library.js` sends it with `fetch` (JSON), reloads on success, writes the error with
-  `textContent` into the alert (a non JSON answer: the alert's data text for 403, else the unavailable text).
-- Activity (migration 3): `activity(id AUTOINCREMENT, at, actor, text)`; `record` inserts (actor lower cased, `at` from
-  the clock) then `DELETE ... WHERE id <= MAX(id) - 500` in the caller's transaction; `activity()` is `ORDER BY id DESC
-  LIMIT 500`. Only successful actions call `record` (refusals, sign ins and saves never do). AUTOINCREMENT adds the
-  `sqlite_sequence` table. Cost per creation: one insert, one indexed delete; the page is O(folders log folders + 500).
+Home page, folder page, administration and folder deletion (US-0127, US-0129 to US-0131): `.agent_docs/library-pages.md`.
 
 ## Storage (DEC-025)
 
@@ -204,10 +155,13 @@ deck padded with an HTML comment to exactly `size` bytes, below the smallest dec
 `builder.numbered_folders(count, email=None, role="RW")` (`Folder 001`...), `LibraryReply.presentation_rows()`,
 `launch_chromium(playwright, *other_hosts)`, `person_context(chromium, running, session, zone=)`, `EVIL_HOST` and
 `RecordingListener.page` (a hostile HTML page served from loopback).
+US-0131: `StoredLibrary(library_dir, state_dir).entries()` (every path under both directories as `library/...` and
+`state/...`), `LibraryBuilder(database, clock, state_dir).records(presentation)` (two history versions, two requests, one
+AI suggestion through `HistoryStore`, `RequestService`; returns `<state_dir>/files/<key>`).
 US-0130: `Browser.post_json(path, payload, headers=None)` (default `page_post_headers()`: `Origin`, `Sec-Fetch-Site:
 same-origin`, JSON type), `LibraryReply.activity_lines()` (unescaped `(UTC ISO, actor, text)`).
 Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for the areas `visitor`, `auth`, `home`,
-`sessions`, `gate`, `folders`, `admin`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
+`sessions`, `gate`, `folders`, `admin`, `foldel`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
 
 ## Gotchas
 

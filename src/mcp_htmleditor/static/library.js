@@ -5,7 +5,10 @@
    is reloaded, so the server decides again and a signed out browser gets the sign in page.
    Administration (US-0130): the Create folder form is sent with fetch as JSON (the server refuses any other content
    type); success reloads the page, a refusal is written with textContent into the alert next to the field (the
-   JSON "error", else the alert's own text for a page answer: data-denied for 403, data-unavailable otherwise). */
+   JSON "error", else the alert's own text for a page answer: data-denied for 403, data-unavailable otherwise).
+   Delete folder (US-0131): each row's button opens the one <dialog> (modal, focus in its field); Cancel or Escape
+   closes it without a request and focus returns to that button; Delete folder sends {"confirm": typed text} for the
+   button's folder id, reloads on success, writes a refusal into the dialog's alert as above. */
 (function () {
   "use strict";
 
@@ -42,14 +45,12 @@
     });
   }
 
-  function createFolder(event) {
-    var alert = document.getElementById("create-folder-alert");
-    event.preventDefault();
-    fetch("/api/folders", {
+  function sendJson(path, payload, alert) {
+    fetch(path, {
       method: "POST",
       credentials: "same-origin",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({name: document.getElementById("folder-name").value})
+      body: JSON.stringify(payload)
     }).then(function (response) {
       if (response.ok) {
         window.location.reload();
@@ -63,11 +64,50 @@
     });
   }
 
+  function createFolder(event) {
+    event.preventDefault();
+    sendJson("/api/folders", {name: document.getElementById("folder-name").value},
+      document.getElementById("create-folder-alert"));
+  }
+
+  function bindFolderDeletion() {
+    var dialog = document.getElementById("delete-folder");
+    var field = document.getElementById("delete-folder-name");
+    var alert = document.getElementById("delete-folder-alert");
+    var opener = null;
+    if (!dialog) {
+      return;
+    }
+    document.querySelectorAll("button.delete-folder").forEach(function (button) {
+      button.addEventListener("click", function () {
+        opener = button;
+        field.value = "";
+        alert.textContent = "";
+        alert.hidden = true;
+        dialog.showModal();
+        field.focus();
+      });
+    });
+    document.getElementById("delete-folder-cancel").addEventListener("click", function () {
+      dialog.close();
+    });
+    dialog.addEventListener("close", function () {
+      if (opener) {
+        opener.focus();
+      }
+    });
+    document.getElementById("delete-folder-form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      sendJson("/api/folders/" + opener.dataset.folderId + "/delete", {confirm: field.value}, alert);
+    });
+  }
+
   function bindAdministration() {
     var form = document.getElementById("create-folder");
     if (form) {
       form.addEventListener("submit", createFolder);
     }
+    bindFolderDeletion();
   }
 
   document.addEventListener("DOMContentLoaded", localizeTimes);

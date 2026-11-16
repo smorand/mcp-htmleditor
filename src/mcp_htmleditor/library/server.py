@@ -318,7 +318,7 @@ class LibraryServer(_EditorServer):
         self._thread: threading.Thread | None = None
         self.routes = ROUTES
         self.database = Database(settings.library_dir / DATABASE_NAME)
-        self.library = Library(self.database, clock)
+        self.library = Library(self.database, clock, state_dir=settings.state_dir)
         google = GoogleClient(settings.google_credentials_file, settings.library_origin + CALLBACK_PATH)
         self.accounts = Accounts(self.database, google, clock)
         super().__init__(settings.host, settings.port, LibraryHandler)

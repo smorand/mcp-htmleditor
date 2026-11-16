@@ -24,6 +24,10 @@ cookie in a fixed time zone.
 Administration (US-0130): ``Browser.post_json`` sends what ``library.js`` sends (``Origin``, ``Sec-Fetch-Site:
 same-origin``, ``Content-Type: application/json``), or the headers a test gives instead;
 ``LibraryReply.activity_lines()`` reads the activity rows of the administration page.
+
+Folder deletion (US-0131): ``StoredLibrary.entries()`` walks ``library_dir`` and ``state_dir``;
+``LibraryBuilder.records(presentation)`` gives a presentation history versions, requests and AI suggestions and
+returns its state directory ``<state_dir>/files/<key>``.
 """
 
 from __future__ import annotations
@@ -55,9 +59,12 @@ from playwright.sync_api import Browser as Chromium
 from playwright.sync_api import BrowserContext, Playwright
 
 from mcp_htmleditor.config import Settings
+from mcp_htmleditor.history import HistoryStore
 from mcp_htmleditor.library.names import name_key
 from mcp_htmleditor.library.server import LibraryServer
 from mcp_htmleditor.library.store import Database, Library
+from mcp_htmleditor.request_service import RequestService
+from mcp_htmleditor.request_store import RequestStore
 
 LIBRARY_HOST = "slides.test"
 CONTENT_HOST = "slides-content.test"
@@ -420,9 +427,20 @@ class RecordingListener(ThreadingHTTPServer):
 
 @dataclass(frozen=True)
 class StoredLibrary:
-    """The operator view: tables of ``library.db`` read directly, never through the product."""
+    """The operator view: tables of ``library.db`` read directly, never through the product; ``entries()`` walks
+    the library and state directories."""
 
     library_dir: Path
+    state_dir: Path
+
+    def entries(self) -> list[str]:
+        """Every file and directory under ``library_dir`` and ``state_dir``, as ``library/<relative path>`` and
+        ``state/<relative path>`` (POSIX separators), sorted."""
+        return sorted(
+            f"{label}/{entry.relative_to(root).as_posix()}"
+            for label, root in (("library", self.library_dir), ("state", self.state_dir))
+            for entry in root.rglob("*")
+        )
 
     def rows(self, sql: str) -> list[tuple[Any, ...]]:
         with closing(sqlite3.connect(self.library_dir / "library.db")) as connection:
@@ -462,6 +480,7 @@ class LibraryBuilder:
 
     database: Database
     clock: Callable[[], float]
+    state_dir: Path
 
     def folder(self, name: str) -> str:
         folder_id = secrets.token_hex(16)
@@ -503,7 +522,9 @@ class LibraryBuilder:
     ) -> Presentation:
         """A deck of ``slides`` slides padded to exactly ``size`` bytes, modified at ``modified``, and its row."""
         presentation_id = secrets.token_hex(16)
-        path = Library(self.database, self.clock).presentation_path(folder_id, presentation_id)
+        path = Library(self.database, self.clock, state_dir=self.state_dir).presentation_path(
+            folder_id, presentation_id
+        )
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(deck_bytes(title if title is not None else name, slides, size))
         os.utime(path, (modified.timestamp(), modified.timestamp()))
@@ -513,6 +534,22 @@ class LibraryBuilder:
                 (presentation_id, folder_id, name, name_key(name), self.clock()),
             )
         return Presentation(presentation_id, folder_id, name, path)
+
+    def records(self, presentation: Presentation) -> Path:
+        """Two history versions, two queued requests and one AI suggestion for ``presentation``, through the
+        editor's own stores; returns their directory ``<state_dir>/files/<key>``."""
+        history = HistoryStore(self.state_dir, self.clock)
+        for reason in ("browser-save", "replace"):
+            history.stage(presentation.path, presentation.path.read_bytes(), reason)
+        store = RequestStore(self.state_dir)
+        service = RequestService(store)
+        service.queue(presentation.path, f"Shorten the title of {presentation.name}", None)
+        service.queue(presentation.path, "Add a summary slide", None)
+        service.write_review(
+            presentation.path,
+            [{"id": "s1", "slide": None, "title": "Fewer words", "why": "Dense", "change": "Cut the second line"}],
+        )
+        return store.record_dir(presentation.path).parent
 
     def standard_presentations(self, ids: dict[str, str]) -> dict[str, Presentation]:
         """The five presentations of the standard library in the folders of ``ids``; returns name to presentation."""
@@ -559,11 +596,11 @@ class RunningLibrary:
 
     @property
     def stored(self) -> StoredLibrary:
-        return StoredLibrary(self.library_dir)
+        return StoredLibrary(self.library_dir, self.state_dir)
 
     @property
     def builder(self) -> LibraryBuilder:
-        return LibraryBuilder(self.database, self.clock)
+        return LibraryBuilder(self.database, self.clock, self.state_dir)
 
     def client(self, host: str | None = None) -> HttpClient:
         """A client whose requests carry ``Host: host`` (default the library origin's host and port)."""

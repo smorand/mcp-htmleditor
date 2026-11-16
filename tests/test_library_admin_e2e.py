@@ -30,12 +30,14 @@ CYRILLIC = "\u041a\u0430\u0440\u0434\u0438\u043e\u043b\u043e\u0433\u0438\u044f 2
 ARABIC = "\u0623\u0645\u0631\u0627\u0636 \u0627\u0644\u0631\u0626\u0629"
 CHINESE = "\u5fc3\u81d3\u75c5\u5b66"
 FOLDER_NAMES_SCRIPT = "() => [...document.querySelectorAll('ul.folders a')].map(link => link.textContent)"
-# The box of the folder link named ``name`` against the page and every other control (DEC-053: a, button, input).
+# The box of the folder link named ``name`` against the page and every other control (DEC-053: a, button, input),
+# the controls of a closed deletion prompt (US-0131) aside.
 LAYOUT_SCRIPT = """name => {
   const link = [...document.querySelectorAll('ul.folders a')].find(element => element.textContent === name);
   const box = link.getBoundingClientRect();
   const width = document.documentElement.clientWidth;
-  const controls = [...document.querySelectorAll('a, button, input')].filter(element => element !== link);
+  const controls = [...document.querySelectorAll('a, button, input')]
+    .filter(element => element !== link && !element.closest('dialog:not([open])'));
   const overlapping = controls.filter(element => {
     const other = element.getBoundingClientRect();
     return !(other.right <= box.left || other.left >= box.right || other.bottom <= box.top || other.top >= box.bottom);
@@ -85,7 +87,7 @@ def admin_page(
 
 def create_folder(page: Page, name: str) -> None:
     """Type ``name`` in ``Folder name`` and press ``Create folder``; the page reloads on success."""
-    page.get_by_label("Folder name").fill(name)
+    page.get_by_label("Folder name", exact=True).fill(name)
     with page.expect_navigation():
         page.get_by_role("button", name="Create folder").click()
 
@@ -148,10 +150,10 @@ def test_a_refused_name_is_written_in_the_alert_and_nothing_is_created(
     page = admin_page(running, fake_google, chromium)
     alert = page.locator("#create-folder-alert")
 
-    page.get_by_label("Folder name").fill("R&D")
+    page.get_by_label("Folder name", exact=True).fill("R&D")
     page.get_by_role("button", name="Create folder").click()
     wait_until(page, alert.text_content, lambda text: text == NAME_REFUSED, what="the name rule in the alert")
-    page.get_by_label("Folder name").fill("cardiology 2027")
+    page.get_by_label("Folder name", exact=True).fill("cardiology 2027")
     page.get_by_role("button", name="Create folder").click()
     wait_until(
         page,
