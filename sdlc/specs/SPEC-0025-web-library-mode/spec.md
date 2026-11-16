@@ -4,7 +4,7 @@
 > Nature: FEAT
 > Depth: L
 > Depth evidence: FEAT / depth L: 9 bounded contexts (sign in and sessions, access control, library, upload and removal, administration, activity, presentation editing, local mode, deployment address), 3 new persisted concepts (folders with member roles, the activity list, sessions) and 74 requirements. Override with --depth.
-> Status: specified
+> Status: designed
 > Generated on: 16 November 2026
 > Project: existing
 > From backlog: BL-0049

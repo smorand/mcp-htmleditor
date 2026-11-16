@@ -123,3 +123,29 @@
 | US-0121 | SPEC-0023 | serve files next to the open deck | US-0117 | 1 | done | feat/breathe-template | US-0120 |
 | US-0122 | SPEC-0023 | breathe skill topic, docs and evidence | US-0120, US-0121 | 1 | done | feat/breathe-template | US-0121 |
 | US-0123 | SPEC-0023 | breathe converge gaps | US-0122 | 1 | done | feat/breathe-template | US-0122 |
+| US-0124 | SPEC-0025 | webserve starts, accepts only its two host names, answers /health | main | 1 | todo | feat/0049-web-library-mode | |
+| US-0125 | SPEC-0025 | A visitor sees only the sign in page | US-0124 | 2 | todo | feat/0049-web-library-mode | |
+| US-0126 | SPEC-0025 | Sign in with a Google account, stay signed in, sign out | US-0125 | 1 | todo | feat/0049-web-library-mode | |
+| US-0127 | SPEC-0025 | The home page: Admin role, order, empty states, uniform refusal | US-0126 | 1 | todo | feat/0049-web-library-mode | |
+| US-0128 | SPEC-0025 | Exact 30 day sessions, restarts, unavailable library, 200 folders | US-0127 | 1 | todo | feat/0049-web-library-mode | |
+| US-0129 | SPEC-0025 | The folder page lists presentations | US-0127 | 1 | todo | feat/0049-web-library-mode | |
+| US-0130 | SPEC-0025 | Administration: create folders and read the activity list | US-0127, US-0129 | 1 | todo | feat/0049-web-library-mode | |
+| US-0131 | SPEC-0025 | Administration: delete a folder after retyping its name | US-0130 | 1 | todo | feat/0049-web-library-mode | |
+| US-0132 | SPEC-0025 | Administration: members and roles of a folder | US-0130 | 1 | todo | feat/0049-web-library-mode | |
+| US-0133 | SPEC-0025 | Open a presentation: ticket, grant, deck frame, status, HTML download | US-0129, US-0131 | 1 | todo | feat/0049-web-library-mode | |
+| US-0134 | SPEC-0025 | The editor shell opens on the content origin | US-0133 | 2 | todo | feat/0049-web-library-mode | |
+| US-0135 | SPEC-0025 | Read only editor, presenter window, full screen, hostile script isolation | US-0134, US-0132 | 2 | todo | feat/0049-web-library-mode | |
+| US-0136 | SPEC-0025 | Edit a presentation and store changes by themselves | US-0135 | 1 | todo | feat/0049-web-library-mode | |
+| US-0137 | SPEC-0025 | The editor when the session or the right ends | US-0136 | 2 | todo | feat/0049-web-library-mode | |
+| US-0138 | SPEC-0025 | Requests, Ask AI and arch layout work for editors and are refused to read only people | US-0136 | 2 | todo | feat/0049-web-library-mode | |
+| US-0139 | SPEC-0025 | The PPTX exporter can be confined to pictures held in the presentation | main | 2 | todo | feat/0049-web-library-mode | |
+| US-0140 | SPEC-0025 | Download the presentation as PPTX without running its scripts | US-0137, US-0138, US-0139 | 2 | todo | feat/0049-web-library-mode | |
+| US-0141 | SPEC-0025 | Upload a valid presentation into a folder | US-0137 | 1 | todo | feat/0049-web-library-mode | |
+| US-0142 | SPEC-0025 | Upload file names: allow list, composed form, hostile names | US-0141 | 2 | todo | feat/0049-web-library-mode | |
+| US-0143 | SPEC-0025 | Upload limits, progress, interruption and storage failure | US-0142 | 1 | todo | feat/0049-web-library-mode | |
+| US-0144 | SPEC-0025 | Replace an existing presentation after a collision question | US-0143, US-0138 | 1 | todo | feat/0049-web-library-mode | |
+| US-0145 | SPEC-0025 | Delete a presentation for good | US-0144, US-0138, US-0140 | 1 | todo | feat/0049-web-library-mode | |
+| US-0146 | SPEC-0025 | Create the initial content on the first start | US-0145 | 1 | todo | feat/0049-web-library-mode | |
+| US-0147 | SPEC-0025 | The operator can list the stored library and find a file's history | US-0146 | 2 | todo | feat/0049-web-library-mode | |
+| US-0148 | SPEC-0025 | Deployment files and the VPS runbook | US-0147, US-0146 | 1 | todo | feat/0049-web-library-mode | |
+| US-0149 | SPEC-0025 | Closing journeys, documentation audit and acceptance of the whole spec | US-0148 | 1 | todo | feat/0049-web-library-mode | |
