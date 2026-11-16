@@ -14,7 +14,12 @@ SIGN_IN_LABEL: Final = "Sign in with Google"
 ACCESS_DENIED_TEXT: Final = "Access denied."
 SIGN_OUT_LABEL: Final = "Sign out"
 SIGN_IN_UNAVAILABLE: Final = "Sign-in is unavailable. Try again later."
-ROLE_LABELS: Final = {"RW": "Read and write", "RO": "Read only"}
+ADMIN_LABEL: Final = "Admin"
+ADMINISTRATION_LABEL: Final = "Administration"
+NO_FOLDER_YET: Final = "You have no access to any folder yet."
+ROLE_LABELS: Final = {"Admin": ADMIN_LABEL, "RW": "Read and write", "RO": "Read only"}  # keyed by ``Role`` value
+ADMINISTRATION_PATH: Final = "/admin"
+STYLESHEET_PATH: Final = "/lib/library.css"
 SIGN_IN_START_PATH: Final = "/auth/start"
 SIGN_OUT_PATH: Final = "/auth/logout"
 HTML_CONTENT_TYPE: Final = "text/html; charset=utf-8"
@@ -39,13 +44,16 @@ def access_denied() -> bytes:
     return _page(f"<p>{esc(ACCESS_DENIED_TEXT)}</p>{_sign_out_form()}")
 
 
-def home_page(folders: Sequence[FolderView]) -> bytes:
-    """The person's folders, each a link by id with the person's role, and the ``Sign out`` form."""
+def home_page(folders: Sequence[FolderView], *, is_admin: bool) -> bytes:
+    """The folders in the given order, each a link by id with the person's role; ``Administration`` for the
+    administrator; ``You have no access to any folder yet.`` when there is none; the ``Sign out`` form."""
+    administration = f'<nav><a href="{ADMINISTRATION_PATH}">{esc(ADMINISTRATION_LABEL)}</a></nav>' if is_admin else ""
     rows = "".join(
         f'<li><a href="/f/{esc(folder.id)}">{esc(folder.name)}</a> <span>{esc(ROLE_LABELS[folder.role])}</span></li>'
         for folder in folders
     )
-    return _page(f"<h1>{esc(PRODUCT_NAME)}</h1><ul>{rows}</ul>{_sign_out_form()}")
+    listing = f'<ul class="folders">{rows}</ul>' if rows else f"<p>{esc(NO_FOLDER_YET)}</p>"
+    return _page(f"<h1>{esc(PRODUCT_NAME)}</h1>{administration}{listing}{_sign_out_form()}")
 
 
 def _sign_out_form() -> str:
@@ -55,6 +63,7 @@ def _sign_out_form() -> str:
 def _page(body: str) -> bytes:
     title = esc(PRODUCT_NAME)
     return (
-        f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>{title}</title></head>'
+        f'<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>{title}</title>'
+        f'<link rel="stylesheet" href="{STYLESHEET_PATH}"></head>'
         f"<body>{body}</body></html>"
     ).encode()

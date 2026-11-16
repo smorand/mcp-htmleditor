@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from .access import Role
+from .access import ADMIN_EMAIL, Role
+from .names import order_key
 
 DIRECTORY_MODE: Final = 0o700
 FILE_MODE: Final = 0o600
@@ -106,20 +107,45 @@ class Database:
 
 
 class Library:
-    """Folders and members; roles are read from ``members`` on every call, never cached (DEC-018)."""
+    """Folders and members; roles are read from ``members`` on every call, never cached (DEC-018).
+
+    The administrator is decided here and nowhere else: ``is_admin`` compares the normalized address with
+    ``ADMIN_EMAIL``, and ``role_in`` and ``folders_for`` ask it before any member row (FR-NEW-011, FR-NEW-014).
+    """
 
     def __init__(self, database: Database) -> None:
         self._database = database
 
     def folders_for(self, email: str) -> list[FolderView]:
-        """The folders where ``email`` (lower case) holds a role, by name (the order rule arrives in US-0127)."""
-        rows = (
-            self._database.connection()
-            .execute(
+        """The folders ``email`` can open with its role, in ``order_key`` order: every folder (Admin) for the
+        administrator, the member rows for anyone else."""
+        if self.is_admin(email):
+            rows = self._database.connection().execute("SELECT id, name, ? FROM folders", (Role.ADMIN.value,))
+        else:
+            rows = self._database.connection().execute(
                 "SELECT folders.id, folders.name, members.role FROM members JOIN folders ON folders.id ="
-                " members.folder_id WHERE members.email = ? ORDER BY folders.name",
-                (email,),
+                " members.folder_id WHERE members.email = ?",
+                (normalize_email(email),),
             )
-            .fetchall()
+        views = [FolderView(id=row[0], name=row[1], role=Role(row[2])) for row in rows.fetchall()]
+        return sorted(views, key=lambda view: order_key(view.name))
+
+    def is_admin(self, email: str) -> bool:
+        """True for the administrator's address in any letter case; a look alike address is another address."""
+        return normalize_email(email) == ADMIN_EMAIL
+
+    def role_in(self, email: str, folder_id: str) -> Role | None:
+        """Admin first whatever the member rows hold, else the member row of that folder, else None."""
+        if self.is_admin(email):
+            return Role.ADMIN
+        row = (
+            self._database.connection()
+            .execute("SELECT role FROM members WHERE folder_id = ? AND email = ?", (folder_id, normalize_email(email)))
+            .fetchone()
         )
-        return [FolderView(id=row[0], name=row[1], role=Role(row[2])) for row in rows]
+        return Role(row[0]) if row is not None else None
+
+
+def normalize_email(email: str) -> str:
+    """The stored form of an address: trimmed and lower cased, nothing else (no dot removal, no domain rewriting)."""
+    return email.strip().lower()

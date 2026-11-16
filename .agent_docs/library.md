@@ -9,11 +9,12 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | Module | Holds |
 |---|---|
 | `__init__.py` | package docstring |
-| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, `home_page(folders)`, every English text constant (DEC-055: `SIGN_IN_UNAVAILABLE`, `ROLE_LABELS`) |
+| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, `home_page(folders, is_admin=)`, every English text constant (DEC-055: `SIGN_IN_UNAVAILABLE`, `ADMIN_LABEL`, `ADMINISTRATION_LABEL`, `NO_FOLDER_YET`, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` |
+| `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029) |
 | `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route`, `Context`, `Answer`, `SetCookie` (DEC-021) |
-| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()` seam, `MIGRATIONS`), `Library` (`folders_for(email)`), `FolderView` |
+| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()` seam, `MIGRATIONS`), `Library` (`folders_for(email)`, `is_admin(email)`, `role_in(email, folder_id)`), `normalize_email`, `FolderView` |
 | `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
-| `routes_library.py` | `ROUTES`: `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN) |
+| `routes_library.py` | `ROUTES`: `GET /lib/library.css`, `GET /lib/library.js` (PUBLIC, `static_file`, `STATIC_DIR`), `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN) |
 | `server.py` | `load_routes`, `cookie_name`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_origin_ok`, `_send_answer`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
 
 A route handler is a plain function `(Context) -> Answer` (not a `LibraryHandler` method, so a `routes_*` module never
@@ -70,12 +71,30 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
   (`sha256(token)`, lower case email, `created_at`, `expires_at = created_at + 2592000`, never updated), cookie `lib`
   (`Max-Age=2592000`), `303` to the stored destination.
 - `POST /auth/logout`: deletes the row, clears `lib` and `lib-b` (`Max-Age=0`), `303 /`. Other browsers stay signed in.
-- `GET /`: `Library.folders_for(email)` (members rows only, ordered by name); none: `403` `Access denied.` page. Roles
-  are read at every request, so a role given later shows at the next page.
+- `GET /`: see Home page and roles below.
 - Cookies: `cookie_name` gives `lib`/`lib-b` on http, `__Host-lib`/`__Host-lib-b` on https; attributes
   `Path=/; HttpOnly; SameSite=Lax`, `Max-Age` for `lib` only, `Secure` on https.
 - The credentials file is read once at `LibraryServer` construction: missing or unreadable is one ERROR line, a return
   address absent from `redirect_uris` one WARNING line; the server starts either way.
+
+## Home page and roles (US-0127, DEC-018, DEC-029, DEC-023)
+
+- The administrator is decided in `store.py` only: `Library.is_admin(email)` compares `normalize_email(email)`
+  (`strip().lower()`, nothing else: no dot removal, no `googlemail.com` rewriting) with `access.ADMIN_EMAIL`;
+  `role_in` returns `Role.ADMIN` before reading `members`, so a member row (even RO for the administrator) never
+  changes it (FR-NEW-014), and `members.role` is `CHECK (role IN ('RW','RO'))` (FR-NEW-012). Roles are read at every
+  request, so a role given later shows at the next page.
+- `folders_for(email)`: every folder with `Role.ADMIN` for the administrator, the member rows otherwise, sorted in
+  Python by `names.order_key(name)`: NFD, drop `Mn`, `lower()`, NFC, compared by code point (digits, Latin letters,
+  other alphabets), then the exact name (`Cafe` before `Café`). Never `casefold`: `ß` is not `ss`. O(n log n) per page.
+- `GET /`: `home_page(folders, is_admin=)`: `<nav><a href="/admin">Administration</a></nav>` for the administrator
+  only; rows `<li><a href="/f/<id>">name</a> <span>role label</span></li>` in a `ul.folders`; no folder: the
+  administrator gets `<p>You have no access to any folder yet.</p>` (200), anyone else `403` `Access denied.`
+  (FR-NEW-003). `/admin` has no row yet (US-0130): it is `Access denied.` even for the administrator until then.
+- Any path in no row: `Access denied.` for a signed in person, the sign in page for a visitor (`next` = the path).
+- `/lib/library.css` (`text/css`) and `/lib/library.js` (`application/javascript`) are the two public rows; a missing
+  file is `404 {"error": "Not found"}` (`library.js` arrives in US-0129); any other `/lib/...` is no row.
+  `static/library.css` uses logical properties only (RTL names) and `unicode-bidi: plaintext` on folder links.
 
 ## Database (DEC-025)
 
@@ -114,11 +133,14 @@ Sign in support (US-0126): `start(google=fake, google_registered=True)` writes a
 `FakeGoogle` (fixture `fake_google`: `choose(email)`, `cancel()`, `accounts[email]` claim overrides,
 `registered_redirects` = the console, `exchange_failure` `close`/`unavailable`/`bad_json`, `received`);
 `running.browser(resolver)` is a `Browser` (cookies, redirects across hosts, `visited`, `replies`, `sign_in`,
-`sign_out` with `Origin`); `running.builder` (`folder`, `member`, `standard()`) and `running.stored` (`sessions`,
+`sign_out` with `Origin`); `LibraryReply.folder_rows()` (id, escaped name, role label of each home row);
+`running.builder` (`folder` with `names.name_key`, `folders(*names)`, `member`, `standard()`) and `running.stored` (`sessions`,
 `logins`, `folder_names`, `activity`, `rows`); fixture `evil_listener` counts visits to evil.example.
 `tests/test_library_visitor_http.py`: E2E-004, 134 (library side), 145, route table, `esc`, `authorize`, `safe_destination`.
 `tests/test_library_auth_http.py`: E2E-003, 005, 007, 090, 150, 171, 172, 183, 184, SEC-015, 016, 019, sign out,
 cookies, claims, PKCE, database.
+`tests/test_library_home_http.py`: E2E-014, 018, 087, 149, 165, `role_in`, empty home, escaping, `/lib/*`.
+`tests/test_library_names.py`: `order_key`, `name_key`, 100 random names.
 `tests/test_library_gate_http.py`: E2E-135, 136, 146, 147, 186, headers, settings, CLI refusal, a real `webserve`
 child stopped by SIGTERM.
 

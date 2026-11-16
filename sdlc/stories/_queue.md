@@ -126,7 +126,7 @@
 | US-0124 | SPEC-0025 | webserve starts, accepts only its two host names, answers /health | main | 1 | done | feat/0049-web-library-mode | main |
 | US-0125 | SPEC-0025 | A visitor sees only the sign in page | US-0124 | 2 | done | feat/0049-web-library-mode | US-0124 |
 | US-0126 | SPEC-0025 | Sign in with a Google account, stay signed in, sign out | US-0125 | 1 | done | feat/0049-web-library-mode | US-0125 |
-| US-0127 | SPEC-0025 | The home page: Admin role, order, empty states, uniform refusal | US-0126 | 1 | todo | feat/0049-web-library-mode | |
+| US-0127 | SPEC-0025 | The home page: Admin role, order, empty states, uniform refusal | US-0126 | 1 | done | feat/0049-web-library-mode | US-0126 |
 | US-0128 | SPEC-0025 | Exact 30 day sessions, restarts, unavailable library, 200 folders | US-0127 | 1 | todo | feat/0049-web-library-mode | |
 | US-0129 | SPEC-0025 | The folder page lists presentations | US-0127 | 1 | todo | feat/0049-web-library-mode | |
 | US-0130 | SPEC-0025 | Administration: create folders and read the activity list | US-0127, US-0129 | 1 | todo | feat/0049-web-library-mode | |

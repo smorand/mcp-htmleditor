@@ -438,7 +438,11 @@ address required). `HTMLEDITOR_GOOGLE_CREDENTIALS_FILE` names the OAuth client f
 authorized redirect address in that console first. Without the file, or with the address missing, the server still
 starts, logs an error or a warning, and every sign in shows `Sign-in is unavailable. Try again later.` A session lasts
 30 days from the sign in; `Sign out` ends it in that browser only. The home page lists the folders where the account
-holds a role; an account with none sees `Access denied.`
+holds a role (`Read and write` or `Read only`), ordered without regard to case or accents (digits, then Latin letters,
+then other alphabets); an account with none sees `Access denied.`, and so does a signed in person at any address that
+names no page. seb.morand@gmail.com, in any letter case, is the administrator: every folder labelled `Admin`, the
+`Administration` entry, and `You have no access to any folder yet.` when no folder exists. `/lib/library.css` and
+`/lib/library.js` are the only files served without a session.
 
 ## Templates
 
@@ -653,8 +657,10 @@ src/mcp_htmleditor/
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
 ├── library/signin.py  Google sign in (GoogleClient, claims), login attempts and sessions (Accounts)
-├── library/store.py   library.db: Database (migrations), Library repository
-├── library/routes_library.py  /auth/start, /auth/callback, /auth/logout, home page
+├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin)
+├── library/names.py   compose, name_key, order_key (folder order)
+├── library/pages.py   every page and English text of the library mode, esc()
+├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

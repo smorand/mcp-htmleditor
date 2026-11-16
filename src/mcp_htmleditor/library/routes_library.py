@@ -1,9 +1,12 @@
-"""Library origin routes: sign in, sign out, home page (SPEC-0025, DEC-012 to DEC-017, DEC-021)."""
+"""Library origin routes: public files, sign in, sign out, home page (SPEC-0025, DEC-011 to DEC-017, DEC-021)."""
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+from collections.abc import Callable
+from pathlib import Path
 from typing import Final
 
 from . import pages
@@ -13,6 +16,22 @@ from .signin import BROWSER_COOKIE, SESSION_COOKIE, SESSION_SECONDS, SignInUnava
 logger = logging.getLogger(__name__)
 
 CONSENT_CANCELLED: Final = "access_denied"
+STATIC_DIR: Final = Path(__file__).resolve().parent.parent / "static"
+NOT_FOUND_BODY: Final = json.dumps({"error": "Not found"}).encode()
+JSON_CONTENT_TYPE: Final = "application/json"
+
+
+def static_file(name: str, media_type: str) -> Callable[[Context], Answer]:
+    """The handler of one public file of ``static/`` (DEC-011); ``404`` JSON while the file is not shipped."""
+
+    def serve(_context: Context) -> Answer:
+        path = STATIC_DIR / name
+        if not path.is_file():
+            logger.warning("Refused GET /lib/%s: not served", name)
+            return Answer(404, NOT_FOUND_BODY, content_type=JSON_CONTENT_TYPE)
+        return Answer(200, path.read_bytes(), content_type=media_type)
+
+    return serve
 
 
 def sign_in_start(context: Context) -> Answer:
@@ -51,14 +70,27 @@ def sign_out(context: Context) -> Answer:
 
 
 def home(context: Context) -> Answer:
-    """The person's folders; an account with no role anywhere gets the ``Access denied.`` page."""
-    folders = context.library.folders_for(context.person_email) if context.person_email else []
-    if not folders:
+    """The person's folders (every folder for the administrator, who also gets ``Administration``); an account
+    with no role anywhere gets the ``Access denied.`` page (FR-NEW-003, FR-NEW-016)."""
+    email = context.person_email or ""
+    is_admin = context.library.is_admin(email)
+    folders = context.library.folders_for(email)
+    if not folders and not is_admin:
         return Answer(403, pages.access_denied())
-    return Answer(200, pages.home_page(folders))
+    return Answer(200, pages.home_page(folders, is_admin=is_admin))
 
 
 ROUTES: tuple[Route, ...] = (
+    Route(
+        "library", "GET", re.compile(r"/lib/library\.css"), Permission.PUBLIC, static_file("library.css", "text/css")
+    ),
+    Route(
+        "library",
+        "GET",
+        re.compile(r"/lib/library\.js"),
+        Permission.PUBLIC,
+        static_file("library.js", "application/javascript"),
+    ),
     Route("library", "GET", re.compile(r"/auth/start"), Permission.PUBLIC, sign_in_start),
     Route("library", "GET", re.compile(r"/auth/callback"), Permission.PUBLIC, sign_in_callback),
     Route("library", "POST", re.compile(r"/auth/logout"), Permission.SIGNED_IN, sign_out),

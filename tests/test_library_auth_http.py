@@ -93,7 +93,7 @@ def assert_home_lists(reply: LibraryReply, *names: str) -> None:
 
 def folder_rows(reply: LibraryReply) -> list[tuple[str, str, str]]:
     """``(folder id, name as written, role label)`` of each row of the home page."""
-    return re.findall(r'<li><a href="/f/([0-9a-f]{32})">([^<]*)</a> <span>([^<]*)</span></li>', reply.text)
+    return reply.folder_rows()
 
 
 def sign_in_link(reply: LibraryReply) -> str:

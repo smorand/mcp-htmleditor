@@ -18,6 +18,7 @@ import base64
 import hashlib
 import http.client
 import json
+import re
 import secrets
 import socket
 import sqlite3
@@ -34,6 +35,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 import pytest
 
 from mcp_htmleditor.config import Settings
+from mcp_htmleditor.library.names import name_key
 from mcp_htmleditor.library.server import LibraryServer
 from mcp_htmleditor.library.store import Database
 
@@ -53,6 +55,7 @@ DAN = "dan.rw@example.org"
 CAROL = "carol.ro@example.org"
 BOB = "bob.nobody@gmail.com"
 ADMIN = "seb.morand@gmail.com"
+FOLDER_ROW = re.compile(r'<li><a href="/f/([0-9a-f]{32})">([^<]*)</a> <span>([^<]*)</span></li>')
 
 
 @dataclass
@@ -80,6 +83,10 @@ class LibraryReply:
     @property
     def text(self) -> str:
         return self.body.decode("utf-8", "replace")
+
+    def folder_rows(self) -> list[tuple[str, str, str]]:
+        """``(folder id, name as written in the HTML, role label)`` of each row of a home page, in page order."""
+        return FOLDER_ROW.findall(self.text)
 
     def json(self) -> Any:
         return json.loads(self.body)
@@ -383,9 +390,13 @@ class LibraryBuilder:
         with self.database.transaction(immediate=True) as connection:
             connection.execute(
                 "INSERT INTO folders(id, name, name_key, created_at) VALUES (?, ?, ?, ?)",
-                (folder_id, name, name.lower(), self.clock()),
+                (folder_id, name, name_key(name), self.clock()),
             )
         return folder_id
+
+    def folders(self, *names: str) -> dict[str, str]:
+        """One folder per name, written in the given order; returns name to id."""
+        return {name: self.folder(name) for name in names}
 
     def member(self, folder_id: str, email: str, role: str) -> None:
         with self.database.transaction(immediate=True) as connection:

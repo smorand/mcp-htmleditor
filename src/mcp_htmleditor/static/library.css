@@ -1,0 +1,70 @@
+/* Web library pages (SPEC-0025): plain and readable. Names may be written right to left: only logical
+   properties (inline, block) are used, never a fixed left or right, and each name keeps its own direction. */
+
+:root {
+  color-scheme: light dark;
+  --library-accent: #0f62fe;
+  --library-muted: #6f6f6f;
+  --library-line: #c6c6c6;
+}
+
+body {
+  margin: 0 auto;
+  max-inline-size: 48rem;
+  padding: 2rem 1.25rem;
+  font: 1rem/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+h1 {
+  margin-block: 0 1.5rem;
+  font-size: 1.75rem;
+}
+
+nav {
+  margin-block-end: 1rem;
+}
+
+a {
+  color: var(--library-accent);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--library-accent);
+  outline-offset: 2px;
+}
+
+ul.folders {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+ul.folders li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  justify-content: space-between;
+  padding-block: 0.6rem;
+  border-block-end: 1px solid var(--library-line);
+}
+
+ul.folders a {
+  unicode-bidi: plaintext;
+  overflow-wrap: anywhere;
+}
+
+ul.folders span {
+  color: var(--library-muted);
+}
+
+p[role="alert"] {
+  padding: 0.75rem 1rem;
+  border-inline-start: 4px solid #da1e28;
+}
+
+button {
+  font: inherit;
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+}
