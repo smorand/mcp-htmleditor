@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Final
 
 from . import pages
-from .access import Answer, Context, Permission, Route, SetCookie
+from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Route, SetCookie
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, SESSION_SECONDS, SignInUnavailable, safe_destination
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 CONSENT_CANCELLED: Final = "access_denied"
 STATIC_DIR: Final = Path(__file__).resolve().parent.parent / "static"
 NOT_FOUND_BODY: Final = json.dumps({"error": "Not found"}).encode()
-JSON_CONTENT_TYPE: Final = "application/json"
 
 
 def static_file(name: str, media_type: str) -> Callable[[Context], Answer]:

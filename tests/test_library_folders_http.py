@@ -196,6 +196,26 @@ def test_a_presentation_file_that_cannot_be_read_gives_the_unavailable_page(
     assert rows(dan.open(f"/f/{ids[CARDIOLOGY]}")) == CARDIOLOGY_ROWS
 
 
+def test_a_presentation_row_with_a_malformed_id_gives_the_unavailable_page(
+    library_server: START, fake_google: FakeGoogle
+) -> None:
+    """FR-NEW-062: a damaged row (an id that is not 32 hex digits) is an unreadable library, not a crash."""
+    running = library_server(fake_google)
+    ids = running.builder.standard()
+    running.builder.standard_presentations(ids)
+    with running.database.transaction(immediate=True) as connection:
+        connection.execute(
+            "INSERT INTO presentations(id, folder_id, name, name_key, created_at) VALUES (?, ?, ?, ?, ?)",
+            ("../../etc/passwd", ids[CARDIOLOGY], "Damaged", "damaged", 0.0),
+        )
+    dan, _ = signed_in(running, fake_google, DAN)
+
+    reply = dan.open(f"/f/{ids[CARDIOLOGY]}")
+
+    assert reply.status == 503
+    assert visible_texts(reply) == ["Slides", LIBRARY_UNAVAILABLE]
+
+
 # ---------------------------------------------------------------------------
 # E2E-022: an empty folder
 # ---------------------------------------------------------------------------
@@ -404,6 +424,21 @@ def test_rows_of_the_same_minute_follow_the_name_order_and_stay_stable(
     assert [name for name, *_ in first] == ["Zulu", "Alpha", "beta", "Eclair", "Éclair", "aardvark"]
     assert second == first
     assert [fallback for _, _, fallback, _ in first[1:5]] == ["12 Nov 2026 16:40"] * 4
+
+
+def test_the_minute_of_a_time_before_1970_is_rounded_down(library_server: START, fake_google: FakeGoogle) -> None:
+    """FR-NEW-018: 61 s and 60.5 s before the epoch are the same minute (from 120 s before), so the name decides;
+    truncating toward zero would put the second in the next minute."""
+    running = library_server(fake_google)
+    ids = running.builder.standard()
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    running.builder.presentation(ids[CARDIOLOGY], "Alpha", size=500, modified=epoch - timedelta(seconds=61))
+    running.builder.presentation(ids[CARDIOLOGY], "Beta", size=500, modified=epoch - timedelta(seconds=60.5))
+    dan, _ = signed_in(running, fake_google, DAN)
+
+    shown = rows(dan.open(f"/f/{ids[CARDIOLOGY]}"))
+
+    assert [name for name, *_ in shown] == ["Alpha", "Beta"]
 
 
 # ---------------------------------------------------------------------------

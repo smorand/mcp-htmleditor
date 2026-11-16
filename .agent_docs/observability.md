@@ -59,7 +59,10 @@ sizes, charter keys and durations only.
 
 Web library (SPEC-0025, DEC-048): no address, name, cookie, token, `state`, `nonce`, PKCE verifier, code or client
 secret in a log line or a span attribute. A refused sign in logs `Sign in refused: <fixed reason>` (WARNING,
-`library.routes_library`); a refused state change logs `Refused <METHOD> <path>: origin`.
+`library.routes_library`); a refused state change logs `Refused <METHOD> <path>: origin` (or `: content type` for a
+JSON route without `application/json`). Administration (US-0130, no new span: one SQLite transaction, no external
+call): `Created a folder` (INFO), `Refused POST /api/folders: folder name` and `: duplicate folder name` (WARNING,
+`library.routes_admin`), never the name.
 
 ## Exporting somewhere else
 

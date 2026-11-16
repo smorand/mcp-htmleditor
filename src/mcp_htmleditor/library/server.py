@@ -5,8 +5,9 @@ inherited ``_refuse_ambiguous_headers``); ``GET /health`` answers on any host na
 only; a ``Host`` other than the netloc of one of the two configured origins gets ``403 {"error": "forbidden host"}``;
 ``X-Forwarded-Proto: http`` gets ``308`` to the configured origin of that host; every request on the content
 origin gets a ``302`` to the library origin (DEC-011); on the library origin the route table decides (DEC-021):
-a state changing request needs its ``Origin`` (DEC-022) before the route or the session is looked up, a path in no row
-or a non public route gives the sign in page to a visitor and ``Access denied.`` to a signed in person; a
+a state changing request needs its ``Origin`` (DEC-022) before the route or the session is looked up, and a JSON route
+its ``Content-Type: application/json`` before the session; a path in no row or a non public route gives the sign in
+page to a visitor and ``Access denied.`` to a signed in person; the role and the permission come before the body; a
 ``sqlite3.Error`` or ``OSError`` while reading the library gives ``503`` and the unavailable page (DEC-024). Every
 answer carries the protection headers of DEC-009 (``end_headers``).
 """
@@ -14,6 +15,7 @@ answer carries the protection headers of DEC-009 (``end_headers``).
 from __future__ import annotations
 
 import importlib
+import json
 import logging
 import pkgutil
 import re
@@ -26,10 +28,10 @@ from typing import Any, cast, override
 from urllib.parse import parse_qsl, urlsplit
 
 from ..config import Settings, is_origin
-from ..http_server import _EditorHandler, _EditorServer
+from ..http_server import SaveRefusal, _EditorHandler, _EditorServer, check_content_type, parse_content_length
 from ..version import __version__
 from . import pages
-from .access import Answer, Context, Permission, Route, authorize
+from .access import Answer, Context, Permission, Route, authorize, json_answer
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, Accounts, GoogleClient, safe_destination
 from .store import Database, Library
 
@@ -54,6 +56,7 @@ FOLDER_GROUP = "fid"
 HOST_PREFIX = "__Host-"
 DATABASE_NAME = "library.db"
 CALLBACK_PATH = "/auth/callback"
+JSON_BODY_MAX_BYTES = 65_536  # a JSON route carries a name, an address, a role: far below this
 
 
 class LibraryConfigError(Exception):
@@ -164,26 +167,34 @@ class LibraryHandler(_EditorHandler):
             logger.warning("Refused %s %s: origin", self.command, path)
             self._send_answer(origin, Answer(403, pages.access_denied()))
             return
+        route = self._library_server().find_route("library", self.command, path)
+        if route is not None and route.is_json and not self._is_json():
+            logger.warning("Refused %s %s: content type", self.command, path)
+            self._send_answer(origin, Answer(403, pages.access_denied()))
+            return
         try:
-            answer = self._library_answer(origin, path, query)
+            answer = self._library_answer(origin, route, path, query)
         except (sqlite3.Error, OSError) as exc:
             logger.error("Library unavailable for %s %s: %s", self.command, path, type(exc).__name__)
             answer = Answer(503, pages.library_unavailable())
         self._send_answer(origin, answer)
 
-    def _library_answer(self, origin: str, path: str, query: str) -> Answer:
-        """Route, session, role and permission (DEC-021), then the handler; no body is read before the handler."""
+    def _library_answer(self, origin: str, route: Route | None, path: str, query: str) -> Answer:
+        """Session, role and permission (DEC-021), then the JSON body of a JSON route (DEC-019), then the handler; no
+        body is read before the permission holds."""
         server = self._library_server()
-        route = server.find_route("library", self.command, path)
         cookies = parse_cookies(self.headers.get_all("Cookie") or [])
         token = cookies.get(cookie_name(origin, SESSION_COOKIE))
         session = server.accounts.session_for(token)
         if route is None or (route.permission is not Permission.PUBLIC and session is None):
             return self._refusal(path, signed_in=session is not None)
         folder_id = _folder_id(route, path)
-        role = server.library.role_in(session.email, folder_id) if session is not None and folder_id else None
+        role = server.library.role_in(session.email, folder_id) if session is not None else None
         if not authorize(role, route.permission):
             return Answer(403, pages.access_denied())
+        payload = self._read_library_json() if route.is_json else {}
+        if isinstance(payload, Answer):
+            return payload
         context = Context(
             person_email=session.email if session is not None else None,
             query=dict(reversed(parse_qsl(query, keep_blank_values=True))),
@@ -193,8 +204,37 @@ class LibraryHandler(_EditorHandler):
             library=server.library,
             folder_id=folder_id,
             role=role,
+            payload=payload,
         )
         return route.handler(context)
+
+    def _is_json(self) -> bool:
+        """``Content-Type`` is ``application/json`` (parameters and case aside): what a form of another page cannot
+        send without a preflight (DEC-022)."""
+        try:
+            check_content_type(self.headers.get("Content-Type", ""))
+        except SaveRefusal:
+            return False
+        return True
+
+    def _read_library_json(self) -> dict[str, Any] | Answer:
+        """The body as a JSON object, or the refusal to answer: 400 for a malformed length or body, 413 above
+        ``JSON_BODY_MAX_BYTES`` before a byte is read. Only called once the permission holds."""
+        try:
+            length = parse_content_length(self.headers.get("Content-Length"))
+        except SaveRefusal as refusal:
+            self.close_connection = True  # the body is not read: it must not be parsed as the next request
+            return json_answer(refusal.status, {"ok": False, "error": refusal.payload["error"]})
+        if length > JSON_BODY_MAX_BYTES:
+            self.close_connection = True
+            return json_answer(413, {"ok": False, "error": pages.REQUEST_TOO_LARGE})
+        try:
+            data = json.loads(self.rfile.read(length))
+        except (ValueError, RecursionError):  # UnicodeDecodeError is a ValueError
+            data = None
+        if not isinstance(data, dict):
+            return json_answer(400, {"ok": False, "error": pages.INVALID_REQUEST_BODY})
+        return data
 
     def _origin_ok(self, origin: str) -> bool:
         """DEC-022: ``Origin`` exactly the receiving origin, ``Sec-Fetch-Site`` absent, ``same-origin`` or ``none``."""
@@ -278,7 +318,7 @@ class LibraryServer(_EditorServer):
         self._thread: threading.Thread | None = None
         self.routes = ROUTES
         self.database = Database(settings.library_dir / DATABASE_NAME)
-        self.library = Library(self.database)
+        self.library = Library(self.database, clock)
         google = GoogleClient(settings.google_credentials_file, settings.library_origin + CALLBACK_PATH)
         self.accounts = Accounts(self.database, google, clock)
         super().__init__(settings.host, settings.port, LibraryHandler)

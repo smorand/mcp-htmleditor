@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, StrEnum
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from .pages import HTML_CONTENT_TYPE
 
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from .store import Library
 
 ADMIN_EMAIL: Final = "seb.morand@gmail.com"
+JSON_CONTENT_TYPE: Final = "application/json"
 
 
 class Role(StrEnum):
@@ -55,7 +57,8 @@ class Context:
     """What the dispatcher hands a route handler once the route is authorized.
 
     ``folder_id`` is the ``fid`` of the route's pattern (None for a route that names no folder) and ``role`` the
-    person's role in it, both already checked by ``authorize`` (DEC-021).
+    person's role in it (Admin for the administrator whatever the route), both already checked by ``authorize``
+    (DEC-021). ``payload`` is the JSON object of a JSON route, read after ``authorize`` (DEC-019); empty otherwise.
     """
 
     person_email: str | None
@@ -66,6 +69,7 @@ class Context:
     library: Library
     folder_id: str | None = None
     role: Role | None = None
+    payload: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +87,9 @@ class Answer:
 class Route:
     """One row of the table every later route joins: matched on origin, method and ``pattern.fullmatch(path)``.
 
-    A pattern naming a folder captures its id as the group ``fid``; the dispatcher reads the role there.
+    A pattern naming a folder captures its id as the group ``fid``; the dispatcher reads the role there. A route with
+    ``is_json`` takes a JSON object body: ``Content-Type: application/json`` is required with the ``Origin`` (DEC-022)
+    and the body is read only once the permission holds.
     """
 
     origin: Literal["library", "content"]
@@ -91,6 +97,12 @@ class Route:
     pattern: re.Pattern[str]
     permission: Permission
     handler: Callable[[Context], Answer]
+    is_json: bool = False
+
+
+def json_answer(status: int, payload: Mapping[str, Any]) -> Answer:
+    """A JSON answer (the JSON policy applies: it is not a page)."""
+    return Answer(status, json.dumps(payload).encode(), content_type=JSON_CONTENT_TYPE)
 
 
 def authorize(role: Role | None, permission: Permission) -> bool:

@@ -876,7 +876,8 @@ def test_the_database_is_private_and_migrated_once(library_server: START) -> Non
     assert stat.S_IMODE(running.library_dir.stat().st_mode) == 0o700
     assert running.stored.rows("PRAGMA user_version") == [(len(MIGRATIONS),)]
     tables = {row[0] for row in running.stored.rows("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    assert tables == {"meta", "folders", "members", "logins", "sessions", "presentations"}
+    expected = {"meta", "folders", "members", "logins", "sessions", "presentations", "activity"}
+    assert tables == expected | {"sqlite_sequence"}  # SQLite's own table behind AUTOINCREMENT (activity ids)
     folder = running.builder.folder(CARDIOLOGY)
     again = Database(path)
     assert running.stored.rows("PRAGMA user_version") == [(len(MIGRATIONS),)]

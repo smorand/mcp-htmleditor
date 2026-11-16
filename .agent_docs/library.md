@@ -9,18 +9,18 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | Module | Holds |
 |---|---|
 | `__init__.py` | package docstring |
-| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, `library_unavailable()`, `home_page(folders, is_admin=)`, `folder_page(name, presentations)`, every English text constant (DEC-055: `SIGN_IN_UNAVAILABLE`, `LIBRARY_UNAVAILABLE`, `ADMIN_LABEL`, `ADMINISTRATION_LABEL`, `NO_FOLDER_YET`, `NO_PRESENTATION_YET`, `ALL_FOLDERS_LABEL`, `MONTHS`, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` and loads `/lib/library.js` (`defer`) |
-| `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029), `format_size` (DEC-031) |
-| `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route`, `Context` (`folder_id`, `role` filled by the dispatcher), `Answer`, `SetCookie` (DEC-021) |
-| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library` (`folders_for(email)`, `is_admin(email)`, `role_in(email, folder_id)`, `folder_name(folder_id)`, `presentation_path(folder_id, presentation_id)`, `presentations_in(folder_id)`), `normalize_email`, `FolderView`, `PresentationView` |
+| `pages.py` | `esc`, `sign_in_page`, `access_denied()`, `library_unavailable()`, `home_page(folders, is_admin=)`, `folder_page`, `admin_page(folders, activity)`, `folder_exists(name)`, `created_folder_line(name)`, every English text constant (DEC-055, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` and loads `/lib/library.js` (`defer`) |
+| `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029), `check_folder_name` / `NameRefused`, `format_size` (DEC-031) |
+| `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route` (`is_json`), `Context` (`folder_id`, `role`, `payload` filled by the dispatcher), `Answer`, `json_answer`, `JSON_CONTENT_TYPE`, `SetCookie` (DEC-021) |
+| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library(database, clock)` (`folders_for`, `is_admin`, `role_in(email, folder_id or None)`, `folder_name`, `presentation_path`, `presentations_in`, `create_folder(name, actor)`, `activity()`, `record(connection, actor, text)`), `NameTaken`, `normalize_email`, `FolderView`, `PresentationView`, `ActivityLine` |
+| `routes_admin.py` | `GET /admin` (ADMINISTER, `administration`), `POST /api/folders` (ADMINISTER, JSON, `create_folder`) |
 | `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `purge`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
 | `routes_library.py` | `ROUTES`: `GET /lib/library.css`, `GET /lib/library.js` (PUBLIC, `static_file`, `STATIC_DIR`), `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN), `GET /f/(?P<fid>[0-9a-f]{32})` (VIEW, `folder`) |
 | `static/library.js` | every page: `time[datetime]` rewritten in the browser's zone, `pageshow` with `persisted` reloads (DEC-009, DEC-031) |
 | `server.py` | `load_routes`, `cookie_name`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_origin_ok`, `_send_answer`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
 
-A route handler is a plain function `(Context) -> Answer` (not a `LibraryHandler` method, so a `routes_*` module never
-imports `server.py`: `server` loads the routes while it is itself being imported). The dispatcher writes the `Answer`
-(status, `Location`, cookies turned into the origin's names, body; an HTML body gets `PAGE_POLICY`).
+A route handler is a plain function `(Context) -> Answer` (a `routes_*` module never imports `server.py`, which loads
+the routes while being imported). The dispatcher writes the `Answer` (an HTML body gets `PAGE_POLICY`).
 
 `_EditorServer.__init__(bind_host, port, handler=_EditorHandler)` is the only change to `http_server.py` (DEC-003);
 `_EditorHandler` is subclassed, never edited (`test_the_editor_handler_is_unchanged...` pins its source hash; the
@@ -46,27 +46,26 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
    path + query (never the request's `Host`, an absolute form target keeps only its path), empty body.
 5. Content origin: `302` to `<library origin>/`. An unread body of a non GET closes the connection. Python's
    `BaseHTTPRequestHandler` already turns `//x` into `/x` in `self.path`.
-6. Library origin, `_serve_library`: find the route (origin, method, `pattern.fullmatch(path)`); a matched route
-   whose method is not `GET`/`HEAD`/`OPTIONS` needs `Origin` exactly equal to the library origin and
-   `Sec-Fetch-Site` absent, `same-origin` or `none`, else `403` `Access denied.` page before the session is looked
-   up (DEC-022). Then the session (cookie `lib`/`__Host-lib`, `Accounts.session_for`). No route, or a non PUBLIC route
-   without a session: a visitor gets the sign in page (`200`, `next` = `safe_destination(path)`), a signed in person
-   `403` `Access denied.`. Then the role (US-0129): the group `fid` of the route's pattern is the target,
-   `Library.role_in(email, fid)` the role (None when the pattern names no folder), `authorize(role, permission)` false
-   is `403` `Access denied.` before the handler runs; the handler gets `Context.folder_id` and `Context.role`.
-   The Origin rule applies to every non GET/HEAD/OPTIONS request before the route lookup (2026-11-16): a POST to a
-   path in no row without the library `Origin` gets `Access denied.`; with it, the sign in page for a visitor.
-   The token call uses an opener with no proxy and no redirect (`signin.py`).
-   The JSON `Content-Type` part of DEC-022 arrives with the first JSON route (US-0130).
+6. Library origin, `_serve_library` (DEC-019, DEC-021, DEC-022), in this order: a non GET/HEAD/OPTIONS request needs
+   `Origin` exactly the library origin and `Sec-Fetch-Site` absent, `same-origin` or `none` (before the route lookup:
+   a POST to no row gets `Access denied.` too); the route (origin, method, `pattern.fullmatch(path)`); a route with
+   `is_json` needs `Content-Type: application/json` (`check_content_type`, parameters and case aside: what a form of
+   another page sends without a preflight); every refusal so far is `403` `Access denied.` before the session. Then
+   the session (`lib`/`__Host-lib`, `Accounts.session_for`): no route, or a non PUBLIC route without a session, is the
+   sign in page for a visitor (`200`, `next` = `safe_destination(path)`), `Access denied.` for a signed in person.
+   Then `role_in(email, fid or None)` (Admin for the administrator on any route) and `authorize`; false is `Access
+   denied.`. Only then the JSON body (`_read_library_json`: `parse_content_length`, 413 above 65 536 bytes before
+   reading, 400 `Invalid request body` unless a JSON object) into `Context.payload`, then the handler.
 7. `_library_answer` (route, session, handler) runs inside `except (sqlite3.Error, OSError)`: `503`
    `pages.library_unavailable()` (`The library is unavailable. Try again later.`, no name, no list, no Sign out form),
    one ERROR line naming the exception type. Writing the answer is outside the guard (a closed socket is not the
    library). Nothing is cached: the next request opens a new connection and works as soon as the file is readable.
+   The Google token call uses an opener with no proxy and no redirect (`signin.py`).
 
 ## Lifetime (US-0128, DEC-017, DEC-024, DEC-032)
 
-- Clock: `LibraryServer(settings, clock=time.time)` hands `clock` to `Accounts`; no `library/` module reads the wall
-  clock or contains `UPDATE sessions` (grep test). `Library` reads no time yet, so it takes no clock.
+- Clock: `LibraryServer(settings, clock=time.time)` hands `clock` to `Accounts` and `Library`; no `library/` module
+  reads the wall clock or contains `UPDATE sessions` (grep test).
 - A session is alive while `clock() < expires_at`; at `expires_at` exactly it is over. `expires_at` is written once.
   `Accounts.purge()` (called by `begin_login` and by `finish_login` after it took the attempt) deletes session rows
   ended more than 86 400 s ago (kept a day for US-0137) and attempts of 600 s or more. Tickets join it with US-0133.
@@ -93,7 +92,6 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
   (`sha256(token)`, lower case email, `created_at`, `expires_at = created_at + 2592000`, never updated), cookie `lib`
   (`Max-Age=2592000`), `303` to the stored destination.
 - `POST /auth/logout`: deletes the row, clears `lib` and `lib-b` (`Max-Age=0`), `303 /`. Other browsers stay signed in.
-- `GET /`: see Home page and roles below.
 - Cookies: `cookie_name` gives `lib`/`lib-b` on http, `__Host-lib`/`__Host-lib-b` on https; attributes
   `Path=/; HttpOnly; SameSite=Lax`, `Max-Age` for `lib` only, `Secure` on https.
 - The credentials file is read once at `LibraryServer` construction: missing or unreadable is one ERROR line, a return
@@ -112,7 +110,7 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
 - `GET /`: `home_page(folders, is_admin=)`: `<nav><a href="/admin">Administration</a></nav>` for the administrator
   only; rows `<li><a href="/f/<id>">name</a> <span>role label</span></li>` in a `ul.folders`; no folder: the
   administrator gets `<p>You have no access to any folder yet.</p>` (200), anyone else `403` `Access denied.`
-  (FR-NEW-003). `/admin` has no row yet (US-0130): it is `Access denied.` even for the administrator until then.
+  (FR-NEW-003).
 - Any path in no row: `Access denied.` for a signed in person, the sign in page for a visitor (`next` = the path).
 - `/lib/library.css` (`text/css`) and `/lib/library.js` (`application/javascript`) are the two public rows; a missing
   file is `404 {"error": "Not found"}`; any other `/lib/...` is no row.
@@ -128,12 +126,30 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
   class="size">1.1 KB</span></li>` or `<p>This folder has no presentations yet.</p>` (no list at all), then Sign out.
   The `<time>` text is UTC, computed with `time.gmtime` (no wall clock read); `library.js` rewrites it from `Date`
   getters, so the zone is the browser's (Playwright `timezone_id`).
-- Order: `-(int(st_mtime) // 60)`, then `order_key(name)` (accents and case ignored, then the exact name), sorted in
+- Order: `-(math.floor(st_mtime) // 60)` (a time before 1970 rounds down), then `order_key(name)` (accents and case ignored, then the exact name), sorted in
   Python. `format_size`: integer half up `(count * 20 + unit) // (2 * unit)` tenths (`round` is half even: 1 280 bytes
   would read 1.2 KB).
 - Cost: `role_in` (primary key), `folder_name` (primary key), one `SELECT id, name FROM presentations WHERE folder_id`
   (prefix of the `UNIQUE (folder_id, name_key)` index), one `stat` per row, O(n log n) sort. A row whose file is gone
-  is an `OSError`: the whole page is the unavailable page, never a partial list.
+  is an `OSError`, a row whose id is malformed a `sqlite3.DatabaseError`: the whole page is the unavailable page.
+
+## Administration (US-0130, DEC-019, DEC-029, DEC-030)
+
+- `GET /admin`: `admin_page(folders_for(admin), activity())`: `All folders`, `<h1>Administration</h1>`, `<section
+  id="folders">` (rows as on the home page, `ul.folders`; the form `#create-folder` with `<label for="folder-name">`,
+  the input and `Create folder`; a hidden `p#create-folder-alert role="alert"` carrying `data-denied` and
+  `data-unavailable` so the JS fallbacks stay in `pages.py`), `<section id="activity">` (`ol.activity` rows `<li><time
+  datetime>..</time> <span class="actor">..</span> <span class="text">..</span></li>` or `No activity yet.`), Sign out.
+- `POST /api/folders {"name"}`: a name that is not a string is `Invalid request body`; `check_folder_name`
+  (`compose(raw.strip())`, 1 to 60 characters, each `L*`, `M*`, `Nd`, U+0020 or U+002D) else 400 with the name rule;
+  `create_folder` inserts the row and the line in one `BEGIN IMMEDIATE`; the `name_key` unique constraint
+  (`IntegrityError`) is `NameTaken`, 400 `A folder named "<trimmed composed name>" already exists.`; success `201
+  {"ok": true, "id"}`. `library.js` sends it with `fetch` (JSON), reloads on success, writes the error with
+  `textContent` into the alert (a non JSON answer: the alert's data text for 403, else the unavailable text).
+- Activity (migration 3): `activity(id AUTOINCREMENT, at, actor, text)`; `record` inserts (actor lower cased, `at` from
+  the clock) then `DELETE ... WHERE id <= MAX(id) - 500` in the caller's transaction; `activity()` is `ORDER BY id DESC
+  LIMIT 500`. Only successful actions call `record` (refusals, sign ins and saves never do). AUTOINCREMENT adds the
+  `sqlite_sequence` table. Cost per creation: one insert, one indexed delete; the page is O(folders log folders + 500).
 
 ## Storage (DEC-025)
 
@@ -148,9 +164,8 @@ composed stem without `.html`. Nothing writes presentations yet except the test 
 connection per thread (`LibraryHandler.finish` releases it when the connection's thread ends; `stop()` releases the
 main thread's). Migration 1 (US-0126): `meta`, `folders`, `members` (+ index on `email`), `logins`, `sessions`.
 `migrate()` splits each script on `;` and runs it inside one `BEGIN IMMEDIATE` with `PRAGMA user_version = N`
-(`executescript` would commit first). Only hashes of tokens, states and browser ids are stored.
-
-Unknown methods (`PATCH`, `PUT`) get the stdlib 501, `OPTIONS` the inherited 405.
+(`executescript` would commit first). Only hashes of tokens, states and browser ids are stored. Unknown methods
+(`PATCH`, `PUT`) get the stdlib 501, `OPTIONS` the inherited 405.
 
 ## Headers (DEC-009)
 
@@ -181,25 +196,18 @@ Sign in support (US-0126): `start(google=fake, google_registered=True)` writes a
 `running.browser(resolver)` is a `Browser` (cookies, redirects across hosts, `visited`, `replies`, `sign_in`,
 `sign_out` with `Origin`); `LibraryReply.folder_rows()` (id, escaped name, role label of each home row);
 `running.builder` (`folder` with `names.name_key`, `folders(*names)`, `member`, `standard()`) and `running.stored` (`sessions`,
-`logins`, `folder_names`, `activity`, `rows`); fixture `evil_listener` counts visits to evil.example.
-`tests/test_library_visitor_http.py`: E2E-004, 134 (library side), 145, route table, `esc`, `authorize`, `safe_destination`.
-`tests/test_library_auth_http.py`: E2E-003, 005, 007, 090, 150, 171, 172, 183, 184, SEC-015, 016, 019, sign out,
-cookies, claims, PKCE, database.
-`tests/test_library_home_http.py`: E2E-014, 018, 087, 149, 165, `role_in`, empty home, escaping, `/lib/*`.
-`tests/test_library_names.py`: `order_key`, `name_key`, 100 random names, `format_size`.
-`tests/test_library_sessions_http.py`: E2E-008, 012, 016, 166, new period on a new sign in, corrupted file, 200 folders
-(time and one query), purge (a live session survives), the clock and `UPDATE sessions` grep. Support: `running.restart()`,
-`running.unreadable_database()`, `Browser.reopened()` (only cookies set with `Max-Age` survive).
-`tests/test_library_gate_http.py`: E2E-135, 136, 146, 147, 186, headers, settings, CLI refusal, a real `webserve`
-child stopped by SIGTERM.
+`logins`, `folder_names`, `activity`, `rows`); fixture `evil_listener` counts visits to evil.example; US-0128:
+`running.restart()`, `running.unreadable_database()`, `Browser.reopened()` (only cookies with `Max-Age` survive).
 Folder page (US-0129): `builder.presentation(folder_id, name, *, size, modified, slides=1, title=None)` (a generated
 deck padded with an HTML comment to exactly `size` bytes, below the smallest deck the start of one; `os.utime`),
 `builder.standard_presentations(ids)` (the five decks of spec section 9, about 11 MB: only where a test needs them),
 `builder.numbered_folders(count, email=None, role="RW")` (`Folder 001`...), `LibraryReply.presentation_rows()`,
 `launch_chromium(playwright, *other_hosts)`, `person_context(chromium, running, session, zone=)`, `EVIL_HOST` and
 `RecordingListener.page` (a hostile HTML page served from loopback).
-`tests/test_library_folders_http.py`: E2E-009, 019, 022, 023, 024, 028, 037, 122, 168, same minute order, escaping,
-`presentation_path`. `tests/test_library_folders_e2e.py`: E2E-006, 017, 020, 029, 164, SEC-024.
+US-0130: `Browser.post_json(path, payload, headers=None)` (default `page_post_headers()`: `Origin`, `Sec-Fetch-Site:
+same-origin`, JSON type), `LibraryReply.activity_lines()` (unescaped `(UTC ISO, actor, text)`).
+Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for the areas `visitor`, `auth`, `home`,
+`sessions`, `gate`, `folders`, `admin`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
 
 ## Gotchas
 

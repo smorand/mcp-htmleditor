@@ -57,6 +57,36 @@ ul.presentations .name {
   overflow-wrap: anywhere;
 }
 
+/* Administration (US-0130): an activity line quotes a folder name of any length and any direction. */
+ol.activity {
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+ol.activity li {
+  padding-block: 0.4rem;
+  border-block-end: 1px solid var(--library-line);
+  overflow-wrap: anywhere;
+}
+
+ol.activity time,
+ol.activity .actor {
+  color: var(--library-muted);
+}
+
+ol.activity .text {
+  unicode-bidi: isolate;
+}
+
+#create-folder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-end: 0.5rem;
+}
+
 ul.folders span,
 ul.presentations time,
 ul.presentations .size {

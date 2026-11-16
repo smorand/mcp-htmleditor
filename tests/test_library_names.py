@@ -1,5 +1,5 @@
-"""US-0127, US-0129: ``library/names.py`` (SPEC-0025, DEC-029, DEC-031): composed form, the unique key, the folder
-order and the size text."""
+"""US-0127, US-0129, US-0130: ``library/names.py`` (SPEC-0025, DEC-029, DEC-031): composed form, the unique key, the
+folder order, the size text and the folder name rule."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import unicodedata
 import pytest
 
 from mcp_htmleditor.library import names
-from mcp_htmleditor.library.names import compose, name_key, order_key
+from mcp_htmleditor.library.names import NameRefused, check_folder_name, compose, name_key, order_key
 
 CAFE_COMPOSED = "Caf\u00e9"
 CAFE_DECOMPOSED = "Cafe\u0301"
@@ -18,6 +18,9 @@ RANDOM_SEED = 20261116
 # Bases and combining marks whose composed and decomposed forms differ: a name drawn from them is rarely NFC already.
 RANDOM_ALPHABET = "aAeEiIoOuUcCnNsSzZ\u0430\u0410\u0435\u0415 -0123456789\u00e9\u00c9\u00f1\u00e7\u0419"
 RANDOM_MARKS = "\u0301\u0300\u0302\u0303\u0308\u0327\u030c\u0306"
+
+
+E_ACUTE_DECOMPOSED = "e\u0301"
 
 
 def sorted_names(*names: str) -> list[str]:
@@ -114,3 +117,55 @@ def test_name_key_is_the_same_for_a_name_and_its_composed_form() -> None:
 def test_format_size_chooses_the_unit_from_the_exact_byte_count(count: int, expected: str) -> None:
     """FR-NEW-018, DEC-031: bytes below 1 024, then KB, then MB, one decimal rounded half up from the exact value."""
     assert names.format_size(count) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "kept"),
+    [
+        ("  Oncology 2030  ", "Oncology 2030"),  # E2E-091: trimmed before it is checked and kept
+        ("B" * 60, "B" * 60),  # E2E-096: exactly 60
+        ("-", "-"),  # E2E-096: a single hyphen
+        ("\u041a\u0430\u0440\u0434\u0438\u043e\u043b\u043e\u0433\u0438\u044f 2027", None),  # E2E-097 Cyrillic
+        ("\u0623\u0645\u0631\u0627\u0636 \u0627\u0644\u0631\u0626\u0629", None),  # E2E-097 Arabic
+        ("\u5fc3\u81d3\u75c5\u5b66", None),  # E2E-097 Chinese
+        ("Pneumo E\u0301te\u0301", "Pneumo \u00c9t\u00e9"),  # E2E-163: brought to its composed form
+        (E_ACUTE_DECOMPOSED * 60, "\u00e9" * 60),  # E2E-163: 120 code points, 60 once composed
+        ("Study \u0663\u0660", None),  # decimal digits of another script (Nd)
+        ("Pneumo  \u00c9t\u00e9", None),  # inner spaces are kept as typed
+    ],
+)
+def test_check_folder_name_accepts_letters_of_any_alphabet_digits_spaces_and_hyphens(
+    raw: str, kept: str | None
+) -> None:
+    """FR-NEW-040, FR-NEW-041, DEC-029: the trimmed composed name comes back (``None``: the name as given)."""
+    assert check_folder_name(raw) == (kept if kept is not None else raw)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",  # E2E-093
+        "   ",  # E2E-093: blank once trimmed
+        "A" * 61,  # E2E-094
+        E_ACUTE_DECOMPOSED * 61,  # E2E-163: 61 once composed
+        "Pneumo \U0001fac1",  # E2E-095: emoji
+        "Cardio/Rhythm",  # E2E-095
+        "Cardio_2027",  # E2E-095
+        "R&D",  # E2E-095
+        "Study.2027",  # E2E-095
+        "..",
+        "Cardio\u20132027",  # an en dash is not the plain hyphen
+        "Cardio\u00a02027",  # a no break space inside is not the space
+        "Cardio\t2027",
+        "Folder \u2167",  # a Roman numeral letter is Nl, not a decimal digit
+        "<script>",
+        "\u0301",  # a lone combining mark
+        "A\ufe0f",  # a variation selector is a mark but not an accent
+        "1\ufe0f\u20e3",  # a keycap emoji
+        " \u0301A",  # a mark after a space
+    ],
+)
+def test_check_folder_name_refuses_everything_else(raw: str) -> None:
+    """FR-NEW-041: empty, over 60 composed characters, or a character outside ``L*``, ``M*``, ``Nd``, space, hyphen."""
+    with pytest.raises(NameRefused):
+        check_folder_name(raw)

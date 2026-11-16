@@ -428,8 +428,8 @@ session per presentation if you need several displayed simultaneously.
 name gets `403 {"error": "forbidden host"}`, a request that reached nginx in plain http
 (`X-Forwarded-Proto: http`) gets `308` to the same path on the secure origin, and `GET /health` answers
 `{"ok": true, "status": "ok", "version"}` on any host name, nothing more. `HTMLEDITOR_LIBRARY_DIR` (default
-`<state dir>/library`) holds the library database `library.db` (folders, members, presentations, sign in attempts,
-sessions) and the presentation files `files/<folder id>/<presentation id>.html` (random ids, never names). It
+`<state dir>/library`) holds the library database `library.db` (folders, members, presentations, activity, sign in
+attempts, sessions) and the presentation files `files/<folder id>/<presentation id>.html` (random ids, never names). It
 stops on SIGINT or SIGTERM. The local `serve` is unchanged and never shows a library page.
 
 Sign in is `Sign in with Google` (OpenID Connect code flow with PKCE, the account chooser every time, a verified
@@ -451,6 +451,15 @@ browser's time zone (`16 Nov 2026 14:32`) and its size (`1 byte`, `900 bytes`, `
 folders` back to the home page, or `This folder has no presentations yet.`; a folder that does not exist and a folder
 where the person holds no role give the same `Access denied.` page, byte for byte. No library page can be shown inside
 a page of another site. `/lib/library.css` and `/lib/library.js` are the only files served without a session.
+
+`Administration` (`/admin`, the administrator only; anyone else gets `Access denied.`) lists the folders, the field
+`Folder name` with `Create folder`, and the `Activity` list. A folder name is trimmed, brought to its composed form, and
+holds 1 to 60 letters of any alphabet, digits, spaces or hyphens (`Folder names use 1 to 60 letters, digits, spaces or
+hyphens.` otherwise); a name equal to an existing one without regard to case is refused with `A folder named "<name>"
+already exists.` (an accent makes another name). The activity list shows the 500 newest successful actions, newest
+first (`Created folder "Oncology 2030"`, who, when), or `No activity yet.`; sign ins and refused attempts are not
+listed. Every request that changes the library must come from the library's own pages (`Origin` equal to the library
+origin; JSON calls with `Content-Type: application/json`), else `Access denied.`, even with a valid session.
 
 ## Templates
 
@@ -665,10 +674,11 @@ src/mcp_htmleditor/
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
 ├── library/signin.py  Google sign in (GoogleClient, claims), login attempts and sessions (Accounts)
-├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path)
-├── library/names.py   compose, name_key, order_key (folder order), format_size
+├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path, create_folder, activity, record)
+├── library/names.py   compose, name_key, order_key (folder order), check_folder_name, format_size
 ├── library/pages.py   every page and English text of the library mode, esc()
 ├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page, folder page
+├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder)
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

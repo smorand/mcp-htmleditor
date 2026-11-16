@@ -20,6 +20,10 @@ Folder page (US-0129): ``LibraryBuilder.presentation`` writes a generated deck o
 five decks of the standard library; ``LibraryReply.presentation_rows()`` reads the rows of a folder page;
 ``launch_chromium`` maps both library host names to loopback and ``person_context`` is a context holding one session
 cookie in a fixed time zone.
+
+Administration (US-0130): ``Browser.post_json`` sends what ``library.js`` sends (``Origin``, ``Sec-Fetch-Site:
+same-origin``, ``Content-Type: application/json``), or the headers a test gives instead;
+``LibraryReply.activity_lines()`` reads the activity rows of the administration page.
 """
 
 from __future__ import annotations
@@ -40,6 +44,7 @@ from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html import escape as html_escape
+from html import unescape as html_unescape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
@@ -74,6 +79,10 @@ ADMIN = "seb.morand@gmail.com"
 FOLDER_ROW = re.compile(r'<li><a href="/f/([0-9a-f]{32})">([^<]*)</a> <span>([^<]*)</span></li>')
 PRESENTATION_ROW = re.compile(
     r'<li><span class="name">([^<]*)</span> <time datetime="([^"]*)">([^<]*)</time> <span class="size">([^<]*)</span>'
+    r"</li>"
+)
+ACTIVITY_ROW = re.compile(
+    r'<li><time datetime="([^"]*)">[^<]*</time> <span class="actor">([^<]*)</span> <span class="text">([^<]*)</span>'
     r"</li>"
 )
 HEART_FAILURE = "Heart Failure Update"
@@ -126,6 +135,13 @@ class LibraryReply:
     def presentation_rows(self) -> list[tuple[str, str, str, str]]:
         """``(name as written in the HTML, UTC ISO date, fallback date text, size)`` of each row of a folder page."""
         return PRESENTATION_ROW.findall(self.text)
+
+    def activity_lines(self) -> list[tuple[str, str, str]]:
+        """``(UTC ISO date, actor, line text)`` of each activity row of the administration page, in page order,
+        unescaped."""
+        return [
+            (when, html_unescape(actor), html_unescape(text)) for when, actor, text in ACTIVITY_ROW.findall(self.text)
+        ]
 
     def json(self) -> Any:
         return json.loads(self.body)
@@ -487,7 +503,7 @@ class LibraryBuilder:
     ) -> Presentation:
         """A deck of ``slides`` slides padded to exactly ``size`` bytes, modified at ``modified``, and its row."""
         presentation_id = secrets.token_hex(16)
-        path = Library(self.database).presentation_path(folder_id, presentation_id)
+        path = Library(self.database, self.clock).presentation_path(folder_id, presentation_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(deck_bytes(title if title is not None else name, slides, size))
         os.utime(path, (modified.timestamp(), modified.timestamp()))
@@ -615,6 +631,22 @@ class Browser:
         """The ``Sign out`` form: a same origin POST, with the ``Origin`` a browser sends under ``same-origin``."""
         headers = {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin"}
         return self._navigate("POST", "/auth/logout", headers, follow=True)
+
+    def post_json(self, path: str, payload: Any, *, headers: dict[str, str] | None = None) -> LibraryReply:
+        """POST ``payload`` (JSON encoded unless already bytes) with this browser's cookies and the headers of the
+        library's own ``fetch``, or ``headers`` instead of them; redirects are not followed."""
+        body = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+        sent = headers if headers is not None else self.page_post_headers()
+        if self.cookies:
+            sent = {**sent, "Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items())}
+        reply = self.running.client().request("POST", path, headers=sent, body=body)
+        self._keep_cookies(reply)
+        self.replies.append(reply)
+        return reply
+
+    def page_post_headers(self) -> dict[str, str]:
+        """What Chromium sends with a ``fetch`` POST of JSON from a library page."""
+        return {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json"}
 
     def reopened(self) -> Browser:
         """The browser closed and opened again: the cookies without ``Max-Age`` are gone, the others kept."""

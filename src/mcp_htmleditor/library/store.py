@@ -7,8 +7,10 @@ appends one entry and never edits an earlier one.
 
 from __future__ import annotations
 
+import math
 import os
 import re
+import secrets
 import sqlite3
 import threading
 from collections.abc import Callable, Iterator
@@ -17,8 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Final
 
+from . import pages
 from .access import ADMIN_EMAIL, Role
-from .names import order_key
+from .names import name_key, order_key
 
 DIRECTORY_MODE: Final = 0o700
 FILE_MODE: Final = 0o600
@@ -27,6 +30,8 @@ FILES_DIRECTORY: Final = "files"
 PRESENTATION_SUFFIX: Final = ".html"
 ID_PATTERN: Final = re.compile(r"[0-9a-f]{32}")
 SECONDS_PER_MINUTE: Final = 60
+ACTIVITY_KEPT: Final = 500  # the newest lines shown and kept (FR-NEW-050)
+ID_BYTES: Final = 16  # a folder id is 32 hex digits
 
 MIGRATIONS: Final[tuple[str, ...]] = (
     # 1 (US-0126): folders, members, login attempts, sessions
@@ -49,7 +54,16 @@ MIGRATIONS: Final[tuple[str, ...]] = (
                                name TEXT NOT NULL, name_key TEXT NOT NULL, created_at REAL NOT NULL,
                                UNIQUE (folder_id, name_key));
     """,
+    # 3 (US-0130): the activity list, one row per successful action, the 500 newest kept
+    """
+    CREATE TABLE activity(id INTEGER PRIMARY KEY AUTOINCREMENT, at REAL NOT NULL, actor TEXT NOT NULL,
+                          text TEXT NOT NULL);
+    """,
 )
+
+
+class NameTaken(Exception):  # noqa: N818 - a domain outcome, not an error of the program
+    """A folder whose name is the same without regard to case already exists (the ``name_key`` constraint)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +73,15 @@ class FolderView:
     id: str
     name: str
     role: Role
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityLine:
+    """One line of the activity list: when (``at``, the injected clock), who (lower case address), what."""
+
+    at: float
+    actor: str
+    text: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,15 +163,43 @@ class Database:
 
 
 class Library:
-    """Folders and members; roles are read from ``members`` on every call, never cached (DEC-018).
+    """Folders, members and the activity list; roles are read from ``members`` on every call, never cached (DEC-018).
 
     The administrator is decided here and nowhere else: ``is_admin`` compares the normalized address with
     ``ADMIN_EMAIL``, and ``role_in`` and ``folders_for`` ask it before any member row (FR-NEW-011, FR-NEW-014).
+    Every successful action writes its activity line in its own transaction (``record``, DEC-030); ``clock`` dates
+    rows and lines.
     """
 
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, clock: Callable[[], float]) -> None:
         self._database = database
+        self._clock = clock
         self._files = database.path.parent / FILES_DIRECTORY
+
+    def activity(self) -> list[ActivityLine]:
+        """The 500 newest lines, newest first (FR-NEW-050)."""
+        rows = self._database.connection().execute(
+            "SELECT at, actor, text FROM activity ORDER BY id DESC LIMIT ?", (ACTIVITY_KEPT,)
+        )
+        return [ActivityLine(at=row[0], actor=row[1], text=row[2]) for row in rows.fetchall()]
+
+    def create_folder(self, name: str, actor: str) -> str:
+        """Add an empty folder without any member and its line ``Created folder "<name>"``; returns its id.
+
+        ``name`` is already checked (``names.check_folder_name``); ``NameTaken`` when its ``name_key`` exists, in
+        which case nothing is written (the transaction rolls back).
+        """
+        folder_id = secrets.token_hex(ID_BYTES)
+        try:
+            with self._database.transaction(immediate=True) as connection:
+                connection.execute(
+                    "INSERT INTO folders(id, name, name_key, created_at) VALUES (?, ?, ?, ?)",
+                    (folder_id, name, name_key(name), self._clock()),
+                )
+                self.record(connection, actor, pages.created_folder_line(name))
+        except sqlite3.IntegrityError as exc:
+            raise NameTaken from exc
+        return folder_id
 
     def folders_for(self, email: str) -> list[FolderView]:
         """The folders ``email`` can open with its role, in ``order_key`` order: every folder (Admin) for the
@@ -191,14 +242,31 @@ class Library:
         )
         views = []
         for presentation_id, name in rows:
-            status = self.presentation_path(folder_id, presentation_id).stat()
+            try:
+                path = self.presentation_path(folder_id, presentation_id)
+            except ValueError as exc:  # a damaged row: the library cannot be read, like a missing file (FR-NEW-062)
+                raise sqlite3.DatabaseError("malformed presentation id") from exc
+            status = path.stat()
             views.append(PresentationView(presentation_id, name, status.st_mtime, status.st_size))
-        return sorted(views, key=lambda view: (-(int(view.modified) // SECONDS_PER_MINUTE), order_key(view.name)))
+        return sorted(
+            views, key=lambda view: (-(math.floor(view.modified) // SECONDS_PER_MINUTE), order_key(view.name))
+        )
 
-    def role_in(self, email: str, folder_id: str) -> Role | None:
-        """Admin first whatever the member rows hold, else the member row of that folder, else None."""
+    def record(self, connection: sqlite3.Connection, actor: str, text: str) -> None:
+        """Add an activity line inside the caller's transaction, then drop the lines older than the 500 newest
+        (DEC-030); only a successful action calls it, never a refusal, a sign in or a stored change (FR-NEW-051)."""
+        connection.execute(
+            "INSERT INTO activity(at, actor, text) VALUES (?, ?, ?)", (self._clock(), normalize_email(actor), text)
+        )
+        connection.execute("DELETE FROM activity WHERE id <= (SELECT MAX(id) FROM activity) - ?", (ACTIVITY_KEPT,))
+
+    def role_in(self, email: str, folder_id: str | None) -> Role | None:
+        """Admin first whatever the member rows hold and whatever the route (a route naming no folder has
+        ``folder_id`` None), else the member row of that folder, else None."""
         if self.is_admin(email):
             return Role.ADMIN
+        if folder_id is None:
+            return None
         row = (
             self._database.connection()
             .execute("SELECT role FROM members WHERE folder_id = ? AND email = ?", (folder_id, normalize_email(email)))
