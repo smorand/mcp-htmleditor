@@ -144,7 +144,8 @@ def test_e2e_020_a_folder_lists_its_presentations_newest_first(
     assert page.locator("h1").inner_text() == CARDIOLOGY
     assert shown_rows(page) == UTC_ROWS
     order = assert_controls_are_named_links_and_buttons(page)
-    assert order == ["/", "Sign out"]
+    assert [order[0], order[-1]] == ["/", "Sign out"]  # the presentation names in between are links (US-0134)
+    assert [link.rsplit("/", 1)[0] for link in order[1:-1]] == ["/open"] * len(UTC_ROWS)
     assert page.get_by_role("link", name="All folders").count() == 1
     assert tab_until(page, "/", order) == ["/"]
     page.keyboard.press("Enter")

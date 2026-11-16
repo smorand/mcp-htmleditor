@@ -180,7 +180,7 @@ The browser injects helper nodes and attributes into the iframe DOM (`_mcp_forma
 `_mcp_editor_styles`, `_editor_ctx_host`, `_mcp_drop_indicator`, `_mcp_drag_handle`, `_mcp_editable`,
 `contenteditable`, Google Translate and Grammarly attributes); `_strip_editor_artifacts` removes them before writing.
 A new artifact goes into `_EDITOR_ARTIFACTS` (`http_server.py`) with its `editor-*.js`, or it leaks into the file.
-
+The library shell (`library_shell`, `library/routes_deck.py`) edits `editor.html` by string: keep its frame `src`, download `href` and first `<script src=`.
 * The client save (`saveContent` in `editor-save.js`, SPEC-0004) strips the artifacts on a detached clone and never
   mutates the live DOM: removing `contenteditable` from the focused zone would move focus to `<body>` and drop the
   keystrokes typed after the save. A new client artifact is stripped on the clone too.

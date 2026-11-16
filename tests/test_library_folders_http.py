@@ -308,7 +308,9 @@ def reachable_pages(browser: Browser) -> dict[str, LibraryReply]:
             continue
         reply = seen[address] = browser.open(address)
         queue.extend(
-            link for link in ADDRESS.findall(reply.text) if link.startswith("/") and not link.startswith("/lib/")
+            link
+            for link in ADDRESS.findall(reply.text)
+            if link.startswith("/") and not link.startswith(("/lib/", "/open/"))  # /open/ leaves the library pages
         )
     return seen
 

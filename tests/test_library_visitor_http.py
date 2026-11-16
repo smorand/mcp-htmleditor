@@ -79,7 +79,7 @@ def test_library_visitor_the_content_origin_redirects_to_the_library(library_ser
     running = library_server()
     content = running.client(running.content_netloc)
 
-    for path in ("/", "/d/x/", "/static/editor.js", "/deck/frame"):
+    for path in ("/", "/d/x/", "/deck/frame"):
         reply = content.get(path)
         assert reply.status == 302, path
         assert reply.headers["location"] == f"{running.settings.library_origin}/"

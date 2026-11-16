@@ -31,13 +31,20 @@ from typing import Any, cast, override
 from urllib.parse import parse_qsl, urlsplit
 
 from ..config import Settings, is_origin
-from ..http_server import SaveRefusal, _EditorHandler, _EditorServer, check_content_type, parse_content_length
+from ..http_server import (
+    SaveRefusal,
+    _EditorHandler,
+    _EditorServer,
+    _static_dir,
+    check_content_type,
+    parse_content_length,
+)
 from ..request_service import RequestService
 from ..request_store import RequestStore
 from ..version import __version__
 from . import pages
 from .access import Answer, Context, EditorAnswer, Permission, Role, Route, authorize, json_answer
-from .routes_deck import deck_path, denied
+from .routes_deck import deck_path, denied, library_shell
 from .signin import (
     BROWSER_COOKIE,
     GRANT_COOKIE,
@@ -60,6 +67,7 @@ PAGE_POLICY = (
     "form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 )
 FRAME_POLICY = "frame-ancestors 'self'"  # the deck frame: framed by the editor shell of its own origin only
+SHELL_POLICY = "frame-ancestors 'none'"  # the editor shell runs the editor's own inline styles and scripts
 FRAME_DENIED = "DENY"
 FRAME_SAME_ORIGIN = "SAMEORIGIN"
 EDITOR_HEADER = "X-Editor"  # every fetch of the editor in the library carries it (DEC-040)
@@ -91,6 +99,7 @@ class DeckTarget:
     path: Path
     name: str
     role: Role
+    presentation_id: str = ""
 
 
 def health_answer() -> dict[str, Any]:
@@ -233,7 +242,10 @@ class LibraryHandler(_EditorHandler):
             logger.warning("Refused %s %s: no right", self.command, path)
             return self._deck_refusal(route, presentation_id)
         self._deck = DeckTarget(
-            server.library.presentation_path(presentation.folder_id, presentation_id), presentation.name, role
+            server.library.presentation_path(presentation.folder_id, presentation_id),
+            presentation.name,
+            role,
+            presentation_id,
         )
         return route.handler(replace(context, folder_id=presentation.folder_id, role=role))
 
@@ -273,6 +285,8 @@ class LibraryHandler(_EditorHandler):
         if not isinstance(answer, EditorAnswer):
             self._send_answer(origin, answer)
             return
+        if answer.route == "shell":
+            self.policy = SHELL_POLICY
         if answer.is_framed:
             self.policy = FRAME_POLICY
             self.frame_options = FRAME_SAME_ORIGIN
@@ -280,6 +294,8 @@ class LibraryHandler(_EditorHandler):
             "content": self._serve_content,
             "content-frame": self._serve_content_frame,
             "download": self._serve_download,
+            "shell": self._serve_editor_html,
+            "static": self._serve_library_static,
             "status": self._serve_status,
         }
         editor_methods[answer.route]()
@@ -310,6 +326,29 @@ class LibraryHandler(_EditorHandler):
             else 0,
         }
         self._send_json(payload)
+
+    @override
+    def _serve_editor_html(self) -> None:
+        """DEC-038: the shell of the presentation of this request, derived from ``static/editor.html``."""
+        deck = self._deck
+        if deck is None:  # the shell row sets the deck first
+            self._not_found()
+            return
+        try:
+            source = (_static_dir() / "editor.html").read_text(encoding="utf-8")
+        except OSError:
+            self._not_found()
+            return
+        body = library_shell(source, deck.presentation_id, self._library_server().settings.library_origin).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", pages.HTML_CONTENT_TYPE)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_library_static(self) -> None:
+        """A product file (script, style, picture of the editor): no library content, so no grant (DEC-007)."""
+        self._serve_static(urlsplit(self.path).path[len("/static/") :])
 
     @override
     def _served_file(self) -> str | None:

@@ -66,7 +66,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 import pytest
 from playwright.sync_api import Browser as Chromium
-from playwright.sync_api import BrowserContext, Playwright
+from playwright.sync_api import BrowserContext, Frame, Page, Playwright
 
 from mcp_htmleditor.config import Settings
 from mcp_htmleditor.history import HistoryStore
@@ -95,7 +95,8 @@ BOB = "bob.nobody@gmail.com"
 ADMIN = "seb.morand@gmail.com"
 FOLDER_ROW = re.compile(r'<li><a href="/f/([0-9a-f]{32})">([^<]*)</a> <span>([^<]*)</span></li>')
 PRESENTATION_ROW = re.compile(
-    r'<li><span class="name">([^<]*)</span> <time datetime="([^"]*)">([^<]*)</time> <span class="size">([^<]*)</span>'
+    r'<li><span class="name"><a href="/open/[0-9a-f]{32}">([^<]*)</a></span> '
+    r'<time datetime="([^"]*)">([^<]*)</time> <span class="size">([^<]*)</span>'
     r"</li>"
 )
 ACTIVITY_ROW = re.compile(
@@ -117,6 +118,9 @@ STANDARD_PRESENTATIONS = (
     (CARDIOLOGY, HEART_FAILURE, 2_097_152, 8, datetime(2026, 11, 10, 9, 15, tzinfo=UTC)),
     (CARDIOLOGY, ARRHYTHMIA, 524_288, 5, datetime(2026, 11, 12, 16, 40, tzinfo=UTC)),
     (CARDIOLOGY, STATINS, 1_572_864, 6, datetime(2026, 11, 12, 16, 40, tzinfo=UTC)),
+)
+PNG_1X1 = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 )
 PADDING_OPEN = b"<!--"
 PADDING_CLOSE = b"-->"
@@ -894,6 +898,28 @@ def person_context(
     if session is not None:
         context.add_cookies([{"name": "lib", "value": session, "url": running.origin}])
     return context
+
+
+def deck_frame(page: Page) -> Frame:
+    """The deck frame of an editor shell (the frame that loaded ``.../content-frame``)."""
+    frame = page.frame(url=re.compile(r"/content-frame"))
+    assert frame is not None, "no deck frame"
+    return frame
+
+
+def deck_with_pictures(title: str, slides: int) -> bytes:
+    """A presentation of ``slides`` slides, each holding one embedded picture (a 1 by 1 PNG data address)."""
+    picture = "data:image/png;base64," + base64.b64encode(PNG_1X1).decode()
+    sections = "".join(
+        f'<section class="slide" data-type="slide" data-id="slide-{number}" data-title="Slide {number}">'
+        f'<h1 data-editable="text">{html_escape(title) if number == 1 else f"Slide {number}"}</h1>'
+        f'<img src="{picture}" alt="picture {number}"></section>'
+        for number in range(1, slides + 1)
+    )
+    return (
+        f'<!DOCTYPE html><html lang="en" data-doc-type="presentation"><head><meta charset="utf-8">'
+        f"<title>{html_escape(title)}</title></head><body>{sections}</body></html>\n"
+    ).encode()
 
 
 def free_port() -> int:

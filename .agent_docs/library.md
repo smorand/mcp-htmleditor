@@ -123,7 +123,12 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
   reads per request.
 - The deck frame answer sets `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`
   (handler attributes `frame_options`, `policy`, reset per request); `_send_no_store_headers` is a no op
-  (`end_headers` already sends them). The shell `/d/<pid>/` is US-0134: until then it is a refused path.
+  (`end_headers` already sends them).
+- The shell `GET /d/<pid>/` (US-0134, DEC-038, `library_shell`): `editor.html` with `src`/`href` under `/d/<pid>`, the
+  meta `editor-config` (`base`, `readOnly`, `library`) and `static/editor-library.js` before the first script; policy
+  `frame-ancestors 'none'` only (the editor has inline styles), `X-Frame-Options: DENY`. The script wraps `fetch`
+  for the eight editor paths (prefix `base`, header `X-Editor: 1`, `window.__libraryCode` on 401/403) and redefines
+  `reloadFrame`. `GET /static/<name>` on the content origin is public (product files). Folder page names link `/open/<pid>`.
 
 ## Pages
 

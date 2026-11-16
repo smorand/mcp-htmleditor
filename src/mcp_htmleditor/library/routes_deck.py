@@ -1,4 +1,5 @@
-"""Content origin routes of one presentation: enter, deck frame, content, download, status (SPEC-0025, DEC-037).
+"""Content origin routes of one presentation: enter, shell, static files, deck frame, content, download, status
+(SPEC-0025, DEC-037, DEC-038).
 
 ``GET /enter?t=<ticket>`` redeems the one time ticket ``/open/<pid>`` issued and sets the grant cookie scoped to
 ``/d/<pid>/``; every ``/d/<pid>/`` row is answered by the inherited editor method through the DEC-003 hooks once the
@@ -8,6 +9,8 @@ and the files next to a deck included, DEC-044) is ``Access denied.`` for every 
 
 from __future__ import annotations
 
+import html
+import json
 import re
 from collections.abc import Callable
 from typing import Final, Literal
@@ -15,6 +18,10 @@ from typing import Final, Literal
 from .access import Answer, Context, EditorAnswer, Permission, Route, SetCookie, json_answer
 from .signin import GRANT_COOKIE
 
+SHELL_FRAME: Final = 'src="/content-frame"'
+SHELL_DOWNLOAD: Final = 'href="/download"'
+SHELL_SCRIPT_ANCHOR: Final = "<script src="
+LIBRARY_SCRIPT: Final = '<script src="/static/editor-library.js"></script>'
 PID: Final = r"(?P<pid>[0-9a-f]{32})"
 DENIED_CODE: Final = "denied"
 
@@ -38,8 +45,19 @@ def enter(context: Context) -> Answer:
     return Answer(302, location=path, cookies=(SetCookie(GRANT_COOKIE, grant.token, None, path=path),))
 
 
+def library_shell(editor_html: str, presentation_id: str, library_origin: str) -> str:
+    """The shell of one presentation (DEC-038): ``editor.html`` with the frame and the download link under
+    ``/d/<pid>`` and the meta and script of ``editor-library.js`` inserted before the first script."""
+    base = f"/d/{presentation_id}"
+    config = json.dumps({"base": base, "readOnly": False, "library": library_origin}, separators=(",", ":"))
+    meta = f"<meta name=\"editor-config\" content='{html.escape(config, quote=True)}'>{LIBRARY_SCRIPT}"
+    shell = editor_html.replace(SHELL_FRAME, f'src="{base}/content-frame"', 1)
+    shell = shell.replace(SHELL_DOWNLOAD, f'href="{base}/download"', 1)
+    return shell.replace(SHELL_SCRIPT_ANCHOR, meta + SHELL_SCRIPT_ANCHOR, 1)
+
+
 def inherited(
-    route: Literal["content", "content-frame", "download", "status"], *, is_framed: bool = False
+    route: Literal["content", "content-frame", "download", "shell", "static", "status"], *, is_framed: bool = False
 ) -> Callable[[Context], EditorAnswer]:
     """The handler of a route the editor already answers (DEC-003)."""
 
@@ -60,6 +78,8 @@ def _deck(route: str) -> re.Pattern[str]:
 
 ROUTES: tuple[Route, ...] = (
     Route("content", "GET", re.compile(r"/enter"), Permission.PUBLIC, enter),
+    Route("content", "GET", re.compile(r"/static/[^/]+"), Permission.PUBLIC, inherited("static")),
+    Route("content", "GET", _deck(""), Permission.VIEW, inherited("shell"), is_navigation=True),
     Route(
         "content",
         "GET",

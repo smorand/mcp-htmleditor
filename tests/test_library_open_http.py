@@ -4,8 +4,7 @@ Spec tests: E2E-026, E2E-035, E2E-102, E2E-123, E2E-148, E2E-185, E2E-187, E2E-S
 follows ``/open/<pid>`` (library origin, a ``302`` to ``/enter?t=`` on the content origin, then ``/d/<pid>/``) and
 reads ``/d/<pid>/content-frame``, ``/status`` and ``/download`` with the grant cookie the ``Browser`` keeps by path.
 The second channel is the stored library: the presentation file (``sha256``) and the ``sessions``, ``tickets`` and
-``grants`` tables read directly. The editor shell ``/d/<pid>/`` arrives with US-0134: here it is still a path under
-``/d/<pid>/`` that no row serves.
+``grants`` tables read directly. The editor shell ``/d/<pid>/`` is US-0134 (``test_library_shell_e2e.py``).
 """
 
 from __future__ import annotations
@@ -248,7 +247,7 @@ def test_library_open_frame_headers_and_unserved_paths(standard: Standard, monke
         person = standard.person(email)
         person.open_presentation(pid)
         frames.append(person.deck(pid, "content-frame"))
-        for route in ("export/docx", "picture.png", "", "content-frame/x", "assets/a.css"):
+        for route in ("export/docx", "picture.png", "content-frame/x", "assets/a.css"):
             reply = person.deck(pid, route)
             assert (reply.status, answer_of(reply)) == (403, DENIED), (email, route)
             assert answer_of(person.deck(pid, route, x_editor="1")) == DENIED

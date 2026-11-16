@@ -164,7 +164,8 @@ def folder_page(name: str, presentations: Sequence[PresentationView]) -> bytes:
     zone (DEC-031), so the server never guesses the person's zone.
     """
     rows = "".join(
-        f'<li><span class="name">{esc(presentation.name)}</span> {_time(presentation.modified)} '
+        f'<li><span class="name"><a href="/open/{esc(presentation.id)}">{esc(presentation.name)}</a></span> '
+        f"{_time(presentation.modified)} "
         f'<span class="size">{esc(format_size(presentation.size))}</span></li>'
         for presentation in presentations
     )
