@@ -15,13 +15,17 @@ import re
 from collections.abc import Callable
 from typing import Final, Literal
 
-from .access import Answer, Context, EditorAnswer, Permission, Route, SetCookie, json_answer
+from .access import Answer, Context, EditorAnswer, Permission, Role, Route, SetCookie, json_answer
 from .signin import GRANT_COOKIE
 
 SHELL_FRAME: Final = 'src="/content-frame"'
 SHELL_DOWNLOAD: Final = 'href="/download"'
 SHELL_SCRIPT_ANCHOR: Final = "<script src="
 LIBRARY_SCRIPT: Final = '<script src="/static/editor-library.js"></script>'
+READ_ONLY_STYLE: Final = (
+    "<style>#edit-mode-btn,#undo-btn,#redo-btn,#requests-toggle,#ask-ai-btn,#notes-btn,#toolbar-slide-actions,"
+    "#toolbar-doc-actions,#export-docx-btn,#requests-side,#ask-ai-panel,#notes-panel{display:none !important}</style>"
+)
 PID: Final = r"(?P<pid>[0-9a-f]{32})"
 DENIED_CODE: Final = "denied"
 
@@ -45,12 +49,15 @@ def enter(context: Context) -> Answer:
     return Answer(302, location=path, cookies=(SetCookie(GRANT_COOKIE, grant.token, None, path=path),))
 
 
-def library_shell(editor_html: str, presentation_id: str, library_origin: str) -> str:
+def library_shell(editor_html: str, presentation_id: str, library_origin: str, role: Role | None = None) -> str:
     """The shell of one presentation (DEC-038): ``editor.html`` with the frame and the download link under
     ``/d/<pid>`` and the meta and script of ``editor-library.js`` inserted before the first script."""
     base = f"/d/{presentation_id}"
-    config = json.dumps({"base": base, "readOnly": False, "library": library_origin}, separators=(",", ":"))
+    is_read_only = role is Role.RO
+    config = json.dumps({"base": base, "readOnly": is_read_only, "library": library_origin}, separators=(",", ":"))
     meta = f"<meta name=\"editor-config\" content='{html.escape(config, quote=True)}'>{LIBRARY_SCRIPT}"
+    if is_read_only:
+        meta += READ_ONLY_STYLE
     shell = editor_html.replace(SHELL_FRAME, f'src="{base}/content-frame"', 1)
     shell = shell.replace(SHELL_DOWNLOAD, f'href="{base}/download"', 1)
     return shell.replace(SHELL_SCRIPT_ANCHOR, meta + SHELL_SCRIPT_ANCHOR, 1)

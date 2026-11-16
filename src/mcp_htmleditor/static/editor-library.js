@@ -27,6 +27,19 @@
     return response;
   };
 
+  if (config.readOnly) {
+    // DEC-039: the editor's own listeners (loaded after this script) never see the key E or the deck's edit message.
+    document.addEventListener('keydown', function (e) {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || String(e.key).toLowerCase() !== 'e') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
+    window.addEventListener('message', function (e) {
+      const data = e.data;
+      if (data && data.type === 'deck-key' && String(data.key).toLowerCase() === 'e') e.stopImmediatePropagation();
+    }, true);
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     // editor.js assigns the absolute path '/content-frame?...': on the content origin that would blank the deck.
     window.reloadFrame = function () {

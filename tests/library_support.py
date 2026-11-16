@@ -75,6 +75,7 @@ from mcp_htmleditor.library.server import LibraryServer
 from mcp_htmleditor.library.store import Database, Library
 from mcp_htmleditor.request_service import RequestService
 from mcp_htmleditor.request_store import RequestStore
+from tests.deck_support import build_deck
 
 LIBRARY_HOST = "slides.test"
 CONTENT_HOST = "slides-content.test"
@@ -920,6 +921,27 @@ def deck_with_pictures(title: str, slides: int) -> bytes:
         f'<!DOCTYPE html><html lang="en" data-doc-type="presentation"><head><meta charset="utf-8">'
         f"<title>{html_escape(title)}</title></head><body>{sections}</body></html>\n"
     ).encode()
+
+
+def deck_with_notes(titles: tuple[str, ...], notes: str, script: str = "") -> bytes:
+    """A real "ei" deck of ``titles`` whose slide 1 carries the speaker notes ``notes`` and, when ``script`` is not
+    empty, the element ``probe`` and that script (the presentation's own script, as a hostile one would be)."""
+    extra = f'<aside data-role="speaker-notes">{html_escape(notes)}</aside>'
+    if script:
+        extra += f'<p id="probe"></p><script>{script}</script>'
+
+    def put_in_first_slide(deck: str) -> str:
+        end = deck.index("</article>")
+        return deck[:end] + extra + deck[end:]
+
+    return build_deck("ei", titles, mutate=put_in_first_slide).encode()
+
+
+def open_presenter(page: Page) -> Page:
+    """Press the key S in the editor shell: the deck's presenter window, once the notes reached it."""
+    with page.context.expect_page(timeout=10_000) as opened:
+        page.locator("body").press("s")
+    return opened.value
 
 
 def free_port() -> int:

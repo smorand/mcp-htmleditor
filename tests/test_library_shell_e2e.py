@@ -93,9 +93,9 @@ def test_library_shell_the_served_shell_differs_from_editor_html_in_three_places
     shows exactly the frame, the download link and the inserted meta and script."""
     running = library_server(fake_google)
     _ids, heart = heart_library(running)
-    carol = signed_in(running, fake_google, CAROL)
-    carol.open_presentation(heart.id)
-    reply = carol.deck(heart.id, "")
+    dan = signed_in(running, fake_google, DAN)
+    dan.open_presentation(heart.id)
+    reply = dan.deck(heart.id, "")
     original = (_static_dir() / "editor.html").read_text(encoding="utf-8")
 
     assert reply.status == 200

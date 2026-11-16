@@ -339,7 +339,9 @@ class LibraryHandler(_EditorHandler):
         except OSError:
             self._not_found()
             return
-        body = library_shell(source, deck.presentation_id, self._library_server().settings.library_origin).encode()
+        body = library_shell(
+            source, deck.presentation_id, self._library_server().settings.library_origin, deck.role
+        ).encode()
         self.send_response(200)
         self.send_header("Content-Type", pages.HTML_CONTENT_TYPE)
         self.send_header("Content-Length", str(len(body)))
