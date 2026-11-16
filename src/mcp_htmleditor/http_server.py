@@ -1027,9 +1027,9 @@ _WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})  # noqa: S104  # nosec B104
 class _EditorServer(ThreadingHTTPServer):
     """HTTP server that remembers the host it was asked to bind (SPEC-0005 host gate) and its open connections."""
 
-    def __init__(self, bind_host: str, port: int) -> None:
+    def __init__(self, bind_host: str, port: int, handler: type[BaseHTTPRequestHandler] = _EditorHandler) -> None:
         self.connections = ConnectionRegistry()  # before the bind: a handler may look it up as soon as one exists
-        super().__init__((bind_host, port), _EditorHandler)
+        super().__init__((bind_host, port), handler)
         self.bind_host = bind_host
 
 

@@ -196,6 +196,47 @@ def serve_cmd(file: str, port: int | None, host: str | None, poll: int | None, n
     )
 
 
+@main.command("webserve")
+@click.option("--host", default=None, help="Bind address (default HTMLEDITOR_HOST or localhost).")
+@click.option("--port", default=None, type=int, help="HTTP port (default HTMLEDITOR_PORT or 7842).")
+def webserve_cmd(host: str | None, port: int | None) -> None:
+    """Serve the web library: every folder and presentation, behind Google sign in, until SIGINT or SIGTERM.
+
+    One process answers the library origin and the content origin (HTMLEDITOR_LIBRARY_ORIGIN,
+    HTMLEDITOR_LIBRARY_CONTENT_ORIGIN) and refuses every other host name. The local `serve` is unchanged.
+    """
+    import signal
+    import threading
+
+    from .library.server import LibraryConfigError, LibraryServer
+
+    overrides = {name: value for name, value in (("host", host), ("port", port)) if value is not None}
+    settings = get_settings().model_copy(update=overrides)
+    if not is_utf8_encodable(settings.host):
+        raise click.ClickException(UNENCODABLE_BIND_ADDRESS)
+    try:
+        server = LibraryServer(settings)
+    except LibraryConfigError as exc:
+        click.echo(str(exc), err=True)
+        raise SystemExit(1) from exc
+    except OSError as exc:
+        raise click.ClickException(f"Cannot listen on {settings.host}:{settings.port}: {exc}") from exc
+    stopped = threading.Event()
+
+    def request_stop(signum: int, frame: object) -> None:  # noqa: ARG001 - signal handler signature
+        stopped.set()  # the stop itself runs below, never inside the handler
+
+    signal.signal(signal.SIGINT, request_stop)
+    signal.signal(signal.SIGTERM, request_stop)
+    server.start()
+    click.echo(
+        f"Serving the library on http://{settings.host}:{server.port}/ (library origin {settings.library_origin},"
+        f" content origin {settings.library_content_origin})"
+    )
+    stopped.wait()
+    server.stop()
+
+
 def _require_encodable_file(file: str) -> None:
     if not is_utf8_encodable(file):
         raise click.ClickException(UNENCODABLE_FILE_NAME)

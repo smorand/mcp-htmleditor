@@ -123,7 +123,7 @@
 | US-0121 | SPEC-0023 | serve files next to the open deck | US-0117 | 1 | done | feat/breathe-template | US-0120 |
 | US-0122 | SPEC-0023 | breathe skill topic, docs and evidence | US-0120, US-0121 | 1 | done | feat/breathe-template | US-0121 |
 | US-0123 | SPEC-0023 | breathe converge gaps | US-0122 | 1 | done | feat/breathe-template | US-0122 |
-| US-0124 | SPEC-0025 | webserve starts, accepts only its two host names, answers /health | main | 1 | todo | feat/0049-web-library-mode | |
+| US-0124 | SPEC-0025 | webserve starts, accepts only its two host names, answers /health | main | 1 | done | feat/0049-web-library-mode | main |
 | US-0125 | SPEC-0025 | A visitor sees only the sign in page | US-0124 | 2 | todo | feat/0049-web-library-mode | |
 | US-0126 | SPEC-0025 | Sign in with a Google account, stay signed in, sign out | US-0125 | 1 | todo | feat/0049-web-library-mode | |
 | US-0127 | SPEC-0025 | The home page: Admin role, order, empty states, uniform refusal | US-0126 | 1 | todo | feat/0049-web-library-mode | |

@@ -386,9 +386,12 @@ def test_wcbip_switched_is_painted_with_its_notes(tmp_path: Path) -> None:
     )
     to_pptx(str(switched), str(tmp_path / "switched.pptx"))
     slides = Presentation(str(tmp_path / "switched.pptx")).slides
-    assert len(slides) == 14
+    soup = BeautifulSoup(original, "html.parser")
+    assert len(slides) == len(soup.select('[data-type="slide"]'))
     assert all(is_full_slide_picture(next(iter(s.shapes))) for s in slides)
-    assert sum(1 for s in slides if s.has_notes_slide and s.notes_slide.notes_text_frame.text.strip()) == 14
+    noted = sum(1 for s in slides if s.has_notes_slide and s.notes_slide.notes_text_frame.text.strip())
+    asides = soup.select('[data-type="slide"] > aside[data-role="speaker-notes"]')
+    assert noted == len([a for a in asides if a.get_text(strip=True)])
 
 
 @needs_chromium

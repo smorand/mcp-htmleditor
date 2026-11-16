@@ -76,11 +76,24 @@ No foreign key from `grants` to `presentations`: a grant for a deleted presentat
 **Hooks** in `_EditorHandler` (`http_server.py`), defaults reproduce the previous expressions exactly (DEC-003):
 
 ```python
-def _served_file(self) -> str | None: return get_state().current_file
-def _served_name(self) -> str: return Path(self._served_file() or "").name
-def _save_lock(self) -> AbstractContextManager[object]: return get_state().save_lock
-def _failure_reason(self, exc: Exception) -> str: return str(exc)
-def _pptx_options(self) -> dict[str, bool]: return {}
+def _served_file(self) -> str | None:
+    return get_state().current_file
+
+
+def _served_name(self) -> str:
+    return Path(self._served_file() or "").name
+
+
+def _save_lock(self) -> AbstractContextManager[object]:
+    return get_state().save_lock
+
+
+def _failure_reason(self, exc: Exception) -> str:
+    return str(exc)
+
+
+def _pptx_options(self) -> dict[str, bool]:
+    return {}
 ```
 
 Replace in `_serve_content` (`:376`), `_serve_content_frame` (`:389`), `_serve_download` (`:409`, name from `_served_name()`), `_export_pptx` (`:432`, `to_pptx(str(src), tmp_path, **self._pptx_options())`, stem from `_served_name()`), `_export_docx` (`:458`), `_loaded_file` (`:578`), `_receive_content` (`:625`, `with self._save_lock():`), `_run_arch_layout` (`:653`) every `get_state().current_file` and `state.current_file` by `self._served_file()`, every `state.save_lock` by `self._save_lock()`, and `str(exc)` in the three export and download failure answers by `self._failure_reason(exc)` (`:419-420`, `:448-450`, `:474-476`). The existing suites prove nothing changed.

@@ -419,6 +419,18 @@ server runs at a time: calling `start_server` on a second file switches the serv
 (use `open_file` for that) rather than opening a second server — run a separate agent
 session per presentation if you need several displayed simultaneously.
 
+## Web library mode
+
+`mcp-htmleditor webserve [--host HOST] [--port PORT]` starts one process meant to run behind nginx at
+`slides.scm-platform.org` (SPEC-0025, being built story by story). It answers only the host names of
+`HTMLEDITOR_LIBRARY_ORIGIN` (default `https://slides.scm-platform.org`) and `HTMLEDITOR_LIBRARY_CONTENT_ORIGIN`
+(default `https://slides-content.scm-platform.org`, the two must differ, else the command exits 1); any other host
+name gets `403 {"error": "forbidden host"}`, a request that reached nginx in plain http
+(`X-Forwarded-Proto: http`) gets `308` to the same path on the secure origin, and `GET /health` answers
+`{"ok": true, "status": "ok", "version"}` on any host name, nothing more. `HTMLEDITOR_LIBRARY_DIR` (default
+`<state dir>/library`) will hold the library data. It stops on SIGINT or SIGTERM. The local `serve` is unchanged
+and never shows a library page.
+
 ## Templates
 
 Templates are resolved in priority order:
@@ -566,6 +578,9 @@ Every variable is read through the `Settings` class (pydantic-settings,
 | `HTMLEDITOR_BIN_DIR` | `~/.local/bin` | CLI install target |
 | `HTMLEDITOR_OTEL_DESTINATION` | unset | OTLP/HTTP endpoint for spans; unset means local JSONL |
 | `HTMLEDITOR_OTEL_API_KEY` | unset | Sent as `Authorization: Bearer <key>` on OTLP exports |
+| `HTMLEDITOR_LIBRARY_ORIGIN` | `https://slides.scm-platform.org` | `webserve` library origin, `http(s)://host[:port]` without a path |
+| `HTMLEDITOR_LIBRARY_CONTENT_ORIGIN` | `https://slides-content.scm-platform.org` | `webserve` content origin, another host name |
+| `HTMLEDITOR_LIBRARY_DIR` | `<state dir>/library` | `webserve` library data |
 | `XDG_CONFIG_HOME` | `~/.config` | Base for config |
 | `XDG_CACHE_HOME` | `~/.cache` | Base for cache |
 
@@ -626,6 +641,7 @@ src/mcp_htmleditor/
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
 ├── mcp_server.py    FastMCP server with 22 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
+├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers)
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)
