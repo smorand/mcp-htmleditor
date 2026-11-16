@@ -12,20 +12,21 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | `pages.py` | `esc`, `sign_in_page`, `access_denied()`, `library_unavailable()`, `home_page(folders, is_admin=)`, `folder_page`, `admin_page(folders, activity)` (with the `Delete folder` buttons and the `<dialog>`), `folder_exists(name)`,
 `created_folder_line(name)`, `deleted_folder_line(name)`, every English text constant (DEC-055, `ROLE_LABELS` keyed by `Role` value); every page links `/lib/library.css` and loads `/lib/library.js` (`defer`) |
 | `names.py` | `compose` (NFC), `name_key` (NFC of lower of NFC, the unique `folders.name_key`), `order_key` (DEC-029), `check_folder_name`, `check_email` / `NameRefused`, `format_size` (DEC-031) |
-| `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route` (`is_json`), `Context` (`folder_id`, `role`, `payload` filled by the dispatcher), `Answer`, `json_answer`, `JSON_CONTENT_TYPE`, `SetCookie` (DEC-021) |
-| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library(database, clock, *, state_dir)` (`folders_for`, `is_admin`, `role_in(email, folder_id or None)`, `folder_name`, `presentation_path`, `presentations_in`, `create_folder(name, actor)`, `delete_folder(folder_id, confirm, actor)`, `set_member(folder_id, email, role, actor)`, `remove_member(folder_id, email, actor)`, `members_by_folder()`, `activity()`, `record(connection, actor, text)`), `NameTaken`, `NameMismatch`, `FolderMissing`, `normalize_email`, `FolderView`, `MemberView`, `PresentationView`, `ActivityLine` |
+| `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route` (`is_json`, `is_navigation`), `Context` (`folder_id`, `role`, `payload`, `session`, `presentation_id`, both origins, filled by the dispatcher), `Answer`, `EditorAnswer` (a deck route answered by the inherited editor method), `json_answer`, `JSON_CONTENT_TYPE`, `SetCookie` (`path`) (DEC-021) |
+| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()`, test seam `Database.connect_hook`, `MIGRATIONS`), `Library(database, clock, *, state_dir)` (`folders_for`, `is_admin`, `role_in(email, folder_id or None)`, `folder_name`, `presentation(pid)` (`PresentationRow` or None), `presentation_path`, `presentations_in`, `create_folder(name, actor)`, `delete_folder(folder_id, confirm, actor)`, `set_member(folder_id, email, role, actor)`, `remove_member(folder_id, email, actor)`, `members_by_folder()`, `activity()`, `record(connection, actor, text)`), `NameTaken`, `NameMismatch`, `FolderMissing`, `normalize_email`, `FolderView`, `MemberView`, `PresentationView`, `ActivityLine` |
 | `routes_admin.py` | `GET /admin` (ADMINISTER, `administration`), `POST /api/folders` (ADMINISTER, JSON, `create_folder`), `POST /api/folders/<fid>/delete` (`delete_folder`), `POST /api/folders/<fid>/members` (`set_member`), `POST /api/folders/<fid>/members/remove` (`remove_member`), all ADMINISTER and JSON |
-| `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `purge`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
-| `routes_library.py` | `ROUTES`: `GET /lib/library.css`, `GET /lib/library.js` (PUBLIC, `static_file`, `STATIC_DIR`), `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN), `GET /f/(?P<fid>[0-9a-f]{32})` (VIEW, `folder`) |
+| `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `purge`, `session_for`, `end_session`, `issue_ticket`, `redeem_ticket`, `grant_for`), `Session`, `NewSession`, `NewGrant`, `Live`, `NoGrant` (`ENDED`, `ABSENT`), `GrantState`, `SignInUnavailable`, cookie base names (`lib`, `lib-b`, `d`) |
+| `routes_library.py` | `ROUTES`: `GET /lib/library.css`, `GET /lib/library.js` (PUBLIC, `static_file`, `STATIC_DIR`), `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN), `GET /f/(?P<fid>[0-9a-f]{32})` (VIEW, `folder`), `GET /open/(?P<pid>[0-9a-f]{32})` (VIEW on the presentation's folder, `open_presentation`) |
+| `routes_deck.py` | content origin `ROUTES`: `GET /enter` (PUBLIC), `GET /d/<pid>/content-frame` (framed, navigation), `/status`, `/content`, `/download` (navigation), then `GET` and `POST /d/<pid>/.*` (`refuse`); `deck_path`, `denied()` |
 | `static/library.js` | every page: `time[datetime]` rewritten in the browser's zone, `pageshow` with `persisted` reloads (DEC-009, DEC-031); administration: `sendJson` (fetch, reload on success, refusal into an alert), `Create folder`, the deletion `<dialog>`, the `Members` controls |
-| `server.py` | `load_routes`, `cookie_name`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_origin_ok`, `_send_answer`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
+| `server.py` | `load_routes`, `cookie_name(origin, base, path)`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `FRAME_POLICY`, `DeckTarget`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_serve_content_origin`, `_deck_answer`, `_respond`, the DEC-003 hook overrides, `_serve_status`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
 
 A route handler is a plain function `(Context) -> Answer` (a `routes_*` module never imports `server.py`, which loads
 the routes while being imported). The dispatcher writes the `Answer` (an HTML body gets `PAGE_POLICY`).
 
-`_EditorServer.__init__(bind_host, port, handler=_EditorHandler)` is the only change to `http_server.py` (DEC-003);
-`_EditorHandler` is subclassed, never edited (`test_the_editor_handler_is_unchanged...` pins its source hash; the
-story that adds the DEC-003 hooks updates the hash in its own diff).
+`_EditorServer.__init__(bind_host, port, handler=_EditorHandler)` and the five hooks (US-0133) are the only changes to
+`http_server.py` (DEC-003; `.agent_docs/architecture.md`); `test_the_editor_handler_is_unchanged...` pins the source
+hash of `_EditorHandler`: a story editing it updates the hash in its own diff.
 
 ## Settings (DEC-005)
 
@@ -45,8 +46,9 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
    `403 {"error": "forbidden host"}` and one `Refused <METHOD> <path>: forbidden host '<host>'` warning.
 4. `X-Forwarded-Proto: http` (any case) while that origin is https: `308`, `Location` = configured origin + request
    path + query (never the request's `Host`, an absolute form target keeps only its path), empty body.
-5. Content origin: `302` to `<library origin>/`. An unread body of a non GET closes the connection. Python's
-   `BaseHTTPRequestHandler` already turns `//x` into `/x` in `self.path`.
+5. Content origin, `_serve_content_origin`: a path in no `content` row is `302` to `<library origin>/`; otherwise
+   § Opening a presentation. An unread body of a non GET closes the connection. Python's `BaseHTTPRequestHandler`
+   already turns `//x` into `/x` in `self.path`.
 6. Library origin, `_serve_library` (DEC-019, DEC-021, DEC-022), in this order: a non GET/HEAD/OPTIONS request needs
    `Origin` exactly the library origin and `Sec-Fetch-Site` absent, `same-origin` or `none` (before the route lookup:
    a POST to no row gets `Access denied.` too); the route (origin, method, `pattern.fullmatch(path)`); a route with
@@ -70,7 +72,8 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
   reads the wall clock or contains `UPDATE sessions` (grep test).
 - A session is alive while `clock() < expires_at`; at `expires_at` exactly it is over. `expires_at` is written once.
   `Accounts.purge()` (called by `begin_login` and by `finish_login` after it took the attempt) deletes session rows
-  ended more than 86 400 s ago (kept a day for US-0137) and attempts of 600 s or more. Tickets join it with US-0133.
+  ended more than 86 400 s ago (kept a day for US-0137; their grants cascade), attempts of 600 s or more and tickets
+  of 60 s or more (`issue_ticket` purges tickets too).
 - Restart: no state in memory; a new `LibraryServer` on the same `library_dir` serves the same sessions and folders.
 - Unreadable library: tests set `Database.connect_hook` (class attribute, called before each new connection) to
   raise `sqlite3.OperationalError`, or swap a junk `library.db` in (`running.unreadable_database()`). A connection
@@ -99,6 +102,29 @@ are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the 
 - The credentials file is read once at `LibraryServer` construction: missing or unreadable is one ERROR line, a return
   address absent from `redirect_uris` one WARNING line; the server starts either way.
 
+## Opening a presentation (US-0133, DEC-037, DEC-040, DEC-041)
+
+- `GET /open/<pid>` (library): the dispatcher's `_target` reads `presentation(pid)` and takes the role in its folder
+  (unknown id: no folder, only the administrator passes, then the handler answers `Access denied.`); success is a
+  ticket row (`sha256`, session hash, pid, `created_at`) and `302 <content origin>/enter?t=<43 char ticket>`.
+- `GET /enter?t=` (content): `redeem_ticket` deletes the ticket first (`DELETE ... RETURNING`), refuses 60 s or more
+  or a session no longer alive, inserts a grant (fresh 256 bit token, hash only); cookie `d` (`__Secure-d` on https,
+  `__Host-` needs `Path=/`) `Path=/d/<pid>/; HttpOnly; SameSite=Lax`, no `Max-Age`; `302 /d/<pid>/`. A bad ticket:
+  `302 <library origin>/`, no cookie. Migration 4: `tickets`, `grants`, both `ON DELETE CASCADE` from `sessions`
+  (sign out kills them), no foreign key to `presentations`.
+- `/d/<pid>/` rows (`_deck_answer`, every request): `grant_for(pid, cookie)` (one join, the grant must name this pid
+  and its session be alive): not `Live` is `401 {"error": SESSION_EXPIRED, "code": "session_expired"}` with
+  `X-Editor: 1`, else `302 <library origin>/open/<pid>`. Then `presentation(pid)`, `role_in`, `authorize`: refused
+  is `302 /open/<pid>` for a navigation route without `X-Editor`, else `403 {"error": "Access denied.", "code":
+  "denied"}`. Then `DeckTarget(path, name, role)` feeds the hooks: `_served_file`, `_served_name` (`<name>.html`),
+  `_failure_reason` (`strerror`, else `Export failed`); `_save_lock` and `_pptx_options` keep the defaults until
+  US-0136 and US-0140. `_serve_status`: `mtime`, `false`, `null`, `<name>.html`, `poll_interval`, `port` 0,
+  `requests_revision` (0 without EDIT). `_serve_deck_file` is never reached (catch all rows). Cost: four primary key
+  reads per request.
+- The deck frame answer sets `X-Frame-Options: SAMEORIGIN` and `Content-Security-Policy: frame-ancestors 'self'`
+  (handler attributes `frame_options`, `policy`, reset per request); `_send_no_store_headers` is a no op
+  (`end_headers` already sends them). The shell `/d/<pid>/` is US-0134: until then it is a refused path.
+
 ## Pages
 
 Home page, folder page, administration, folder deletion and members (US-0127, US-0129 to US-0132): `.agent_docs/library-pages.md`.
@@ -125,7 +151,7 @@ main thread's). Migration 1 (US-0126): `meta`, `folders`, `members` (+ index on 
 included) carries `Cache-Control: no-store, must-revalidate`, `Pragma: no-cache`, `X-Content-Type-Options: nosniff`,
 `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none';
 frame-ancestors 'none'`, plus `Strict-Transport-Security: max-age=31536000` when the library origin is https.
-The handler attribute `policy` (default JSON) is set to `PAGE_POLICY` by the page answers; the deck frame (US-0133) will set its own.
+The handler attribute `policy` (default JSON) is set to `PAGE_POLICY` by the page answers; the deck frame sets its own.
 
 ## Process
 
@@ -163,8 +189,11 @@ US-0132: `Browser.add_member(fid, email, role)`, `Browser.remove_member(fid, ema
 (address, role label; asserts the folder's `Members` section exists), `StoredLibrary.members()`, `signed_in`, `visible_texts`.
 US-0130: `Browser.post_json(path, payload, headers=None)` (default `page_post_headers()`: `Origin`, `Sec-Fetch-Site:
 same-origin`, JSON type), `LibraryReply.activity_lines()` (unescaped `(UTC ISO, actor, text)`).
+US-0133: `start(scheme="https")`, `Browser.deck_cookies` (content origin, by path; `X-Forwarded-Proto` sent when the
+origins are https), `open_presentation(pid)`, `deck(pid, route, follow=, x_editor="1")`, `grant(pid)`, `copied()`;
+`sign_out` posts to the library origin wherever the browser is; `StoredLibrary.tickets()`, `grants()`.
 Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for the areas `visitor`, `auth`, `home`,
-`sessions`, `gate`, `folders`, `admin`, `foldel`, `members`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
+`sessions`, `gate`, `folders`, `admin`, `foldel`, `members`, `open`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
 
 ## Gotchas
 

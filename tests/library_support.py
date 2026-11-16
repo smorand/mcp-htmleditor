@@ -32,6 +32,12 @@ returns its state directory ``<state_dir>/files/<key>``.
 Members (US-0132): ``Browser.add_member`` and ``Browser.remove_member`` send what the ``Members`` controls send;
 ``LibraryReply.member_rows(folder_id)`` reads the members of one folder on the administration page;
 ``StoredLibrary.members()`` the table; ``signed_in`` and ``visible_texts`` are shared by the member modules.
+
+Opening a presentation (US-0133): the ``Browser`` also keeps the grant cookies of the content origin by path
+(``deck_cookies``) and sends ``X-Forwarded-Proto`` as nginx does when the origins are https (``start(scheme=
+"https")``); ``Browser.open_presentation(pid)`` chooses a presentation, ``Browser.deck(pid, route)`` asks one route of
+it without following redirects, ``Browser.copied()`` is a tool holding a copy of every cookie;
+``StoredLibrary.tickets()`` and ``grants()`` read the two tables.
 """
 
 from __future__ import annotations
@@ -477,11 +483,30 @@ class StoredLibrary:
         """``(folder_id, email, role)`` of every member row."""
         return self.rows("SELECT folder_id, email, role FROM members ORDER BY folder_id, email")
 
+    def tickets(self) -> list[tuple[Any, ...]]:
+        """``(ticket_hash, session_id_hash, presentation_id, created_at)`` of every ticket row (none before the
+        table exists)."""
+        if not self._has_table("tickets"):
+            return []
+        return self.rows("SELECT ticket_hash, session_id_hash, presentation_id, created_at FROM tickets")
+
+    def grants(self) -> list[tuple[Any, ...]]:
+        """``(token_hash, session_id_hash, presentation_id, created_at)`` of every grant row (none before the
+        table exists)."""
+        if not self._has_table("grants"):
+            return []
+        return self.rows("SELECT token_hash, session_id_hash, presentation_id, created_at FROM grants")
+
     def activity(self) -> list[tuple[Any, ...]]:
         """The activity lines, empty while the table does not exist (it arrives with US-0130)."""
-        if not self.rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'activity'"):
+        if not self._has_table("activity"):
             return []
         return self.rows("SELECT * FROM activity ORDER BY id")
+
+    def _has_table(self, name: str) -> bool:
+        with closing(sqlite3.connect(self.library_dir / "library.db")) as connection:
+            found = connection.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,))
+            return found.fetchone() is not None
 
 
 @dataclass(frozen=True)
@@ -615,6 +640,14 @@ class RunningLibrary:
         return self.settings.library_origin
 
     @property
+    def content_origin(self) -> str:
+        return self.settings.library_content_origin
+
+    @property
+    def is_secure(self) -> bool:
+        return self.origin.startswith("https://")
+
+    @property
     def stored(self) -> StoredLibrary:
         return StoredLibrary(self.library_dir, self.state_dir)
 
@@ -667,6 +700,7 @@ class Browser:
     resolver: dict[str, int]
     cookies: dict[str, str] = field(default_factory=dict)
     persistent: set[str] = field(default_factory=set)  # names of the cookies set with a Max-Age
+    deck_cookies: dict[tuple[str, str], str] = field(default_factory=dict)  # content origin, (path, name) to value
     visited: list[str] = field(default_factory=list)
     replies: list[LibraryReply] = field(default_factory=list)
     url: str = ""
@@ -687,7 +721,7 @@ class Browser:
     def sign_out(self) -> LibraryReply:
         """The ``Sign out`` form: a same origin POST, with the ``Origin`` a browser sends under ``same-origin``."""
         headers = {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin"}
-        return self._navigate("POST", "/auth/logout", headers, follow=True)
+        return self._navigate("POST", f"{self.running.origin}/auth/logout", headers, follow=True)
 
     def post_json(self, path: str, payload: Any, *, headers: dict[str, str] | None = None) -> LibraryReply:
         """POST ``payload`` (JSON encoded unless already bytes) with this browser's cookies and the headers of the
@@ -712,6 +746,31 @@ class Browser:
     def page_post_headers(self) -> dict[str, str]:
         """What Chromium sends with a ``fetch`` POST of JSON from a library page."""
         return {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json"}
+
+    def open_presentation(self, presentation_id: str) -> LibraryReply:
+        """Choose a presentation on a folder page: ``/open/<pid>`` of the library origin, redirects followed."""
+        return self.open(f"{self.running.origin}/open/{presentation_id}")
+
+    def deck(self, presentation_id: str, route: str, *, follow: bool = False, **headers: str) -> LibraryReply:
+        """GET ``/d/<pid>/<route>`` on the content origin with this browser's cookies (``x_editor="1"`` sends
+        ``X-Editor: 1``); redirects followed only when ``follow``."""
+        address = f"{self.running.content_origin}/d/{presentation_id}/{route}"
+        return self._navigate("GET", address, _header_names(headers), follow=follow)
+
+    def grant(self, presentation_id: str) -> str | None:
+        """The value of the grant cookie of a presentation, None when the browser holds none."""
+        path = f"/d/{presentation_id}/"
+        return next((value for (where, _), value in self.deck_cookies.items() if where == path), None)
+
+    def copied(self) -> Browser:
+        """A command line tool holding a copy of every cookie of this browser, no history."""
+        return Browser(
+            self.running,
+            dict(self.resolver),
+            cookies=dict(self.cookies),
+            persistent=set(self.persistent),
+            deck_cookies=dict(self.deck_cookies),
+        )
 
     def reopened(self) -> Browser:
         """The browser closed and opened again: the cookies without ``Max-Age`` are gone, the others kept."""
@@ -739,11 +798,19 @@ class Browser:
         self.visited.append(url)
         self.url = url
         path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
-        if parts.scheme == "http" and parts.netloc == self.running.library_netloc:
+        if self.running.is_secure and parts.netloc in {self.running.library_netloc, self.running.content_netloc}:
+            headers = {**headers, "X-Forwarded-Proto": parts.scheme}  # nginx in front of the https origins
+        if parts.scheme in {"http", "https"} and parts.netloc == self.running.library_netloc:
             if self.cookies:
                 headers = {**headers, "Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items())}
             reply = self.running.client().request(method, path, headers=headers)
             self._keep_cookies(reply)
+        elif parts.scheme in {"http", "https"} and parts.netloc == self.running.content_netloc:
+            sent = [f"{name}={value}" for (where, name), value in self.deck_cookies.items() if path.startswith(where)]
+            if sent:
+                headers = {**headers, "Cookie": "; ".join(sent)}
+            reply = self.running.client(self.running.content_netloc).request(method, path, headers=headers)
+            self._keep_deck_cookies(reply)
         elif parts.hostname in self.resolver:
             reply = HttpClient(self.resolver[str(parts.hostname)], parts.netloc).request(method, path, headers=headers)
         elif parts.hostname == "127.0.0.1" and parts.port is not None:
@@ -752,6 +819,16 @@ class Browser:
             raise AssertionError(f"the browser cannot reach {url!r}")
         self.replies.append(reply)
         return reply
+
+    def _keep_deck_cookies(self, reply: LibraryReply) -> None:
+        for header in reply.set_cookies:
+            pair, *attributes = (part.strip() for part in header.split(";"))
+            name, _, value = pair.partition("=")
+            path = next((item[len("Path=") :] for item in attributes if item.startswith("Path=")), "/")
+            if "Max-Age=0" in attributes:
+                self.deck_cookies.pop((path, name), None)
+            else:
+                self.deck_cookies[(path, name)] = value
 
     def _keep_cookies(self, reply: LibraryReply) -> None:
         for header in reply.set_cookies:
@@ -827,7 +904,8 @@ def free_port() -> int:
 
 @pytest.fixture
 def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
-    """Return ``start(google=None, google_registered=True, **settings_overrides)``; all stopped at teardown.
+    """Return ``start(google=None, google_registered=True, scheme="http", **settings_overrides)``; all stopped at
+    teardown; ``scheme="https"`` gives two https origins on the same loopback port (nginx's view).
 
     With ``google`` the credentials file points at that ``FakeGoogle`` and the sign in return address
     ``<library origin>/auth/callback`` is registered in its console and listed in the file, unless
@@ -836,7 +914,11 @@ def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
     started: list[RunningLibrary] = []
 
     def start(
-        google: FakeGoogle | None = None, *, google_registered: bool = True, **settings_overrides: Any
+        google: FakeGoogle | None = None,
+        *,
+        google_registered: bool = True,
+        scheme: str = "http",
+        **settings_overrides: Any,
     ) -> RunningLibrary:
         port = free_port()
         library_dir = tmp_path / "library"
@@ -844,8 +926,8 @@ def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
         values: dict[str, Any] = {
             "host": "127.0.0.1",
             "port": port,
-            "library_origin": f"http://{LIBRARY_HOST}:{port}",
-            "library_content_origin": f"http://{CONTENT_HOST}:{port}",
+            "library_origin": f"{scheme}://{LIBRARY_HOST}:{port}",
+            "library_content_origin": f"{scheme}://{CONTENT_HOST}:{port}",
             "library_dir_override": library_dir,
             "state_dir_override": state_dir,
         }

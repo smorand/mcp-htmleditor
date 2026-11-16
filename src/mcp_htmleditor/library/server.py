@@ -3,8 +3,10 @@
 Gate order of every request (DEC-007, DEC-008, DEC-010): a header block readable two ways is refused (400,
 inherited ``_refuse_ambiguous_headers``); ``GET /health`` answers on any host name with ``running`` and the version
 only; a ``Host`` other than the netloc of one of the two configured origins gets ``403 {"error": "forbidden host"}``;
-``X-Forwarded-Proto: http`` gets ``308`` to the configured origin of that host; every request on the content
-origin gets a ``302`` to the library origin (DEC-011); on the library origin the route table decides (DEC-021):
+``X-Forwarded-Proto: http`` gets ``308`` to the configured origin of that host; on the content origin a path in no
+row gets a ``302`` to the library origin (DEC-011) and a ``/d/<pid>/`` row needs a live grant, the presentation and a
+role allowing the route before the inherited editor method answers through the DEC-003 hooks (DEC-037, DEC-040,
+DEC-041); on the library origin the route table decides (DEC-021):
 a state changing request needs its ``Origin`` (DEC-022) before the route or the session is looked up, and a JSON route
 its ``Content-Type: application/json`` before the session; a path in no row or a non public route gives the sign in
 page to a visitor and ``Access denied.`` to a signed in person; the role and the permission come before the body; a
@@ -23,16 +25,28 @@ import sqlite3
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast, override
 from urllib.parse import parse_qsl, urlsplit
 
 from ..config import Settings, is_origin
 from ..http_server import SaveRefusal, _EditorHandler, _EditorServer, check_content_type, parse_content_length
+from ..request_service import RequestService
+from ..request_store import RequestStore
 from ..version import __version__
 from . import pages
-from .access import Answer, Context, Permission, Route, authorize, json_answer
-from .signin import BROWSER_COOKIE, SESSION_COOKIE, Accounts, GoogleClient, safe_destination
+from .access import Answer, Context, EditorAnswer, Permission, Role, Route, authorize, json_answer
+from .routes_deck import deck_path, denied
+from .signin import (
+    BROWSER_COOKIE,
+    GRANT_COOKIE,
+    SESSION_COOKIE,
+    Accounts,
+    GoogleClient,
+    Live,
+    safe_destination,
+)
 from .store import Database, Library
 
 logger = logging.getLogger(__name__)
@@ -45,6 +59,10 @@ PAGE_POLICY = (
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
     "form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 )
+FRAME_POLICY = "frame-ancestors 'self'"  # the deck frame: framed by the editor shell of its own origin only
+FRAME_DENIED = "DENY"
+FRAME_SAME_ORIGIN = "SAMEORIGIN"
+EDITOR_HEADER = "X-Editor"  # every fetch of the editor in the library carries it (DEC-040)
 ROUTES_MODULE_PREFIX = "routes_"
 STRICT_TRANSPORT = "max-age=31536000"
 POLL_INTERVAL_SECONDS = 0.05
@@ -53,7 +71,9 @@ SECURE_SCHEME = "https"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 FETCH_SITES_ALLOWED = frozenset({"same-origin", "none"})
 FOLDER_GROUP = "fid"
+PRESENTATION_GROUP = "pid"
 HOST_PREFIX = "__Host-"
+SECURE_PREFIX = "__Secure-"
 DATABASE_NAME = "library.db"
 CALLBACK_PATH = "/auth/callback"
 JSON_BODY_MAX_BYTES = 65_536  # a JSON route carries a name, an address, a role: far below this
@@ -63,19 +83,32 @@ class LibraryConfigError(Exception):
     """The settings cannot run the library (the message is the user text)."""
 
 
+@dataclass(frozen=True, slots=True)
+class DeckTarget:
+    """The presentation a content origin request is about, once its grant and role hold: the stored file, the
+    name (without ``.html``) and the person's role."""
+
+    path: Path
+    name: str
+    role: Role
+
+
 def health_answer() -> dict[str, Any]:
     """The liveness answer: running and the version, nothing about files, process or presentations (DEC-010)."""
     return {"ok": True, "status": "ok", "version": __version__}
 
 
-def cookie_name(origin: str, base: str) -> str:
-    """``lib`` on http, ``__Host-lib`` on https: the prefix forbids a parent domain or another path from setting it."""
-    return f"{HOST_PREFIX}{base}" if urlsplit(origin).scheme == SECURE_SCHEME else base
+def cookie_name(origin: str, base: str, path: str = "/") -> str:
+    """``lib`` on http, ``__Host-lib`` on https: the prefix forbids a parent domain or another path from setting it.
+    A cookie of a narrower path (a grant, ``/d/<pid>/``) takes ``__Secure-``, since ``__Host-`` requires ``Path=/``."""
+    if urlsplit(origin).scheme != SECURE_SCHEME:
+        return base
+    return f"{HOST_PREFIX if path == '/' else SECURE_PREFIX}{base}"
 
 
-def cookie_header(origin: str, base: str, value: str, *, max_age: int | None) -> str:
-    """The ``Set-Cookie`` value (DEC-017); ``max_age`` None is a browser session cookie, 0 clears the cookie."""
-    parts = [f"{cookie_name(origin, base)}={value}", "Path=/", "HttpOnly", "SameSite=Lax"]
+def cookie_header(origin: str, base: str, value: str, *, max_age: int | None, path: str = "/") -> str:
+    """The ``Set-Cookie`` value (DEC-017, DEC-037); ``max_age`` None is a browser session cookie, 0 clears it."""
+    parts = [f"{cookie_name(origin, base, path)}={value}", f"Path={path}", "HttpOnly", "SameSite=Lax"]
     if max_age is not None:
         parts.append(f"Max-Age={max_age}")
     if urlsplit(origin).scheme == SECURE_SCHEME:
@@ -111,6 +144,8 @@ class LibraryHandler(_EditorHandler):
     """The library gate in front of every method; the connection bounds and ``do_OPTIONS`` are inherited."""
 
     policy = JSON_POLICY
+    frame_options = FRAME_DENIED
+    _deck: DeckTarget | None = None
 
     @override
     def do_GET(self) -> None:
@@ -138,6 +173,8 @@ class LibraryHandler(_EditorHandler):
 
     def _dispatch(self) -> None:
         self.policy = JSON_POLICY  # one handler serves several requests of a keep alive connection
+        self.frame_options = FRAME_DENIED
+        self._deck = None
         if self.command != "GET":  # a body is never read: it must not desynchronize the next request
             self.close_connection = True
         if self._refuse_ambiguous_headers():
@@ -154,9 +191,143 @@ class LibraryHandler(_EditorHandler):
             self._redirect_secure(origin, target.path, target.query)
             return
         if self._library_server().is_content_host(self.headers.get("Host", "")):
-            self._redirect_to_library()
+            self._serve_content_origin(origin, self._request_path(target.path), target.query)
             return
         self._serve_library(origin, self._request_path(target.path), target.query)
+
+    def _serve_content_origin(self, origin: str, path: str, query: str) -> None:
+        """A path in no row goes to the library origin (DEC-011); a row is answered once the grant, the presentation
+        and the role hold, reads guarded like the library's (DEC-024)."""
+        route = self._library_server().find_route("content", self.command, path)
+        if route is None:
+            self._redirect_to_library()
+            return
+        try:
+            answer = self._deck_answer(route, path, query)
+        except (sqlite3.Error, OSError) as exc:
+            logger.error("Library unavailable for %s %s: %s", self.command, path, type(exc).__name__)
+            answer = Answer(503, pages.library_unavailable())
+        self._respond(origin, answer)
+
+    def _deck_answer(self, route: Route, path: str, query: str) -> Answer | EditorAnswer:
+        """Grant (DEC-037), then presentation, then role and permission (DEC-021), recomputed at every request; a
+        refusal depends on who asked (DEC-040). On success the hooks serve ``DeckTarget`` (DEC-003)."""
+        server = self._library_server()
+        context = self._context(query)
+        match = route.pattern.fullmatch(path)
+        presentation_id = match.groupdict().get(PRESENTATION_GROUP) if match is not None else None
+        if route.permission is Permission.PUBLIC:
+            return route.handler(context)
+        if presentation_id is None:  # fail closed: every other content row names its presentation
+            return denied()
+        cookies = parse_cookies(self.headers.get_all("Cookie") or [])
+        token = cookies.get(
+            cookie_name(server.settings.library_content_origin, GRANT_COOKIE, deck_path(presentation_id))
+        )
+        grant = server.accounts.grant_for(presentation_id, token)
+        if not isinstance(grant, Live):
+            return self._grant_missing(presentation_id)
+        presentation = server.library.presentation(presentation_id)
+        role = server.library.role_in(grant.email, presentation.folder_id) if presentation is not None else None
+        if presentation is None or role is None or not authorize(role, route.permission):
+            logger.warning("Refused %s %s: no right", self.command, path)
+            return self._deck_refusal(route, presentation_id)
+        self._deck = DeckTarget(
+            server.library.presentation_path(presentation.folder_id, presentation_id), presentation.name, role
+        )
+        return route.handler(replace(context, folder_id=presentation.folder_id, role=role))
+
+    def _grant_missing(self, presentation_id: str) -> Answer:
+        """No grant, or one that no longer resolves: the editor's fetch learns the session ended; anything else goes
+        to ``/open/<pid>`` (the sign in page for a visitor or a copied session)."""
+        if self.headers.get(EDITOR_HEADER) == "1":
+            return json_answer(401, {"error": pages.SESSION_EXPIRED, "code": "session_expired"})
+        return self._to_open(presentation_id)
+
+    def _deck_refusal(self, route: Route, presentation_id: str) -> Answer:
+        """A live grant without the right (or a presentation gone): JSON, except a navigation of the browser, sent to
+        ``/open/<pid>``, which answers ``Access denied.``."""
+        if route.is_navigation and self.headers.get(EDITOR_HEADER) != "1":
+            return self._to_open(presentation_id)
+        return denied()
+
+    def _to_open(self, presentation_id: str) -> Answer:
+        return Answer(302, location=f"{self._library_server().settings.library_origin}/open/{presentation_id}")
+
+    def _context(self, query: str) -> Context:
+        """The context of a content origin request: no session, the person comes from a grant."""
+        server = self._library_server()
+        return Context(
+            person_email=None,
+            query=dict(reversed(parse_qsl(query, keep_blank_values=True))),
+            session_token=None,
+            browser_id=None,
+            accounts=server.accounts,
+            library=server.library,
+            library_origin=server.settings.library_origin,
+            content_origin=server.settings.library_content_origin,
+        )
+
+    def _respond(self, origin: str, answer: Answer | EditorAnswer) -> None:
+        """An editor answer is written by the inherited method of its route, the others by ``_send_answer``."""
+        if not isinstance(answer, EditorAnswer):
+            self._send_answer(origin, answer)
+            return
+        if answer.is_framed:
+            self.policy = FRAME_POLICY
+            self.frame_options = FRAME_SAME_ORIGIN
+        editor_methods = {
+            "content": self._serve_content,
+            "content-frame": self._serve_content_frame,
+            "download": self._serve_download,
+            "status": self._serve_status,
+        }
+        editor_methods[answer.route]()
+
+    @override
+    def _serve_status(self) -> None:
+        """DEC-041: the change marker and the name, never a path, a process number or a folder; the request
+        revision only for a role that may read the requests."""
+        deck = self._deck
+        if deck is None:  # every route answering the status sets the deck first
+            self._not_found()
+            return
+        try:
+            mtime = deck.path.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        settings = self._library_server().settings
+        is_editor = authorize(deck.role, Permission.EDIT)
+        payload: dict[str, Any] = {
+            "mtime": mtime,
+            "update_in_progress": False,
+            "update_expires_in": None,
+            "filename": self._served_name(),
+            "poll_interval": settings.poll_interval,
+            "port": 0,
+            "requests_revision": RequestService(RequestStore(settings.state_dir)).revision(deck.path)
+            if is_editor
+            else 0,
+        }
+        self._send_json(payload)
+
+    @override
+    def _served_file(self) -> str | None:
+        return str(self._deck.path) if self._deck is not None else None
+
+    @override
+    def _served_name(self) -> str:
+        return f"{self._deck.name}.html" if self._deck is not None else ""
+
+    @override
+    def _failure_reason(self, exc: Exception) -> str:
+        """The operating system reason, never ``str(exc)``, which names the stored path (DEC-042)."""
+        reason = exc.strerror if isinstance(exc, OSError) else None
+        return reason or pages.EXPORT_FAILED
+
+    @override
+    def _send_no_store_headers(self) -> None:
+        """``end_headers`` already sends them with every answer (DEC-009)."""
 
     def _serve_library(self, origin: str, path: str, query: str) -> None:
         """``Origin`` rule, then the answer; a library that cannot be read is the unavailable page (DEC-024).
@@ -177,9 +348,9 @@ class LibraryHandler(_EditorHandler):
         except (sqlite3.Error, OSError) as exc:
             logger.error("Library unavailable for %s %s: %s", self.command, path, type(exc).__name__)
             answer = Answer(503, pages.library_unavailable())
-        self._send_answer(origin, answer)
+        self._respond(origin, answer)
 
-    def _library_answer(self, origin: str, route: Route | None, path: str, query: str) -> Answer:
+    def _library_answer(self, origin: str, route: Route | None, path: str, query: str) -> Answer | EditorAnswer:
         """Session, role and permission (DEC-021), then the JSON body of a JSON route (DEC-019), then the handler; no
         body is read before the permission holds."""
         server = self._library_server()
@@ -188,7 +359,7 @@ class LibraryHandler(_EditorHandler):
         session = server.accounts.session_for(token)
         if route is None or (route.permission is not Permission.PUBLIC and session is None):
             return self._refusal(path, signed_in=session is not None)
-        folder_id = _folder_id(route, path)
+        folder_id, presentation_id = self._target(route, path)
         role = server.library.role_in(session.email, folder_id) if session is not None else None
         if not authorize(role, route.permission):
             return Answer(403, pages.access_denied())
@@ -205,8 +376,23 @@ class LibraryHandler(_EditorHandler):
             folder_id=folder_id,
             role=role,
             payload=payload,
+            session=session,
+            presentation_id=presentation_id,
+            library_origin=server.settings.library_origin,
+            content_origin=server.settings.library_content_origin,
         )
         return route.handler(context)
+
+    def _target(self, route: Route, path: str) -> tuple[str | None, str | None]:
+        """The folder whose role decides (the ``fid`` of the path, or the folder of its presentation ``pid``) and the
+        presentation id; an unknown presentation names no folder, so only the administrator's role holds there."""
+        match = route.pattern.fullmatch(path)
+        groups = match.groupdict() if match is not None else {}
+        presentation_id = groups.get(PRESENTATION_GROUP)
+        if presentation_id is None:
+            return groups.get(FOLDER_GROUP), None
+        presentation = self._library_server().library.presentation(presentation_id)
+        return (presentation.folder_id if presentation is not None else None), presentation_id
 
     def _is_json(self) -> bool:
         """``Content-Type`` is ``application/json`` (parameters and case aside): what a form of another page cannot
@@ -256,7 +442,9 @@ class LibraryHandler(_EditorHandler):
         if answer.location is not None:
             self.send_header("Location", answer.location)
         for cookie in answer.cookies:
-            self.send_header("Set-Cookie", cookie_header(origin, cookie.base, cookie.value, max_age=cookie.max_age))
+            self.send_header(
+                "Set-Cookie", cookie_header(origin, cookie.base, cookie.value, max_age=cookie.max_age, path=cookie.path)
+            )
         if answer.body:
             self.send_header("Content-Type", answer.content_type)
         self.send_header("Content-Length", str(len(answer.body)))
@@ -293,7 +481,7 @@ class LibraryHandler(_EditorHandler):
         self.send_header("Pragma", "no-cache")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
-        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("X-Frame-Options", self.frame_options)
         self.send_header("Content-Security-Policy", self.policy)
         if self._library_server().is_secure:
             self.send_header("Strict-Transport-Security", STRICT_TRANSPORT)
@@ -360,12 +548,6 @@ class LibraryServer(_EditorServer):
         self.connections.close_idle()
         self.database.release()
         logger.info("Library server stopped")
-
-
-def _folder_id(route: Route, path: str) -> str | None:
-    """The folder id the route's pattern captures as ``fid`` in ``path``, None when it names no folder."""
-    match = route.pattern.fullmatch(path)
-    return match.groupdict().get(FOLDER_GROUP) if match is not None else None
 
 
 def _origins_by_host(settings: Settings) -> dict[str, str]:

@@ -452,6 +452,14 @@ folders` back to the home page, or `This folder has no presentations yet.`; a fo
 where the person holds no role give the same `Access denied.` page, byte for byte. No library page can be shown inside
 a page of another site. `/lib/library.css` and `/lib/library.js` are the only files served without a session.
 
+A presentation opens at `/open/<presentation id>` for anyone holding a role in its folder: the library hands out a
+one time ticket (60 s) and sends the browser to the content origin, which trades it for a cookie valid for that one
+presentation (`/d/<presentation id>/`) as long as the session lives. There the deck itself, its status (change marker
+and `<name>.html`, no storage location) and the HTML download (the stored file unchanged, under its own name, accents
+and apostrophes kept) answer that person only; a DOCX export or any other address under `/d/<id>/` is `Access
+denied.`. After `Sign out` a copy of the session or of the presentation cookie gets the sign in page and no byte of the
+presentation; a stale, unknown or forbidden presentation link gives the same `Access denied.` page.
+
 `Administration` (`/admin`, the administrator only; anyone else gets `Access denied.`) lists the folders, the field
 `Folder name` with `Create folder`, and the `Activity` list. A folder name is trimmed, brought to its composed form, and
 holds 1 to 60 letters of any alphabet, digits, spaces or hyphens (`Folder names use 1 to 60 letters, digits, spaces or
@@ -686,13 +694,14 @@ src/mcp_htmleditor/
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
 ├── mcp_server.py    FastMCP server with 22 tools
-├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
+├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck; DEC-003 hooks for the library)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
-├── library/signin.py  Google sign in (GoogleClient, claims), login attempts and sessions (Accounts)
-├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation_path, create_folder, delete_folder, set_member, remove_member, members_by_folder, activity, record)
+├── library/signin.py  Google sign in (GoogleClient, claims), login attempts, sessions, presentation tickets and grants (Accounts)
+├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation, presentation_path, create_folder, delete_folder, set_member, remove_member, members_by_folder, activity, record)
 ├── library/names.py   compose, name_key, order_key (folder order), check_folder_name, check_email, format_size
 ├── library/pages.py   every page and English text of the library mode, esc()
-├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page, folder page
+├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page, folder page, /open/<id>
+├── library/routes_deck.py  content origin: /enter, /d/<id>/content-frame, /status, /content, /download
 ├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder), POST /api/folders/<id>/delete, POST /api/folders/<id>/members (add or change), POST /api/folders/<id>/members/remove
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures

@@ -1,4 +1,5 @@
-"""Library origin routes: public files, sign in, sign out, home and folder pages (SPEC-0025, DEC-011 to DEC-021)."""
+"""Library origin routes: public files, sign in, sign out, home and folder pages, opening a presentation (SPEC-0025,
+DEC-011 to DEC-021, DEC-037)."""
 
 from __future__ import annotations
 
@@ -89,6 +90,17 @@ def folder(context: Context) -> Answer:
     return Answer(200, pages.folder_page(name, context.library.presentations_in(folder_id)))
 
 
+def open_presentation(context: Context) -> Answer:
+    """``VIEW`` already authorized on the presentation's folder: a one time ticket and ``302`` to ``/enter`` on the
+    content origin; a presentation that does not exist, which the administrator's role does not rule out, is the
+    same ``Access denied.`` as a forbidden one (DEC-023, DEC-037)."""
+    presentation_id = context.presentation_id or ""
+    if context.session is None or context.library.presentation(presentation_id) is None:
+        return Answer(403, pages.access_denied())
+    ticket = context.accounts.issue_ticket(context.session, presentation_id)
+    return Answer(302, location=f"{context.content_origin}/enter?t={ticket}")
+
+
 ROUTES: tuple[Route, ...] = (
     Route(
         "library", "GET", re.compile(r"/lib/library\.css"), Permission.PUBLIC, static_file("library.css", "text/css")
@@ -105,4 +117,5 @@ ROUTES: tuple[Route, ...] = (
     Route("library", "POST", re.compile(r"/auth/logout"), Permission.SIGNED_IN, sign_out),
     Route("library", "GET", re.compile(r"/"), Permission.SIGNED_IN, home),
     Route("library", "GET", re.compile(r"/f/(?P<fid>[0-9a-f]{32})"), Permission.VIEW, folder),
+    Route("library", "GET", re.compile(r"/open/(?P<pid>[0-9a-f]{32})"), Permission.VIEW, open_presentation),
 )

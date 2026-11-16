@@ -56,9 +56,9 @@ COMMON_HEADERS = {
     "content-security-policy": JSON_POLICY,
 }
 SAME_HOST_MESSAGE = "The library origin and the content origin must be two different host names."
-# sha256 of inspect.getsource(_EditorHandler) at main (bf60b21): the library subclasses it, never edits it (DEC-003).
-# A later story that adds the DEC-003 hooks updates this value in its own diff.
-EDITOR_HANDLER_SOURCE_SHA256 = "361aeb9186297461e3621fd10e503d7c12c2128fcbe3dbb75adb7c551995d011"
+# sha256 of inspect.getsource(_EditorHandler) once US-0133 added the five DEC-003 hooks: the library subclasses it
+# and overrides the hooks; any other edit of the editor handler must update this value in its own diff.
+EDITOR_HANDLER_SOURCE_SHA256 = "070d0f89baf365fb108033357d639bfb034c0e1b2ef1470ef526f425a8aa3128"
 CHILD_START_SECONDS = 30.0
 
 

@@ -5,6 +5,10 @@ verifier, destination, hashed browser id) and returns Google's address; ``Accoun
 first (single use), checks its age and browser, exchanges the code at ``token_uri`` and validates the ID token claims
 (decoded, not signature checked: it comes straight from Google over TLS), then stores a session row keyed by the
 SHA-256 of a 256 bit token. Every failure is one ``SignInUnavailable`` whose text is a fixed reason, never a value.
+
+Opening a presentation (DEC-037): ``issue_ticket`` stores the hash of a one time ticket bound to the session and the
+presentation; ``redeem_ticket`` deletes it first (single use), then, under 60 s and while the session lives, stores a
+grant with a fresh 256 bit token; ``grant_for`` resolves the grant cookie of a request for one presentation.
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import Enum
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Final
@@ -32,6 +37,8 @@ logger = logging.getLogger(__name__)
 
 SESSION_COOKIE: Final = "lib"
 BROWSER_COOKIE: Final = "lib-b"
+GRANT_COOKIE: Final = "d"
+TICKET_SECONDS: Final = 60
 SESSION_SECONDS: Final = 2_592_000  # 30 days exactly, never extended (DEC-017)
 LOGIN_SECONDS: Final = 600
 ENDED_SESSION_KEPT_SECONDS: Final = 86_400  # an ended row stays one day, for the editor's notice (US-0137)
@@ -87,6 +94,33 @@ class NewSession:
     token: str
     session: Session
     destination: str
+
+
+@dataclass(frozen=True, slots=True)
+class NewGrant:
+    """What ``redeem_ticket`` returns: the raw grant token (only here), its presentation and its session's end."""
+
+    token: str
+    presentation_id: str
+    session_expires_at: float
+
+
+@dataclass(frozen=True, slots=True)
+class Live:
+    """A grant cookie that resolves: the lower case address of the person whose session it belongs to."""
+
+    email: str
+
+
+class NoGrant(Enum):
+    """A request without a usable grant: ``ENDED`` (a cookie that no longer resolves: session expired, signed out,
+    purged, or a grant of another presentation) or ``ABSENT`` (no cookie)."""
+
+    ENDED = "ended"
+    ABSENT = "absent"
+
+
+GrantState = Live | NoGrant
 
 
 class GoogleClient:
@@ -211,11 +245,13 @@ class Accounts:
         return NewSession(*self._create_session(email), destination=destination)
 
     def purge(self) -> None:
-        """Delete the session rows ended more than a day ago and the attempts of 10 minutes or more."""
+        """Delete the session rows ended more than a day ago (their grants cascade), the attempts of 10 minutes or
+        more and the tickets of 60 s or more."""
         now = self._clock()
         with self._database.transaction(immediate=True) as connection:
             connection.execute("DELETE FROM sessions WHERE expires_at < ?", (now - ENDED_SESSION_KEPT_SECONDS,))
             connection.execute("DELETE FROM logins WHERE created_at <= ?", (now - LOGIN_SECONDS,))
+            connection.execute("DELETE FROM tickets WHERE created_at <= ?", (now - TICKET_SECONDS,))
 
     def session_for(self, token: str | None) -> Session | None:
         """The live session of a cookie token: alive while ``now < expires_at``, over at ``expires_at`` exactly.
@@ -233,9 +269,65 @@ class Accounts:
         return Session(*row) if row is not None else None
 
     def end_session(self, token: str) -> None:
-        """Sign out: the row is deleted, so a copy of the cookie resolves to nothing (DEC-017)."""
+        """Sign out: the row is deleted, so a copy of the cookie resolves to nothing (DEC-017); its tickets and
+        grants go with it (``ON DELETE CASCADE``)."""
         with self._database.transaction(immediate=True) as connection:
             connection.execute("DELETE FROM sessions WHERE id_hash = ?", (token_hash(token),))
+
+    def issue_ticket(self, session: Session, presentation_id: str) -> str:
+        """Store the hash of a new one time ticket for this session and presentation and return the ticket; tickets
+        of 60 s or more are purged in the same transaction."""
+        ticket = secrets.token_urlsafe(32)
+        now = self._clock()
+        with self._database.transaction(immediate=True) as connection:
+            connection.execute("DELETE FROM tickets WHERE created_at <= ?", (now - TICKET_SECONDS,))
+            connection.execute(
+                "INSERT INTO tickets(ticket_hash, session_id_hash, presentation_id, created_at) VALUES (?, ?, ?, ?)",
+                (token_hash(ticket), session.token_hash, presentation_id, now),
+            )
+        return ticket
+
+    def redeem_ticket(self, ticket: str) -> NewGrant | None:
+        """Delete the ticket, then, when it is under 60 s old and its session alive, store a grant; None otherwise
+        (unknown, used, expired, or a session that ended meanwhile)."""
+        if not ticket:
+            return None
+        now = self._clock()
+        with self._database.transaction(immediate=True) as connection:
+            rows = connection.execute(
+                "DELETE FROM tickets WHERE ticket_hash = ? RETURNING session_id_hash, presentation_id, created_at",
+                (token_hash(ticket),),
+            ).fetchall()
+            if not rows or not 0 <= now - rows[0][2] < TICKET_SECONDS:
+                return None
+            session_hash, presentation_id, _ = rows[0]
+            alive = connection.execute(
+                "SELECT expires_at FROM sessions WHERE id_hash = ? AND expires_at > ?", (session_hash, now)
+            ).fetchone()
+            if alive is None:
+                return None
+            token = secrets.token_urlsafe(32)
+            connection.execute(
+                "INSERT INTO grants(token_hash, session_id_hash, presentation_id, created_at) VALUES (?, ?, ?, ?)",
+                (token_hash(token), session_hash, presentation_id, now),
+            )
+        return NewGrant(token, presentation_id, alive[0])
+
+    def grant_for(self, presentation_id: str, token: str | None) -> GrantState:
+        """``Live(email)`` while the grant of this presentation belongs to a live session, ``NoGrant.ENDED`` for a
+        cookie that does not resolve, ``NoGrant.ABSENT`` without a cookie (DEC-037)."""
+        if not token:
+            return NoGrant.ABSENT
+        row = (
+            self._database.connection()
+            .execute(
+                "SELECT sessions.email FROM grants JOIN sessions ON sessions.id_hash = grants.session_id_hash"
+                " WHERE grants.token_hash = ? AND grants.presentation_id = ? AND sessions.expires_at > ?",
+                (token_hash(token), presentation_id, self._clock()),
+            )
+            .fetchone()
+        )
+        return Live(str(row[0])) if row is not None else NoGrant.ENDED
 
     def _create_session(self, email: str) -> tuple[str, Session]:
         token = secrets.token_urlsafe(32)

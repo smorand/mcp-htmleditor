@@ -65,6 +65,16 @@ MIGRATIONS: Final[tuple[str, ...]] = (
     CREATE TABLE activity(id INTEGER PRIMARY KEY AUTOINCREMENT, at REAL NOT NULL, actor TEXT NOT NULL,
                           text TEXT NOT NULL);
     """,
+    # 4 (US-0133): one time tickets and per presentation grants, both gone with their session (DEC-037); no foreign
+    # key to presentations: a grant for a deleted presentation answers Access denied
+    """
+    CREATE TABLE tickets(ticket_hash TEXT PRIMARY KEY,
+                         session_id_hash TEXT NOT NULL REFERENCES sessions(id_hash) ON DELETE CASCADE,
+                         presentation_id TEXT NOT NULL, created_at REAL NOT NULL);
+    CREATE TABLE grants(token_hash TEXT PRIMARY KEY,
+                        session_id_hash TEXT NOT NULL REFERENCES sessions(id_hash) ON DELETE CASCADE,
+                        presentation_id TEXT NOT NULL, created_at REAL NOT NULL);
+    """,
 )
 
 
@@ -114,6 +124,15 @@ class PresentationView:
     name: str
     modified: float
     size: int
+
+
+@dataclass(frozen=True, slots=True)
+class PresentationRow:
+    """A stored presentation: its id, its folder's id and its name (without ``.html``)."""
+
+    id: str
+    folder_id: str
+    name: str
 
 
 class Database:
@@ -281,6 +300,17 @@ class Library:
         for folder_id, email, role in rows:
             listing.setdefault(folder_id, []).append(MemberView(email, Role(role)))
         return listing
+
+    def presentation(self, presentation_id: str) -> PresentationRow | None:
+        """The presentation of this id, None when none has it (a malformed id is never looked up)."""
+        if not ID_PATTERN.fullmatch(presentation_id):
+            return None
+        row = (
+            self._database.connection()
+            .execute("SELECT folder_id, name FROM presentations WHERE id = ?", (presentation_id,))
+            .fetchone()
+        )
+        return PresentationRow(presentation_id, str(row[0]), str(row[1])) if row is not None else None
 
     def presentation_path(self, folder_id: str, presentation_id: str) -> Path:
         """``files/<folder id>/<presentation id>.html``, built from two ids that each match ``^[0-9a-f]{32}$``
