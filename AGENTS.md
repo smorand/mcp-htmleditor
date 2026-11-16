@@ -38,7 +38,7 @@ mcp-htmleditor new medical talk.html --serve
 mcp-htmleditor new breathe talk.html
 mcp-htmleditor breathe-inline talk.html [--link]   # embed (or link) the Breathe decoration and pictures
 mcp-htmleditor serve file.html [-v|-q] [--host] [--port] [--poll] [--no-browser]
-mcp-htmleditor webserve [--host] [--port]  # web library mode (SPEC-0025): two host names, /health, SIGTERM stops
+mcp-htmleditor webserve [--host] [--port]  # web library mode (SPEC-0025): two host names, Google sign in (HTMLEDITOR_GOOGLE_CREDENTIALS_FILE), /health, SIGTERM stops
 mcp-htmleditor mcp                         # MCP server (stdio)
 mcp-htmleditor export pptx in.html out.pptx
 mcp-htmleditor export docx in.html out.docx
@@ -146,7 +146,7 @@ Load only what the task needs.
 | `.agent_docs/agent-editing.md` | Deck service layer (`src/mcp_htmleditor/deck/`: `read`, `scan`, `renumber`, `patch`, `lint`, `tools`): outline, get-slide, the five `patch` operations, lint rules, templates/new/export, the 22 tool surface, scanner and renumbering rules, gotchas |
 | `.agent_docs/breathe.md` | Breathe template: map of the pieces, detection rule, decoration, painted PPTX, sync, gotchas (SPEC-0023) |
 | `.agent_docs/pptx-fidelity.md` | PPTX fidelity harness (`make pptx-fidelity`): pipeline, score definition, reference modes, output, gotchas; baseline in `sdlc/specs/SPEC-0024-pptx-generic-extraction/baseline.md` |
-| `.agent_docs/library.md` | Web library mode (`webserve`, SPEC-0025): module map, settings, gate order, headers, test support |
+| `.agent_docs/library.md` | Web library mode (`webserve`, SPEC-0025): module map, settings, gate order, sign in flow, cookies, database, headers, test support (FakeGoogle, Browser) |
 | `.agent_docs/render.md` | Visual render: picture rules, output directory and cleanup, scale and size rounding, check order, fixtures and install |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`

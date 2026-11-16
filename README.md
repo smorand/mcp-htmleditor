@@ -428,8 +428,17 @@ session per presentation if you need several displayed simultaneously.
 name gets `403 {"error": "forbidden host"}`, a request that reached nginx in plain http
 (`X-Forwarded-Proto: http`) gets `308` to the same path on the secure origin, and `GET /health` answers
 `{"ok": true, "status": "ok", "version"}` on any host name, nothing more. `HTMLEDITOR_LIBRARY_DIR` (default
-`<state dir>/library`) will hold the library data. It stops on SIGINT or SIGTERM. The local `serve` is unchanged
-and never shows a library page.
+`<state dir>/library`) holds the library database `library.db` (folders, members, sign in attempts, sessions). It
+stops on SIGINT or SIGTERM. The local `serve` is unchanged and never shows a library page.
+
+Sign in is `Sign in with Google` (OpenID Connect code flow with PKCE, the account chooser every time, a verified
+address required). `HTMLEDITOR_GOOGLE_CREDENTIALS_FILE` names the OAuth client file downloaded from the Google console
+(`{"web": {"client_id", "client_secret", "auth_uri", "token_uri", "redirect_uris"}}`); register
+`<HTMLEDITOR_LIBRARY_ORIGIN>/auth/callback` (for example `https://slides.scm-platform.org/auth/callback`) as an
+authorized redirect address in that console first. Without the file, or with the address missing, the server still
+starts, logs an error or a warning, and every sign in shows `Sign-in is unavailable. Try again later.` A session lasts
+30 days from the sign in; `Sign out` ends it in that browser only. The home page lists the folders where the account
+holds a role; an account with none sees `Access denied.`
 
 ## Templates
 
@@ -581,6 +590,7 @@ Every variable is read through the `Settings` class (pydantic-settings,
 | `HTMLEDITOR_LIBRARY_ORIGIN` | `https://slides.scm-platform.org` | `webserve` library origin, `http(s)://host[:port]` without a path |
 | `HTMLEDITOR_LIBRARY_CONTENT_ORIGIN` | `https://slides-content.scm-platform.org` | `webserve` content origin, another host name |
 | `HTMLEDITOR_LIBRARY_DIR` | `<state dir>/library` | `webserve` library data |
+| `HTMLEDITOR_GOOGLE_CREDENTIALS_FILE` | unset | `webserve` Google OAuth client file (secret, read only by `library/signin.py`) |
 | `XDG_CONFIG_HOME` | `~/.config` | Base for config |
 | `XDG_CACHE_HOME` | `~/.cache` | Base for cache |
 
@@ -641,7 +651,10 @@ src/mcp_htmleditor/
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
 ├── mcp_server.py    FastMCP server with 22 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
-├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers)
+├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
+├── library/signin.py  Google sign in (GoogleClient, claims), login attempts and sessions (Accounts)
+├── library/store.py   library.db: Database (migrations), Library repository
+├── library/routes_library.py  /auth/start, /auth/callback, /auth/logout, home page
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

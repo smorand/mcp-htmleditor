@@ -4,26 +4,55 @@
 ``state_dir`` and the origins ``http://slides.test:<port>`` and ``http://slides-content.test:<port>``; overrides
 replace any setting. ``HttpClient`` connects to ``127.0.0.1:<port>`` and sends the ``Host`` it is given, so one
 listener is reached under any host name. ``FakeClock`` moves time by seconds.
+
+Sign in (US-0126): ``FakeGoogle`` plays Google on a loopback port (``/authorize`` answers for the next scripted
+choice, ``/token`` checks PKCE and returns an unsigned ID token); ``Browser`` keeps the library cookies, follows
+redirects across the library, Google and any host given to its resolver (like ``--host-resolver-rules``), and records
+every address it visited; ``RecordingListener`` counts visits to a hostile site; ``StoredLibrary`` is the operator view
+(tables read directly); ``LibraryBuilder`` writes folders and members.
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import http.client
 import json
+import secrets
 import socket
+import sqlite3
+import threading
+from collections import deque
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from contextlib import closing
+from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 import pytest
 
 from mcp_htmleditor.config import Settings
 from mcp_htmleditor.library.server import LibraryServer
+from mcp_htmleditor.library.store import Database
 
 LIBRARY_HOST = "slides.test"
 CONTENT_HOST = "slides-content.test"
 CLOCK_START = 1_000_000_000.0
+GOOGLE_CLIENT_ID = "slides-test.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "test-client-secret-7d1c"  # noqa: S105 - a fake client of the fake provider
+UNREGISTERED_REDIRECT = "https://elsewhere.example/auth/callback"
+REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+MAX_REDIRECTS = 10
+CARDIOLOGY = "Cardiology 2027"
+PNEUMO = "Pneumo Été"
+WCBIP = "WCBIP Melbourne Décembre 2026"
+LAMYA = "lamya.chrif@gmail.com"
+DAN = "dan.rw@example.org"
+CAROL = "carol.ro@example.org"
+BOB = "bob.nobody@gmail.com"
+ADMIN = "seb.morand@gmail.com"
 
 
 @dataclass
@@ -41,11 +70,12 @@ class FakeClock:
 
 @dataclass(frozen=True)
 class LibraryReply:
-    """One answer: status, headers (lower case names) and body bytes."""
+    """One answer: status, headers (lower case names, last value kept), body bytes, every ``Set-Cookie`` value."""
 
     status: int
     headers: dict[str, str]
     body: bytes
+    set_cookies: tuple[str, ...] = ()
 
     @property
     def text(self) -> str:
@@ -77,13 +107,299 @@ class HttpClient:
             response = conn.getresponse()
             data = response.read()
             return LibraryReply(
-                status=response.status, headers={k.lower(): v for k, v in response.getheaders()}, body=data
+                status=response.status,
+                headers={k.lower(): v for k, v in response.getheaders()},
+                body=data,
+                set_cookies=tuple(response.headers.get_all("Set-Cookie") or ()),
             )
         finally:
             conn.close()
 
     def get(self, path: str, **headers: str) -> LibraryReply:
         return self.request("GET", path, headers=_header_names(headers))
+
+
+# ---------------------------------------------------------------------------
+# Fake Google (design section 9, spec design input 13)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class GoogleRequest:
+    """One request the fake received: method, path, and the query (GET) or form (POST) parameters."""
+
+    method: str
+    path: str
+    params: dict[str, str]
+
+
+@dataclass(frozen=True)
+class _IssuedCode:
+    claims: dict[str, Any]
+    challenge: str
+    redirect_uri: str
+
+
+class _FakeGoogleHandler(BaseHTTPRequestHandler):
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
+        pass
+
+    def do_GET(self) -> None:
+        cast(_FakeGoogleServer, self.server).fake.answer_authorize(self)
+
+    def do_POST(self) -> None:
+        cast(_FakeGoogleServer, self.server).fake.answer_token(self)
+
+
+class _FakeGoogleServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def __init__(self, fake: FakeGoogle) -> None:
+        self.fake = fake
+        super().__init__(("127.0.0.1", 0), _FakeGoogleHandler)
+
+
+class FakeGoogle:
+    """Google's ``/authorize`` and ``/token`` on a loopback port, scripted by the test.
+
+    ``accounts`` maps an address to claims that replace the defaults (``{"email_verified": False}``).
+    ``choose(email)`` queues the account the person picks at the next ``/authorize``; ``cancel()`` queues a cancelled
+    consent (``error=access_denied``). A ``redirect_uri`` missing from ``registered_redirects`` (the owner's console)
+    comes back with ``error=redirect_uri_mismatch``.
+    ``exchange_failure`` scripts ``/token``: ``"redirect"`` (302 to
+    ``redirect_target``), ``"unavailable"`` (503), ``"close"`` (connection closed, no answer), ``"bad_json"``.
+    ``received`` lists every request.
+    """
+
+    def __init__(self, accounts: dict[str, dict[str, Any]] | None = None) -> None:
+        self.accounts: dict[str, dict[str, Any]] = dict(accounts or {})
+        self.registered_redirects: set[str] = set()
+        self.exchange_failure: str | None = None
+        self.redirect_target: str = ""  # where ``exchange_failure == "redirect"`` sends the token request
+        self.received: list[GoogleRequest] = []
+        self.clock: Callable[[], float] = FakeClock()
+        self._choices: deque[str | None] = deque()
+        self._codes: dict[str, _IssuedCode] = {}
+        self._lock = threading.Lock()
+        self._server = _FakeGoogleServer(self)
+        self.port = int(self._server.server_address[1])
+        self._thread = threading.Thread(target=self._server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        self._thread.start()
+
+    @property
+    def netloc(self) -> str:
+        return f"127.0.0.1:{self.port}"
+
+    def choose(self, email: str) -> None:
+        self._choices.append(email)
+
+    def cancel(self) -> None:
+        self._choices.append(None)
+
+    def credentials(self, redirect_uris: list[str]) -> dict[str, Any]:
+        """The operator's file, as Google's console exports it."""
+        return {
+            "web": {
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "auth_uri": f"http://{self.netloc}/authorize",
+                "token_uri": f"http://{self.netloc}/token",
+                "redirect_uris": redirect_uris,
+            }
+        }
+
+    def requests_to(self, path: str) -> list[GoogleRequest]:
+        return [request for request in self.received if request.path == path]
+
+    def stop(self) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+
+    def answer_authorize(self, handler: BaseHTTPRequestHandler) -> None:
+        target = urlsplit(handler.path)
+        query = dict(parse_qsl(target.query, keep_blank_values=True))
+        self.received.append(GoogleRequest("GET", target.path, query))
+        redirect = query.get("redirect_uri", "")
+        if target.path != "/authorize" or query.get("client_id") != GOOGLE_CLIENT_ID or not redirect:
+            _answer(handler, 400, b'{"error": "invalid_request"}')
+            return
+        if not self._choices:
+            _answer(handler, 400, b'{"error": "the test scripted no choice"}')
+            return
+        email = self._choices.popleft()  # the person picks the account before Google reports a problem
+        answer: dict[str, str] = {"state": query.get("state", "")}
+        if redirect not in self.registered_redirects:
+            answer["error"] = "redirect_uri_mismatch"
+        elif email is None:
+            answer["error"] = "access_denied"
+        else:
+            code = secrets.token_urlsafe(16)
+            with self._lock:
+                self._codes[code] = _IssuedCode(self._claims(email, query), query.get("code_challenge", ""), redirect)
+            answer["code"] = code
+        _answer(handler, 302, b"", location=f"{redirect}?{urlencode(answer)}")
+
+    def answer_token(self, handler: BaseHTTPRequestHandler) -> None:
+        body = handler.rfile.read(int(handler.headers.get("Content-Length", "0")))
+        form = dict(parse_qsl(body.decode("utf-8"), keep_blank_values=True))
+        self.received.append(GoogleRequest("POST", urlsplit(handler.path).path, form))
+        if self.exchange_failure == "close":
+            handler.close_connection = True  # nothing written: the client sees the connection end
+            return
+        if self.exchange_failure == "redirect":
+            _answer(handler, 302, b"", location=self.redirect_target)
+            return
+        if self.exchange_failure == "unavailable":
+            _answer(handler, 503, b'{"error": "temporarily_unavailable"}')
+            return
+        with self._lock:
+            issued = self._codes.pop(form.get("code", ""), None)
+        error = self._token_error(form, issued)
+        if error is not None:
+            _answer(handler, 400, json.dumps({"error": error}).encode())
+            return
+        if self.exchange_failure == "bad_json":
+            _answer(handler, 200, b"<html>not json</html>")
+            return
+        assert issued is not None
+        payload = {"access_token": "ya29.fake", "id_token": unsigned_jwt(issued.claims), "token_type": "Bearer"}
+        _answer(handler, 200, json.dumps(payload).encode())
+
+    def _claims(self, email: str, query: dict[str, str]) -> dict[str, Any]:
+        now = self.clock()
+        claims: dict[str, Any] = {
+            "iss": "https://accounts.google.com",
+            "aud": GOOGLE_CLIENT_ID,
+            "sub": hashlib.sha256(email.lower().encode()).hexdigest()[:21],
+            "email": email,
+            "email_verified": True,
+            "nonce": query.get("nonce", ""),
+            "iat": int(now),
+            "exp": int(now) + 3600,
+        }
+        return claims | self.accounts.get(email, {})
+
+    def _token_error(self, form: dict[str, str], issued: _IssuedCode | None) -> str | None:
+        if form.get("client_id") != GOOGLE_CLIENT_ID or form.get("client_secret") != GOOGLE_CLIENT_SECRET:
+            return "invalid_client"
+        if form.get("grant_type") != "authorization_code" or issued is None:
+            return "invalid_grant"
+        if form.get("redirect_uri") != issued.redirect_uri or issued.redirect_uri not in self.registered_redirects:
+            return "redirect_uri_mismatch"
+        if pkce_challenge(form.get("code_verifier", "")) != issued.challenge:
+            return "invalid_grant"
+        return None
+
+
+def pkce_challenge(verifier: str) -> str:
+    """RFC 7636 ``S256``: base64url of the SHA-256 of the verifier, without padding."""
+    return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+
+
+def unsigned_jwt(claims: dict[str, Any]) -> str:
+    """header.payload.signature with a junk signature: the product does not verify it (DEC-012)."""
+    parts = ({"alg": "RS256", "typ": "JWT"}, claims)
+    encoded = [base64.urlsafe_b64encode(json.dumps(part).encode()).rstrip(b"=").decode() for part in parts]
+    return ".".join([*encoded, "c2lnbmF0dXJl"])
+
+
+def _answer(handler: BaseHTTPRequestHandler, status: int, body: bytes, *, location: str | None = None) -> None:
+    handler.send_response(status)
+    if location is not None:
+        handler.send_header("Location", location)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+class _RecordingHandler(BaseHTTPRequestHandler):
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
+        pass
+
+    def do_GET(self) -> None:
+        cast(RecordingListener, self.server).visits.append(f"{self.headers.get('Host')}{self.path}")
+        _answer(self, 200, b'{"phished": true}')
+
+
+class RecordingListener(ThreadingHTTPServer):
+    """A hostile site on a loopback port: ``visits`` lists every request it received."""
+
+    daemon_threads = True
+
+    def __init__(self) -> None:
+        self.visits: list[str] = []
+        super().__init__(("127.0.0.1", 0), _RecordingHandler)
+        self.port = int(self.server_address[1])
+        threading.Thread(target=self.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+
+    def stop(self) -> None:
+        self.shutdown()
+        self.server_close()
+
+
+# ---------------------------------------------------------------------------
+# The library: running server, operator view, builder, browser
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class StoredLibrary:
+    """The operator view: tables of ``library.db`` read directly, never through the product."""
+
+    library_dir: Path
+
+    def rows(self, sql: str) -> list[tuple[Any, ...]]:
+        with closing(sqlite3.connect(self.library_dir / "library.db")) as connection:
+            return connection.execute(sql).fetchall()
+
+    def sessions(self) -> list[tuple[Any, ...]]:
+        """``(id_hash, email, created_at, expires_at)`` of every session row."""
+        return self.rows("SELECT id_hash, email, created_at, expires_at FROM sessions ORDER BY created_at")
+
+    def logins(self) -> list[tuple[Any, ...]]:
+        """``(state_hash, nonce, verifier, destination, browser_hash, created_at)`` of every attempt row."""
+        return self.rows("SELECT state_hash, nonce, verifier, destination, browser_hash, created_at FROM logins")
+
+    def folder_names(self) -> list[str]:
+        return [row[0] for row in self.rows("SELECT name FROM folders ORDER BY name")]
+
+    def activity(self) -> list[tuple[Any, ...]]:
+        """The activity lines, empty while the table does not exist (it arrives with US-0130)."""
+        if not self.rows("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'activity'"):
+            return []
+        return self.rows("SELECT * FROM activity ORDER BY id")
+
+
+@dataclass(frozen=True)
+class LibraryBuilder:
+    """Folders and members written straight into the library database."""
+
+    database: Database
+    clock: Callable[[], float]
+
+    def folder(self, name: str) -> str:
+        folder_id = secrets.token_hex(16)
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute(
+                "INSERT INTO folders(id, name, name_key, created_at) VALUES (?, ?, ?, ?)",
+                (folder_id, name, name.lower(), self.clock()),
+            )
+        return folder_id
+
+    def member(self, folder_id: str, email: str, role: str) -> None:
+        with self.database.transaction(immediate=True) as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO members(folder_id, email, role) VALUES (?, ?, ?)", (folder_id, email, role)
+            )
+
+    def standard(self) -> dict[str, str]:
+        """The folders and members of the spec's standard library (section 9); returns name to id."""
+        ids = {name: self.folder(name) for name in (WCBIP, CARDIOLOGY, PNEUMO)}
+        self.member(ids[WCBIP], LAMYA, "RW")
+        self.member(ids[CARDIOLOGY], DAN, "RW")
+        self.member(ids[CARDIOLOGY], CAROL, "RO")
+        return ids
 
 
 @dataclass
@@ -95,6 +411,7 @@ class RunningLibrary:
     clock: FakeClock
     library_dir: Path
     state_dir: Path
+    database: Database
 
     @property
     def port(self) -> int:
@@ -108,9 +425,99 @@ class RunningLibrary:
     def content_netloc(self) -> str:
         return f"{CONTENT_HOST}:{self.port}"
 
+    @property
+    def origin(self) -> str:
+        return self.settings.library_origin
+
+    @property
+    def stored(self) -> StoredLibrary:
+        return StoredLibrary(self.library_dir)
+
+    @property
+    def builder(self) -> LibraryBuilder:
+        return LibraryBuilder(self.database, self.clock)
+
     def client(self, host: str | None = None) -> HttpClient:
         """A client whose requests carry ``Host: host`` (default the library origin's host and port)."""
         return HttpClient(self.port, host if host is not None else self.library_netloc)
+
+    def browser(self, resolver: dict[str, int] | None = None) -> Browser:
+        """A fresh browser (no cookie); ``resolver`` maps other host names to loopback ports."""
+        return Browser(self, dict(resolver or {}))
+
+
+@dataclass
+class Browser:
+    """One browser: library cookies, redirects followed across hosts, every visited address recorded."""
+
+    running: RunningLibrary
+    resolver: dict[str, int]
+    cookies: dict[str, str] = field(default_factory=dict)
+    visited: list[str] = field(default_factory=list)
+    replies: list[LibraryReply] = field(default_factory=list)
+    url: str = ""
+
+    def open(self, address: str, *, follow: bool = True) -> LibraryReply:
+        """GET ``address`` (absolute, or a path of the library origin) and follow redirects when ``follow``."""
+        return self._navigate("GET", address, {}, follow=follow)
+
+    def sign_in(self, google: FakeGoogle, email: str | None, destination: str | None = None) -> LibraryReply:
+        """Choose ``Sign in with Google`` (``next=destination``) and pick ``email`` at Google, or cancel (None)."""
+        if email is None:
+            google.cancel()
+        else:
+            google.choose(email)
+        query = "" if destination is None else f"?next={quote(destination, safe='')}"
+        return self.open(f"/auth/start{query}")
+
+    def sign_out(self) -> LibraryReply:
+        """The ``Sign out`` form: a same origin POST, with the ``Origin`` a browser sends under ``same-origin``."""
+        headers = {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin"}
+        return self._navigate("POST", "/auth/logout", headers, follow=True)
+
+    def callback_addresses(self) -> list[str]:
+        return [address for address in self.visited if urlsplit(address).path == "/auth/callback"]
+
+    def hosts_visited(self) -> set[str]:
+        return {urlsplit(address).netloc for address in self.visited}
+
+    def _navigate(self, method: str, address: str, headers: dict[str, str], *, follow: bool) -> LibraryReply:
+        url = urljoin(self.url or f"{self.running.origin}/", address)
+        reply = self._send(method, url, headers)
+        for _ in range(MAX_REDIRECTS):
+            if not follow or reply.status not in REDIRECT_STATUSES:
+                return reply
+            url = urljoin(url, reply.headers["location"])
+            reply = self._send("GET", url, {})
+        raise AssertionError(f"more than {MAX_REDIRECTS} redirects, last {url}")
+
+    def _send(self, method: str, url: str, headers: dict[str, str]) -> LibraryReply:
+        parts = urlsplit(url)
+        self.visited.append(url)
+        self.url = url
+        path = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+        if parts.scheme == "http" and parts.netloc == self.running.library_netloc:
+            if self.cookies:
+                headers = {**headers, "Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items())}
+            reply = self.running.client().request(method, path, headers=headers)
+            self._keep_cookies(reply)
+        elif parts.hostname in self.resolver:
+            reply = HttpClient(self.resolver[str(parts.hostname)], parts.netloc).request(method, path, headers=headers)
+        elif parts.hostname == "127.0.0.1" and parts.port is not None:
+            reply = HttpClient(parts.port, parts.netloc).request(method, path, headers=headers)
+        else:
+            raise AssertionError(f"the browser cannot reach {url!r}")
+        self.replies.append(reply)
+        return reply
+
+    def _keep_cookies(self, reply: LibraryReply) -> None:
+        for header in reply.set_cookies:
+            pair, _, attributes = header.partition(";")
+            name, _, value = pair.strip().partition("=")
+            if "max-age=0" in attributes.replace(" ", "").lower().split(";"):
+                self.cookies.pop(name, None)
+            else:
+                self.cookies[name] = value
 
 
 def free_port() -> int:
@@ -121,10 +528,17 @@ def free_port() -> int:
 
 @pytest.fixture
 def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
-    """Return ``start(**settings_overrides)``; every server it started is stopped at teardown."""
-    started: list[LibraryServer] = []
+    """Return ``start(google=None, google_registered=True, **settings_overrides)``; all stopped at teardown.
 
-    def start(**settings_overrides: Any) -> RunningLibrary:
+    With ``google`` the credentials file points at that ``FakeGoogle`` and the sign in return address
+    ``<library origin>/auth/callback`` is registered in its console and listed in the file, unless
+    ``google_registered`` is False (then neither lists it).
+    """
+    started: list[tuple[LibraryServer, Database]] = []
+
+    def start(
+        google: FakeGoogle | None = None, *, google_registered: bool = True, **settings_overrides: Any
+    ) -> RunningLibrary:
         port = free_port()
         library_dir = tmp_path / "library"
         state_dir = tmp_path / "state"
@@ -136,19 +550,48 @@ def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
             "library_dir_override": library_dir,
             "state_dir_override": state_dir,
         }
+        clock = FakeClock()
+        if google is not None:
+            redirect = f"{values['library_origin']}/auth/callback"
+            registered = [redirect] if google_registered else [UNREGISTERED_REDIRECT]
+            google.registered_redirects.update(registered)
+            google.clock = clock
+            credentials = tmp_path / "google-oauth.json"
+            credentials.write_text(json.dumps(google.credentials(registered)), encoding="utf-8")
+            values["google_credentials_override"] = credentials
         values.update(settings_overrides)
         settings = Settings(**values)
-        clock = FakeClock()
+        database = Database(library_dir / "library.db")
         server = LibraryServer(settings, clock=clock)
-        started.append(server)
+        started.append((server, database))
         server.start()
         return RunningLibrary(
-            server=server, settings=settings, clock=clock, library_dir=library_dir, state_dir=state_dir
+            server=server,
+            settings=settings,
+            clock=clock,
+            library_dir=library_dir,
+            state_dir=state_dir,
+            database=database,
         )
 
     yield start
-    for server in started:
+    for server, database in started:
         server.stop()
+        database.release()
+
+
+@pytest.fixture
+def fake_google() -> Iterator[FakeGoogle]:
+    google = FakeGoogle()
+    yield google
+    google.stop()
+
+
+@pytest.fixture
+def evil_listener() -> Iterator[RecordingListener]:
+    listener = RecordingListener()
+    yield listener
+    listener.stop()
 
 
 def _header_names(headers: dict[str, str]) -> dict[str, str]:

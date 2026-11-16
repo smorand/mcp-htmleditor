@@ -71,6 +71,7 @@ _PATH_FIELDS = (
     "state_dir_override",
     "xdg_state_home_override",
     "library_dir_override",
+    "google_credentials_override",
 )
 
 # Environment variables that change the resolved configuration. Used only to key
@@ -96,6 +97,7 @@ _SIGNIFICANT_ENV_VARS = (
     "HTMLEDITOR_LIBRARY_ORIGIN",
     "HTMLEDITOR_LIBRARY_CONTENT_ORIGIN",
     "HTMLEDITOR_LIBRARY_DIR",
+    "HTMLEDITOR_GOOGLE_CREDENTIALS_FILE",
 )
 
 
@@ -141,6 +143,9 @@ class Settings(BaseSettings):
     state_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_STATE_DIR")
     xdg_state_home_override: Path | None = Field(default=None, validation_alias="XDG_STATE_HOME")
     library_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LIBRARY_DIR")
+    google_credentials_override: Path | None = Field(
+        default=None, validation_alias="HTMLEDITOR_GOOGLE_CREDENTIALS_FILE"
+    )
 
     @field_validator("port", "poll_interval", mode="before")
     @classmethod
@@ -266,6 +271,11 @@ class Settings(BaseSettings):
     def library_dir(self) -> Path:
         """Web library database and presentation files: HTMLEDITOR_LIBRARY_DIR, else <state_dir>/library."""
         return self.library_dir_override or self.state_dir / "library"
+
+    @property
+    def google_credentials_file(self) -> Path | None:
+        """The operator's Google OAuth client file (HTMLEDITOR_GOOGLE_CREDENTIALS_FILE), read by ``library/signin``."""
+        return self.google_credentials_override
 
     @property
     def bin_dir(self) -> Path:

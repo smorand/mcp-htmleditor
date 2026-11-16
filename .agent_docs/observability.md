@@ -45,6 +45,8 @@ Names follow `category.operation`.
 | `render.cleanup` | `render/files.remove_stale`, after a successful picture | `file.count` (pictures removed) |
 | `mcp.render` | `mcp_server.render` | `file.path` |
 | `file.write` | editor save, `new` from a template, PPTX save, `fileio.atomic_write` (`patch`) | `file.path`, `file.size`, `export.format`, `template.key` |
+| `auth.google_token` | `library/signin.GoogleClient.exchange`, the code exchange at Google's `token_uri` | `http.status_code` (absent when Google was unreachable) |
+| `session.create` | `library/signin.Accounts`, the session row of a successful sign in | none |
 
 The deck service (`src/mcp_htmleditor/deck/`) opens no span of its own (no `deck.*` span exists yet); a `patch`
 shows up as `mcp.patch` around one `file.write` from `fileio.atomic_write`, absent for a dry run or a no change patch.
@@ -54,6 +56,10 @@ is recorded and the span status becomes `ERROR`; the exception is re-raised unto
 
 Never trace document content, prompts, HTML fragments or credentials. Paths, counts,
 sizes, charter keys and durations only.
+
+Web library (SPEC-0025, DEC-048): no address, name, cookie, token, `state`, `nonce`, PKCE verifier, code or client
+secret in a log line or a span attribute. A refused sign in logs `Sign in refused: <fixed reason>` (WARNING,
+`library.routes_library`); a refused state change logs `Refused <METHOD> <path>: origin`.
 
 ## Exporting somewhere else
 

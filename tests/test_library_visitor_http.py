@@ -60,11 +60,15 @@ def test_library_visitor_direct_links_to_a_folder_and_a_presentation_show_nothin
 
 def test_library_visitor_other_methods_and_odd_paths_give_the_page(library_server: START) -> None:
     """Every method and an address naming no page give the sign in page; a hostile ``next`` becomes ``/``."""
-    client = library_server().client()
+    running = library_server()
+    client = running.client()
 
     for method in ("POST", "DELETE"):
-        reply = client.request(method, "/f/x", body=b'{"a": 1}')
+        reply = client.request(method, "/f/x", headers={"Origin": running.origin}, body=b'{"a": 1}')
         assert (reply.status, reply.body) == (200, pages.sign_in_page("/f/x", None)), method
+    for headers in ({}, {"Origin": "http://evil.example"}):  # DEC-022 comes before the route: no page, no route lookup
+        reply = client.request("POST", "/no/such/path", headers=headers, body=b"{}")
+        assert (reply.status, reply.body) == (403, pages.access_denied()), headers
     reply = client.get("/%3Cscript%3E")
     assert reply.body == pages.sign_in_page("/%3Cscript%3E", None)
     assert client.get("/a:b").body == pages.sign_in_page("/", None)

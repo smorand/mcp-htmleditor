@@ -3,9 +3,11 @@
 Gate order of every request (DEC-007, DEC-008, DEC-010): a header block readable two ways is refused (400,
 inherited ``_refuse_ambiguous_headers``); ``GET /health`` answers on any host name with ``running`` and the version
 only; a ``Host`` other than the netloc of one of the two configured origins gets ``403 {"error": "forbidden host"}``;
-``X-Forwarded-Proto: http`` gets ``308`` to the configured origin of that host; a visitor (no session
-exists yet) gets the sign in page at every library address and a ``302`` to the library origin on the content
-origin (DEC-011). Every answer carries the protection headers of DEC-009 (``end_headers``).
+``X-Forwarded-Proto: http`` gets ``308`` to the configured origin of that host; every request on the content
+origin gets a ``302`` to the library origin (DEC-011); on the library origin the route table decides (DEC-021):
+a state changing request needs its ``Origin`` (DEC-022) before the route or the session is looked up, a path in no row
+or a non public route gives the sign in page to a visitor and ``Access denied.`` to a signed in person. Every answer
+carries the protection headers of DEC-009 (``end_headers``).
 """
 
 from __future__ import annotations
@@ -19,13 +21,15 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast, override
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from ..config import Settings, is_origin
 from ..http_server import _EditorHandler, _EditorServer
 from ..version import __version__
 from . import pages
-from .access import Route
+from .access import Answer, Context, Permission, Route
+from .signin import BROWSER_COOKIE, SESSION_COOKIE, Accounts, GoogleClient, safe_destination
+from .store import Database, Library
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +41,16 @@ PAGE_POLICY = (
     "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
     "form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 )
-SAFE_DESTINATION = re.compile(r"^/[A-Za-z0-9._~/%-]*$")
 ROUTES_MODULE_PREFIX = "routes_"
 STRICT_TRANSPORT = "max-age=31536000"
 POLL_INTERVAL_SECONDS = 0.05
 PLAIN_SCHEME = "http"
 SECURE_SCHEME = "https"
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+FETCH_SITES_ALLOWED = frozenset({"same-origin", "none"})
+HOST_PREFIX = "__Host-"
+DATABASE_NAME = "library.db"
+CALLBACK_PATH = "/auth/callback"
 
 
 class LibraryConfigError(Exception):
@@ -54,11 +62,30 @@ def health_answer() -> dict[str, Any]:
     return {"ok": True, "status": "ok", "version": __version__}
 
 
-def safe_destination(raw: str) -> str:
-    """The post sign in address when it is a plain local path (DEC-014), else ``/``."""
-    if not SAFE_DESTINATION.fullmatch(raw) or raw.startswith(("//", "/\\")):
-        return "/"
-    return raw
+def cookie_name(origin: str, base: str) -> str:
+    """``lib`` on http, ``__Host-lib`` on https: the prefix forbids a parent domain or another path from setting it."""
+    return f"{HOST_PREFIX}{base}" if urlsplit(origin).scheme == SECURE_SCHEME else base
+
+
+def cookie_header(origin: str, base: str, value: str, *, max_age: int | None) -> str:
+    """The ``Set-Cookie`` value (DEC-017); ``max_age`` None is a browser session cookie, 0 clears the cookie."""
+    parts = [f"{cookie_name(origin, base)}={value}", "Path=/", "HttpOnly", "SameSite=Lax"]
+    if max_age is not None:
+        parts.append(f"Max-Age={max_age}")
+    if urlsplit(origin).scheme == SECURE_SCHEME:
+        parts.append("Secure")
+    return "; ".join(parts)
+
+
+def parse_cookies(headers: list[str]) -> dict[str, str]:
+    """Name to value of every ``Cookie`` header; the first of a repeated name wins."""
+    cookies: dict[str, str] = {}
+    for header in headers:
+        for pair in header.split(";"):
+            name, separator, value = pair.strip().partition("=")
+            if separator and name not in cookies:
+                cookies[name] = value
+    return cookies
 
 
 def load_routes() -> tuple[Route, ...]:
@@ -95,6 +122,14 @@ class LibraryHandler(_EditorHandler):
         self._send_common_headers()
         super().end_headers()
 
+    @override
+    def finish(self) -> None:
+        """The thread of this connection ends with it: so does its database connection."""
+        try:
+            super().finish()
+        finally:
+            self._library_server().database.release()
+
     def _dispatch(self) -> None:
         self.policy = JSON_POLICY  # one handler serves several requests of a keep alive connection
         if self.command != "GET":  # a body is never read: it must not desynchronize the next request
@@ -115,7 +150,58 @@ class LibraryHandler(_EditorHandler):
         if self._library_server().is_content_host(self.headers.get("Host", "")):
             self._redirect_to_library()
             return
-        self._send_sign_in_page(safe_destination(self._request_path(target.path)))
+        self._serve_library(origin, self._request_path(target.path), target.query)
+
+    def _serve_library(self, origin: str, path: str, query: str) -> None:
+        """Route, ``Origin`` rule, session, permission, then the handler; no body is read before the handler."""
+        server = self._library_server()
+        route = server.find_route("library", self.command, path)
+        if self.command not in SAFE_METHODS and not self._origin_ok(origin):
+            logger.warning("Refused %s %s: origin", self.command, path)
+            self._send_answer(origin, Answer(403, pages.access_denied()))
+            return
+        cookies = parse_cookies(self.headers.get_all("Cookie") or [])
+        token = cookies.get(cookie_name(origin, SESSION_COOKIE))
+        session = server.accounts.session_for(token)
+        if route is None or (route.permission is not Permission.PUBLIC and session is None):
+            self._send_refusal(origin, path, signed_in=session is not None)
+            return
+        context = Context(
+            person_email=session.email if session is not None else None,
+            query=dict(reversed(parse_qsl(query, keep_blank_values=True))),
+            session_token=token if session is not None else None,
+            browser_id=cookies.get(cookie_name(origin, BROWSER_COOKIE)),
+            accounts=server.accounts,
+            library=server.library,
+        )
+        self._send_answer(origin, route.handler(context))
+
+    def _origin_ok(self, origin: str) -> bool:
+        """DEC-022: ``Origin`` exactly the receiving origin, ``Sec-Fetch-Site`` absent, ``same-origin`` or ``none``."""
+        fetch_site = self.headers.get("Sec-Fetch-Site")
+        return self.headers.get("Origin") == origin and (fetch_site is None or fetch_site in FETCH_SITES_ALLOWED)
+
+    def _send_refusal(self, origin: str, path: str, *, signed_in: bool) -> None:
+        """``Access denied.`` for a signed in person, the sign in page keeping ``path`` for a visitor."""
+        if signed_in:
+            self._send_answer(origin, Answer(403, pages.access_denied()))
+        else:
+            self._send_answer(origin, Answer(200, pages.sign_in_page(safe_destination(path), None)))
+
+    def _send_answer(self, origin: str, answer: Answer) -> None:
+        """Status, ``Location``, cookies of the origin, body; a page body carries the page policy."""
+        if answer.body and answer.content_type == pages.HTML_CONTENT_TYPE:
+            self.policy = PAGE_POLICY
+        self.send_response(answer.status)
+        if answer.location is not None:
+            self.send_header("Location", answer.location)
+        for cookie in answer.cookies:
+            self.send_header("Set-Cookie", cookie_header(origin, cookie.base, cookie.value, max_age=cookie.max_age))
+        if answer.body:
+            self.send_header("Content-Type", answer.content_type)
+        self.send_header("Content-Length", str(len(answer.body)))
+        self.end_headers()
+        self.wfile.write(answer.body)
 
     def _request_path(self, parsed_path: str) -> str:
         """The path as written in the request line: ``//host/x`` is a path here, not an authority."""
@@ -141,16 +227,6 @@ class LibraryHandler(_EditorHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    def _send_sign_in_page(self, destination: str) -> None:
-        """200 page with the page policy."""
-        data = pages.sign_in_page(destination, None)
-        self.policy = PAGE_POLICY
-        self.send_response(200)
-        self.send_header("Content-Type", pages.HTML_CONTENT_TYPE)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
     def _send_common_headers(self) -> None:
         """DEC-009 headers of every answer of this story (JSON or empty bodies)."""
         self.send_header("Cache-Control", "no-store, must-revalidate")
@@ -169,7 +245,9 @@ class LibraryHandler(_EditorHandler):
 class LibraryServer(_EditorServer):
     """One process for every folder and presentation (DEC-002), bound to ``settings.host`` and ``settings.port``.
 
-    ``port`` is the port actually bound (``settings.port`` 0 picks a free one).
+    ``port`` is the port actually bound (``settings.port`` 0 picks a free one). The database
+    ``<library_dir>/library.db`` is created and migrated before the bind; the Google credentials file is read once
+    here (a missing file or an unlisted return address is logged, the server still starts, DEC-015).
     """
 
     def __init__(self, settings: Settings, *, clock: Callable[[], float] = time.time) -> None:
@@ -178,8 +256,24 @@ class LibraryServer(_EditorServer):
         self._origins = _origins_by_host(settings)  # refused before the bind
         self.is_secure = urlsplit(settings.library_origin).scheme == SECURE_SCHEME
         self._thread: threading.Thread | None = None
+        self.routes = ROUTES
+        self.database = Database(settings.library_dir / DATABASE_NAME)
+        self.library = Library(self.database)
+        google = GoogleClient(settings.google_credentials_file, settings.library_origin + CALLBACK_PATH)
+        self.accounts = Accounts(self.database, google, clock)
         super().__init__(settings.host, settings.port, LibraryHandler)
         self.port = int(self.server_address[1])
+
+    def find_route(self, origin: str, method: str, path: str) -> Route | None:
+        """The first row of the table for this origin, method and whole path, else None."""
+        return next(
+            (
+                route
+                for route in self.routes
+                if route.origin == origin and route.method == method and route.pattern.fullmatch(path)
+            ),
+            None,
+        )
 
     def is_content_host(self, host: str) -> bool:
         """True when ``Host`` is the netloc of the content origin."""
@@ -204,6 +298,7 @@ class LibraryServer(_EditorServer):
             self._thread = None
         self.server_close()
         self.connections.close_idle()
+        self.database.release()
         logger.info("Library server stopped")
 
 

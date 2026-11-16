@@ -9,10 +9,16 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | Module | Holds |
 |---|---|
 | `__init__.py` | package docstring |
-| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, every English text constant (DEC-055) |
-| `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route` record (DEC-021) |
-| `routes_*.py` | (none yet) each exports `ROUTES: tuple[Route, ...]`; `server.load_routes()` imports every module named `routes_*` |
-| `server.py` | `safe_destination`, `load_routes`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `is_secure`, `clock`), `LibraryHandler(_EditorHandler)` (gate, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE` |
+| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, `home_page(folders)`, every English text constant (DEC-055: `SIGN_IN_UNAVAILABLE`, `ROLE_LABELS`) |
+| `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route`, `Context`, `Answer`, `SetCookie` (DEC-021) |
+| `store.py` | `Database(path)` (per thread connection, `transaction(immediate=)`, `release()`, `connect()` seam, `MIGRATIONS`), `Library` (`folders_for(email)`), `FolderView` |
+| `signin.py` | `GoogleClient` (`authorization_url`, `exchange`), `read_credentials`, `validate_claims`, `safe_destination`, `Accounts` (`begin_login`, `finish_login`, `session_for`, `end_session`), `Session`, `NewSession`, `SignInUnavailable`, cookie base names |
+| `routes_library.py` | `ROUTES`: `GET /auth/start`, `GET /auth/callback` (PUBLIC), `POST /auth/logout`, `GET /` (SIGNED_IN) |
+| `server.py` | `load_routes`, `cookie_name`, `cookie_header`, `parse_cookies`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `find_route`, `is_secure`, `clock`, `database`, `library`, `accounts`), `LibraryHandler(_EditorHandler)` (gate, `_serve_library`, `_origin_ok`, `_send_answer`, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE`; re-exports `safe_destination` |
+
+A route handler is a plain function `(Context) -> Answer` (not a `LibraryHandler` method, so a `routes_*` module never
+imports `server.py`: `server` loads the routes while it is itself being imported). The dispatcher writes the `Answer`
+(status, `Location`, cookies turned into the origin's names, body; an HTML body gets `PAGE_POLICY`).
 
 `_EditorServer.__init__(bind_host, port, handler=_EditorHandler)` is the only change to `http_server.py` (DEC-003);
 `_EditorHandler` is subclassed, never edited (`test_the_editor_handler_is_unchanged...` pins its source hash; the
@@ -21,11 +27,12 @@ story that adds the DEC-003 hooks updates the hash in its own diff).
 ## Settings (DEC-005)
 
 `library_origin` (`HTMLEDITOR_LIBRARY_ORIGIN`), `library_content_origin` (`HTMLEDITOR_LIBRARY_CONTENT_ORIGIN`),
-`library_dir_override` (`HTMLEDITOR_LIBRARY_DIR`, property `library_dir`, default `<state_dir>/library`). An origin
+`library_dir_override` (`HTMLEDITOR_LIBRARY_DIR`, property `library_dir`, default `<state_dir>/library`),
+`google_credentials_override` (`HTMLEDITOR_GOOGLE_CREDENTIALS_FILE`, property `google_credentials_file`, default None). An origin
 must be exactly `http(s)://host[:port]` (`config.is_origin`: no user, path, `/`, query or fragment, port in range,
 no empty or default port, no trailing dot: the netloc is compared with `Host` as is); otherwise `Settings()` fails
 with a message naming the variable, for every command since the click group builds the settings. The three names
-are in `_SIGNIFICANT_ENV_VARS`. HSTS follows the library origin's scheme only (both origins are expected to share it).
+are in `_SIGNIFICANT_ENV_VARS` (the credentials variable too). HSTS follows the library origin's scheme only (both origins are expected to share it).
 
 ## Gate order (every method, `LibraryHandler._dispatch`)
 
@@ -35,10 +42,48 @@ are in `_SIGNIFICANT_ENV_VARS`. HSTS follows the library origin's scheme only (b
    `403 {"error": "forbidden host"}` and one `Refused <METHOD> <path>: forbidden host '<host>'` warning.
 4. `X-Forwarded-Proto: http` (any case) while that origin is https: `308`, `Location` = configured origin + request
    path + query (never the request's `Host`, an absolute form target keeps only its path), empty body.
-5. Library origin: the sign in page (`200 text/html`, `PAGE_POLICY`, one `Sign in with Google` link whose `next` is
-   `safe_destination(request path)`) for every method and every path; no session exists until US-0126 (the route
-   table is loaded but empty). Content origin: `302` to `<library origin>/`. An unread body of a non GET closes the
-   connection. Python's `BaseHTTPRequestHandler` already turns `//x` into `/x` in `self.path`.
+5. Content origin: `302` to `<library origin>/`. An unread body of a non GET closes the connection. Python's
+   `BaseHTTPRequestHandler` already turns `//x` into `/x` in `self.path`.
+6. Library origin, `_serve_library`: find the route (origin, method, `pattern.fullmatch(path)`); a matched route
+   whose method is not `GET`/`HEAD`/`OPTIONS` needs `Origin` exactly equal to the library origin and
+   `Sec-Fetch-Site` absent, `same-origin` or `none`, else `403` `Access denied.` page before the session is looked
+   up (DEC-022). Then the session (cookie `lib`/`__Host-lib`, `Accounts.session_for`). No route, or a non PUBLIC route
+   without a session: a visitor gets the sign in page (`200`, `next` = `safe_destination(path)`), a signed in person
+   `403` `Access denied.`. Then the handler (the role check joins with the first route that names a target).
+   The Origin rule applies to every non GET/HEAD/OPTIONS request before the route lookup (2026-11-16): a POST to a
+   path in no row without the library `Origin` gets `Access denied.`; with it, the sign in page for a visitor.
+   The token call uses an opener with no proxy and no redirect (`signin.py`).
+   The JSON `Content-Type` part of DEC-022 arrives with the first JSON route (US-0130).
+
+## Sign in (US-0126, DEC-012 to DEC-017)
+
+- `GET /auth/start?next=`: `begin_login` stores a `logins` row (`sha256(state)`, `nonce`, `verifier`,
+  `safe_destination(next)`, `sha256(browser id)`, `created_at`; rows of 10 minutes or more are purged here), sets
+  `lib-b` (random browser id, session cookie) when the browser had none, `302` to `auth_uri` with `response_type=code`,
+  `client_id`, `redirect_uri=<library origin>/auth/callback`, `scope=openid email`, `state`, `nonce`, `code_challenge`
+  (`S256`), `prompt=select_account`. No credentials: the sign in page with `Sign-in is unavailable. Try again later.`
+- `GET /auth/callback`: `error=access_denied` is the sign in page with no message; any other `error`, a missing
+  `code`/`state`, an unknown or used `state` (the row is deleted first, `DELETE ... RETURNING`), an attempt aged 600 s
+  or more, a browser id whose hash differs, any exchange failure (network, non 200, over 1 MiB, not JSON, no
+  `id_token`) or a failed claim (`iss` Google, `aud` client id, `exp` number in the future, `nonce`, `email_verified`
+  `true` or `"true"`, non empty `email`) is the sign in page with the message and no session. Success: a `sessions` row
+  (`sha256(token)`, lower case email, `created_at`, `expires_at = created_at + 2592000`, never updated), cookie `lib`
+  (`Max-Age=2592000`), `303` to the stored destination.
+- `POST /auth/logout`: deletes the row, clears `lib` and `lib-b` (`Max-Age=0`), `303 /`. Other browsers stay signed in.
+- `GET /`: `Library.folders_for(email)` (members rows only, ordered by name); none: `403` `Access denied.` page. Roles
+  are read at every request, so a role given later shows at the next page.
+- Cookies: `cookie_name` gives `lib`/`lib-b` on http, `__Host-lib`/`__Host-lib-b` on https; attributes
+  `Path=/; HttpOnly; SameSite=Lax`, `Max-Age` for `lib` only, `Secure` on https.
+- The credentials file is read once at `LibraryServer` construction: missing or unreadable is one ERROR line, a return
+  address absent from `redirect_uris` one WARNING line; the server starts either way.
+
+## Database (DEC-025)
+
+`<library_dir>/library.db` (file `0600`, directory `0700`), WAL, `foreign_keys=ON`, `busy_timeout` 30 s, one
+connection per thread (`LibraryHandler.finish` releases it when the connection's thread ends; `stop()` releases the
+main thread's). Migration 1 (US-0126): `meta`, `folders`, `members` (+ index on `email`), `logins`, `sessions`.
+`migrate()` splits each script on `;` and runs it inside one `BEGIN IMMEDIATE` with `PRAGMA user_version = N`
+(`executescript` would commit first). Only hashes of tokens, states and browser ids are stored.
 
 Unknown methods (`PATCH`, `PUT`) get the stdlib 501, `OPTIONS` the inherited 405.
 
@@ -65,7 +110,15 @@ http://<host>:<port>/ (library origin <o>, content origin <o>)`, waits for the e
 and `http://slides-content.test:<port>`, temporary `library_dir` and `state_dir`, stopped at teardown),
 `HttpClient(port, host)` (sets `Host`, keyword headers `x_forwarded_proto=` become `X-Forwarded-Proto`),
 `FakeClock`. Use it in a test module with `library_server = library_support.library_server`.
+Sign in support (US-0126): `start(google=fake, google_registered=True)` writes a credentials file pointing at the
+`FakeGoogle` (fixture `fake_google`: `choose(email)`, `cancel()`, `accounts[email]` claim overrides,
+`registered_redirects` = the console, `exchange_failure` `close`/`unavailable`/`bad_json`, `received`);
+`running.browser(resolver)` is a `Browser` (cookies, redirects across hosts, `visited`, `replies`, `sign_in`,
+`sign_out` with `Origin`); `running.builder` (`folder`, `member`, `standard()`) and `running.stored` (`sessions`,
+`logins`, `folder_names`, `activity`, `rows`); fixture `evil_listener` counts visits to evil.example.
 `tests/test_library_visitor_http.py`: E2E-004, 134 (library side), 145, route table, `esc`, `authorize`, `safe_destination`.
+`tests/test_library_auth_http.py`: E2E-003, 005, 007, 090, 150, 171, 172, 183, 184, SEC-015, 016, 019, sign out,
+cookies, claims, PKCE, database.
 `tests/test_library_gate_http.py`: E2E-135, 136, 146, 147, 186, headers, settings, CLI refusal, a real `webserve`
 child stopped by SIGTERM.
 
