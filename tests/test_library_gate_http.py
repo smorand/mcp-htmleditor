@@ -22,7 +22,7 @@ import pytest
 
 from mcp_htmleditor.config import Settings
 from mcp_htmleditor.http_server import _EditorHandler, _EditorServer, health_payload
-from mcp_htmleditor.library.server import LibraryConfigError, LibraryServer
+from mcp_htmleditor.library.server import PAGE_POLICY, LibraryConfigError, LibraryServer
 from mcp_htmleditor.version import __version__
 from tests import library_support
 from tests.conftest import ServedDeck
@@ -143,7 +143,7 @@ def test_e2e_146_the_plain_address_is_sent_to_the_secure_one(library_server: STA
         assert reply.headers["strict-transport-security"] == "max-age=31536000"
     assert library.get("/", x_forwarded_proto="http").headers["location"] == f"{SECURE_LIBRARY}/"
     assert content.get("/d/x/", x_forwarded_proto="HTTP").headers["location"] == f"{SECURE_CONTENT}/d/x/"
-    assert library.get("/x", x_forwarded_proto="https").status == 404
+    assert library.get("/x", x_forwarded_proto="https").status == 200
 
 
 def test_e2e_146_the_redirect_is_built_from_the_settings_never_from_the_request(library_server: START) -> None:
@@ -195,12 +195,12 @@ def test_e2e_147_a_request_without_host_is_refused(library_server: START) -> Non
 
 
 def test_the_two_configured_host_names_are_accepted_in_any_case(library_server: START) -> None:
-    """The gate compares host and port case insensitively; this story answers ``Not found`` behind it."""
+    """Host and port compare case insensitively: the sign in page (library) or a redirect (content)."""
     running = library_server()
 
     for host in (running.library_netloc, running.content_netloc, running.library_netloc.upper()):
         reply = running.client(host).get("/")
-        assert (reply.status, reply.json()) == (404, {"error": "Not found"}), host
+        assert reply.status == (302 if host == running.content_netloc else 200), host
 
 
 # ---------------------------------------------------------------------------
@@ -253,9 +253,9 @@ def test_every_answer_carries_the_protection_headers(library_server: START) -> N
     library = running.client()
     replies = {
         "health": library.get("/health"),
-        "not found": library.get("/"),
+        "sign in page": library.get("/"),
         "forbidden host": running.client("evil.example").get("/"),
-        "redirect": library.get("/x", x_forwarded_proto="http"),
+        "redirect": library.get("/x", x_forwarded_proto="http"),  # http origin: no redirect, the page
         "options": library.request("OPTIONS", "/"),
         "unknown method": library.request("PATCH", "/"),
     }
@@ -264,7 +264,12 @@ def test_every_answer_carries_the_protection_headers(library_server: START) -> N
     )
 
     for name, reply in replies.items():
-        for header, value in COMMON_HEADERS.items():
+        expected = (
+            {**COMMON_HEADERS, "content-security-policy": PAGE_POLICY}
+            if name in {"sign in page", "redirect"}
+            else COMMON_HEADERS
+        )
+        for header, value in expected.items():
             assert reply.headers.get(header) == value, (name, header)
         assert "strict-transport-security" not in reply.headers, name
     assert replies["options"].status == 405

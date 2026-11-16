@@ -9,7 +9,10 @@ US-0124 to US-0149 land on `feat/0049-web-library-mode`; this file grows with ea
 | Module | Holds |
 |---|---|
 | `__init__.py` | package docstring |
-| `server.py` | `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `is_secure`, `clock`), `LibraryHandler(_EditorHandler)` (gate, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE` |
+| `pages.py` | `esc`, `sign_in_page(destination, message)`, `access_denied()`, every English text constant (DEC-055) |
+| `access.py` | `ADMIN_EMAIL`, `Role`, `Permission`, `authorize(role, permission)`, frozen `Route` record (DEC-021) |
+| `routes_*.py` | (none yet) each exports `ROUTES: tuple[Route, ...]`; `server.load_routes()` imports every module named `routes_*` |
+| `server.py` | `safe_destination`, `load_routes`, `PAGE_POLICY`, `LibraryServer(_EditorServer)` (`start`, `stop`, `port`, `origin_for`, `is_secure`, `clock`), `LibraryHandler(_EditorHandler)` (gate, `_send_common_headers`), `health_answer`, `LibraryConfigError`, `SAME_HOST_MESSAGE` |
 
 `_EditorServer.__init__(bind_host, port, handler=_EditorHandler)` is the only change to `http_server.py` (DEC-003);
 `_EditorHandler` is subclassed, never edited (`test_the_editor_handler_is_unchanged...` pins its source hash; the
@@ -32,7 +35,10 @@ are in `_SIGNIFICANT_ENV_VARS`. HSTS follows the library origin's scheme only (b
    `403 {"error": "forbidden host"}` and one `Refused <METHOD> <path>: forbidden host '<host>'` warning.
 4. `X-Forwarded-Proto: http` (any case) while that origin is https: `308`, `Location` = configured origin + request
    path + query (never the request's `Host`, an absolute form target keeps only its path), empty body.
-5. Anything else: `404 {"error": "Not found"}` (US-0125 puts the route table here).
+5. Library origin: the sign in page (`200 text/html`, `PAGE_POLICY`, one `Sign in with Google` link whose `next` is
+   `safe_destination(request path)`) for every method and every path; no session exists until US-0126 (the route
+   table is loaded but empty). Content origin: `302` to `<library origin>/`. An unread body of a non GET closes the
+   connection. Python's `BaseHTTPRequestHandler` already turns `//x` into `/x` in `self.path`.
 
 Unknown methods (`PATCH`, `PUT`) get the stdlib 501, `OPTIONS` the inherited 405.
 
@@ -42,7 +48,7 @@ Unknown methods (`PATCH`, `PUT`) get the stdlib 501, `OPTIONS` the inherited 405
 included) carries `Cache-Control: no-store, must-revalidate`, `Pragma: no-cache`, `X-Content-Type-Options: nosniff`,
 `Referrer-Policy: same-origin`, `X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'none';
 frame-ancestors 'none'`, plus `Strict-Transport-Security: max-age=31536000` when the library origin is https.
-Pages (US-0125) and the deck frame (US-0133) need another policy: make the helper take it per answer then.
+The handler attribute `policy` (default JSON) is set to `PAGE_POLICY` by the page answers; the deck frame (US-0133) will set its own.
 
 ## Process
 
@@ -59,6 +65,7 @@ http://<host>:<port>/ (library origin <o>, content origin <o>)`, waits for the e
 and `http://slides-content.test:<port>`, temporary `library_dir` and `state_dir`, stopped at teardown),
 `HttpClient(port, host)` (sets `Host`, keyword headers `x_forwarded_proto=` become `X-Forwarded-Proto`),
 `FakeClock`. Use it in a test module with `library_server = library_support.library_server`.
+`tests/test_library_visitor_http.py`: E2E-004, 134 (library side), 145, route table, `esc`, `authorize`, `safe_destination`.
 `tests/test_library_gate_http.py`: E2E-135, 136, 146, 147, 186, headers, settings, CLI refusal, a real `webserve`
 child stopped by SIGTERM.
 
