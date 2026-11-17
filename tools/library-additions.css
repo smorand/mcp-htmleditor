@@ -1,0 +1,91 @@
+/* ===== Web library pages (SPEC-0025): what the design system does not ship ===== */
+/* Names may be written right to left: logical properties for what is new, and each name keeps its own direction. */
+.name,.crumbs a,.crumbs span.here{unicode-bidi:plaintext;overflow-wrap:anywhere}
+.sr-only{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lib-bar{display:flex;align-items:center;gap:var(--sp-3);padding:10px var(--sp-5);background:var(--surface);border-block-end:1px solid var(--border);position:sticky;inset-block-start:0;z-index:20}
+.lib-bar .brand{display:inline-flex;align-items:center;gap:10px;font:var(--h-weight) 18px var(--font-display);color:var(--text)}
+.lib-bar .brand svg{inline-size:30px;block-size:30px}
+.lib-bar .grow{flex:1}
+.lib-bar form{margin:0}
+.lib-main{max-inline-size:1100px;margin-inline:auto;padding:var(--sp-5);display:flex;flex-direction:column;gap:var(--sp-5)}
+.lib-main>section{display:flex;flex-direction:column;gap:var(--sp-3)}
+.lib-hero{padding-block-end:80px}
+.lib-hero h1{color:var(--hero-text);margin:0 0 6px}
+.lib-hero p{color:var(--hero-text);margin:0;opacity:.85}
+.lib-hero .ridge{block-size:80px}
+.ridge{inline-size:100%}.ridge .r1{fill:var(--hero-3);opacity:.45}.ridge .r2{fill:var(--hero-4);opacity:.6}.ridge .r3{fill:var(--hero-4)}
+ul.cards{list-style:none;margin:0;padding:0}
+/* Folder gallery: a card with the tab of a folder */
+.folder-card{position:relative;display:flex;align-items:center;gap:var(--sp-4);padding:var(--sp-4);margin-block-start:10px}
+.folder-card::before{content:"";position:absolute;inset-block-start:-10px;inset-inline-start:14px;inline-size:56px;block-size:11px;background:var(--surface);border:1px solid var(--border);border-block-end:0;border-start-start-radius:8px;border-start-end-radius:8px}
+.folder-card .tile{inline-size:52px;block-size:52px;border-radius:var(--r);background:var(--primary-soft);color:var(--primary-text);display:grid;place-items:center;flex:none}
+.folder-card .tile .ico{inline-size:28px;block-size:28px}
+.folder-card .body,.pres-card .body{display:flex;flex-direction:column;gap:6px;min-inline-size:0}
+.folder-card .name,.pres-card .name{font-weight:600;font-size:15px}
+.folder-card .name a::after,.pres-card .name a::after{content:"";position:absolute;inset:0;border-radius:inherit}
+.folder-card .name a,.pres-card .name a{color:var(--text)}
+.folder-card .name a:hover,.pres-card .name a:hover{text-decoration:none}
+.card:focus-within{box-shadow:var(--focus)}
+.meta{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;color:var(--text-muted);font-size:12.5px}
+/* Presentation gallery: the cover of the deck, or the ridge when it has no picture */
+.pres-card{position:relative;overflow:hidden;display:flex;flex-direction:column}
+.cover{position:relative;aspect-ratio:16/9;background:linear-gradient(var(--hero-1),var(--hero-2));overflow:hidden}
+.cover .ridge{position:absolute;inset-inline:0;inset-block-end:0;block-size:55%}
+.cover img{position:absolute;inset:0;inline-size:100%;block-size:100%;object-fit:contain;background:var(--surface-2)}
+.pres-card .body{padding:var(--sp-3) var(--sp-4) 0}
+.pres-card .actions{padding:var(--sp-2) var(--sp-4) var(--sp-3);display:flex;justify-content:flex-end;position:relative;z-index:1}
+.pres-card .actions:empty{display:none}
+.pres-card .size::before{content:"·";margin-inline-end:12px}
+/* Upload */
+.upload-box{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3)}
+.upload-box input[type=file]{font:inherit;color:var(--text-muted);max-inline-size:100%}
+.upload-box label{font-weight:600}
+#upload-status{margin:0;color:var(--text-muted);min-block-size:1.5em;unicode-bidi:plaintext}
+/* Question dialogs: the modal of the design system */
+dialog{border:0;border-radius:var(--r-lg);box-shadow:var(--shadow-3);padding:0;background:var(--surface);color:var(--text);inline-size:min(480px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(15,22,28,.55)}
+dialog form{padding:var(--sp-5);display:flex;flex-direction:column;gap:var(--sp-3)}
+dialog p{margin:0}
+dialog .modal-f{display:flex;justify-content:flex-end;gap:var(--sp-2)}
+dialog #confirm-question,dialog label{font-weight:600;unicode-bidi:plaintext;overflow-wrap:anywhere}
+/* Alerts a script fills */
+p[role=alert]{padding:10px 14px;border-radius:var(--r);border:1px solid var(--danger);background:var(--danger-soft);margin:0}
+p[role=alert][hidden]{display:none}
+/* Administration */
+.admin-folder{padding:var(--sp-4);display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:var(--sp-3);margin-block-start:10px;position:relative}
+.admin-folder .name{flex:1;min-inline-size:0;font-weight:600;font-size:15px}
+.admin-folder section.members{flex-basis:100%;display:flex;flex-direction:column;gap:var(--sp-3);border-block-start:1px solid var(--border);padding-block-start:var(--sp-3)}
+.admin-folder::before{content:"";position:absolute;inset-block-start:-10px;inset-inline-start:14px;inline-size:56px;block-size:11px;background:var(--surface);border:1px solid var(--border);border-block-end:0;border-start-start-radius:8px;border-start-end-radius:8px}
+ul.members{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--sp-2)}
+ul.members li{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);padding-block:4px;border-block-end:1px solid var(--border)}
+ul.members .email{flex:1;min-inline-size:0;overflow-wrap:anywhere}
+section.members h3{margin:0 0 var(--sp-2)}
+form.add-member,#create-folder{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2)}
+form.add-member label,#create-folder label{font-weight:500;font-size:13px}
+form.add-member .input,form.add-member .select,#create-folder .input{inline-size:auto;min-inline-size:200px}
+ol.activity{list-style:none;margin:0;padding:0;border-inline-start:2px solid var(--border);margin-inline-start:8px;padding-inline-start:18px;display:flex;flex-direction:column;gap:14px}
+ol.activity li{position:relative;display:flex;flex-wrap:wrap;gap:4px 12px;overflow-wrap:anywhere}
+ol.activity li::before{content:"";position:absolute;inset-inline-start:-25px;inset-block-start:7px;inline-size:10px;block-size:10px;border-radius:50%;background:var(--primary);border:2px solid var(--surface)}
+ol.activity time,ol.activity .actor{color:var(--text-muted);font-size:12.5px}
+ol.activity .text{unicode-bidi:isolate}
+/* Sign in and refusal pages */
+.auth-art .brand{display:inline-flex;align-items:center;gap:10px;font:var(--h-weight) 20px var(--font-display);color:#fff}
+.auth-art .brand svg{inline-size:34px;block-size:34px}
+.auth-art .ridge{block-size:200px}
+.auth-box h1{margin:0}
+.center-note{min-block-size:100vh;display:grid;place-items:center;padding:20px;background:linear-gradient(var(--hero-1),var(--bg) 60%)}
+.center-note .card{max-inline-size:420px;inline-size:100%;padding:var(--sp-6);display:flex;flex-direction:column;align-items:center;gap:var(--sp-4);text-align:center}
+.center-note .card p{margin:0;font:var(--h-weight) 20px var(--font-display)}
+.center-note form{margin:0}
+@media(max-width:900px){.auth{grid-template-columns:1fr}.auth-art{min-block-size:220px}.auth-art .quote{margin-block:auto 100px}.lib-main{padding:var(--sp-4)}}
+@media(max-width:600px){.lib-bar{padding:10px var(--sp-3)}.page-head .toolbar{inline-size:100%}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.ico.plain{stroke:none}
+.btn.danger-text{color:var(--danger)}
+.lib-bar .theme .ico-sun{display:none}
+[data-theme=dark] .lib-bar .theme .ico-sun{display:inline}
+[data-theme=dark] .lib-bar .theme .ico-moon{display:none}
+.upload-box input[type=file].sr-only:focus-visible+label{box-shadow:var(--focus)}
+dialog .modal-f{flex-direction:row-reverse;justify-content:flex-start}
+.lib-main>section.upload-box{flex-direction:row}
+ul.members li .select{inline-size:auto;min-inline-size:170px}

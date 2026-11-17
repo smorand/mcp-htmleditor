@@ -222,7 +222,7 @@ def test_e2e_sec_005_a_folder_named_two_dots_is_refused_and_an_upload_lands_in_i
 
     assert reply.status == 400
     assert reply.json()["error"] == "Folder names use 1 to 60 letters, digits, spaces or hyphens."
-    assert len(admin.open("/").text.split('<li><a href="/f/')) - 1 == 3
+    assert len(admin.open("/").folder_rows()) == 3
     assert library.storage() == before
     assert library.upload("Quarterly Review.html").status == 201
     added = sorted(set(library.storage()) - set(before))

@@ -58,7 +58,7 @@ def test_e2e_001_a_member_signs_in_and_signs_out(library_server: START, fake_goo
     seen.append(home)
 
     texts = visible_texts(home)
-    assert texts == [PRODUCT, WCBIP, "Read and write", "Sign out"]
+    assert texts == [PRODUCT, WCBIP, "Read and write", "0 presentations", "Sign out"]
     assert "Administration" not in home.text
     assert not [reply for reply in fake_google.received if "password" in reply.path.lower()]
     assert browser.upload(folder, f"{QUARTERLY}.html", valid_deck()).status == 201

@@ -189,6 +189,18 @@ def delete_presentation(context: Context) -> Answer:
     return json_answer(200, {"ok": True})
 
 
+def cover(context: Context) -> Answer:
+    """``GET /cover/<pid>`` (``VIEW`` on the presentation's folder): the first picture of the deck for the gallery, a
+    raster image served as such; ``404`` when the deck has none. Never a stored name or path (DEC-023)."""
+    presentation_id = context.presentation_id or ""
+    if context.library.presentation(presentation_id) is None:  # the administrator's role does not rule it out
+        return Answer(403, pages.access_denied())
+    found = context.library.cover(presentation_id)
+    if found is None:
+        return Answer(404, NOT_FOUND_BODY, content_type=JSON_CONTENT_TYPE)
+    return Answer(200, found.data, content_type=found.media_type)
+
+
 def open_presentation(context: Context) -> Answer:
     """``VIEW`` already authorized on the presentation's folder: a one time ticket and ``302`` to ``/enter`` on the
     content origin; a presentation that does not exist, which the administrator's role does not rule out, is the
@@ -213,6 +225,14 @@ ROUTES: tuple[Route, ...] = (
         Permission.PUBLIC,
         static_file("library.js", "application/javascript"),
     ),
+    Route(
+        "library",
+        "GET",
+        re.compile(r"/lib/theme\.js"),
+        Permission.PUBLIC,
+        static_file("theme.js", "application/javascript"),
+    ),
+    Route("library", "GET", re.compile(r"/cover/(?P<pid>[0-9a-f]{32})"), Permission.VIEW, cover),
     Route("library", "GET", re.compile(r"/auth/start"), Permission.PUBLIC, sign_in_start),
     Route("library", "GET", re.compile(r"/auth/callback"), Permission.PUBLIC, sign_in_callback),
     Route("library", "POST", re.compile(r"/auth/logout"), Permission.SIGNED_IN, sign_out),

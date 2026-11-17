@@ -99,11 +99,16 @@ DAN = "dan.rw@example.org"
 CAROL = "carol.ro@example.org"
 BOB = "bob.nobody@gmail.com"
 ADMIN = "seb.morand@gmail.com"
-FOLDER_ROW = re.compile(r'<li><a href="/f/([0-9a-f]{32})">([^<]*)</a> <span>([^<]*)</span></li>')
+FOLDER_ROW = re.compile(
+    r'<li class="card hover folder-card"><span class="tile">.*?</span><div class="body">'
+    r'<span class="name"><a href="/f/([0-9a-f]{32})">([^<]*)</a></span> '
+    r'<span class="meta"><span class="badge primary">([^<]*)</span> <span>[^<]*</span></span></div></li>'
+)
 PRESENTATION_ROW = re.compile(
-    r'<li><span class="name"><a href="/open/[0-9a-f]{32}">([^<]*)</a></span> '
-    r'<time datetime="([^"]*)">([^<]*)</time> <span class="size">([^<]*)</span>'
-    r"(?: <button [^>]*>[^<]*</button>)?</li>"
+    r'<li class="card hover pres-card"><div class="cover">.*?</div>'
+    r'<div class="body"><span class="name"><a href="/open/[0-9a-f]{32}">([^<]*)</a></span>'
+    r'<span class="meta"><time datetime="([^"]*)">([^<]*)</time> <span class="size">([^<]*)</span></span></div>'
+    r'<div class="actions">.*?</div></li>'
 )
 ACTIVITY_ROW = re.compile(
     r'<li><time datetime="([^"]*)">[^<]*</time> <span class="actor">([^<]*)</span> <span class="text">([^<]*)</span>'
@@ -1039,9 +1044,13 @@ def signed_in(running: RunningLibrary, google: FakeGoogle, email: str) -> Browse
 
 
 def visible_texts(reply: LibraryReply) -> list[str]:
-    """The text nodes of the page body, unescaped, in order."""
+    """The text nodes of the page body, unescaped, in order; those of the bar at the top of a signed in page (the
+    administration link, the sign out button) come last, after the page's own, as the pages were read before the bar."""
     body = reply.text.split("<body>", 1)[1]
-    return [html_unescape(text).strip() for text in re.split(r"<[^>]*>", body) if text.strip()]
+    bar = re.search(r'<header class="lib-bar">.*?</header>', body)
+    content = body.replace(bar[0], "", 1) if bar else body
+    ordered = content + (bar[0] if bar else "")
+    return [html_unescape(text).strip() for text in re.split(r"<[^>]*>", ordered) if text.strip()]
 
 
 def launch_chromium(playwright: Playwright, *other_hosts: str) -> Chromium:

@@ -98,7 +98,7 @@ def folder_rows(reply: LibraryReply) -> list[tuple[str, str, str]]:
 
 def sign_in_link(reply: LibraryReply) -> str:
     """The address of the ``Sign in with Google`` link of a sign in page."""
-    match = re.search(r'<a href="([^"]+)">Sign in with Google</a>', reply.text)
+    match = re.search(r'<a class="btn lg block" href="([^"]+)">.*?Sign in with Google</a>', reply.text)
     assert match is not None, reply.text
     return html.unescape(match.group(1))
 
@@ -549,7 +549,7 @@ def test_the_home_page_lists_the_persons_folders_with_their_role(
         (ids[PNEUMO], PNEUMO, "Read only"),
     ]
     assert WCBIP not in reply.text and "<b>" not in reply.text
-    assert '<form method="post" action="/auth/logout"><button type="submit">Sign out</button></form>' in reply.text
+    assert '<form method="post" action="/auth/logout"><button type="submit" class="btn sm">' in reply.text
     assert reply.headers["content-security-policy"].endswith("frame-ancestors 'none'")
     assert reply.headers["x-frame-options"] == "DENY"
 

@@ -3,7 +3,7 @@
 
 .PHONY: sync run run-dev test test-cov lint lint-fix format format-check typecheck \
         security check build install install-browser install-skill uninstall docker-build docker-push \
-        docker run-up run-down deploy-vps undeploy-vps bootstrap-ei sync-medical-css sync-deck-pointer pptx-fidelity breathe-assets sync-breathe-layouts check-generated clean clean-all info help
+        docker run-up run-down deploy-vps undeploy-vps bootstrap-ei sync-medical-css sync-deck-pointer pptx-fidelity breathe-assets sync-breathe-layouts check-generated sync-library-design clean clean-all info help
 
 PROJECT_NAME=$(shell grep -m1 '^name' pyproject.toml 2>/dev/null | sed 's/.*= *"\([^"]*\)".*/\1/')
 PACKAGE := mcp_htmleditor
@@ -253,6 +253,10 @@ run-down:
 	  docker compose down
 	@echo "Services stopped!"
 
+## sync-library-design: Rebuild static/library.css from the design system (light and dark only, DESIGN=<css dir>)
+sync-library-design:
+	@uv run python tools/sync_library_design.py $(DESIGN)
+
 ## deploy-vps: Deploy the web library mode to the VPS (TAG=vX.Y.Z required; data in /app/data is kept)
 deploy-vps:
 ifndef TAG
@@ -391,6 +395,7 @@ help:
 	@echo "  docker           - Build and push"
 	@echo "  run-up           - Build and start docker compose"
 	@echo "  run-down         - Stop docker compose"
+	@echo "  sync-library-design - Rebuild library.css from the design system (DESIGN=<css dir>)"
 	@echo "  deploy-vps       - Deploy the web library mode to the VPS (TAG=vX.Y.Z)"
 	@echo "  undeploy-vps     - Remove it from the VPS (the data stays)"
 	@echo ""

@@ -35,6 +35,7 @@ from tests.library_support import (
     FakeGoogle,
     LibraryReply,
     RunningLibrary,
+    visible_texts,
 )
 
 library_server = library_support.library_server
@@ -72,12 +73,6 @@ def duplicate(name: str) -> str:
 def home_names(browser: Browser) -> list[str]:
     """The folder names of the person's home page, unescaped, in page order."""
     return [html.unescape(name) for _, name, _ in browser.open("/").folder_rows()]
-
-
-def visible_texts(reply: LibraryReply) -> list[str]:
-    """The text nodes of the page body, unescaped, in order."""
-    body = reply.text.split("<body>", 1)[1]
-    return [html.unescape(text).strip() for text in re.split(r"<[^>]*>", body) if text.strip()]
 
 
 def assert_access_denied(reply: LibraryReply) -> None:
@@ -400,11 +395,12 @@ def test_the_administration_page_names_its_controls(library_server: START, fake_
         "Cancel",
         "Activity",
         NO_ACTIVITY,
+        "Administration",  # the bar of the page: its texts come last (``visible_texts``)
         "Sign out",
     ]
     assert '<label for="folder-name">Folder name</label>' in page.text
-    assert '<input id="folder-name" name="name" type="text" autocomplete="off">' in page.text
-    assert '<a href="/">All folders</a>' in page.text and '<section id="activity">' in page.text
+    assert '<input class="input" id="folder-name" name="name" type="text" autocomplete="off">' in page.text
+    assert "All folders</a></nav>" in page.text and '<section id="activity">' in page.text
 
 
 def folder_texts(name: str, member_texts: list[str]) -> list[str]:

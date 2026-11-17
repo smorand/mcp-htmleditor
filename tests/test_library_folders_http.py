@@ -38,6 +38,7 @@ from tests.library_support import (
     FakeGoogle,
     LibraryReply,
     RunningLibrary,
+    visible_texts,
 )
 
 library_server = library_support.library_server
@@ -51,8 +52,8 @@ READY_SECONDS = 2.0  # FR-NEW-060
 LINK_BYTES_PER_SECOND = 50_000_000 / 8  # the 50 megabit per second connection of FR-NEW-060
 EMPTY_FOLDER = "This folder has no presentations yet."
 LIBRARY_UNAVAILABLE = "The library is unavailable. Try again later."
-BACK_LINK = '<a href="/">All folders</a>'
-SIGN_OUT_FORM = '<form method="post" action="/auth/logout"><button type="submit">Sign out</button></form>'
+BACK_LINK = "All folders</a></nav>"
+SIGN_OUT_FORM = '<form method="post" action="/auth/logout"><button type="submit" class="btn sm">'
 CARDIOLOGY_ROWS = [
     (ARRHYTHMIA, "2026-11-12T16:40:00Z", "12 Nov 2026 16:40", "512.0 KB"),
     (STATINS, "2026-11-12T16:40:00Z", "12 Nov 2026 16:40", "1.5 MB"),
@@ -74,12 +75,6 @@ def standard_library(running: RunningLibrary) -> dict[str, str]:
     ids = running.builder.standard()
     running.builder.standard_presentations(ids)
     return ids
-
-
-def visible_texts(reply: LibraryReply) -> list[str]:
-    """The text nodes of the page body, unescaped, in order."""
-    body = reply.text.split("<body>", 1)[1]
-    return [html.unescape(text).strip() for text in re.split(r"<[^>]*>", body) if text.strip()]
 
 
 def rows(reply: LibraryReply) -> list[tuple[str, str, str, str]]:
@@ -318,7 +313,8 @@ def reachable_pages(browser: Browser) -> dict[str, LibraryReply]:
         queue.extend(
             link
             for link in ADDRESS.findall(reply.text)
-            if link.startswith("/") and not link.startswith(("/lib/", "/open/"))  # /open/ leaves the library pages
+            if link.startswith("/")
+            and not link.startswith(("/lib/", "/open/", "/cover/"))  # /open/ leaves the pages, /cover/ is a picture
         )
     return seen
 

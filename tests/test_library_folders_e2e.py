@@ -149,10 +149,11 @@ def test_e2e_020_a_folder_lists_its_presentations_newest_first(
         order.remove(control)
     assert order.count("Delete") == len(UTC_ROWS)  # one Delete button on each row of a writer (US-0145)
     order = [control for control in order if control != "Delete"]
-    assert [order[0], order[-1]] == ["/", "Sign out"]  # the presentation names in between are links (US-0134)
-    assert [link.rsplit("/", 1)[0] for link in order[1:-1]] == ["/open"] * len(UTC_ROWS)
+    assert order[:2] == ["Switch theme", "Sign out"]  # the bar of the page comes first (design system)
+    assert order[2] == "/"  # then "All folders"; the presentation names after it are links (US-0134)
+    assert [link.rsplit("/", 1)[0] for link in order[3:]] == ["/open"] * len(UTC_ROWS)
     assert page.get_by_role("link", name="All folders").count() == 1
-    assert tab_until(page, "/", order) == ["/"]
+    assert tab_until(page, "/", order) == ["", "Sign out", "/"]  # the bar first: the theme button (no text), Sign out
     page.keyboard.press("Enter")
     page.wait_for_url(f"{running.origin}/")
     assert page.get_by_role("link", name=CARDIOLOGY).count() == 1
@@ -243,9 +244,10 @@ def test_e2e_017_a_library_of_200_folders_stays_usable(
     announced = re.findall(r'- link "([^"]*)"', page.locator("ul.folders").aria_snapshot())
     assert announced == names
     order = assert_controls_are_named_links_and_buttons(page)
-    assert len(order) == 202  # Administration, the 200 folders and Sign out
+    assert len(order) == 203  # Administration, the theme button, Sign out and the 200 folders
     focused = tab_until(page, target, order)
-    assert focused == order[: order.index(target) + 1]
+    # the theme button has no text, only its accessible name: the focus probe reads its text
+    assert focused == ["" if name == "Switch theme" else name for name in order[: order.index(target) + 1]]
     page.keyboard.press("Enter")
     page.wait_for_url(f"{running.origin}{target}")
     assert page.locator("h1").inner_text() == "Folder 200"

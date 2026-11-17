@@ -26,6 +26,7 @@ make sync-medical-css  # propagate the medical charter CSS to the reference deck
 make breathe-assets    # redraw the Breathe decoration catalogue (ARGS=--list to list it)
 make sync-breathe-layouts  # re-embed the Breathe shipped files, regenerate the Breathe picker set
 make check-generated  # verify both generated template families are fresh (writes nothing)
+make sync-library-design  # rebuild static/library.css from the design system (~/projects/perso/app-design), light and dark only
 make help        # every target
 ```
 
@@ -151,6 +152,7 @@ Load only what the task needs.
 | `.agent_docs/library.md` | Web library mode (`webserve`, SPEC-0025): module map, settings, gate order, sign in flow, cookies, database, headers, test support (FakeGoogle, Browser) |
 | `.agent_docs/library-pages.md` | Web library pages: home page and roles, folder page, administration (folders, activity), folder deletion order, members and their check order |
 | `.agent_docs/library-editor.md` | Web library editor shell of a presentation: read only form, saving and the presentation lock, session and right ending, requests, downloads, hostile deck script isolation |
+| `.agent_docs/library-design.md` | Library pages design system (app-design): generated `library.css`, theme, gallery of folders and presentations, covers, page policy rules |
 | `.agent_docs/library-tests.md` | Web library test support (`library_support.py` helpers per story), suite map, the 225 s budget and the `slow` file |
 | `.agent_docs/render.md` | Visual render: picture rules, output directory and cleanup, scale and size rounding, check order, fixtures and install |
 

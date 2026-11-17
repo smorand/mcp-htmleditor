@@ -39,7 +39,9 @@ READ_WRITE = "Read and write"
 READ_ONLY = "Read only"
 ALICE = "alice.ro@example.org"
 INVALID_ADDRESS = "This is not a valid email address."
-FOLDER_NAMES_SCRIPT = "() => [...document.querySelectorAll('ul.folders > li > a')].map(link => link.textContent)"
+FOLDER_NAMES_SCRIPT = (
+    "() => [...document.querySelectorAll('ul.folders a[href^=\"/f/\"]')].map(link => link.textContent)"
+)
 SELECTED_SCRIPT = "chooser => chooser.selectedOptions[0].textContent"
 
 

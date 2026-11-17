@@ -19,6 +19,7 @@
    at most 99); the extension and the 25 MB are checked before anything is sent; a second choice made while one upload
    is in progress is ignored; an error or an abort reads the page's own failure text.
    US-0144: a 409 with the existing name opens the Replace / Cancel question; Replace sends the file again with X-Replace.
+   Design (app-design): the theme button toggles light and dark; a cover that answers 404 is hidden.
    US-0145: a row's Delete opens the same dialog as Delete / Cancel; Delete sends DELETE /api/presentations/<id>, then the list
    is replaced by the server's (a refusal reads the page's own Access denied. text). */
 (function () {
@@ -164,8 +165,8 @@
     fetch(window.location.href, {credentials: "same-origin"}).then(function (response) {
       return response.ok ? response.text() : "";
     }).then(function (text) {
-      var next = new DOMParser().parseFromString(text, "text/html").querySelector("ul.presentations, #upload ~ p");
-      var current = document.querySelector("ul.presentations, #upload ~ p");
+      var next = new DOMParser().parseFromString(text, "text/html").querySelector("ul.presentations, .card.empty");
+      var current = document.querySelector("ul.presentations, .card.empty");
       if (next && current) {
         current.replaceWith(next);
         localizeTimes();
@@ -197,9 +198,16 @@
     var yes = document.getElementById("confirm-yes");
     question.textContent = question.dataset[kind].replace("{name}", name);
     yes.textContent = yes.dataset[kind];
+    yes.disabled = false;
     yes.onclick = function () {
-      dialog.close();
-      onYes();
+      if (yes.disabled) {
+        return;
+      }
+      yes.disabled = true;  /* the dialog stays until the request ends: a second click has no card under it */
+      onYes(function () {
+        yes.disabled = false;
+        dialog.close();
+      });
     };
     document.getElementById("confirm-no").onclick = function () {
       dialog.close();
@@ -213,18 +221,20 @@
   function askReplace(file, existing, status, section, input) {
     status.textContent = "";
     input.value = "";
-    ask("replace", existing, function () {
-      sendFile(file, status, section, input, true);
+    ask("replace", existing, function (done) {
+      sendFile(file, status, section, input, true, done);
     }, input);
   }
 
-  function deletePresentation(button, status) {
+  function deletePresentation(button, status, done) {
     fetch("/api/presentations/" + button.dataset.presentationId, {method: "DELETE", credentials: "same-origin"})
       .then(function (response) {
         status.textContent = response.ok ? "" : status.dataset.denied;
         refreshListing();
+        done();
       }, function () {
         status.textContent = status.dataset.failed;
+        done();
       });
   }
 
@@ -236,14 +246,14 @@
     document.addEventListener("click", function (event) {
       var button = event.target.closest("button.delete-presentation");
       if (button) {
-        ask("delete", button.dataset.name, function () {
-          deletePresentation(button, status);
+        ask("delete", button.dataset.name, function (done) {
+          deletePresentation(button, status, done);
         }, document.getElementById("upload-file"));
       }
     });
   }
 
-  function sendFile(file, status, section, input, replace) {
+  function sendFile(file, status, section, input, replace, done) {
     uploading = true;
     var request = new XMLHttpRequest();
     request.open("POST", "/api/folders/" + section.dataset.folderId + "/presentations");
@@ -262,6 +272,9 @@
         collision = null;
       }
       uploading = false;
+      if (done) {
+        done();
+      }
       if (collision !== null && collision !== undefined) {
         askReplace(file, collision, status, section, input);
         return;
@@ -273,6 +286,9 @@
     };
     request.onerror = request.onabort = function () {
       finishUpload(input, status, status.dataset.failed);
+      if (done) {
+        done();
+      }
     };
     status.textContent = progressText(file.name, 0, file.size);
     request.send(file);
@@ -307,7 +323,45 @@
     });
   }
 
+  /* Theme (light or dark, kept in this browser; theme.js set it before the first paint). */
+  function toggleTheme() {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("library-theme", next);
+    } catch (error) {
+      /* storage refused: the choice lasts for this page */
+    }
+  }
+
+  /* A cover that does not exist (404) is hidden: the ridge of the card shows instead. An error event does not bubble,
+     so it is caught on the way down; covers that failed before this script ran are found by their size. */
+  function hideBrokenCover(img) {
+    if (img.closest(".cover")) {
+      img.hidden = true;
+    }
+  }
+
+  function bindChrome() {
+    document.addEventListener("click", function (event) {
+      if (event.target.closest("[data-theme-toggle]")) {
+        toggleTheme();
+      }
+    });
+    document.addEventListener("error", function (event) {
+      if (event.target.tagName === "IMG") {
+        hideBrokenCover(event.target);
+      }
+    }, true);
+    document.querySelectorAll(".cover img").forEach(function (img) {
+      if (img.complete && img.naturalWidth === 0) {
+        hideBrokenCover(img);
+      }
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", localizeTimes);
+  document.addEventListener("DOMContentLoaded", bindChrome);
   document.addEventListener("DOMContentLoaded", bindUpload);
   document.addEventListener("DOMContentLoaded", bindDeletion);
   document.addEventListener("DOMContentLoaded", bindAdministration);

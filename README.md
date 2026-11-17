@@ -450,7 +450,7 @@ lists its presentations, newest first (same minute: by name), each with its name
 browser's time zone (`16 Nov 2026 14:32`) and its size (`1 byte`, `900 bytes`, `1.5 KB`, `2.0 MB`), with `All
 folders` back to the home page, or `This folder has no presentations yet.`; a folder that does not exist and a folder
 where the person holds no role give the same `Access denied.` page, byte for byte. No library page can be shown inside
-a page of another site. `/lib/library.css` and `/lib/library.js` are the only files served without a session.
+a page of another site. `/lib/library.css`, `/lib/library.js` and `/lib/theme.js` are the only files served without a session.
 
 A presentation opens at `/open/<presentation id>` for anyone holding a role in its folder: the library hands out a
 one time ticket (60 s) and sends the browser to the content origin, which trades it for a cookie valid for that one
@@ -509,6 +509,12 @@ decks `From Challenges to Change` and `Bridging the Gap` (copied unchanged from 
 modified times kept) and lamya.chrif@gmail.com as `Read and write`. It is created once and remembered
 (`HTMLEDITOR_LIBRARY_SEED_DIR` overrides the directory): later starts add and reset nothing, even when every folder was
 deleted, and the seeding is not an entry of the activity list.
+
+The pages follow the design system of `~/projects/perso/app-design` in a light and a dark theme (the system's at first, then the choice
+of the button in the bar, kept in the browser). Folders and presentations are galleries: a folder is a card with the shape of a folder, its
+role and its number of presentations; a presentation is a card showing the first picture of its first slide (read from the file, no
+rendering) or the ridge of the design system when it has none. `make sync-library-design` rebuilds `static/library.css` from the design
+system; see `.agent_docs/library-design.md`.
 
 ### Deploying the web library mode
 

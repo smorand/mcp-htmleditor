@@ -33,6 +33,7 @@ from tests.library_support import (
     FakeGoogle,
     LibraryReply,
     RunningLibrary,
+    visible_texts,
 )
 
 library_server = library_support.library_server
@@ -40,8 +41,8 @@ fake_google = library_support.fake_google
 START = Callable[..., RunningLibrary]
 
 ADMIN_LABEL = "Admin"
-ADMINISTRATION_LINK = '<a href="/admin">Administration</a>'
-SIGN_OUT_FORM = '<form method="post" action="/auth/logout"><button type="submit">Sign out</button></form>'
+ADMINISTRATION_LINK = '<a class="btn sm ghost" href="/admin">'
+SIGN_OUT_FORM = '<form method="post" action="/auth/logout"><button type="submit" class="btn sm">'
 EMPTY_HOME = "You have no access to any folder yet."
 LIBRARY_UNAVAILABLE = "The library is unavailable. Try again later."
 READY_SECONDS = 2.0
@@ -58,12 +59,6 @@ def signed_in(running: RunningLibrary, google: FakeGoogle, email: str) -> tuple[
 def names_and_roles(reply: LibraryReply) -> list[tuple[str, str]]:
     """``(folder name, role label)`` of each row, in page order, unescaped."""
     return [(html.unescape(name), role) for _, name, role in reply.folder_rows()]
-
-
-def visible_texts(reply: LibraryReply) -> list[str]:
-    """The text nodes of the page body, unescaped, in order."""
-    body = reply.text.split("<body>", 1)[1]
-    return [html.unescape(text).strip() for text in re.split(r"<[^>]*>", body) if text.strip()]
 
 
 def assert_access_denied(reply: LibraryReply) -> None:
@@ -191,7 +186,9 @@ def test_e2e_018_folders_are_ordered_without_regard_to_case_or_accents(
 
     expected = ["alpha trial", CARDIOLOGY, "Éclair Study", PNEUMO, "zeta"]
     assert [name for name, _ in names_and_roles(reply)] == expected
-    added = [text for text in visible_texts(reply) if text not in folders]
+    added = [
+        text for text in visible_texts(reply) if text not in folders and not re.fullmatch(r"\d+ presentations?", text)
+    ]
     assert added, reply.text
     assert set(added) <= ENGLISH_HOME_TEXTS, added
     assert '<html lang="en">' in reply.text
@@ -236,7 +233,7 @@ def test_the_administrator_with_no_folder_sees_the_empty_message(
     admin, reply = signed_in(running, fake_google, ADMIN)
 
     assert reply.status == 200
-    assert visible_texts(reply) == ["Slides", "Administration", EMPTY_HOME, "Sign out"]
+    assert visible_texts(reply) == ["Slides", EMPTY_HOME, "Administration", "Sign out"]
     assert reply.folder_rows() == [] and "<li>" not in reply.text
 
     running.builder.folder("Oncology 2030")

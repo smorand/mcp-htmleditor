@@ -103,7 +103,7 @@ def sha256(data: bytes) -> str:
 
 def follow_sign_in_link(browser: Browser, page: LibraryReply, google: FakeGoogle, email: str) -> LibraryReply:
     """Choose ``Sign in with Google`` on the sign in page shown, then ``email`` at Google."""
-    link = re.search(r'<a href="([^"]*)">Sign in with Google</a>', page.text)
+    link = re.search(r'<a class="btn lg block" href="([^"]*)">.*?Sign in with Google</a>', page.text)
     assert link is not None, page.text[:300]
     google.choose(email)
     return browser.open(html.unescape(link.group(1)))

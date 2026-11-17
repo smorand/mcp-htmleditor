@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import html
 import logging
-import re
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -33,6 +32,7 @@ from tests.library_support import (
     LibraryReply,
     Presentation,
     RunningLibrary,
+    visible_texts,
 )
 
 library_server = library_support.library_server
@@ -88,11 +88,6 @@ def delete(browser: Browser, folder_id: str, confirm: Any) -> LibraryReply:
 
 def home_names(browser: Browser) -> list[str]:
     return [html.unescape(name) for _, name, _ in browser.open("/").folder_rows()]
-
-
-def visible_texts(reply: LibraryReply) -> list[str]:
-    body = reply.text.split("<body>", 1)[1]
-    return [html.unescape(text).strip() for text in re.split(r"<[^>]*>", body) if text.strip()]
 
 
 def assert_access_denied(reply: LibraryReply) -> None:
@@ -216,7 +211,7 @@ def test_e2e_015_the_administrator_with_no_folder_sees_the_empty_message(pneumo:
 
     empty = pneumo.admin.open("/")
     assert empty.status == 200
-    assert visible_texts(empty) == ["Slides", "Administration", NO_FOLDER, "Sign out"]
+    assert visible_texts(empty) == ["Slides", NO_FOLDER, "Administration", "Sign out"]
 
     assert pneumo.admin.post_json("/api/folders", {"name": ONCOLOGY}).status == 201
     listed = pneumo.admin.open("/")

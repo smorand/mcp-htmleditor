@@ -26,6 +26,7 @@ from ..request_store import RequestStore
 from ..tracing import trace_span
 from . import pages
 from .access import ADMIN_EMAIL, Role
+from .covers import Cover, first_cover
 from .names import compose, name_key, order_key
 
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ FILES_DIRECTORY: Final = "files"
 PRESENTATION_SUFFIX: Final = ".html"
 ID_PATTERN: Final = re.compile(r"[0-9a-f]{32}")
 SECONDS_PER_MINUTE: Final = 60
+COVERS_KEPT: Final = 64  # cover pictures kept in memory
 ACTIVITY_KEPT: Final = 500  # the newest lines shown and kept (FR-NEW-050)
 ID_BYTES: Final = 16  # a folder id is 32 hex digits
 
@@ -131,6 +133,7 @@ class FolderView:
     id: str
     name: str
     role: Role
+    count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -279,6 +282,7 @@ class Library:
         self._records = RequestStore(state_dir)
         self._locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
+        self._covers: dict[str, tuple[tuple[int, int], Cover | None]] = {}
 
     def add_presentation(self, folder_id: str, name: str, data: bytes, actor: str, *, replace: bool = False) -> Outcome:
         """Store ``data`` as the presentation ``name`` of the folder and write its line ``Uploaded "<name>" in
@@ -402,6 +406,32 @@ class Library:
             raise
         return True
 
+    def cover(self, presentation_id: str) -> Cover | None:
+        """The cover of a presentation (``covers.first_cover``), cached by file modified time and size: a deck is read
+        and scanned once until it changes. At most ``COVERS_KEPT`` entries are kept (the oldest goes first)."""
+        row = self.presentation(presentation_id)
+        if row is None:
+            return None
+        path = self.presentation_path(row.folder_id, presentation_id)
+        try:
+            status = path.stat()
+        except OSError:
+            return None
+        stamp = (status.st_mtime_ns, status.st_size)
+        with self._locks_guard:
+            kept = self._covers.get(presentation_id)
+        if kept is not None and kept[0] == stamp:
+            return kept[1]
+        try:
+            cover = first_cover(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError):
+            cover = None
+        with self._locks_guard:
+            self._covers[presentation_id] = (stamp, cover)
+            while len(self._covers) > COVERS_KEPT:
+                self._covers.pop(next(iter(self._covers)))
+        return cover
+
     def lock_for(self, presentation_id: str) -> threading.Lock:
         """The one lock of a presentation (created on first use): a save, a replacement and a deletion hold it."""
         with self._locks_guard:
@@ -491,14 +521,18 @@ class Library:
         """The folders ``email`` can open with its role, in ``order_key`` order: every folder (Admin) for the
         administrator, the member rows for anyone else."""
         if self.is_admin(email):
-            rows = self._database.connection().execute("SELECT id, name, ? FROM folders", (Role.ADMIN.value,))
+            rows = self._database.connection().execute(
+                "SELECT id, name, ?, (SELECT COUNT(*) FROM presentations WHERE folder_id = folders.id) FROM folders",
+                (Role.ADMIN.value,),
+            )
         else:
             rows = self._database.connection().execute(
-                "SELECT folders.id, folders.name, members.role FROM members JOIN folders ON folders.id ="
-                " members.folder_id WHERE members.email = ?",
+                "SELECT folders.id, folders.name, members.role,"
+                " (SELECT COUNT(*) FROM presentations WHERE folder_id = folders.id)"
+                " FROM members JOIN folders ON folders.id = members.folder_id WHERE members.email = ?",
                 (normalize_email(email),),
             )
-        views = [FolderView(id=row[0], name=row[1], role=Role(row[2])) for row in rows.fetchall()]
+        views = [FolderView(id=row[0], name=row[1], role=Role(row[2]), count=row[3]) for row in rows.fetchall()]
         return sorted(views, key=lambda view: order_key(view.name))
 
     def folder_name(self, folder_id: str) -> str | None:

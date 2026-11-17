@@ -123,7 +123,15 @@ def test_e2e_002_an_account_with_no_right_is_let_in_at_its_next_page_once_added(
     signed_out = bob.sign_out()
     assert visible_texts(signed_out) == ["Slides", "Sign in with Google"]
     seen = {text for reply in (refused, home, signed_out) for text in visible_texts(reply)}
-    assert seen == {"Access denied.", "Sign out", "Slides", CARDIOLOGY, READ_ONLY, "Sign in with Google"}
+    assert seen == {
+        "Access denied.",
+        "Sign out",
+        "Slides",
+        CARDIOLOGY,
+        READ_ONLY,
+        "1 presentation",
+        "Sign in with Google",
+    }
 
 
 def test_e2e_002_the_account_chooser_lets_the_same_browser_pick_another_account(
