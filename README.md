@@ -484,6 +484,26 @@ updates it. A change applies to that folder only, at the person's next page, wit
 reads `Added <email> as RW to "<folder>"`, `Changed <email> to RO in "<folder>"`, `Removed <email> from "<folder>"`.
 The administrator's rights never come from a member list.
 
+A person with `Read and write` (or the administrator) edits a presentation in the same editor as the local mode: each
+change is stored 0.8 s after typing stops, at once when the field is left, 0.6 s after a slide action, the previous version
+goes to the history, and a conflict with someone else's change shows the editor's own `Keep mine` / `Reload` notice. A
+person with `Read only` gets the same screen with no control that changes anything (full screen, pointer, presenter window
+and the HTML and PPTX downloads stay; the PPTX is the flow output, no script of the deck runs on the server). When a
+session ends or a right is removed while a presentation is open, the editor keeps its text and shows `Your session has
+expired. Sign in again to save.` or `Access denied.` at the next store, and stays silent until the person acts if nothing
+is unsaved. `Upload` on a folder page (writers only) takes a `.html` file of at most 25 MB (`The file is larger than 25
+MB.`), checks the name (`This file name is not allowed.`: Latin letters, digits, spaces and `. _ - ( ) '`, 100 characters
+at most), and that it is a valid presentation by the editor's own checks (`This file is not a valid presentation: <first
+problem>.`), then shows `<name> <percent>%` and `Uploaded <name>.`; a name that exists (without regard to case, accents
+count) asks `A presentation named "<name>" already exists. Replace it?` with `Replace` and `Cancel`. `Delete` on a row asks
+`Delete "<name>"? This cannot be undone.` and removes the presentation, its history and its requests for good.
+
+On the first start of a new library the product creates the folder `WCBIP Melbourne Décembre 2026` with the two conference
+decks `From Challenges to Change` and `Bridging the Gap` (copied unchanged from `library-seed/`, shipped in the wheel, their
+modified times kept) and lamya.chrif@gmail.com as `Read and write`. It is created once and remembered
+(`HTMLEDITOR_LIBRARY_SEED_DIR` overrides the directory): later starts add and reset nothing, even when every folder was
+deleted, and the seeding is not an entry of the activity list.
+
 ## Templates
 
 Templates are resolved in priority order:

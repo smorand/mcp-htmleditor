@@ -15,11 +15,11 @@ import secrets
 import shutil
 import sqlite3
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Final
+from typing import TYPE_CHECKING, ClassVar, Final
 
 from ..fileio import atomic_write
 from ..request_store import RequestStore
@@ -27,6 +27,9 @@ from ..tracing import trace_span
 from . import pages
 from .access import ADMIN_EMAIL, Role
 from .names import compose, name_key, order_key
+
+if TYPE_CHECKING:
+    from .seed import SeedPresentation
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +319,58 @@ class Library:
                     folder_name = _folder_name_in(connection, folder_id)
                     self.record(connection, actor, pages.replaced_line(existing, folder_name))
         return Replaced(presentation_id, existing)
+
+    def is_seeded(self) -> bool:
+        """Whether the initial content was created (or decided) already: ``meta('seeded')`` exists."""
+        row = self._database.connection().execute("SELECT 1 FROM meta WHERE key = 'seeded'").fetchone()
+        return row is not None
+
+    def seed_initial_content(
+        self,
+        folder: str,
+        members: Sequence[tuple[str, str]],
+        presentations: Sequence[SeedPresentation],
+        clock: Callable[[], float],
+    ) -> bool:
+        """Create the folder, its members and its presentations from verified files, and remember it (DEC-036).
+
+        One ``BEGIN IMMEDIATE`` transaction: the flag is looked up again (another process may have won), the rows are
+        inserted, each source file is copied byte for byte to its new path and given its modified time, then
+        ``meta('seeded')`` is written; no activity line. Any failure removes the copied files and rolls back.
+        """
+        folder_id = secrets.token_hex(ID_BYTES)
+        copied: list[Path] = []
+        try:
+            with self._database.transaction(immediate=True) as connection:
+                if connection.execute("SELECT 1 FROM meta WHERE key = 'seeded'").fetchone() is not None:
+                    return False
+                connection.execute(
+                    "INSERT INTO folders(id, name, name_key, created_at) VALUES (?, ?, ?, ?)",
+                    (folder_id, folder, name_key(folder), self._clock()),
+                )
+                connection.executemany(
+                    "INSERT INTO members(folder_id, email, role) VALUES (?, ?, ?)",
+                    [(folder_id, normalize_email(email), role) for email, role in members],
+                )
+                for presentation in presentations:
+                    presentation_id = secrets.token_hex(ID_BYTES)
+                    path = self.presentation_path(folder_id, presentation_id)
+                    path.parent.mkdir(mode=DIRECTORY_MODE, parents=True, exist_ok=True)
+                    shutil.copyfile(presentation.source, path)
+                    copied.append(path)
+                    path.chmod(FILE_MODE)
+                    os.utime(path, (presentation.modified, presentation.modified))
+                    connection.execute(
+                        "INSERT INTO presentations(id, folder_id, name, name_key, created_at) VALUES (?, ?, ?, ?, ?)",
+                        (presentation_id, folder_id, presentation.name, name_key(presentation.name), self._clock()),
+                    )
+                connection.execute("INSERT INTO meta(key, value) VALUES ('seeded', ?)", (str(clock()),))
+        except BaseException:
+            for path in copied:
+                path.unlink(missing_ok=True)
+            _remove_directory(self._files / folder_id)
+            raise
+        return True
 
     def lock_for(self, presentation_id: str) -> threading.Lock:
         """The one lock of a presentation (created on first use): a save, a replacement and a deletion hold it."""

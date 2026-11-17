@@ -122,3 +122,4 @@ with trace_span("export.pdf", {"file.path": str(path)}) as span:
 no-op tracer, so a library user pays nothing.
 - `library.upload` (US-0141): one span per stored upload, attribute `file.size` only; no name, address or path.
 - `library.replace` (US-0144): one span per replacement, attribute `file.size` only.
+- `library.seed` (US-0146): one span on the first start, attribute `presentations` only.

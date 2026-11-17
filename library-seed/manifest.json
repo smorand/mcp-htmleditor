@@ -1,0 +1,7 @@
+{"folder": "WCBIP Melbourne Décembre 2026",
+ "members": [{"email": "lamya.chrif@gmail.com", "role": "RW"}],
+ "presentations": [
+  {"name": "From Challenges to Change", "file": "from-challenges-to-change.html", "bytes": 3901499,
+   "sha256": "85dd0f464c068eb8fb784627d1f2f4beeaabf7162f7381e334007cb8a15155dd", "modified": "2026-11-15T19:57:19Z"},
+  {"name": "Bridging the Gap", "file": "bridging-the-gap.html", "bytes": 3278888,
+   "sha256": "011a91e9d03995fb0efe30d5f794f77706ba42c76d18d388f89b2ddb1a5e4eb2", "modified": "2026-11-15T19:57:18Z"}]}

@@ -48,6 +48,7 @@ from ..version import __version__
 from . import pages
 from .access import Answer, Context, EditorAnswer, Permission, Role, Route, authorize, json_answer
 from .routes_deck import DENIED_PAYLOAD, deck_path, denied, library_shell
+from .seed import SeedError, seed_if_new
 from .signin import (
     BROWSER_COOKIE,
     GRANT_COOKIE,
@@ -696,8 +697,11 @@ class LibraryServer(_EditorServer):
 
     ``port`` is the port actually bound (``settings.port`` 0 picks a free one). The database
     ``<library_dir>/library.db`` is created and migrated before the bind; the Google credentials file is read once
-    here (a missing file or an unlisted return address is logged, the server still starts, DEC-015).
+    here (a missing file or an unlisted return address is logged, the server still starts, DEC-015). ``start`` creates
+    the initial content of a new library (DEC-036) unless ``is_seeding`` is set to False first (the test fixtures do).
     """
+
+    is_seeding = True
 
     def __init__(self, settings: Settings, *, clock: Callable[[], float] = time.time) -> None:
         self.settings = settings
@@ -745,6 +749,12 @@ class LibraryServer(_EditorServer):
 
     def start(self) -> None:
         """Serve on a daemon thread, like ``start_http_server``."""
+        if self.is_seeding:
+            try:
+                seed_if_new(self.library, self.settings.library_seed_dir, self.clock)
+            except SeedError:
+                logger.error("The initial content could not be created: the library is left empty")
+                raise
         self._thread = threading.Thread(
             target=self.serve_forever, kwargs={"poll_interval": POLL_INTERVAL_SECONDS}, daemon=True
         )

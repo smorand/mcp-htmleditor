@@ -72,6 +72,7 @@ _PATH_FIELDS = (
     "xdg_state_home_override",
     "library_dir_override",
     "google_credentials_override",
+    "library_seed_dir_override",
 )
 
 # Environment variables that change the resolved configuration. Used only to key
@@ -98,6 +99,7 @@ _SIGNIFICANT_ENV_VARS = (
     "HTMLEDITOR_LIBRARY_CONTENT_ORIGIN",
     "HTMLEDITOR_LIBRARY_DIR",
     "HTMLEDITOR_GOOGLE_CREDENTIALS_FILE",
+    "HTMLEDITOR_LIBRARY_SEED_DIR",
 )
 
 
@@ -146,6 +148,7 @@ class Settings(BaseSettings):
     google_credentials_override: Path | None = Field(
         default=None, validation_alias="HTMLEDITOR_GOOGLE_CREDENTIALS_FILE"
     )
+    library_seed_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LIBRARY_SEED_DIR")
 
     @field_validator("port", "poll_interval", mode="before")
     @classmethod
@@ -271,6 +274,17 @@ class Settings(BaseSettings):
     def library_dir(self) -> Path:
         """Web library database and presentation files: HTMLEDITOR_LIBRARY_DIR, else <state_dir>/library."""
         return self.library_dir_override or self.state_dir / "library"
+
+    @property
+    def library_seed_dir(self) -> Path:
+        """Initial content of a new library: HTMLEDITOR_LIBRARY_SEED_DIR, else library-seed/ of the repo or package."""
+        if self.library_seed_dir_override:
+            return self.library_seed_dir_override
+        candidates = (
+            Path(__file__).resolve().parents[2] / "library-seed",
+            Path(__file__).resolve().parent / "library_seed",
+        )
+        return next((c for c in candidates if c.is_dir()), candidates[0])
 
     @property
     def google_credentials_file(self) -> Path | None:

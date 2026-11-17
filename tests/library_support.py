@@ -633,6 +633,7 @@ class RunningLibrary:
     library_dir: Path
     state_dir: Path
     database: Database
+    seed: bool = False
 
     @property
     def port(self) -> int:
@@ -687,6 +688,7 @@ class RunningLibrary:
         """Stop the server and start a new ``LibraryServer`` on the same settings (port, directory) and clock."""
         self.server.stop()
         self.server = LibraryServer(self.settings, clock=self.clock)
+        self.server.is_seeding = self.seed
         self.server.start()
         return self.server
 
@@ -1322,8 +1324,9 @@ def free_port() -> int:
 
 @pytest.fixture
 def library_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., RunningLibrary]]:
-    """Return ``start(google=None, google_registered=True, scheme="http", **settings_overrides)``; all stopped at
-    teardown; ``scheme="https"`` gives two https origins on the same loopback port (nginx's view).
+    """Return ``start(google=None, google_registered=True, scheme="http", seed=False, **overrides)``; all stopped at
+    teardown; ``scheme="https"`` gives two https origins on the same loopback port (nginx's view). ``seed=True``
+    creates the initial content of a new library (US-0146); the builder based tests keep it off.
 
     With ``google`` the credentials file points at that ``FakeGoogle`` and the sign in return address
     ``<library origin>/auth/callback`` is registered in its console and listed in the file, unless
@@ -1336,6 +1339,7 @@ def library_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[
         *,
         google_registered: bool = True,
         scheme: str = "http",
+        seed: bool = False,
         **settings_overrides: Any,
     ) -> RunningLibrary:
         port = free_port()
@@ -1365,6 +1369,7 @@ def library_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[
         reset_settings_cache()
         database = Database(library_dir / "library.db")
         server = LibraryServer(settings, clock=clock)
+        server.is_seeding = seed
         running = RunningLibrary(
             server=server,
             settings=settings,
@@ -1372,6 +1377,7 @@ def library_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[
             library_dir=library_dir,
             state_dir=state_dir,
             database=database,
+            seed=seed,
         )
         started.append(running)
         server.start()

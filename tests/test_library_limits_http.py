@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -285,6 +286,11 @@ def test_a_fifth_concurrent_upload_is_refused_without_waiting(library: Library) 
         thread.start()
     for paused, _ in held:
         assert paused.wait(20)
+    slots = library.running.server.upload_slots
+    deadline = time.monotonic() + 20  # the sender paused after sending: wait until the server holds the four slots
+    while slots._value > 0 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert slots._value == 0
 
     fifth = library.dan.upload_streaming(library.folder, "Fifth.html", body, UploadPlan(len(body)))
     for _, resume in held:
