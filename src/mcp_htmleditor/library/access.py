@@ -97,7 +97,7 @@ class EditorAnswer:
     """A deck route answered by the inherited editor method of that name through the DEC-003 hooks; ``is_framed``
     lets the content origin frame the answer (``X-Frame-Options: SAMEORIGIN``, ``frame-ancestors 'self'``)."""
 
-    route: Literal["content", "content-frame", "download", "shell", "static", "status"]
+    route: Literal["content", "content-frame", "download", "save", "shell", "static", "status"]
     is_framed: bool = False
 
 

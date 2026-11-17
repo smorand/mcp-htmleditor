@@ -15,6 +15,25 @@ Complements `library.md` (shell route, grant, `editor-library.js` fetch prefix).
 - Kept for RO: full screen (F), pointer, presenter window (S, speaker notes), HTML and PPTX download, help.
 - Hiding is usability only; the server refusal of writes (US-0136) is the control.
 
+## Saving a change (US-0136, DEC-003, DEC-022, DEC-028)
+
+- `POST /d/<pid>/content` (`routes_deck.py`: `EDIT`, `is_json`, answered as `EditorAnswer("save")`) is the inherited
+  `_receive_content`: no save pipeline is copied. `check_conflict`, `write_save` and `atomic_write` are unchanged.
+- Order on the content origin: route found, then `_refused_by_origin_rule` (a state changing method needs `Origin` equal to
+  the content origin, `Sec-Fetch-Site` absent or `same-origin`/`none`, and `application/json`; refusal is the JSON
+  `Access denied.`), then grant, presentation, role (`authorize(role, EDIT)`, a RO role is refused before the body is
+  read), then the handler.
+- `LibraryHandler._save_lock()` returns `LibraryServer.save_lock(pid)`: a `PresentationLock` (one `threading.Lock` per
+  presentation id from `lock_for`, created on first use under one guard lock). After acquiring it re-reads the row and raises
+  `SaveRefusal(403, DENIED_PAYLOAD)` when the presentation was deleted meanwhile, so a save that lost the race creates
+  nothing. Uploads and deletions of later stories take the same lock.
+- History: `atomic_write` keeps the previous version under `<state_dir>/files/<key>/history/` with the state directory of
+  the environment (`HTMLEDITOR_STATE_DIR`), so `webserve` must run with the state directory of its settings; the
+  `library_server` fixture sets it. Stored changes write nothing in the activity table (FR-NEW-051).
+- Answers are those of the local mode: 200 `{ok, mtime}`, 409 conflict, 413 `Request too large`, 500 with the operating
+  system reason (`_failure_reason`, never a path). The timers (0.8 s, at once on blur, 0.6 s after a slide action) are the
+  editor's own.
+
 ## Hostile deck script
 
 A deck script runs on the content origin with no library cookie (the session cookie is on the library origin, the grant

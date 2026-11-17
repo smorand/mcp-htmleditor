@@ -27,6 +27,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import TracebackType
 from typing import Any, cast, override
 from urllib.parse import parse_qsl, urlsplit
 
@@ -44,7 +45,7 @@ from ..request_store import RequestStore
 from ..version import __version__
 from . import pages
 from .access import Answer, Context, EditorAnswer, Permission, Role, Route, authorize, json_answer
-from .routes_deck import deck_path, denied, library_shell
+from .routes_deck import DENIED_PAYLOAD, deck_path, denied, library_shell
 from .signin import (
     BROWSER_COOKIE,
     GRANT_COOKIE,
@@ -211,12 +212,23 @@ class LibraryHandler(_EditorHandler):
         if route is None:
             self._redirect_to_library()
             return
+        if self._refused_by_origin_rule(origin, route):
+            logger.warning("Refused %s %s: origin or content type", self.command, path)
+            self._respond(origin, denied())
+            return
         try:
             answer = self._deck_answer(route, path, query)
         except (sqlite3.Error, OSError) as exc:
             logger.error("Library unavailable for %s %s: %s", self.command, path, type(exc).__name__)
             answer = Answer(503, pages.library_unavailable())
         self._respond(origin, answer)
+
+    def _refused_by_origin_rule(self, origin: str, route: Route) -> bool:
+        """DEC-022 on the content origin: a state changing request carries this origin's ``Origin`` and a JSON route
+        the JSON content type, before any grant is looked up."""
+        if self.command in SAFE_METHODS:
+            return False
+        return not self._origin_ok(origin) or (route.is_json and not self._is_json())
 
     def _deck_answer(self, route: Route, path: str, query: str) -> Answer | EditorAnswer:
         """Grant (DEC-037), then presentation, then role and permission (DEC-021), recomputed at every request; a
@@ -294,6 +306,7 @@ class LibraryHandler(_EditorHandler):
             "content": self._serve_content,
             "content-frame": self._serve_content_frame,
             "download": self._serve_download,
+            "save": self._receive_content,
             "shell": self._serve_editor_html,
             "static": self._serve_library_static,
             "status": self._serve_status,
@@ -359,6 +372,13 @@ class LibraryHandler(_EditorHandler):
     @override
     def _served_name(self) -> str:
         return f"{self._deck.name}.html" if self._deck is not None else ""
+
+    @override
+    def _save_lock(self) -> PresentationLock:
+        """DEC-028: the lock of this presentation, taken before the conflict check, then the row re-checked."""
+        deck = self._deck
+        presentation_id = deck.presentation_id if deck is not None else ""
+        return self._library_server().save_lock(presentation_id)
 
     @override
     def _failure_reason(self, exc: Exception) -> str:
@@ -531,6 +551,36 @@ class LibraryHandler(_EditorHandler):
         return cast(LibraryServer, self.server)
 
 
+class PresentationLock:
+    """A context manager holding the lock of one presentation (DEC-028) and refusing, once it holds it, when the row
+    is gone: a save that lost the race with a deletion creates nothing."""
+
+    __slots__ = ("_exists", "_lock")
+
+    def __init__(self, lock: threading.Lock, exists: Callable[[], bool]) -> None:
+        self._lock = lock
+        self._exists = exists
+
+    def __enter__(self) -> PresentationLock:
+        self._lock.acquire()
+        try:
+            if not self._exists():
+                raise SaveRefusal(403, dict(DENIED_PAYLOAD))
+        except sqlite3.Error as exc:  # an unreadable library: nothing is written, the editor shows the reason
+            self._lock.release()
+            logger.error("Library unavailable for a save: %s", type(exc).__name__)
+            raise SaveRefusal(503, {"error": pages.LIBRARY_UNAVAILABLE}) from exc
+        except BaseException:
+            self._lock.release()
+            raise
+        return self
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self._lock.release()
+
+
 class LibraryServer(_EditorServer):
     """One process for every folder and presentation (DEC-002), bound to ``settings.host`` and ``settings.port``.
 
@@ -546,12 +596,25 @@ class LibraryServer(_EditorServer):
         self.is_secure = urlsplit(settings.library_origin).scheme == SECURE_SCHEME
         self._thread: threading.Thread | None = None
         self.routes = ROUTES
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
         self.database = Database(settings.library_dir / DATABASE_NAME)
         self.library = Library(self.database, clock, state_dir=settings.state_dir)
         google = GoogleClient(settings.google_credentials_file, settings.library_origin + CALLBACK_PATH)
         self.accounts = Accounts(self.database, google, clock)
         super().__init__(settings.host, settings.port, LibraryHandler)
         self.port = int(self.server_address[1])
+
+    def lock_for(self, presentation_id: str) -> threading.Lock:
+        """The one lock of a presentation (created on first use): saves, replacements and deletions take it."""
+        with self._locks_guard:
+            return self._locks.setdefault(presentation_id, threading.Lock())
+
+    def save_lock(self, presentation_id: str) -> PresentationLock:
+        """The context manager a save (or an upload replacement, or a deletion) holds while it writes."""
+        return PresentationLock(
+            self.lock_for(presentation_id), lambda: self.library.presentation(presentation_id) is not None
+        )
 
     def find_route(self, origin: str, method: str, path: str) -> Route | None:
         """The first row of the table for this origin, method and whole path, else None."""

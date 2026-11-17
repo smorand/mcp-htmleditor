@@ -209,3 +209,4 @@ Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for
   `X-Frame-Options` removed. Serve the hostile page from a loopback listener (`RecordingListener.page`, `EVIL_HOST`
   in `launch_chromium`); then removing the headers makes the frame show `Sign in with Google` (a cross site frame has
   no `SameSite=Lax` cookie, so it is a visitor's view).
+- The editor shell, the read only form, saving a change and the per presentation lock: `library-editor.md`.

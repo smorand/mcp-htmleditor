@@ -135,7 +135,7 @@
 | US-0133 | SPEC-0025 | Open a presentation: ticket, grant, deck frame, status, HTML download | US-0129, US-0131 | 1 | done | feat/0049-web-library-mode | US-0132 |
 | US-0134 | SPEC-0025 | The editor shell opens on the content origin | US-0133 | 2 | done | feat/0049-web-library-mode | US-0133 |
 | US-0135 | SPEC-0025 | Read only editor, presenter window, full screen, hostile script isolation | US-0134, US-0132 | 2 | done | feat/0049-web-library-mode | US-0134 |
-| US-0136 | SPEC-0025 | Edit a presentation and store changes by themselves | US-0135 | 1 | todo | feat/0049-web-library-mode | |
+| US-0136 | SPEC-0025 | Edit a presentation and store changes by themselves | US-0135 | 1 | done | feat/0049-web-library-mode | US-0135 |
 | US-0137 | SPEC-0025 | The editor when the session or the right ends | US-0136 | 2 | todo | feat/0049-web-library-mode | |
 | US-0138 | SPEC-0025 | Requests, Ask AI and arch layout work for editors and are refused to read only people | US-0136 | 2 | todo | feat/0049-web-library-mode | |
 | US-0139 | SPEC-0025 | The PPTX exporter can be confined to pictures held in the presentation | main | 2 | todo | feat/0049-web-library-mode | |

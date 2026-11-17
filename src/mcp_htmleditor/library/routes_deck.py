@@ -28,6 +28,7 @@ READ_ONLY_STYLE: Final = (
 )
 PID: Final = r"(?P<pid>[0-9a-f]{32})"
 DENIED_CODE: Final = "denied"
+DENIED_PAYLOAD: Final = {"error": "Access denied.", "code": DENIED_CODE}
 
 
 def deck_path(presentation_id: str) -> str:
@@ -37,7 +38,7 @@ def deck_path(presentation_id: str) -> str:
 
 def denied() -> Answer:
     """The refusal of a deck route that is not a navigation: ``403 {"error": "Access denied.", "code": "denied"}``."""
-    return json_answer(403, {"error": "Access denied.", "code": DENIED_CODE})
+    return json_answer(403, DENIED_PAYLOAD)
 
 
 def enter(context: Context) -> Answer:
@@ -64,7 +65,9 @@ def library_shell(editor_html: str, presentation_id: str, library_origin: str, r
 
 
 def inherited(
-    route: Literal["content", "content-frame", "download", "shell", "static", "status"], *, is_framed: bool = False
+    route: Literal["content", "content-frame", "download", "save", "shell", "static", "status"],
+    *,
+    is_framed: bool = False,
 ) -> Callable[[Context], EditorAnswer]:
     """The handler of a route the editor already answers (DEC-003)."""
 
@@ -98,6 +101,7 @@ ROUTES: tuple[Route, ...] = (
     Route("content", "GET", _deck("status"), Permission.VIEW, inherited("status")),
     Route("content", "GET", _deck("content"), Permission.VIEW, inherited("content")),
     Route("content", "GET", _deck("download"), Permission.VIEW, inherited("download"), is_navigation=True),
+    Route("content", "POST", _deck("content"), Permission.EDIT, inherited("save"), is_json=True),
     Route("content", "GET", _deck(".*"), Permission.VIEW, refuse),
     Route("content", "POST", _deck(".*"), Permission.VIEW, refuse),
 )

@@ -54,7 +54,7 @@ import sqlite3
 import threading
 from collections import deque
 from collections.abc import Callable, Iterator
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html import escape as html_escape
@@ -68,13 +68,14 @@ import pytest
 from playwright.sync_api import Browser as Chromium
 from playwright.sync_api import BrowserContext, Frame, Page, Playwright
 
-from mcp_htmleditor.config import Settings
-from mcp_htmleditor.history import HistoryStore
+from mcp_htmleditor.config import Settings, reset_settings_cache
+from mcp_htmleditor.history import HistoryStore, Version
 from mcp_htmleditor.library.names import name_key
 from mcp_htmleditor.library.server import LibraryServer
 from mcp_htmleditor.library.store import Database, Library
 from mcp_htmleditor.request_service import RequestService
 from mcp_htmleditor.request_store import RequestStore
+from tests.browser_wait import wait_for_js
 from tests.deck_support import build_deck
 
 LIBRARY_HOST = "slides.test"
@@ -199,7 +200,8 @@ class HttpClient:
                 conn.putheader(name, value)
             if body or method in {"POST", "PUT", "DELETE"}:
                 conn.putheader("Content-Length", str(len(body)))
-            conn.endheaders(body or None)
+            with suppress(BrokenPipeError, ConnectionResetError):  # a refusal is answered before the body is read
+                conn.endheaders(body or None)
             response = conn.getresponse()
             data = response.read()
             return LibraryReply(
@@ -660,6 +662,15 @@ class RunningLibrary:
     def builder(self) -> LibraryBuilder:
         return LibraryBuilder(self.database, self.clock, self.state_dir)
 
+    def versions(self, presentation: Presentation) -> list[Version]:
+        """The history versions of ``presentation``, newest first, from the state directory."""
+        return HistoryStore(self.state_dir, self.clock).list_versions(presentation.path.resolve())
+
+    def version_text(self, presentation: Presentation, version: Version) -> str:
+        """The stored text of one history version."""
+        store = HistoryStore(self.state_dir, self.clock)
+        return store.read(presentation.path.resolve(), version.id).decode("utf-8")
+
     def client(self, host: str | None = None) -> HttpClient:
         """A client whose requests carry ``Host: host`` (default the library origin's host and port)."""
         return HttpClient(self.port, host if host is not None else self.library_netloc)
@@ -761,6 +772,50 @@ class Browser:
         ``X-Editor: 1``); redirects followed only when ``follow``."""
         address = f"{self.running.content_origin}/d/{presentation_id}/{route}"
         return self._navigate("GET", address, _header_names(headers), follow=follow)
+
+    def save_headers(self, presentation_id: str) -> dict[str, str]:
+        """What Chromium sends with the editor's own ``fetch`` of ``POST /d/<pid>/content``, grant cookie included."""
+        path = f"/d/{presentation_id}/"
+        cookie = "; ".join(f"{name}={value}" for (where, name), value in self.deck_cookies.items() if where == path)
+        headers = {
+            "Origin": self.running.content_origin,
+            "Sec-Fetch-Site": "same-origin",
+            "Content-Type": "application/json",
+            "X-Editor": "1",
+        }
+        return {**headers, "Cookie": cookie} if cookie else headers
+
+    def save(
+        self, presentation_id: str, html: str, *, base_mtime: float | None = None, force: bool = False
+    ) -> LibraryReply:
+        """What the editor sends to store ``html`` (a whole document) for a presentation this browser opened."""
+        payload: dict[str, Any] = {"html": html}
+        if base_mtime is not None:
+            payload["base_mtime"] = base_mtime
+        if force:
+            payload["force"] = True
+        client = self.running.client(self.running.content_netloc)
+        return client.request(
+            "POST",
+            f"/d/{presentation_id}/content",
+            headers=self.save_headers(presentation_id),
+            body=json.dumps(payload).encode(),
+        )
+
+    def send_save_length(self, presentation_id: str, length: int) -> LibraryReply:
+        """A save declaring ``Content-Length: length`` and sending no body: the server must refuse by the header."""
+        headers = {**self.save_headers(presentation_id), "Host": self.running.content_netloc}
+        headers["Content-Length"] = str(length)
+        with socket.create_connection(("127.0.0.1", self.running.port), timeout=10) as sock:
+            head = f"POST /d/{presentation_id}/content HTTP/1.1\r\n" + "".join(
+                f"{k}: {v}\r\n" for k, v in headers.items()
+            )
+            sock.sendall((head + "\r\n").encode())
+            raw = b""
+            while chunk := sock.recv(65536):  # the server closes the connection after a refusal
+                raw += chunk
+        status = int(raw.split(b" ", 2)[1])
+        return LibraryReply(status=status, headers={}, body=raw.split(b"\r\n\r\n", 1)[-1], set_cookies=())
 
     def grant(self, presentation_id: str) -> str | None:
         """The value of the grant cookie of a presentation, None when the browser holds none."""
@@ -937,6 +992,40 @@ def deck_with_notes(titles: tuple[str, ...], notes: str, script: str = "") -> by
     return build_deck("ei", titles, mutate=put_in_first_slide).encode()
 
 
+TITLE_FIELD = "h1[data-editable~='text']"
+
+
+def turn_edit_on(page: Page) -> None:
+    """Click the edit button of the editor shell and wait for the first title of the deck to be editable."""
+    page.click("#edit-mode-btn")
+    frame = deck_frame(page)
+    wait_for_js(frame, f'document.querySelector("{TITLE_FIELD}").isContentEditable', True, what="editable")
+
+
+def type_in_title(page: Page, text: str, *, replace: bool = False, index: int = 0, insert: bool = False) -> None:
+    """Type ``text`` at the end of the title ``index`` of the deck (the whole title replaced when ``replace``); the
+    focus stays in the field. ``insert`` pastes the text in one step (characters the keyboard has no key for)."""
+    field = deck_frame(page).locator(TITLE_FIELD).nth(index)
+    field.click()
+    page.keyboard.press("ControlOrMeta+A" if replace else "End")
+    if insert:
+        page.keyboard.insert_text(text)
+    else:
+        page.keyboard.type(text)
+
+
+def leave_field(page: Page) -> None:
+    """Click the file name of the toolbar: the edited field loses the focus."""
+    page.click("#toolbar-filename")
+
+
+def stored_title(presentation: Presentation) -> str:
+    """The first ``<h1>`` of the file stored for ``presentation``."""
+    match = re.search(r"<h1[^>]*>([^<]*)</h1>", presentation.path.read_text(encoding="utf-8"))
+    assert match is not None, "no title in the stored file"
+    return html_unescape(match.group(1))
+
+
 def open_presenter(page: Page) -> Page:
     """Press the key S in the editor shell: the deck's presenter window, once the notes reached it."""
     with page.context.expect_page(timeout=10_000) as opened:
@@ -951,7 +1040,7 @@ def free_port() -> int:
 
 
 @pytest.fixture
-def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
+def library_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., RunningLibrary]]:
     """Return ``start(google=None, google_registered=True, scheme="http", **settings_overrides)``; all stopped at
     teardown; ``scheme="https"`` gives two https origins on the same loopback port (nginx's view).
 
@@ -990,6 +1079,9 @@ def library_server(tmp_path: Path) -> Iterator[Callable[..., RunningLibrary]]:
             values["google_credentials_override"] = credentials
         values.update(settings_overrides)
         settings = Settings(**values)
+        # ``webserve`` runs with one state directory: the editor's history writer reads it from the environment.
+        monkeypatch.setenv("HTMLEDITOR_STATE_DIR", str(settings.state_dir))
+        reset_settings_cache()
         database = Database(library_dir / "library.db")
         server = LibraryServer(settings, clock=clock)
         running = RunningLibrary(
