@@ -1,7 +1,6 @@
 """Shared model of the PPTX exporter: constants, report, block types and the builder base class.
 
-``to_pptx.py`` and the ``pptx_*`` builder modules import from here; nothing in this
-module imports from ``to_pptx.py``.
+``to_pptx.py`` and the ``pptx_*`` builders import from here; this module never imports ``to_pptx.py``.
 """
 
 from __future__ import annotations
@@ -176,6 +175,7 @@ class _Context:
     theme: Theme
     base_dir: Path
     report: ExportReport
+    embedded_pictures_only: bool = False
 
 
 @dataclass

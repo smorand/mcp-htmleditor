@@ -59,7 +59,7 @@ class PaintUnavailable(Exception):  # noqa: N818 - a reason, not an error the ca
         self.reason = reason
 
 
-def paint_presentation(prs: Any, html_path: Path, report: ExportReport) -> bool:
+def paint_presentation(prs: Any, html_path: Path, report: ExportReport, embedded_pictures_only: bool = False) -> bool:
     """Repaint every slide of ``prs`` from the deck at ``html_path``; on failure keep the flowed slides and warn once.
 
     Returns True when the slides were painted. Time O(e) for e measured elements; the pictures are decoded once
@@ -77,7 +77,7 @@ def paint_presentation(prs: Any, html_path: Path, report: ExportReport) -> bool:
         painter_base = html_path.resolve().parent
         items = 0
         for slide, page in zip(prs.slides, pages, strict=True):
-            items += Painter(slide, report, painter_base).paint(page)
+            items += Painter(slide, report, painter_base, embedded_pictures_only=embedded_pictures_only).paint(page)
         span.set_attribute("paint.items", items)
     return True
 
@@ -234,10 +234,13 @@ def _rasterise(page: Any, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 class Painter(ShapesMixin, TextMixin, TablesMixin):
     """Repaints one PPTX slide from the measured HTML slide."""
 
-    def __init__(self, slide: Any, report: ExportReport, base_dir: Path) -> None:
+    def __init__(
+        self, slide: Any, report: ExportReport, base_dir: Path, *, embedded_pictures_only: bool = False
+    ) -> None:
         self.slide = slide
         self.report = report
         self.base_dir = base_dir
+        self.embedded_pictures_only = embedded_pictures_only
 
     def paint(self, items: list[dict[str, Any]]) -> int:
         """Clear the slide's shapes, then draw the items in order; return how many were drawn."""

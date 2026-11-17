@@ -17,6 +17,9 @@ SRC_PREVIEW_CHARS = 60
 _IGNORED = "l'export PPTX ne convertit pas les vecteurs."
 
 
+NOT_EMBEDDED = "Image non incluse dans le fichier, ignoree."  # embedded_pictures_only: a picture not in a data URI
+
+
 def is_vector_src(src: str) -> bool:
     """Return whether an ``<img>`` source is a vector image (``.svg`` file or ``data:image/svg`` URI)."""
     lowered = src.lower()

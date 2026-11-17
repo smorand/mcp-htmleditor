@@ -35,7 +35,7 @@ from .pptx_paint_style import (
     shape_for_radii,
     to_emu,
 )
-from .pptx_vectors import is_vector_src
+from .pptx_vectors import NOT_EMBEDDED, is_vector_src
 
 REMOTE: Final = re.compile(r"^https?://")
 ANGLE_UNIT: Final = 60000
@@ -74,6 +74,7 @@ class ShapesMixin:
     slide: Any
     report: Any
     base_dir: Path
+    embedded_pictures_only: bool
 
     def background(self, item: dict[str, Any]) -> None:
         """The slide colour (or gradient) and background picture, full bleed."""
@@ -189,6 +190,9 @@ class ShapesMixin:
             except (binascii.Error, ValueError):
                 self.report.warn("Image data URI illisible ignoree.")
                 return None
+        if self.embedded_pictures_only:
+            self.report.warn(NOT_EMBEDDED)
+            return None
         if REMOTE.match(src):
             self.report.warn(f"Image distante non telechargee: {src[:60]}")
             return None

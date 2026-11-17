@@ -18,7 +18,7 @@ from pptx.util import Inches
 from .pptx_components import color_of, first_pct, inches
 from .pptx_model import _ANNOT_CLASS_COLORS, FILL_KEYS, _BuilderBase, _Para
 from .pptx_style import Box, TextStyle, classes, parse_color, style_props
-from .pptx_vectors import is_vector_src
+from .pptx_vectors import NOT_EMBEDDED, is_vector_src
 
 
 class ImagesMixin(_BuilderBase):
@@ -109,6 +109,9 @@ class ImagesMixin(_BuilderBase):
             except (binascii.Error, ValueError):
                 self.ctx.report.warn("Image data URI illisible ignoree.")
                 return None
+        if self.ctx.embedded_pictures_only:
+            self.ctx.report.warn(NOT_EMBEDDED)
+            return None
         if src.startswith(("http://", "https://", "//")):
             self.ctx.report.warn(f"Image distante non telechargee: {src[:60]}")
             return None

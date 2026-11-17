@@ -82,7 +82,7 @@ previous content goes to the history first (`history.snapshot`) and is discarded
 `patch` and `restore` use the same writer (reasons `patch`, `restore`).
 
 ## Export pipeline
-
+ `to_pptx(..., embedded_pictures_only=True)` (SPEC-0025 DEC-043, library only, no CLI flag): a picture is read only from a `data:` address; any other `src` is skipped with `NOT_EMBEDDED` (`pptx_vectors.py`) in both the flow (`ImagesMixin._image_source`) and the painter (`ShapesMixin._bytes`). Default `False`.
 | Module | Role |
 |--------|------|
 | `export/to_pptx.py` | HTML to PPTX entry point. Keeps `ExportReport` (re-exported from `pptx_model.py`), `to_pptx`, `_build_pptx`, `find_slides` and the composed `_SlideBuilder` (`__init__`, `build`, `_slide_kind`), built from the mixins below. Slide detection (`data-type="slide"` on any tag, `article.slide` fallback). Returns an `ExportReport` (slide count, charter, warnings); the CLI prints it and exits non zero when nothing was exported. Traced as `export.pptx` |
