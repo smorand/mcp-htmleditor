@@ -11,7 +11,10 @@
    button's folder id, reloads on success, writes a refusal into the dialog's alert as above.
    Members (US-0132): per folder, Add member sends {"email", "role"} to /api/folders/<id>/members, a member's role
    chooser sends the same on change, Remove sends {"email"} to .../members/remove; each reloads on success and writes
-   a refusal into the alert of that folder's Members section. */
+   a refusal into the alert of that folder's Members section.
+   Upload (US-0141): choosing a file in the Upload field sends its bytes with XMLHttpRequest to
+   /api/folders/<id>/presentations (X-File-Name is the percent encoded name); the answer's message or error is written
+   with textContent into the status area, and on success the list of the page is replaced by the server's. */
 (function () {
   "use strict";
 
@@ -142,7 +145,62 @@
     bindMembers();
   }
 
+  function uploadAnswer(request, status) {
+    try {
+      var answer = JSON.parse(request.responseText);
+      return answer.message || answer.error || (answer.collision ? answer.collision : status.dataset.failed);
+    } catch (error) {
+      return request.status === 403 ? status.dataset.denied : status.dataset.failed;
+    }
+  }
+
+  function refreshListing() {
+    fetch(window.location.href, {credentials: "same-origin"}).then(function (response) {
+      return response.ok ? response.text() : "";
+    }).then(function (text) {
+      var next = new DOMParser().parseFromString(text, "text/html").querySelector("ul.presentations, #upload ~ p");
+      var current = document.querySelector("ul.presentations, #upload ~ p");
+      if (next && current) {
+        current.replaceWith(next);
+        localizeTimes();
+      }
+    });
+  }
+
+  function sendUpload(input, status, section) {
+    var file = input.files[0];
+    var request = new XMLHttpRequest();
+    request.open("POST", "/api/folders/" + section.dataset.folderId + "/presentations");
+    request.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+    request.onload = function () {
+      status.textContent = uploadAnswer(request, status);
+      input.value = "";
+      if (request.status === 201) {
+        refreshListing();
+      }
+    };
+    request.onerror = function () {
+      status.textContent = status.dataset.failed;
+      input.value = "";
+    };
+    request.send(file);
+  }
+
+  function bindUpload() {
+    var section = document.getElementById("upload");
+    var input = document.getElementById("upload-file");
+    if (!section || !input) {
+      return;
+    }
+    input.addEventListener("change", function () {
+      if (input.files.length) {
+        sendUpload(input, document.getElementById("upload-status"), section);
+      }
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", localizeTimes);
+  document.addEventListener("DOMContentLoaded", bindUpload);
   document.addEventListener("DOMContentLoaded", bindAdministration);
   window.addEventListener("pageshow", function (event) {
     if (event.persisted) {

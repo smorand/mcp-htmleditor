@@ -774,6 +774,29 @@ class Browser:
         address = f"{self.running.content_origin}/d/{presentation_id}/{route}"
         return self._navigate("GET", address, _header_names(headers), follow=follow)
 
+    def upload(self, folder_id: str, name: str, data: bytes, *, headers: dict[str, str] | None = None) -> LibraryReply:
+        """What the Upload control sends: ``POST /api/folders/<fid>/presentations`` with the raw bytes, the percent
+        encoded name in ``X-File-Name`` and the headers of a same origin ``XMLHttpRequest`` (``headers`` replaces
+        them)."""
+        sent = (
+            headers
+            if headers is not None
+            else {
+                "Origin": self.running.origin,
+                "Sec-Fetch-Site": "same-origin",
+                "X-File-Name": quote(name, safe=""),
+                "Content-Type": "text/html",
+            }
+        )
+        if self.cookies:
+            sent = {**sent, "Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items())}
+        reply = self.running.client().request(
+            "POST", f"/api/folders/{folder_id}/presentations", headers=sent, body=data
+        )
+        self._keep_cookies(reply)
+        self.replies.append(reply)
+        return reply
+
     def save_headers(self, presentation_id: str) -> dict[str, str]:
         """What Chromium sends with the editor's own ``fetch`` of ``POST /d/<pid>/content``, grant cookie included."""
         path = f"/d/{presentation_id}/"
@@ -1110,6 +1133,16 @@ def frame_title(page: Page) -> str:
 
 def wait_stored(page: Page, deck: Presentation, title: str) -> None:
     wait_until(page, lambda: stored_title(deck), lambda found: found == title, what=f"stored title {title}")
+
+
+def valid_deck(slides: int = 3, size: int | None = None) -> bytes:
+    """A real "ei" presentation of ``slides`` slides that the editor's checks accept; padded to ``size`` bytes with an
+    HTML comment when given (never smaller than the deck itself)."""
+    deck = build_deck("ei", tuple(f"Slide {number}" for number in range(1, slides + 1))).encode()
+    if size is None or size <= len(deck) + len(PADDING_OPEN) + len(PADDING_CLOSE):
+        return deck
+    padding = size - len(deck) - len(PADDING_OPEN) - len(PADDING_CLOSE)
+    return deck.replace(b"</body>", PADDING_OPEN + b"x" * padding + PADDING_CLOSE + b"</body>", 1)
 
 
 def open_presenter(page: Page) -> Page:

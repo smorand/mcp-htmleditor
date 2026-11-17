@@ -98,3 +98,16 @@ storage and test support are in `.agent_docs/library.md`.
   read and the transaction is `FolderMissing`, `Access denied.`. The `CHECK (role IN ('RW','RO'))` is the last guard.
 - The administrator's address may be stored as a member: `role_in` answers Admin before reading `members` (DEC-006).
   Roles are read at every request, so a change applies to the person's next page without a new sign in (DEC-018).
+
+## Upload (US-0141, DEC-033, DEC-034, DEC-054)
+
+- Folder page: for `RW` or `Admin` a section `#upload` (label `Upload`, `<input type=file id=upload-file>`, `role=status`
+  area `#upload-status`); `library.js` sends the chosen file with `XMLHttpRequest` to `POST /api/folders/<fid>/presentations`
+  (raw body, `X-File-Name` percent encoded) and writes the answer with `textContent`; success swaps the list for the server's.
+- Route (`routes_library.upload_presentation`, `Route.is_upload`, `EDIT`): Origin rule and `X-File-Name` in the dispatcher, then
+  folder exists, extension (`.html` in any case), name, size (26 214 400), body read by `Context.read_body`, validity
+  (`uploads.check_validity`: UTF-8, declared, one slide, first lint error message only), collision (`409 {"collision"}`).
+- `Library.add_presentation`: file first (`atomic_write`, mode 0600, new random id), then one `BEGIN IMMEDIATE` (name key,
+  row, activity line); a taken name or any failure removes the new file. Span `library.upload` (size only).
+- An answer given before the body was read ends with `shutdown(SHUT_WR)` and a bounded `recv` discard (1 MiB or 2 s).
+

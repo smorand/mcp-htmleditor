@@ -21,6 +21,7 @@ import json
 import logging
 import pkgutil
 import re
+import socket
 import sqlite3
 import threading
 import time
@@ -77,6 +78,11 @@ STRICT_TRANSPORT = "max-age=31536000"
 POLL_INTERVAL_SECONDS = 0.05
 PLAIN_SCHEME = "http"
 SECURE_SCHEME = "https"
+UPLOAD_NAME_HEADER = "X-File-Name"
+DRAIN_BYTES = 1_048_576  # DEC-033: at most 1 MiB of unread input is discarded
+DRAIN_STEP_SECONDS = 0.2
+DRAIN_SILENCES = 10  # ten quiet steps of 0.2 s: the 2 seconds of DEC-033
+DRAIN_CHUNK = 65_536
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 FETCH_SITES_ALLOWED = frozenset({"same-origin", "none"})
 FOLDER_GROUP = "fid"
@@ -156,6 +162,7 @@ class LibraryHandler(_EditorHandler):
     policy = JSON_POLICY
     frame_options = FRAME_DENIED
     _deck: DeckTarget | None = None
+    _body_is_unread: bool = False
 
     @override
     def do_GET(self) -> None:
@@ -177,6 +184,8 @@ class LibraryHandler(_EditorHandler):
     def finish(self) -> None:
         """The thread of this connection ends with it: so does its database connection."""
         try:
+            if self._body_is_unread:
+                self._drain_unread_body()
             super().finish()
         finally:
             self._library_server().database.release()
@@ -185,6 +194,7 @@ class LibraryHandler(_EditorHandler):
         self.policy = JSON_POLICY  # one handler serves several requests of a keep alive connection
         self.frame_options = FRAME_DENIED
         self._deck = None
+        self._body_is_unread = False
         if self.command != "GET":  # a body is never read: it must not desynchronize the next request
             self.close_connection = True
         if self._refuse_ambiguous_headers():
@@ -415,6 +425,11 @@ class LibraryHandler(_EditorHandler):
             logger.warning("Refused %s %s: content type", self.command, path)
             self._send_answer(origin, Answer(403, pages.access_denied()))
             return
+        if route is not None and route.is_upload and not self.headers.get(UPLOAD_NAME_HEADER):
+            logger.warning("Refused %s %s: no file name", self.command, path)
+            self._send_answer(origin, Answer(403, pages.access_denied()))
+            return
+        self._body_is_unread = route is not None and route.is_upload
         try:
             answer = self._library_answer(origin, route, path, query)
         except (sqlite3.Error, OSError) as exc:
@@ -448,6 +463,8 @@ class LibraryHandler(_EditorHandler):
             folder_id=folder_id,
             role=role,
             payload=payload,
+            headers=self._upload_headers() if route.is_upload else {},
+            read_body=self._read_upload_body if route.is_upload else None,
             session=session,
             presentation_id=presentation_id,
             library_origin=server.settings.library_origin,
@@ -465,6 +482,36 @@ class LibraryHandler(_EditorHandler):
             return groups.get(FOLDER_GROUP), None
         presentation = self._library_server().library.presentation(presentation_id)
         return (presentation.folder_id if presentation is not None else None), presentation_id
+
+    def _upload_headers(self) -> dict[str, str]:
+        """The two headers of an upload the handler reads, lower case names."""
+        return {name.lower(): self.headers.get(name, "") for name in (UPLOAD_NAME_HEADER, "Content-Length")}
+
+    def _read_upload_body(self, length: int) -> bytes:
+        """Exactly ``length`` bytes of the body: the only place an upload body is read (DEC-033)."""
+        self._body_is_unread = False
+        return self.rfile.read(length)
+
+    def _drain_unread_body(self) -> None:
+        """An answer given before the body was read: stop sending, then discard at most 1 MiB of the client's input,
+        giving up after ``DRAIN_SILENCES`` quiet steps (about 2 seconds), with ``recv`` (not ``rfile``, so nothing
+        counts as read), because closing a socket that still holds unread input sends a reset that can destroy the
+        answer before the client reads it (DEC-033). No clock is read: the bound is the socket timeout."""
+        drained = silences = 0
+        try:
+            self.connection.shutdown(socket.SHUT_WR)
+            self.connection.settimeout(DRAIN_STEP_SECONDS)
+            while drained < DRAIN_BYTES and silences < DRAIN_SILENCES:
+                try:
+                    chunk = self.connection.recv(DRAIN_CHUNK)
+                except TimeoutError:
+                    silences += 1
+                    continue
+                if not chunk:
+                    break
+                drained += len(chunk)
+        except OSError:
+            logger.debug("Drain of an unread upload body ended with the connection")
 
     def _is_json(self) -> bool:
         """``Content-Type`` is ``application/json`` (parameters and case aside): what a form of another page cannot

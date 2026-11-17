@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, Final
 
+from ..fileio import atomic_write
 from ..request_store import RequestStore
 from ..tracing import trace_span
 from . import pages
@@ -88,6 +89,24 @@ class NameMismatch(Exception):  # noqa: N818 - a domain outcome, not an error of
 
 class FolderMissing(Exception):  # noqa: N818 - a domain outcome, not an error of the program
     """No folder has this id."""
+
+
+@dataclass(frozen=True, slots=True)
+class Added:
+    """The outcome of a stored upload: the new presentation's id and name."""
+
+    id: str
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class Collision:
+    """The outcome of an upload whose name is taken in the folder: the existing name, as stored."""
+
+    existing_name: str
+
+
+Outcome = Added | Collision
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +236,44 @@ class Library:
         self._clock = clock
         self._files = database.path.parent / FILES_DIRECTORY
         self._records = RequestStore(state_dir)
+
+    def add_presentation(self, folder_id: str, name: str, data: bytes, actor: str) -> Outcome:
+        """Store ``data`` as the presentation ``name`` of the folder and write its line ``Uploaded "<name>" in
+        "<folder>"`` (FR-NEW-028, FR-NEW-049, DEC-027, DEC-054).
+
+        ``name`` is checked and composed already. The bytes are written first, to a new random id, outside any
+        transaction (a slow write never holds the database); then one ``BEGIN IMMEDIATE`` looks the name key up and
+        inserts the row and the line. A taken name removes the new file and returns ``Collision``; any failure
+        removes it too and the exception goes on, so a failed upload leaves nothing. ``FolderMissing`` when the
+        folder is gone. Time O(n) in the size of the file for the write.
+        """
+        presentation_id = secrets.token_hex(ID_BYTES)
+        path = self.presentation_path(folder_id, presentation_id)
+        with trace_span("library.upload", {"file.size": len(data)}):
+            path.parent.mkdir(mode=DIRECTORY_MODE, parents=True, exist_ok=True)
+            atomic_write(path, data)
+            path.chmod(FILE_MODE)
+            try:
+                with self._database.transaction(immediate=True) as connection:
+                    folder_name = _folder_name_in(connection, folder_id)
+                    taken = connection.execute(
+                        "SELECT name FROM presentations WHERE folder_id = ? AND name_key = ?",
+                        (folder_id, name_key(name)),
+                    ).fetchone()
+                    if taken is None:
+                        connection.execute(
+                            "INSERT INTO presentations(id, folder_id, name, name_key, created_at)"
+                            " VALUES (?, ?, ?, ?, ?)",
+                            (presentation_id, folder_id, name, name_key(name), self._clock()),
+                        )
+                        self.record(connection, actor, pages.uploaded_line(name, folder_name))
+            except BaseException:
+                path.unlink(missing_ok=True)
+                raise
+        if taken is not None:
+            path.unlink(missing_ok=True)
+            return Collision(str(taken[0]))
+        return Added(presentation_id, name)
 
     def activity(self) -> list[ActivityLine]:
         """The 500 newest lines, newest first (FR-NEW-050)."""

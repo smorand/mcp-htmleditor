@@ -231,7 +231,13 @@ def test_e2e_022_an_empty_folder_says_so(library_server: START, fake_google: Fak
 
     assert_folder_page(reply, PNEUMO)
     assert f"<p>{EMPTY_FOLDER}</p>" in reply.text
-    assert visible_texts(reply) == ["All folders", PNEUMO, EMPTY_FOLDER, "Sign out"]
+    assert visible_texts(reply) == [
+        "All folders",
+        PNEUMO,
+        "Upload",
+        EMPTY_FOLDER,
+        "Sign out",
+    ]  # the administrator uploads
     assert not re.search(r"<(?:ul|ol|li|table|thead|th|tr|time)[\s>]", reply.text)
 
 

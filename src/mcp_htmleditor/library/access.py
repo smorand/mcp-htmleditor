@@ -75,6 +75,8 @@ class Context:
     folder_id: str | None = None
     role: Role | None = None
     payload: Mapping[str, Any] = field(default_factory=dict)
+    headers: Mapping[str, str] = field(default_factory=dict)
+    read_body: Callable[[int], bytes] | None = None
     session: Session | None = None
     presentation_id: str | None = None
     library_origin: str = ""
@@ -126,7 +128,8 @@ class Route:
     ``is_json`` takes a JSON object body: ``Content-Type: application/json`` is required with the ``Origin`` (DEC-022)
     and the body is read only once the permission holds. A content origin pattern captures the presentation id as
     ``pid``; ``is_navigation`` marks the routes a browser navigates to (the deck frame, the download), which send a
-    refused person back to ``/open/<pid>`` instead of answering JSON (DEC-040).
+    refused person back to ``/open/<pid>`` instead of answering JSON (DEC-040). A route with ``is_upload`` takes a raw
+    body its handler reads itself, after the checks, through ``Context.read_body`` (DEC-033); it needs ``X-File-Name``.
     """
 
     origin: Literal["library", "content"]
@@ -136,6 +139,7 @@ class Route:
     handler: Callable[[Context], Answer | EditorAnswer]
     is_json: bool = False
     is_navigation: bool = False
+    is_upload: bool = False
 
 
 def json_answer(status: int, payload: Mapping[str, Any]) -> Answer:

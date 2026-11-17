@@ -10,9 +10,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Final
 
-from . import pages
-from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Route, SetCookie
+from ..fileio import WriteError
+from . import pages, uploads
+from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Role, Route, SetCookie, json_answer
+from .names import compose
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, SESSION_SECONDS, SignInUnavailable, safe_destination
+from .store import Collision
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +90,73 @@ def folder(context: Context) -> Answer:
     name = context.library.folder_name(folder_id)
     if name is None:
         return Answer(403, pages.access_denied())
-    return Answer(200, pages.folder_page(name, context.library.presentations_in(folder_id)))
+    can_upload = context.role in {Role.ADMIN, Role.RW}
+    return Answer(
+        200,
+        pages.folder_page(
+            name, context.library.presentations_in(folder_id), can_upload=can_upload, folder_id=folder_id
+        ),
+    )
+
+
+def _refuse(status: int, text: str) -> Answer:
+    return json_answer(status, {"ok": False, "error": text})
+
+
+def upload_presentation(context: Context) -> Answer:
+    """``POST /api/folders/<fid>/presentations``: the checks in the order of FR-NEW-028, the body read only once the
+    right, the extension, the name and the size hold (DEC-033). ``201`` with the message, ``400`` with the first
+    problem, ``409`` with the colliding name, ``403`` ``Access denied.`` for a folder that does not exist."""
+    folder_id = context.folder_id or ""
+    if context.library.folder_name(folder_id) is None or context.read_body is None:
+        return Answer(403, pages.access_denied())
+    stem = _checked_stem(context)
+    if isinstance(stem, Answer):
+        return stem
+    data = _read_upload(context)
+    if isinstance(data, Answer):
+        return data
+    return _store_upload(context, folder_id, stem, data)
+
+
+def _store_upload(context: Context, folder_id: str, stem: str, data: bytes) -> Answer:
+    """The validity check, then the store: ``201``, the first problem, the collision or a failed upload."""
+    try:
+        uploads.check_validity(data)
+        outcome = context.library.add_presentation(folder_id, stem, data, context.person_email or "")
+    except uploads.UploadRefused as exc:
+        return _refuse(400, str(exc))
+    except (OSError, WriteError) as exc:
+        logger.error("Upload failed: %s", type(exc).__name__)
+        return _refuse(500, pages.UPLOAD_FAILED)
+    if isinstance(outcome, Collision):
+        return json_answer(409, {"ok": False, "collision": outcome.existing_name})
+    logger.info("Uploaded a presentation of %d bytes", len(data))
+    return json_answer(201, {"ok": True, "name": stem, "message": pages.uploaded_message(stem)})
+
+
+def _checked_stem(context: Context) -> str | Answer:
+    """The composed name without ``.html``, or the refusal of the extension and the name checks."""
+    name = uploads.file_name(context.headers.get(uploads.NAME_HEADER, ""))
+    if name is None:
+        return _refuse(400, pages.FILE_NAME_REFUSED)
+    if not name.lower().endswith(uploads.EXTENSION):
+        return _refuse(400, pages.ONLY_HTML)
+    stem = compose(name[: -len(uploads.EXTENSION)])
+    return stem if stem.strip() else _refuse(400, pages.FILE_NAME_REFUSED)
+
+
+def _read_upload(context: Context) -> bytes | Answer:
+    """The size check, then exactly the declared bytes; a short body is a failed upload."""
+    try:
+        length = uploads.declared_length(context.headers.get(uploads.LENGTH_HEADER))
+    except uploads.UploadRefused as exc:
+        return _refuse(400, str(exc))
+    if length > uploads.MAX_BYTES:
+        return _refuse(413, pages.TOO_LARGE)
+    read_body = context.read_body
+    data = read_body(length) if read_body is not None else b""
+    return data if len(data) == length else _refuse(400, pages.UPLOAD_FAILED)
 
 
 def open_presentation(context: Context) -> Answer:
@@ -118,4 +187,12 @@ ROUTES: tuple[Route, ...] = (
     Route("library", "GET", re.compile(r"/"), Permission.SIGNED_IN, home),
     Route("library", "GET", re.compile(r"/f/(?P<fid>[0-9a-f]{32})"), Permission.VIEW, folder),
     Route("library", "GET", re.compile(r"/open/(?P<pid>[0-9a-f]{32})"), Permission.VIEW, open_presentation),
+    Route(
+        "library",
+        "POST",
+        re.compile(r"/api/folders/(?P<fid>[0-9a-f]{32})/presentations"),
+        Permission.EDIT,
+        upload_presentation,
+        is_upload=True,
+    ),
 )

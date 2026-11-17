@@ -103,7 +103,7 @@ def assert_controls_are_named_links_and_buttons(page: Page) -> list[str]:
     """FR-NEW-064, DEC-053: only ``a`` and ``button``, each with a visible name, no handler on another element;
     returns each control's address (or its name) in page order."""
     controls = page.evaluate(CONTROLS_SCRIPT)
-    assert {control["tag"] for control in controls} <= {"A", "BUTTON"}
+    assert {control["tag"] for control in controls} <= {"A", "BUTTON", "INPUT"}  # INPUT: the Upload field (US-0141)
     assert all(control["name"] and not control["handler"] and control["tabindex"] is None for control in controls)
     return [control["href"] or control["name"] for control in controls]
 
@@ -144,6 +144,8 @@ def test_e2e_020_a_folder_lists_its_presentations_newest_first(
     assert page.locator("h1").inner_text() == CARDIOLOGY
     assert shown_rows(page) == UTC_ROWS
     order = assert_controls_are_named_links_and_buttons(page)
+    assert order.count("Upload") == 1  # Dan is RW: the Upload field is the one control that is not a link (US-0141)
+    order.remove("Upload")
     assert [order[0], order[-1]] == ["/", "Sign out"]  # the presentation names in between are links (US-0134)
     assert [link.rsplit("/", 1)[0] for link in order[1:-1]] == ["/open"] * len(UTC_ROWS)
     assert page.get_by_role("link", name="All folders").count() == 1

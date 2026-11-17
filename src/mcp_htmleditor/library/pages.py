@@ -33,6 +33,11 @@ DELETE_FOLDER_PROMPT: Final = "Type the folder name to confirm."
 CANCEL_LABEL: Final = "Cancel"
 NAME_MISMATCH: Final = "The name does not match. Nothing was deleted."
 FOLDER_NAME_REFUSED: Final = "Folder names use 1 to 60 letters, digits, spaces or hyphens."
+UPLOAD_LABEL: Final = "Upload"
+ONLY_HTML: Final = "Only .html files are accepted."
+UPLOAD_FAILED: Final = "The upload failed. Nothing was changed."
+FILE_NAME_REFUSED: Final = "This file name is not allowed."
+TOO_LARGE: Final = "The file is larger than 25 MB."
 MEMBERS_LABEL: Final = "Members"
 EMAIL_ADDRESS_LABEL: Final = "Email address"
 ROLE_LABEL: Final = "Role"
@@ -93,6 +98,16 @@ def created_folder_line(name: str) -> str:
 def deleted_folder_line(name: str) -> str:
     """The activity line of a folder deletion (FR-NEW-049)."""
     return f'Deleted folder "{name}"'
+
+
+def uploaded_line(name: str, folder: str) -> str:
+    """The activity line of an upload (FR-NEW-049)."""
+    return f'Uploaded "{name}" in "{folder}"'
+
+
+def uploaded_message(name: str) -> str:
+    """What the person sees after a successful upload (FR-NEW-028)."""
+    return f"Uploaded {name}."
 
 
 def added_member_line(email: str, role: str, folder: str) -> str:
@@ -156,7 +171,9 @@ def admin_page(
     )
 
 
-def folder_page(name: str, presentations: Sequence[PresentationView]) -> bytes:
+def folder_page(
+    name: str, presentations: Sequence[PresentationView], *, can_upload: bool = False, folder_id: str = ""
+) -> bytes:
     """The folder name, ``All folders`` back to the home page, the rows in the given order (name, date, size) or
     ``This folder has no presentations yet.``, and the ``Sign out`` form (FR-NEW-018, FR-NEW-019).
 
@@ -170,7 +187,9 @@ def folder_page(name: str, presentations: Sequence[PresentationView]) -> bytes:
         for presentation in presentations
     )
     listing = f'<ul class="presentations">{rows}</ul>' if rows else f"<p>{esc(NO_PRESENTATION_YET)}</p>"
-    return _page(f"{_back_link()}<h1>{esc(name)}</h1>{listing}{_sign_out_form()}")
+    return _page(
+        f"{_back_link()}<h1>{esc(name)}</h1>{_upload_control(can_upload, folder_id)}{listing}{_sign_out_form()}"
+    )
 
 
 def _folder_rows(folders: Sequence[FolderView]) -> str:
@@ -223,6 +242,19 @@ def _alert(alert_id: str) -> str:
     return (
         f'<p role="alert" id="{alert_id}" data-denied="{esc(ACCESS_DENIED_TEXT)}" '
         f'data-unavailable="{esc(LIBRARY_UNAVAILABLE)}" hidden></p>'
+    )
+
+
+def _upload_control(can_upload: bool, folder_id: str) -> str:
+    """``Upload`` for a person who can edit: a labelled file field (``library.js`` sends the chosen file at once) and
+    the status area that shows the message or the progress (FR-NEW-067)."""
+    if not can_upload:
+        return ""
+    return (
+        f'<section id="upload" data-folder-id="{esc(folder_id)}"><label for="upload-file">{esc(UPLOAD_LABEL)}</label> '
+        '<input id="upload-file" type="file" accept=".html,text/html" aria-label="Upload">'
+        f'<p role="status" id="upload-status" data-denied="{esc(ACCESS_DENIED_TEXT)}" '
+        f'data-failed="{esc(UPLOAD_FAILED)}"></p></section>'
     )
 
 
