@@ -13,7 +13,7 @@ from typing import Final
 from ..fileio import WriteError
 from . import pages, uploads
 from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Role, Route, SetCookie, json_answer
-from .names import compose
+from .names import NameRefused, check_file_name
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, SESSION_SECONDS, SignInUnavailable, safe_destination
 from .store import Collision
 
@@ -142,8 +142,10 @@ def _checked_stem(context: Context) -> str | Answer:
         return _refuse(400, pages.FILE_NAME_REFUSED)
     if not name.lower().endswith(uploads.EXTENSION):
         return _refuse(400, pages.ONLY_HTML)
-    stem = compose(name[: -len(uploads.EXTENSION)])
-    return stem if stem.strip() else _refuse(400, pages.FILE_NAME_REFUSED)
+    try:
+        return check_file_name(name)
+    except NameRefused:
+        return _refuse(400, pages.FILE_NAME_REFUSED)
 
 
 def _read_upload(context: Context) -> bytes | Answer:

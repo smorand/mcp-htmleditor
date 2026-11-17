@@ -141,7 +141,7 @@
 | US-0139 | SPEC-0025 | The PPTX exporter can be confined to pictures held in the presentation | main | 2 | done | feat/0049-web-library-mode | US-0138 |
 | US-0140 | SPEC-0025 | Download the presentation as PPTX without running its scripts | US-0137, US-0138, US-0139 | 2 | done | feat/0049-web-library-mode | US-0139 |
 | US-0141 | SPEC-0025 | Upload a valid presentation into a folder | US-0137 | 1 | done | feat/0049-web-library-mode | US-0140 |
-| US-0142 | SPEC-0025 | Upload file names: allow list, composed form, hostile names | US-0141 | 2 | todo | feat/0049-web-library-mode | |
+| US-0142 | SPEC-0025 | Upload file names: allow list, composed form, hostile names | US-0141 | 2 | done | feat/0049-web-library-mode | US-0141 |
 | US-0143 | SPEC-0025 | Upload limits, progress, interruption and storage failure | US-0142 | 1 | todo | feat/0049-web-library-mode | |
 | US-0144 | SPEC-0025 | Replace an existing presentation after a collision question | US-0143, US-0138 | 1 | todo | feat/0049-web-library-mode | |
 | US-0145 | SPEC-0025 | Delete a presentation for good | US-0144, US-0138, US-0140 | 1 | todo | feat/0049-web-library-mode | |

@@ -797,6 +797,20 @@ class Browser:
         self.replies.append(reply)
         return reply
 
+    def upload_declaring(self, folder_id: str, name: str, length: int) -> LibraryReply:
+        """An upload that declares ``length`` bytes and sends none: the server must answer from the headers alone
+        (the order of the checks is observable without sending 30 MB)."""
+        headers = {
+            "Host": self.running.library_netloc,
+            "Origin": self.running.origin,
+            "Sec-Fetch-Site": "same-origin",
+            "X-File-Name": quote(name, safe=""),
+            "Content-Type": "text/html",
+            "Content-Length": str(length),
+            "Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items()),
+        }
+        return _raw_post(self.running.port, f"/api/folders/{folder_id}/presentations", headers)
+
     def save_headers(self, presentation_id: str) -> dict[str, str]:
         """What Chromium sends with the editor's own ``fetch`` of ``POST /d/<pid>/content``, grant cookie included."""
         path = f"/d/{presentation_id}/"
@@ -834,16 +848,7 @@ class Browser:
         """A save declaring ``Content-Length: length`` and sending no body: the server must refuse by the header."""
         headers = {**self.save_headers(presentation_id), "Host": self.running.content_netloc}
         headers["Content-Length"] = str(length)
-        with socket.create_connection(("127.0.0.1", self.running.port), timeout=10) as sock:
-            head = f"POST /d/{presentation_id}/content HTTP/1.1\r\n" + "".join(
-                f"{k}: {v}\r\n" for k, v in headers.items()
-            )
-            sock.sendall((head + "\r\n").encode())
-            raw = b""
-            while chunk := sock.recv(65536):  # the server closes the connection after a refusal
-                raw += chunk
-        status = int(raw.split(b" ", 2)[1])
-        return LibraryReply(status=status, headers={}, body=raw.split(b"\r\n\r\n", 1)[-1], set_cookies=())
+        return _raw_post(self.running.port, f"/d/{presentation_id}/content", headers)
 
     def grant(self, presentation_id: str) -> str | None:
         """The value of the grant cookie of a presentation, None when the browser holds none."""
@@ -932,6 +937,18 @@ class Browser:
                 self.persistent.add(name)
             else:
                 self.persistent.discard(name)
+
+
+def _raw_post(port: int, path: str, headers: dict[str, str]) -> LibraryReply:
+    """A POST of these headers and no body, read to the end (the server closes the connection after a refusal)."""
+    with socket.create_connection(("127.0.0.1", port), timeout=10) as sock:
+        head = f"POST {path} HTTP/1.1\r\n" + "".join(f"{k}: {v}\r\n" for k, v in headers.items())
+        sock.sendall((head + "\r\n").encode())
+        raw = b""
+        while chunk := sock.recv(65536):
+            raw += chunk
+    status = int(raw.split(b" ", 2)[1])
+    return LibraryReply(status=status, headers={}, body=raw.split(b"\r\n\r\n", 1)[-1], set_cookies=())
 
 
 def deck_bytes(title: str, slides: int, size: int) -> bytes:

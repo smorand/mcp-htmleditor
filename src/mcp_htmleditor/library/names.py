@@ -16,6 +16,11 @@ NONSPACING_MARK: Final = "Mn"
 KILOBYTE: Final = 1_024
 MEGABYTE: Final = 1_048_576
 FOLDER_NAME_MAX: Final = 60
+FILE_EXTENSION: Final = ".html"
+FILE_NAME_MAX: Final = 100  # composed characters before the extension (FR-NEW-032)
+FILE_NAME_SIGNS: Final = frozenset(" ._-()'")  # the straight apostrophe U+0027 only
+ASCII_DIGITS: Final = frozenset("0123456789")
+LATIN: Final = "LATIN"
 FOLDER_NAME_SIGNS: Final = frozenset(" -")  # the space U+0020 and the plain hyphen U+002D, nothing that looks alike
 FOLDER_NAME_CATEGORIES: Final = ("L", "M")  # what a combining mark may follow
 LETTER: Final = "L"
@@ -65,6 +70,34 @@ def check_folder_name(raw: str) -> str:
             raise NameRefused
         previous = category
     return name
+
+
+def check_file_name(raw: str) -> str:
+    """The composed stem of an uploaded file name, without ``.html``; ``NameRefused`` when the name is not allowed
+    (FR-NEW-032, DEC-029). ``raw`` is the percent decoded name, whose extension was checked already.
+
+    Refused: an empty or all space stem, an edge space, a leading dot, more than 100 composed characters, and any
+    character that is not a Latin script letter (by ``unicodedata.name``, so ``ł ø œ ß`` and every accented Latin
+    letter pass, a Cyrillic or a fullwidth one does not), an ASCII digit, a space, one of ``. _ - ( ) '`` (the straight
+    apostrophe only), or a combining mark right after such a letter. Time O(n) in the name length.
+    """
+    name = compose(raw)
+    stem = name[: -len(FILE_EXTENSION)] if name.lower().endswith(FILE_EXTENSION) else name
+    if not stem.strip() or stem != stem.strip(" ") or stem.startswith(".") or len(stem) > FILE_NAME_MAX:
+        raise NameRefused
+    previous_is_letter = False
+    for character in stem:
+        if unicodedata.category(character) == NONSPACING_MARK:
+            if not previous_is_letter:
+                raise NameRefused
+            continue
+        is_letter = unicodedata.category(character).startswith(LETTER) and unicodedata.name(character, "").startswith(
+            LATIN
+        )
+        if not (is_letter or character in FILE_NAME_SIGNS or character in ASCII_DIGITS):
+            raise NameRefused
+        previous_is_letter = is_letter
+    return stem
 
 
 def check_email(raw: str) -> str:

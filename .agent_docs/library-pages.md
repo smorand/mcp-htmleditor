@@ -110,4 +110,9 @@ storage and test support are in `.agent_docs/library.md`.
 - `Library.add_presentation`: file first (`atomic_write`, mode 0600, new random id), then one `BEGIN IMMEDIATE` (name key,
   row, activity line); a taken name or any failure removes the new file. Span `library.upload` (size only).
 - An answer given before the body was read ends with `shutdown(SHUT_WR)` and a bounded `recv` discard (1 MiB or 2 s).
+- File names (US-0142, DEC-029): `names.check_file_name` runs after the extension check: composed (NFC) stem, 1 to 100
+  characters, no edge space, no leading dot, only Latin script letters (`unicodedata.name` starts with `LATIN`: `ł ø œ ß`
+  and accented letters pass, Cyrillic and fullwidth do not), ASCII digits, space and `. _ - ( ) '` (straight apostrophe only);
+  a combining mark only after such a letter. A name that is not percent encoded UTF-8 is refused the same way. The name is
+  never a path: the file is `files/<fid>/<new id>.html`; the order of the checks is observable with `Browser.upload_declaring`.
 

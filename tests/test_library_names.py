@@ -9,7 +9,15 @@ import unicodedata
 import pytest
 
 from mcp_htmleditor.library import names
-from mcp_htmleditor.library.names import NameRefused, check_email, check_folder_name, compose, name_key, order_key
+from mcp_htmleditor.library.names import (
+    NameRefused,
+    check_email,
+    check_file_name,
+    check_folder_name,
+    compose,
+    name_key,
+    order_key,
+)
 
 CAFE_COMPOSED = "Caf\u00e9"
 CAFE_DECOMPOSED = "Cafe\u0301"
@@ -212,3 +220,59 @@ def test_check_email_refuses_anything_but_one_address(raw: str) -> None:
     """FR-NEW-046: one ``local@domain`` with the allowed characters and a dot in the domain, nothing else."""
     with pytest.raises(NameRefused):
         check_email(raw)
+
+
+HUNDRED = "a" * 100
+
+
+@pytest.mark.parametrize(
+    ("raw", "stem"),
+    [
+        ("Report.v2.final.html", "Report.v2.final"),
+        ("Łódź Study.html", "Łódź Study"),
+        ("Øresund.html", "Øresund"),
+        ("Cœur.html", "Cœur"),
+        ("Straße.html", "Straße"),
+        ("L'été (v2).html", "L'été (v2)"),
+        ("Café.HTML", "Café"),
+        ("Cafe\u0301.html", "Caf\u00e9"),  # decomposed: the composed form is returned
+        (f"{HUNDRED}.html", HUNDRED),
+        ("My_deck-1 (copy).html", "My_deck-1 (copy)"),
+        ("e\u0301" * 100 + ".html", "\u00e9" * 100),  # 100 composed characters, 200 code points
+    ],
+)
+def test_check_file_name_returns_the_composed_stem(raw: str, stem: str) -> None:
+    assert check_file_name(raw) == stem
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        f"{HUNDRED}a.html",  # 101 characters
+        ".hidden.html",
+        " lead.html",
+        "trail .html",
+        "   .html",
+        ".html",
+        "a/b.html",
+        "a\\b.html",
+        "a\x00b.html",
+        "a\tb.html",
+        "Dan\u2019s.html",  # curly apostrophe
+        "Дек.html",  # Cyrillic
+        "日本.html",
+        "Report #1.html",
+        "a@b.html",
+        "a;b.html",
+        "a<b>.html",
+        "a'; DROP TABLE users;--.html",
+        "a\u202eb.html",
+        "\u0301a.html",  # a combining mark with no letter before it
+        "a１.html",  # fullwidth digit
+        "ａ.html",  # fullwidth Latin letter
+        "e\u0301" * 101 + ".html",
+    ],
+)
+def test_check_file_name_refuses_everything_else(raw: str) -> None:
+    with pytest.raises(NameRefused):
+        check_file_name(raw)
