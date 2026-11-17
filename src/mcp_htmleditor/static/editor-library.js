@@ -47,6 +47,12 @@
     }, true);
   }
 
+  /** An action that needs the library after the session ended: the notice when text is unsaved, else the sign in. */
+  function sessionEnded() {
+    if (typeof hasPendingChanges !== 'undefined' && hasPendingChanges) showNotice('save-error', EXPIRED);
+    else window.location.href = config.library + '/';
+  }
+
   /** The HTML download goes through fetch: a refused or ended one never saves a page of the library as a file. */
   async function downloadHtml(event) {
     event.preventDefault();
@@ -58,8 +64,7 @@
       link.click();
       URL.revokeObjectURL(link.href);
     } else if (window.__libraryCode === 'session_expired') {
-      if (typeof hasPendingChanges !== 'undefined' && hasPendingChanges) showNotice('save-error', EXPIRED);
-      else window.location.href = config.library + '/';
+      sessionEnded();
     } else if (window.__libraryCode === 'denied') {
       window.alert(DENIED);
     } else {
@@ -79,7 +84,9 @@
     };
     const nativeAlert = window.alert.bind(window);
     window.alert = function (message) {
-      nativeAlert(String(message).endsWith(DENIED) ? DENIED : message);
+      const text = String(message);
+      if (text.endsWith(EXPIRED)) sessionEnded();
+      else nativeAlert(text.endsWith(DENIED) ? DENIED : message);
     };
     const downloadButton = document.getElementById('download-btn');
     if (downloadButton) downloadButton.addEventListener('click', downloadHtml);

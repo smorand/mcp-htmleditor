@@ -97,6 +97,7 @@ ROUTES: tuple[Route, ...] = (
     Route("content", "GET", _deck("status"), Permission.VIEW, inherited("status")),
     Route("content", "GET", _deck("content"), Permission.VIEW, inherited("content")),
     Route("content", "GET", _deck("download"), Permission.VIEW, inherited("download"), is_navigation=True),
+    Route("content", "GET", _deck("export/pptx"), Permission.VIEW, inherited("export-pptx"), is_navigation=True),
     Route("content", "POST", _deck("content"), Permission.EDIT, inherited("save"), is_json=True),
     Route("content", "GET", _deck("requests"), Permission.EDIT, inherited("requests")),
     Route("content", "POST", _deck("requests"), Permission.EDIT, inherited("request-queue"), is_json=True),

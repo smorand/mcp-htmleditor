@@ -63,6 +63,19 @@ Complements `library.md` (shell route, grant, `editor-library.js` fetch prefix).
 - `/arch-layout` rewrites the stored file with its own atomic write and does not take the presentation lock (the local
   mode neither); a concurrent save then wins or loses whole, never a mix.
 
+## Downloads (US-0140, DEC-040, DEC-042, DEC-043, DEC-044)
+
+- `GET /d/<pid>/export/pptx` (`VIEW`, navigation row) is the inherited `_export_pptx`; `LibraryHandler._pptx_options`
+  returns `{"paint": False, "embedded_pictures_only": True}`: the flow engine only (no Chromium, no deck script ever runs
+  on the machine) and a picture only from a `data:` address. The HTML download is `/download` unchanged (the stored bytes).
+  A build failure answers `500 {"error": <strerror>}` (`Export failed` without one), never a path or a file name.
+- A visitor or an ended grant gets `302 /open/<pid>` (no `X-Editor`) or `401 session_expired`; never a file.
+- `editor-library.js`: the `alert` wrapper also handles the expiry text (the PPTX button throws then alerts): the
+  notice when text is unsaved (`hasPendingChanges`), else navigation to the library; the same helper serves the HTML
+  download. The PPTX output is the flow output: `.agent_docs/pptx-fidelity.md` scores are for the local, painted export.
+- Tests: `test_library_pptx_http.py` (SEC-022 is red without the flag: an image `../secret.png` reaches
+  `<library>/files/secret.png`), `test_library_pptx_e2e.py` (the 60 s of the quiet screen are 12 s, 120 polls).
+
 ## Hostile deck script
 
 A deck script runs on the content origin with no library cookie (the session cookie is on the library origin, the grant

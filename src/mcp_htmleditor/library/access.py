@@ -97,6 +97,7 @@ EditorRoute = Literal[
     "content",
     "content-frame",
     "download",
+    "export-pptx",
     "request-delete",
     "request-queue",
     "requests",

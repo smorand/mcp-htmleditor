@@ -307,6 +307,7 @@ class LibraryHandler(_EditorHandler):
             "content-frame": self._serve_content_frame,
             "arch-layout": self._run_arch_layout,
             "download": self._serve_download,
+            "export-pptx": self._export_pptx,
             "request-delete": self._delete_request,
             "request-queue": self._queue_request,
             "requests": self._list_requests,
@@ -384,6 +385,11 @@ class LibraryHandler(_EditorHandler):
         deck = self._deck
         presentation_id = deck.presentation_id if deck is not None else ""
         return self._library_server().save_lock(presentation_id)
+
+    @override
+    def _pptx_options(self) -> dict[str, bool]:
+        """DEC-043: the flow engine only (no Chromium, no script of the deck run here) and data URI pictures only."""
+        return {"paint": False, "embedded_pictures_only": True}
 
     @override
     def _failure_reason(self, exc: Exception) -> str:
