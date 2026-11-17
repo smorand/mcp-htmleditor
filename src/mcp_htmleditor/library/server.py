@@ -305,7 +305,12 @@ class LibraryHandler(_EditorHandler):
         editor_methods = {
             "content": self._serve_content,
             "content-frame": self._serve_content_frame,
+            "arch-layout": self._run_arch_layout,
             "download": self._serve_download,
+            "request-delete": self._delete_request,
+            "request-queue": self._queue_request,
+            "requests": self._list_requests,
+            "review-apply": self._apply_suggestion,
             "save": self._receive_content,
             "shell": self._serve_editor_html,
             "static": self._serve_library_static,

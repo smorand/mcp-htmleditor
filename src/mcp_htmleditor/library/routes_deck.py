@@ -13,9 +13,9 @@ import html
 import json
 import re
 from collections.abc import Callable
-from typing import Final, Literal
+from typing import Final
 
-from .access import Answer, Context, EditorAnswer, Permission, Role, Route, SetCookie, json_answer
+from .access import Answer, Context, EditorAnswer, EditorRoute, Permission, Role, Route, SetCookie, json_answer
 from .signin import GRANT_COOKIE
 
 SHELL_FRAME: Final = 'src="/content-frame"'
@@ -64,11 +64,7 @@ def library_shell(editor_html: str, presentation_id: str, library_origin: str, r
     return shell.replace(SHELL_SCRIPT_ANCHOR, meta + SHELL_SCRIPT_ANCHOR, 1)
 
 
-def inherited(
-    route: Literal["content", "content-frame", "download", "save", "shell", "static", "status"],
-    *,
-    is_framed: bool = False,
-) -> Callable[[Context], EditorAnswer]:
+def inherited(route: EditorRoute, *, is_framed: bool = False) -> Callable[[Context], EditorAnswer]:
     """The handler of a route the editor already answers (DEC-003)."""
 
     def answer(_context: Context) -> EditorAnswer:
@@ -102,6 +98,11 @@ ROUTES: tuple[Route, ...] = (
     Route("content", "GET", _deck("content"), Permission.VIEW, inherited("content")),
     Route("content", "GET", _deck("download"), Permission.VIEW, inherited("download"), is_navigation=True),
     Route("content", "POST", _deck("content"), Permission.EDIT, inherited("save"), is_json=True),
+    Route("content", "GET", _deck("requests"), Permission.EDIT, inherited("requests")),
+    Route("content", "POST", _deck("requests"), Permission.EDIT, inherited("request-queue"), is_json=True),
+    Route("content", "POST", _deck("requests/delete"), Permission.EDIT, inherited("request-delete"), is_json=True),
+    Route("content", "POST", _deck("review/apply"), Permission.EDIT, inherited("review-apply"), is_json=True),
+    Route("content", "POST", _deck("arch-layout"), Permission.EDIT, inherited("arch-layout"), is_json=True),
     Route("content", "GET", _deck(".*"), Permission.VIEW, refuse),
     Route("content", "POST", _deck(".*"), Permission.VIEW, refuse),
 )

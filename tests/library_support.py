@@ -786,6 +786,16 @@ class Browser:
         }
         return {**headers, "Cookie": cookie} if cookie else headers
 
+    def post_deck(self, presentation_id: str, route: str, payload: Any) -> LibraryReply:
+        """What the editor sends with ``fetch`` to ``POST /d/<pid>/<route>`` (JSON, its headers and grant cookie)."""
+        client = self.running.client(self.running.content_netloc)
+        return client.request(
+            "POST",
+            f"/d/{presentation_id}/{route}",
+            headers=self.save_headers(presentation_id),
+            body=json.dumps(payload).encode(),
+        )
+
     def save(
         self, presentation_id: str, html: str, *, base_mtime: float | None = None, force: bool = False
     ) -> LibraryReply:
@@ -795,13 +805,7 @@ class Browser:
             payload["base_mtime"] = base_mtime
         if force:
             payload["force"] = True
-        client = self.running.client(self.running.content_netloc)
-        return client.request(
-            "POST",
-            f"/d/{presentation_id}/content",
-            headers=self.save_headers(presentation_id),
-            body=json.dumps(payload).encode(),
-        )
+        return self.post_deck(presentation_id, "content", payload)
 
     def send_save_length(self, presentation_id: str, length: int) -> LibraryReply:
         """A save declaring ``Content-Length: length`` and sending no body: the server must refuse by the header."""

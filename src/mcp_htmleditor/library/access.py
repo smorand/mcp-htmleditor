@@ -92,12 +92,28 @@ class Answer:
     content_type: str = HTML_CONTENT_TYPE
 
 
+EditorRoute = Literal[
+    "arch-layout",
+    "content",
+    "content-frame",
+    "download",
+    "request-delete",
+    "request-queue",
+    "requests",
+    "review-apply",
+    "save",
+    "shell",
+    "static",
+    "status",
+]
+
+
 @dataclass(frozen=True, slots=True)
 class EditorAnswer:
     """A deck route answered by the inherited editor method of that name through the DEC-003 hooks; ``is_framed``
     lets the content origin frame the answer (``X-Frame-Options: SAMEORIGIN``, ``frame-ancestors 'self'``)."""
 
-    route: Literal["content", "content-frame", "download", "save", "shell", "static", "status"]
+    route: EditorRoute
     is_framed: bool = False
 
 

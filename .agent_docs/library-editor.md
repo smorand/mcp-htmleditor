@@ -52,6 +52,17 @@ Complements `library.md` (shell route, grant, `editor-library.js` fetch prefix).
 - Tests: `test_library_access_e2e.py` (the clock of the server moves past 30 days with `running.clock.advance`),
   `test_library_grants_http.py`.
 
+## Requests, Ask AI and arch layout (US-0138, DEC-003, DEC-044)
+
+- `routes_deck.py` rows (all `EDIT`, the POST ones `is_json`, so the origin rule applies): `GET /d/<pid>/requests`,
+  `POST /requests`, `POST /requests/delete`, `POST /review/apply`, `POST /arch-layout`. They are the inherited editor
+  methods (`_list_requests`, `_queue_request`, `_delete_request`, `_apply_suggestion`, `_run_arch_layout`); the record is
+  the presentation's own under `<state_dir>/files/<key>/requests/`. A RO role gets `403 denied` for each, the read included.
+- `/export/docx` and every other path under `/d/<pid>/` stay `Access denied.` for every role; a test greps
+  `library/routes_*.py` and `server.py` for `to_docx`, `deck.tools`, `render`, `new_file` imports.
+- `/arch-layout` rewrites the stored file with its own atomic write and does not take the presentation lock (the local
+  mode neither); a concurrent save then wins or loses whole, never a mix.
+
 ## Hostile deck script
 
 A deck script runs on the content origin with no library cookie (the session cookie is on the library origin, the grant
