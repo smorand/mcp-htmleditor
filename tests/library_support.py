@@ -67,6 +67,7 @@ from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 import pytest
 from playwright.sync_api import Browser as Chromium
 from playwright.sync_api import BrowserContext, Frame, Page, Playwright
+from playwright.sync_api import Error as PlaywrightError
 
 from mcp_htmleditor.config import Settings, reset_settings_cache
 from mcp_htmleditor.history import HistoryStore, Version
@@ -75,7 +76,7 @@ from mcp_htmleditor.library.server import LibraryServer
 from mcp_htmleditor.library.store import Database, Library
 from mcp_htmleditor.request_service import RequestService
 from mcp_htmleditor.request_store import RequestStore
-from tests.browser_wait import wait_for_js
+from tests.browser_wait import wait_for_js, wait_until
 from tests.deck_support import build_deck
 
 LIBRARY_HOST = "slides.test"
@@ -1019,11 +1020,92 @@ def leave_field(page: Page) -> None:
     page.click("#toolbar-filename")
 
 
+def with_title(presentation: Presentation, title: str) -> str:
+    """The stored deck of ``presentation`` with the first title replaced, as a whole document."""
+    text = presentation.path.read_text(encoding="utf-8")
+    return re.sub(r"(<h1[^>]*>)[^<]*(</h1>)", lambda m: f"{m[1]}{html_escape(title)}{m[2]}", text, count=1)
+
+
 def stored_title(presentation: Presentation) -> str:
     """The first ``<h1>`` of the file stored for ``presentation``."""
     match = re.search(r"<h1[^>]*>([^<]*)</h1>", presentation.path.read_text(encoding="utf-8"))
     assert match is not None, "no title in the stored file"
     return html_unescape(match.group(1))
+
+
+POLL_MILLISECONDS = 100
+FRAME_TITLE = "document.querySelector('h1').textContent"
+
+
+@dataclass
+class EditorLibrary:
+    """The running library with the standard folders and presentations, and the pages opened so far."""
+
+    running: RunningLibrary
+    google: FakeGoogle
+    chromium: Chromium
+    ids: dict[str, str]
+    decks: dict[str, Presentation]
+    pages: dict[str, Page] = field(default_factory=dict)
+
+    def page(self, email: str) -> Page:
+        """A new page of ``email``, signed in (one per call: two people, or one person twice)."""
+        person = signed_in(self.running, self.google, email)
+        return person_context(self.chromium, self.running, person.cookies["lib"]).new_page()
+
+    def open(self, email: str, name: str, *, edit: bool = False) -> Page:
+        """The page of ``email`` on the presentation ``name``, deck shown, in edit mode when ``edit``."""
+        page = self.page(email)
+        deck = self.decks[name]
+        page.goto(f"{self.running.origin}/open/{deck.id}")
+        page.wait_for_url(f"{self.running.content_origin}/d/{deck.id}/")
+        wait_for_js(deck_frame(page), "document.querySelectorAll('.slide').length > 0", True, what="deck")
+        if edit:
+            turn_edit_on(page)
+        return page
+
+    def served_title(self, email: str, name: str) -> str:
+        """The title of slide 1 served to ``email`` for the content of ``name`` (a fresh browser, as a reload)."""
+        person = signed_in(self.running, self.google, email)
+        deck = self.decks[name]
+        person.open_presentation(deck.id)
+        match = re.search(r"<h1[^>]*>([^<]*)</h1>", person.deck(deck.id, "content", x_editor="1").text)
+        assert match is not None
+        return match.group(1)
+
+    def titles_in_history(self, name: str) -> list[str]:
+        """The first title of each history version of ``name``, newest first."""
+        deck = self.decks[name]
+        found = []
+        for version in self.running.versions(deck):
+            match = re.search(r"<h1[^>]*>([^<]*)</h1>", self.running.version_text(deck, version))
+            found.append(match[1] if match else "")
+        return found
+
+
+@pytest.fixture
+def library(
+    library_server: Callable[..., RunningLibrary], fake_google: FakeGoogle, chromium: Chromium
+) -> EditorLibrary:
+    running = library_server(fake_google, poll_interval=POLL_MILLISECONDS)
+    ids = running.builder.standard()
+    return EditorLibrary(running, fake_google, chromium, ids, running.builder.standard_presentations(ids))
+
+
+def notice_visible(page: Page, notice: str) -> bool:
+    return page.evaluate(f"!document.getElementById('{notice}').hidden")
+
+
+def frame_title(page: Page) -> str:
+    """The title shown in the deck frame; empty while the frame navigates (a reload, a new content)."""
+    try:
+        return str(deck_frame(page).evaluate(FRAME_TITLE))
+    except PlaywrightError:
+        return ""
+
+
+def wait_stored(page: Page, deck: Presentation, title: str) -> None:
+    wait_until(page, lambda: stored_title(deck), lambda found: found == title, what=f"stored title {title}")
 
 
 def open_presenter(page: Page) -> Page:

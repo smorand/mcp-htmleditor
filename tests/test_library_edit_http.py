@@ -9,13 +9,11 @@ from __future__ import annotations
 import errno
 import json
 import os
-import re
 import sqlite3
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from html import escape
 
 import pytest
 
@@ -35,6 +33,7 @@ from tests.library_support import (
     Presentation,
     RunningLibrary,
     signed_in,
+    with_title,
 )
 
 library_server = library_support.library_server
@@ -73,10 +72,7 @@ def edit(library_server: START, fake_google: FakeGoogle) -> Edit:
     return Edit(running, ids, heart, people[0], people[1])
 
 
-def titled(heart: Presentation, title: str) -> str:
-    """The stored deck with the title of slide 1 replaced, as a whole document."""
-    text = heart.path.read_text(encoding="utf-8")
-    return re.sub(r"(<h1[^>]*>)[^<]*(</h1>)", lambda m: f"{m[1]}{escape(title)}{m[2]}", text, count=1)
+titled = with_title
 
 
 def text_of(person: Browser, heart: Presentation) -> str:

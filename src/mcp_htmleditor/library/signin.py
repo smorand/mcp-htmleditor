@@ -314,20 +314,45 @@ class Accounts:
         return NewGrant(token, presentation_id, alive[0])
 
     def grant_for(self, presentation_id: str, token: str | None) -> GrantState:
-        """``Live(email)`` while the grant of this presentation belongs to a live session, ``NoGrant.ENDED`` for a
-        cookie that does not resolve, ``NoGrant.ABSENT`` without a cookie (DEC-037)."""
+        """``Live(email)`` while the grant of this presentation belongs to a live session; a grant whose session
+        expired by time moves to a newer live session of the same address within 24 hours of the expiry;
+        ``NoGrant.ENDED`` for a cookie that does not resolve, ``NoGrant.ABSENT`` without a cookie (DEC-037)."""
         if not token:
             return NoGrant.ABSENT
+        now = self._clock()
         row = (
             self._database.connection()
             .execute(
-                "SELECT sessions.email FROM grants JOIN sessions ON sessions.id_hash = grants.session_id_hash"
-                " WHERE grants.token_hash = ? AND grants.presentation_id = ? AND sessions.expires_at > ?",
-                (token_hash(token), presentation_id, self._clock()),
+                "SELECT sessions.email, sessions.created_at, sessions.expires_at FROM grants"
+                " JOIN sessions ON sessions.id_hash = grants.session_id_hash"
+                " WHERE grants.token_hash = ? AND grants.presentation_id = ?",
+                (token_hash(token), presentation_id),
             )
             .fetchone()
         )
-        return Live(str(row[0])) if row is not None else NoGrant.ENDED
+        if row is None:
+            return NoGrant.ENDED
+        email, created_at, expires_at = str(row[0]), float(row[1]), float(row[2])
+        if expires_at > now:
+            return Live(email)
+        if now - expires_at > ENDED_SESSION_KEPT_SECONDS:
+            return NoGrant.ENDED
+        return self._rebind(token, email, created_at, now)
+
+    def _rebind(self, token: str, email: str, created_at: float, now: float) -> GrantState:
+        """Move the grant to the newest live session of ``email`` created after the one that expired, if any."""
+        with self._database.transaction(immediate=True) as connection:
+            newer = connection.execute(
+                "SELECT id_hash FROM sessions WHERE email = ? AND created_at > ? AND expires_at > ?"
+                " ORDER BY created_at DESC LIMIT 1",
+                (email, created_at, now),
+            ).fetchone()
+            if newer is None:
+                return NoGrant.ENDED
+            connection.execute(
+                "UPDATE grants SET session_id_hash = ? WHERE token_hash = ?", (newer[0], token_hash(token))
+            )
+        return Live(email)
 
     def _create_session(self, email: str) -> tuple[str, Session]:
         token = secrets.token_urlsafe(32)

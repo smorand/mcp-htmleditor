@@ -34,6 +34,24 @@ Complements `library.md` (shell route, grant, `editor-library.js` fetch prefix).
   system reason (`_failure_reason`, never a path). The timers (0.8 s, at once on blur, 0.6 s after a slide action) are the
   editor's own.
 
+## Session or right ends while a presentation is open (US-0137, DEC-037, DEC-040)
+
+- Deck routes answer a request with `X-Editor: 1` with a `code`: `401 session_expired` (grant ended or absent) or
+  `403 denied` (live grant, no right, presentation or folder gone). Without the header: `302 /open/<pid>` on navigation
+  routes, `403 Access denied.` otherwise.
+- `Accounts.grant_for` rebinds a grant whose session expired by time to the newest live session of the same address created
+  after it, up to 24 hours after the expiry (`ENDED_SESSION_KEPT_SECONDS`); a session ended by sign out cascades its grants
+  away, so that grant never revives. A second sign in in another window is what lets the first window store again.
+- `editor-library.js` (on `DOMContentLoaded`, the editor scripts are untouched) reassigns the global functions
+  `showSaveError` (the two English texts shown alone, no `Save failed:` prefix), `notePollFailure` (a poll answer with a
+  `code` is a quiet pause: no count, no lost connection notice) and `window.alert` (a message ending with `Access denied.`
+  is alerted as that alone); the click on `#download-btn` goes through `fetch` (200 saves the blob, `session_expired`
+  navigates to the library unless text is unsaved, `denied` alerts `Access denied.`).
+- Nothing unsaved means nothing shown (FR-NEW-074): saves only exist with pending text, and the poll stays quiet; moving
+  between slides never calls the server.
+- Tests: `test_library_access_e2e.py` (the clock of the server moves past 30 days with `running.clock.advance`),
+  `test_library_grants_http.py`.
+
 ## Hostile deck script
 
 A deck script runs on the content origin with no library cookie (the session cookie is on the library origin, the grant
