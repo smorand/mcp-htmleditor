@@ -36,7 +36,7 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 
 `_EditorHandler` and the server lifecycle functions are the I/O boundary and are marked `# pragma: no cover`; the
 pure helpers next to them (`_strip_editor_artifacts`, `_rebuild_full_html`, `health_payload`) are fully tested.
-Hooks (2026-11-16, SPEC-0025 DEC-003): the routes read the file through `_served_file()` (default `get_state().current_file`),
+Hooks (2026-11-16, SPEC-0025 DEC-003): the routes read the file through `_served_file()` (default `get_state().current_file`), Web library module map and flows: `library.md`, `library-pages.md`, `library-editor.md`, `library-tests.md`.
 name downloads and export stems with `_served_name()`, save under `_save_lock()`, answer read, download and export
 failures with `_failure_reason(exc)` (default `str(exc)`), export with `to_pptx(..., **_pptx_options())` (default `{}`).
 

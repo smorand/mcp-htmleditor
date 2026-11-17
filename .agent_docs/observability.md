@@ -123,3 +123,4 @@ no-op tracer, so a library user pays nothing.
 - `library.upload` (US-0141): one span per stored upload, attribute `file.size` only; no name, address or path.
 - `library.replace` (US-0144): one span per replacement, attribute `file.size` only.
 - `library.seed` (US-0146): one span on the first start, attribute `presentations` only.
+- `library.delete_presentation` (US-0145): one span per presentation deletion, no attribute; `library.delete_folder` carries the count of presentations only.

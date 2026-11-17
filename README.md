@@ -693,6 +693,7 @@ Every variable is read through the `Settings` class (pydantic-settings,
 | `HTMLEDITOR_LIBRARY_CONTENT_ORIGIN` | `https://slides-content.scm-platform.org` | `webserve` content origin, another host name |
 | `HTMLEDITOR_LIBRARY_DIR` | `<state dir>/library` | `webserve` library data |
 | `HTMLEDITOR_GOOGLE_CREDENTIALS_FILE` | unset | `webserve` Google OAuth client file (secret, read only by `library/signin.py`) |
+| `HTMLEDITOR_LIBRARY_SEED_DIR` | repo `library-seed/`, else the package's | `webserve` initial content (manifest and the two decks) |
 | `XDG_CONFIG_HOME` | `~/.config` | Base for config |
 | `XDG_CACHE_HOME` | `~/.cache` | Base for cache |
 

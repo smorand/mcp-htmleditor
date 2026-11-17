@@ -169,36 +169,7 @@ http://<host>:<port>/ (library origin <o>, content origin <o>)`, waits for the e
 
 ## Tests
 
-`tests/library_support.py`: `library_server(**overrides)` fixture (free port, origins `http://slides.test:<port>`
-and `http://slides-content.test:<port>`, temporary `library_dir` and `state_dir`, stopped at teardown),
-`HttpClient(port, host)` (sets `Host`, keyword headers `x_forwarded_proto=` become `X-Forwarded-Proto`),
-`FakeClock`. Use it in a test module with `library_server = library_support.library_server`.
-Sign in support (US-0126): `start(google=fake, google_registered=True)` writes a credentials file pointing at the
-`FakeGoogle` (fixture `fake_google`: `choose(email)`, `cancel()`, `accounts[email]` claim overrides,
-`registered_redirects` = the console, `exchange_failure` `close`/`unavailable`/`bad_json`, `received`);
-`running.browser(resolver)` is a `Browser` (cookies, redirects across hosts, `visited`, `replies`, `sign_in`,
-`sign_out` with `Origin`); `LibraryReply.folder_rows()` (id, escaped name, role label of each home row);
-`running.builder` (`folder` with `names.name_key`, `folders(*names)`, `member`, `standard()`) and `running.stored` (`sessions`,
-`logins`, `folder_names`, `activity`, `rows`); fixture `evil_listener` counts visits to evil.example; US-0128:
-`running.restart()`, `running.unreadable_database()`, `Browser.reopened()` (only cookies with `Max-Age` survive).
-Folder page (US-0129): `builder.presentation(folder_id, name, *, size, modified, slides=1, title=None)` (a generated
-deck padded with an HTML comment to exactly `size` bytes, below the smallest deck the start of one; `os.utime`),
-`builder.standard_presentations(ids)` (the five decks of spec section 9, about 11 MB: only where a test needs them),
-`builder.numbered_folders(count, email=None, role="RW")` (`Folder 001`...), `LibraryReply.presentation_rows()`,
-`launch_chromium(playwright, *other_hosts)`, `person_context(chromium, running, session, zone=)`, `EVIL_HOST` and
-`RecordingListener.page` (a hostile HTML page served from loopback).
-US-0131: `StoredLibrary(library_dir, state_dir).entries()` (every path under both directories as `library/...` and
-`state/...`), `LibraryBuilder(database, clock, state_dir).records(presentation)` (two history versions, two requests, one
-AI suggestion through `HistoryStore`, `RequestService`; returns `<state_dir>/files/<key>`).
-US-0132: `Browser.add_member(fid, email, role)`, `Browser.remove_member(fid, email)`, `LibraryReply.member_rows(fid)`
-(address, role label; asserts the folder's `Members` section exists), `StoredLibrary.members()`, `signed_in`, `visible_texts`.
-US-0130: `Browser.post_json(path, payload, headers=None)` (default `page_post_headers()`: `Origin`, `Sec-Fetch-Site:
-same-origin`, JSON type), `LibraryReply.activity_lines()` (unescaped `(UTC ISO, actor, text)`).
-US-0133: `start(scheme="https")`, `Browser.deck_cookies` (content origin, by path; `X-Forwarded-Proto` sent when the
-origins are https), `open_presentation(pid)`, `deck(pid, route, follow=, x_editor="1")`, `grant(pid)`, `copied()`;
-`sign_out` posts to the library origin wherever the browser is; `StoredLibrary.tickets()`, `grants()`.
-Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for the areas `visitor`, `auth`, `home`,
-`sessions`, `gate`, `folders`, `admin`, `foldel`, `members`, `open`, plus `test_library_names.py` (units); each module docstring lists its spec ids.
+Support, helpers and the suite map: `library-tests.md`.
 
 ## Gotchas
 
@@ -209,6 +180,6 @@ Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for
   `X-Frame-Options` removed. Serve the hostile page from a loopback listener (`RecordingListener.page`, `EVIL_HOST`
   in `launch_chromium`); then removing the headers makes the frame show `Sign in with Google` (a cross site frame has
   no `SameSite=Lax` cookie, so it is a visitor's view).
-- Pages added by the upload and editing stories: `library-pages.md` § Upload, § Upload limits, § Collision and replace, § Delete a presentation (names, limits, chunked rule, slots, shared question dialog); the editor shell, read only form, saving and the per presentation lock: `library-editor.md`.
-- Initial content (US-0146, DEC-036): `library/seed.py` `seed_if_new` verifies `library-seed/manifest.json` (size and sha256 of the two decks) then `Library.seed_initial_content` creates the folder, the member and the rows in one transaction, copies the files byte for byte with their modified time and writes `meta('seeded')`; no activity line, nothing on a later start. `LibraryServer(seed=True)` calls it in `start()` (a `SeedError` is logged and re raised, the next start retries); the test fixture passes `seed=False`. `Settings.library_seed_dir` (`HTMLEDITOR_LIBRARY_SEED_DIR`, else the repo `library-seed/`, else the package `library_seed/`).
-- Operator listing (US-0147, DEC-051): `mcp-htmleditor library-list` prints `folder`, `presentation`, stored path, bytes (tab separated) from `store.read_inventory` over a read only connection (`mode=ro` through a running server's WAL, `immutable=1` without one so no `-shm`/`-wal` file is created); its path is what `history` and `restore` take.
+- Pages of the upload and editing stories (names, limits, chunked rule, slots, replace, delete, the shared question dialog): `library-pages.md`; the editor shell, read only form, saving and the presentation lock: `library-editor.md`.
+- Initial content (US-0146, DEC-036): `library/seed.py` `seed_if_new` verifies `library-seed/manifest.json` then `Library.seed_initial_content` creates the folder, the member and the rows in one transaction and writes `meta('seeded')`; no activity line; `LibraryServer.is_seeding` (False in the test fixtures) gates it in `start()`; `Settings.library_seed_dir`.
+- Operator listing (US-0147, DEC-051): `mcp-htmleditor library-list` (`store.read_inventory`, read only, `immutable=1` without a running server so no `-shm`/`-wal` file is created); its path feeds `history` and `restore`.

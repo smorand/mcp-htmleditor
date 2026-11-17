@@ -150,7 +150,8 @@ Load only what the task needs.
 | `.agent_docs/pptx-fidelity.md` | PPTX fidelity harness (`make pptx-fidelity`): pipeline, score definition, reference modes, output, gotchas; baseline in `sdlc/specs/SPEC-0024-pptx-generic-extraction/baseline.md` |
 | `.agent_docs/library.md` | Web library mode (`webserve`, SPEC-0025): module map, settings, gate order, sign in flow, cookies, database, headers, test support (FakeGoogle, Browser) |
 | `.agent_docs/library-pages.md` | Web library pages: home page and roles, folder page, administration (folders, activity), folder deletion order, members and their check order |
-| `.agent_docs/library-editor.md` | Web library editor shell of a presentation: read only form for RO (hiding style, key E and message guards), hostile deck script isolation |
+| `.agent_docs/library-editor.md` | Web library editor shell of a presentation: read only form, saving and the presentation lock, session and right ending, requests, downloads, hostile deck script isolation |
+| `.agent_docs/library-tests.md` | Web library test support (`library_support.py` helpers per story), suite map, the 225 s budget and the `slow` file |
 | `.agent_docs/render.md` | Visual render: picture rules, output directory and cleanup, scale and size rounding, check order, fixtures and install |
 
 Authoring rules for slides and documents live in the skill: run `mcp-htmleditor skill`

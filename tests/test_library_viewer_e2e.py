@@ -115,7 +115,7 @@ def test_e2e_032_a_ro_member_has_no_control_that_changes_anything(
     for control in HIDDEN_CONTROLS:
         assert not visible(page, control), control
     for control in KEPT_CONTROLS:
-        assert visible(page, control), control
+        wait_until(page, lambda control=control: visible(page, control), bool, what=f"{control} shown")
     assert page.get_attribute("#edit-mode-btn", "aria-pressed") == "false"
     assert deck_frame(page).evaluate("document.querySelectorAll('[contenteditable=\"true\"]').length") == 0
     for control in KEPT_CONTROLS:
