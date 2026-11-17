@@ -12,7 +12,7 @@ from typing import Final
 
 from ..fileio import WriteError
 from . import pages, uploads
-from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Role, Route, SetCookie, json_answer
+from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Role, Route, SetCookie, authorize, json_answer
 from .names import NameRefused, check_file_name
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, SESSION_SECONDS, SignInUnavailable, safe_destination
 from .store import Collision
@@ -116,6 +116,10 @@ def upload_presentation(context: Context) -> Answer:
     data = _read_upload(context)
     if isinstance(data, Answer):
         return data
+    role = context.library.role_in(context.person_email or "", folder_id)  # the right may have ended meanwhile
+    if not authorize(role, Permission.EDIT):
+        logger.warning("Refused an upload at its end: no right")
+        return Answer(403, pages.access_denied())
     return _store_upload(context, folder_id, stem, data)
 
 
@@ -149,16 +153,27 @@ def _checked_stem(context: Context) -> str | Answer:
 
 
 def _read_upload(context: Context) -> bytes | Answer:
-    """The size check, then exactly the declared bytes; a short body is a failed upload."""
+    """The size check, then the body: exactly the declared bytes, or a chunked body stopped at 26 214 401 bytes; a
+    short body is a failed upload and a fifth concurrent upload is refused (DEC-033)."""
     try:
+        if context.headers.get(uploads.ENCODING_HEADER) == "chunked":
+            return _read_chunked(context)
         length = uploads.declared_length(context.headers.get(uploads.LENGTH_HEADER))
+        if length > uploads.MAX_BYTES:
+            return _refuse(413, pages.TOO_LARGE)
+        read_body = context.read_body
+        data = read_body(length) if read_body is not None else b""
     except uploads.UploadRefused as exc:
         return _refuse(400, str(exc))
-    if length > uploads.MAX_BYTES:
-        return _refuse(413, pages.TOO_LARGE)
-    read_body = context.read_body
-    data = read_body(length) if read_body is not None else b""
+    except uploads.UploadBusy:
+        return _refuse(503, pages.UPLOAD_FAILED)
     return data if len(data) == length else _refuse(400, pages.UPLOAD_FAILED)
+
+
+def _read_chunked(context: Context) -> bytes | Answer:
+    read_chunked = context.read_chunked
+    data = read_chunked(uploads.MAX_BYTES + 1) if read_chunked is not None else b""
+    return _refuse(413, pages.TOO_LARGE) if len(data) > uploads.MAX_BYTES else data
 
 
 def open_presentation(context: Context) -> Answer:

@@ -77,6 +77,7 @@ class Context:
     payload: Mapping[str, Any] = field(default_factory=dict)
     headers: Mapping[str, str] = field(default_factory=dict)
     read_body: Callable[[int], bytes] | None = None
+    read_chunked: Callable[[int], bytes] | None = None
     session: Session | None = None
     presentation_id: str | None = None
     library_origin: str = ""

@@ -116,3 +116,19 @@ storage and test support are in `.agent_docs/library.md`.
   a combining mark only after such a letter. A name that is not percent encoded UTF-8 is refused the same way. The name is
   never a path: the file is `files/<fid>/<new id>.html`; the order of the checks is observable with `Browser.upload_declaring`.
 
+## Upload limits, progress and failure (US-0143, DEC-033, DEC-054)
+
+- Size: declared `Content-Length` above 26 214 400 is `413 The file is larger than 25 MB.` before any byte is read; no
+  length and no encoding is an empty body (then "not declared"); extra bytes beyond the declared length are never read
+  (`rfile` counter test). Chunked: `LibraryHandler._accepts_chunked_body` lifts the inherited `Transfer-Encoding` refusal for
+  `POST /api/folders/<fid>/presentations` only, exactly `chunked`, never with a length; `uploads.read_chunked` stops at
+  26 214 401 bytes (size line 32 bytes, trailers 8 KiB). Four upload slots (`BoundedSemaphore`, never waited for): a fifth is `503`.
+- Right: re checked after the body arrived (`role_in` then `authorize(EDIT)`): removed or lowered meanwhile gives `Access
+  denied.` and nothing is stored. A disk error (`fileio.replace_file`) gives `500 The upload failed. Nothing was changed.`
+- An answer given before the body was read ends with `shutdown(SHUT_WR)` and a `recv` discard bounded by 1 MiB and ten quiet
+  steps of 0.2 s (no clock is read in `server.py`, a test greps for it).
+- Page: `progressText(name, loaded, total)` (on `window`) is `<name> <percent>%`, percent floored and at most 99; the
+  extension and 25 MB are checked before sending; a second choice during an upload is ignored.
+- Tests: `test_library_limits_http.py` (raw socket helpers `Browser.upload_streaming`, `UploadPlan`, `disk_full`,
+  `CountingReader`), `test_library_limits_e2e.py` (CDP throttle 10 Mbit), `test_library_limits_slow.py` (`-m slow`).
+

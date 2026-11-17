@@ -43,6 +43,7 @@ it without following redirects, ``Browser.copied()`` is a tool holding a copy of
 from __future__ import annotations
 
 import base64
+import errno
 import hashlib
 import http.client
 import json
@@ -52,6 +53,7 @@ import secrets
 import socket
 import sqlite3
 import threading
+import time
 from collections import deque
 from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager, suppress
@@ -62,6 +64,7 @@ from html import unescape as html_unescape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
+from unittest import mock
 from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlsplit
 
 import pytest
@@ -811,6 +814,42 @@ class Browser:
         }
         return _raw_post(self.running.port, f"/api/folders/{folder_id}/presentations", headers)
 
+    def upload_streaming(self, folder_id: str, name: str, body: bytes, plan: UploadPlan) -> Streamed:
+        """Send an upload on a raw socket while reading the answer in the main thread, as a browser does (``plan``
+        says how: announced length, cut, pause, throttle, chunked). A reset after a complete answer is normal."""
+        headers = [
+            f"Host: {self.running.library_netloc}",
+            f"Origin: {self.running.origin}",
+            "Sec-Fetch-Site: same-origin",
+            f"X-File-Name: {quote(name, safe='')}",
+            "Content-Type: text/html",
+            f"Cookie: {'; '.join(f'{k}={v}' for k, v in self.cookies.items())}",
+        ]
+        if plan.chunked:
+            headers.append("Transfer-Encoding: chunked")
+        if plan.declared is not None:
+            headers.append(f"Content-Length: {plan.declared}")
+        head = f"POST /api/folders/{folder_id}/presentations HTTP/1.1\r\n" + "\r\n".join(headers) + "\r\n\r\n"
+        sent = [0]
+        answered = threading.Event()
+
+        with socket.create_connection(("127.0.0.1", self.running.port), timeout=60) as sock:
+            sender = threading.Thread(target=_feed, args=(sock, head, body, plan, sent, answered), daemon=True)
+            sender.start()
+            raw = b""
+            try:
+                while chunk := sock.recv(65_536):
+                    raw += chunk
+                    answered.set()
+            except OSError:
+                pass  # a reset: what was read before it is the answer
+            answered.set()
+            sender.join(30)
+        if not raw.startswith(b"HTTP/"):
+            return Streamed(None, sent[0])
+        status = int(raw.split(b" ", 2)[1])
+        return Streamed(LibraryReply(status, {}, raw.split(b"\r\n\r\n", 1)[-1], ()), sent[0])
+
     def save_headers(self, presentation_id: str) -> dict[str, str]:
         """What Chromium sends with the editor's own ``fetch`` of ``POST /d/<pid>/content``, grant cookie included."""
         path = f"/d/{presentation_id}/"
@@ -1160,6 +1199,91 @@ def valid_deck(slides: int = 3, size: int | None = None) -> bytes:
         return deck
     padding = size - len(deck) - len(PADDING_OPEN) - len(PADDING_CLOSE)
     return deck.replace(b"</body>", PADDING_OPEN + b"x" * padding + PADDING_CLOSE + b"</body>", 1)
+
+
+@dataclass(frozen=True)
+class UploadPlan:
+    """How ``Browser.upload_streaming`` sends: the announced length (None sends none), where to close the socket,
+    where to hold the sender until ``resume`` is set (``paused`` is set when it waits), a rate, chunked or not."""
+
+    declared: int | None = None
+    cut_at: int | None = None
+    pause_at: int | None = None
+    paused: threading.Event | None = None
+    resume: threading.Event | None = None
+    bytes_per_second: int | None = None
+    chunked: bool = False
+
+
+def _feed(  # noqa: PLR0913, PLR0917 - the thread target of one sender, each argument is one piece of its state
+    sock: socket.socket, head: str, body: bytes, plan: UploadPlan, sent: list[int], answered: threading.Event
+) -> None:
+    """The sender of ``upload_streaming``: head, then the body in steps, until done, cut or answered."""
+    step = 65_536 if plan.bytes_per_second is None else max(1, plan.bytes_per_second // 20)
+    limit = len(body) if plan.cut_at is None else min(len(body), plan.cut_at)
+    held = plan.pause_at is not None
+    position = 0
+    try:
+        sock.sendall(head.encode())
+        while position < limit and not answered.is_set():
+            if held and plan.pause_at is not None and position >= plan.pause_at and plan.resume is not None:
+                if plan.paused is not None:
+                    plan.paused.set()
+                plan.resume.wait(30)
+                held = False
+            piece = body[position : min(limit, position + step)]
+            sock.sendall(f"{len(piece):x}\r\n".encode() + piece + b"\r\n" if plan.chunked else piece)
+            position += len(piece)
+            sent[0] = position
+            if plan.bytes_per_second is not None:
+                time.sleep(len(piece) / plan.bytes_per_second)
+        if plan.chunked and position >= len(body) and not answered.is_set():
+            sock.sendall(b"0\r\n\r\n")
+    except OSError:
+        return
+
+
+@dataclass
+class Streamed:
+    """The outcome of ``Browser.upload_streaming``: the answer and how many body bytes the client had sent when the
+    answer arrived (``None`` when no answer came)."""
+
+    reply: LibraryReply | None
+    sent_when_answered: int
+
+
+def disk_full() -> Any:
+    """A context manager making every ``atomic_write`` fail with ENOSPC (the documented seam of DEC-032)."""
+
+    def full(_source: object, _target: object) -> None:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    return mock.patch("mcp_htmleditor.fileio.replace_file", full)
+
+
+class CountingReader:
+    """Wraps the ``rfile`` of a handler and counts every byte it returns (the hostile length test)."""
+
+    def __init__(self, inner: Any, counter: list[int]) -> None:
+        self._inner = inner
+        self._counter = counter
+
+    def read(self, size: int = -1) -> bytes:
+        data: bytes = self._inner.read(size)
+        self._counter.append(len(data))
+        return data
+
+    def readline(self, size: int = -1) -> bytes:
+        data: bytes = self._inner.readline(size)
+        self._counter.append(len(data))
+        return data
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
+def open_page_count(page: Page) -> int:
+    return len(page.context.pages)
 
 
 def open_presenter(page: Page) -> Page:

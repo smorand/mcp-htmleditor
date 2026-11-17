@@ -25,7 +25,8 @@ import socket
 import sqlite3
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import TracebackType
@@ -57,6 +58,7 @@ from .signin import (
     safe_destination,
 )
 from .store import Database, Library
+from .uploads import UploadBusy, UploadRefused, read_chunked
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,8 @@ POLL_INTERVAL_SECONDS = 0.05
 PLAIN_SCHEME = "http"
 SECURE_SCHEME = "https"
 UPLOAD_NAME_HEADER = "X-File-Name"
+UPLOAD_PATH = re.compile(r"/api/folders/[0-9a-f]{32}/presentations")
+UPLOAD_SLOTS = 4  # uploads received at once (DEC-033)
 DRAIN_BYTES = 1_048_576  # DEC-033: at most 1 MiB of unread input is discarded
 DRAIN_STEP_SECONDS = 0.2
 DRAIN_SILENCES = 10  # ten quiet steps of 0.2 s: the 2 seconds of DEC-033
@@ -465,6 +469,7 @@ class LibraryHandler(_EditorHandler):
             payload=payload,
             headers=self._upload_headers() if route.is_upload else {},
             read_body=self._read_upload_body if route.is_upload else None,
+            read_chunked=self._read_chunked_upload_body if route.is_upload else None,
             session=session,
             presentation_id=presentation_id,
             library_origin=server.settings.library_origin,
@@ -484,13 +489,60 @@ class LibraryHandler(_EditorHandler):
         return (presentation.folder_id if presentation is not None else None), presentation_id
 
     def _upload_headers(self) -> dict[str, str]:
-        """The two headers of an upload the handler reads, lower case names."""
-        return {name.lower(): self.headers.get(name, "") for name in (UPLOAD_NAME_HEADER, "Content-Length")}
+        """The headers of an upload the handler reads, lower case names, only those present."""
+        names = (UPLOAD_NAME_HEADER, "Content-Length", "Transfer-Encoding")
+        return {name.lower(): self.headers[name] for name in names if name in self.headers}
+
+    @override
+    def _refuse_ambiguous_headers(self) -> bool:
+        """The inherited gate, except that a chunked upload keeps its ``Transfer-Encoding`` (DEC-033): the header is set
+        aside for the inherited checks (repeated headers, folding, userinfo) and put back."""
+        if not self._accepts_chunked_body():
+            return super()._refuse_ambiguous_headers()
+        encoding = self.headers["Transfer-Encoding"]
+        del self.headers["Transfer-Encoding"]
+        try:
+            return super()._refuse_ambiguous_headers()
+        finally:
+            self.headers["Transfer-Encoding"] = encoding
+
+    def _accepts_chunked_body(self) -> bool:
+        """DEC-033: a chunked body is accepted on the upload route only, exactly ``chunked``, never with a length."""
+        return (
+            self.command == "POST"
+            and UPLOAD_PATH.fullmatch(urlsplit(self.path).path) is not None
+            and self.headers.get("Transfer-Encoding") == "chunked"
+            and "Content-Length" not in self.headers
+        )
 
     def _read_upload_body(self, length: int) -> bytes:
-        """Exactly ``length`` bytes of the body: the only place an upload body is read (DEC-033)."""
+        """Exactly ``length`` bytes of the body, in an upload slot (DEC-033); ``UploadBusy`` when none is free."""
+        with self._upload_slot():
+            return self.rfile.read(length)
+
+    def _read_chunked_upload_body(self, limit: int) -> bytes:
+        """A chunked body decoded up to ``limit`` bytes; whatever is left unread is discarded by the early answer
+        protocol, not read."""
+        with self._upload_slot():
+            try:
+                data = read_chunked(self.rfile.readline, self.rfile.read, limit)
+            except UploadRefused:
+                self._body_is_unread = True  # a body that cannot be read goes on: discard what is still sent
+                raise
+            self._body_is_unread = len(data) >= limit  # a body that reached the limit may go on
+            return data
+
+    @contextmanager
+    def _upload_slot(self) -> Iterator[None]:
+        """Hold one of the ``UPLOAD_SLOTS`` while the body is read; never wait for one."""
+        slots = self._library_server().upload_slots
+        if not slots.acquire(blocking=False):
+            raise UploadBusy
         self._body_is_unread = False
-        return self.rfile.read(length)
+        try:
+            yield
+        finally:
+            slots.release()
 
     def _drain_unread_body(self) -> None:
         """An answer given before the body was read: stop sending, then discard at most 1 MiB of the client's input,
@@ -654,6 +706,7 @@ class LibraryServer(_EditorServer):
         self.is_secure = urlsplit(settings.library_origin).scheme == SECURE_SCHEME
         self._thread: threading.Thread | None = None
         self.routes = ROUTES
+        self.upload_slots = threading.BoundedSemaphore(UPLOAD_SLOTS)
         self._locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
         self.database = Database(settings.library_dir / DATABASE_NAME)

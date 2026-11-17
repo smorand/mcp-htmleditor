@@ -14,7 +14,10 @@
    a refusal into the alert of that folder's Members section.
    Upload (US-0141): choosing a file in the Upload field sends its bytes with XMLHttpRequest to
    /api/folders/<id>/presentations (X-File-Name is the percent encoded name); the answer's message or error is written
-   with textContent into the status area, and on success the list of the page is replaced by the server's. */
+   with textContent into the status area, and on success the list of the page is replaced by the server's.
+   US-0143: while the file is sent the status reads "<file name> <percent>%" (progressText: a whole number rounded down,
+   at most 99); the extension and the 25 MB are checked before anything is sent; a second choice made while one upload
+   is in progress is ignored; an error or an abort reads the page's own failure text. */
 (function () {
   "use strict";
 
@@ -167,22 +170,52 @@
     });
   }
 
+  var MAX_UPLOAD_BYTES = 26214400;
+  var uploading = false;
+
+  /* "<file name> <percent>%", the percent a whole number rounded down and never above 99: the 100 is the answer. */
+  function progressText(name, loaded, total) {
+    var percent = total > 0 ? Math.min(99, Math.floor(100 * loaded / total)) : 0;
+    return name + " " + percent + "%";
+  }
+  window.progressText = progressText;
+
+  function finishUpload(input, status, text) {
+    status.textContent = text;
+    input.value = "";
+    uploading = false;
+  }
+
   function sendUpload(input, status, section) {
     var file = input.files[0];
+    if (uploading) {
+      return;
+    }
+    if (!/\.html$/i.test(file.name)) {
+      finishUpload(input, status, status.dataset.onlyHtml);
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      finishUpload(input, status, status.dataset.tooLarge);
+      return;
+    }
+    uploading = true;
     var request = new XMLHttpRequest();
     request.open("POST", "/api/folders/" + section.dataset.folderId + "/presentations");
     request.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+    request.upload.onprogress = function (event) {
+      status.textContent = progressText(file.name, event.loaded, event.lengthComputable ? event.total : file.size);
+    };
     request.onload = function () {
-      status.textContent = uploadAnswer(request, status);
-      input.value = "";
+      finishUpload(input, status, uploadAnswer(request, status));
       if (request.status === 201) {
         refreshListing();
       }
     };
-    request.onerror = function () {
-      status.textContent = status.dataset.failed;
-      input.value = "";
+    request.onerror = request.onabort = function () {
+      finishUpload(input, status, status.dataset.failed);
     };
+    status.textContent = progressText(file.name, 0, file.size);
     request.send(file);
   }
 

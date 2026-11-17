@@ -254,7 +254,8 @@ def _upload_control(can_upload: bool, folder_id: str) -> str:
         f'<section id="upload" data-folder-id="{esc(folder_id)}"><label for="upload-file">{esc(UPLOAD_LABEL)}</label> '
         '<input id="upload-file" type="file" accept=".html,text/html" aria-label="Upload">'
         f'<p role="status" id="upload-status" data-denied="{esc(ACCESS_DENIED_TEXT)}" '
-        f'data-failed="{esc(UPLOAD_FAILED)}"></p></section>'
+        f'data-failed="{esc(UPLOAD_FAILED)}" data-only-html="{esc(ONLY_HTML)}" '
+        f'data-too-large="{esc(TOO_LARGE)}"></p></section>'
     )
 
 
