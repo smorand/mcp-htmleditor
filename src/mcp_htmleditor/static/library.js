@@ -17,7 +17,8 @@
    with textContent into the status area, and on success the list of the page is replaced by the server's.
    US-0143: while the file is sent the status reads "<file name> <percent>%" (progressText: a whole number rounded down,
    at most 99); the extension and the 25 MB are checked before anything is sent; a second choice made while one upload
-   is in progress is ignored; an error or an abort reads the page's own failure text. */
+   is in progress is ignored; an error or an abort reads the page's own failure text.
+   US-0144: a 409 with the existing name opens the Replace / Cancel question; Replace sends the file again with X-Replace. */
 (function () {
   "use strict";
 
@@ -186,6 +187,65 @@
     uploading = false;
   }
 
+  /* The question of a name collision: the existing name goes into the question with textContent, Replace re sends
+     the same file with X-Replace: 1 (the bytes are sent again, DEC-035), Cancel changes nothing. */
+  function askReplace(file, existing, status, section, input) {
+    var dialog = document.getElementById("replace-upload");
+    var question = document.getElementById("replace-question");
+    question.textContent = question.dataset.template.replace("{name}", existing);
+    status.textContent = "";
+    input.value = "";
+    dialog.showModal();
+    document.getElementById("replace-confirm").onclick = function () {
+      if (uploading) {
+        return;
+      }
+      dialog.close();
+      sendFile(file, status, section, input, true);
+    };
+    document.getElementById("replace-cancel").onclick = function () {
+      dialog.close();
+    };
+    dialog.onclose = function () {
+      input.focus();
+    };
+  }
+
+  function sendFile(file, status, section, input, replace) {
+    uploading = true;
+    var request = new XMLHttpRequest();
+    request.open("POST", "/api/folders/" + section.dataset.folderId + "/presentations");
+    request.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+    if (replace) {
+      request.setRequestHeader("X-Replace", "1");
+    }
+    request.upload.onprogress = function (event) {
+      status.textContent = progressText(file.name, event.loaded, event.lengthComputable ? event.total : file.size);
+    };
+    request.onload = function () {
+      var collision = null;
+      try {
+        collision = request.status === 409 ? JSON.parse(request.responseText).collision : null;
+      } catch (error) {
+        collision = null;
+      }
+      uploading = false;
+      if (collision !== null && collision !== undefined) {
+        askReplace(file, collision, status, section, input);
+        return;
+      }
+      finishUpload(input, status, uploadAnswer(request, status));
+      if (request.status === 201) {
+        refreshListing();
+      }
+    };
+    request.onerror = request.onabort = function () {
+      finishUpload(input, status, status.dataset.failed);
+    };
+    status.textContent = progressText(file.name, 0, file.size);
+    request.send(file);
+  }
+
   function sendUpload(input, status, section) {
     var file = input.files[0];
     if (uploading) {
@@ -199,24 +259,7 @@
       finishUpload(input, status, status.dataset.tooLarge);
       return;
     }
-    uploading = true;
-    var request = new XMLHttpRequest();
-    request.open("POST", "/api/folders/" + section.dataset.folderId + "/presentations");
-    request.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
-    request.upload.onprogress = function (event) {
-      status.textContent = progressText(file.name, event.loaded, event.lengthComputable ? event.total : file.size);
-    };
-    request.onload = function () {
-      finishUpload(input, status, uploadAnswer(request, status));
-      if (request.status === 201) {
-        refreshListing();
-      }
-    };
-    request.onerror = request.onabort = function () {
-      finishUpload(input, status, status.dataset.failed);
-    };
-    status.textContent = progressText(file.name, 0, file.size);
-    request.send(file);
+    sendFile(file, status, section, input, false);
   }
 
   function bindUpload() {

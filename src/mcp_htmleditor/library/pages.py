@@ -34,6 +34,8 @@ CANCEL_LABEL: Final = "Cancel"
 NAME_MISMATCH: Final = "The name does not match. Nothing was deleted."
 FOLDER_NAME_REFUSED: Final = "Folder names use 1 to 60 letters, digits, spaces or hyphens."
 UPLOAD_LABEL: Final = "Upload"
+REPLACE_LABEL: Final = "Replace"
+REPLACE_QUESTION: Final = 'A presentation named "{name}" already exists. Replace it?'  # {name}: written by library.js
 ONLY_HTML: Final = "Only .html files are accepted."
 UPLOAD_FAILED: Final = "The upload failed. Nothing was changed."
 FILE_NAME_REFUSED: Final = "This file name is not allowed."
@@ -103,6 +105,11 @@ def deleted_folder_line(name: str) -> str:
 def uploaded_line(name: str, folder: str) -> str:
     """The activity line of an upload (FR-NEW-049)."""
     return f'Uploaded "{name}" in "{folder}"'
+
+
+def replaced_line(name: str, folder: str) -> str:
+    """The activity line of a replacement (FR-NEW-049)."""
+    return f'Replaced "{name}" in "{folder}"'
 
 
 def uploaded_message(name: str) -> str:
@@ -255,7 +262,18 @@ def _upload_control(can_upload: bool, folder_id: str) -> str:
         '<input id="upload-file" type="file" accept=".html,text/html" aria-label="Upload">'
         f'<p role="status" id="upload-status" data-denied="{esc(ACCESS_DENIED_TEXT)}" '
         f'data-failed="{esc(UPLOAD_FAILED)}" data-only-html="{esc(ONLY_HTML)}" '
-        f'data-too-large="{esc(TOO_LARGE)}"></p></section>'
+        f'data-too-large="{esc(TOO_LARGE)}"></p>{_replace_dialog()}</section>'
+    )
+
+
+def _replace_dialog() -> str:
+    """The question of a name collision (FR-NEW-033): ``Replace`` and ``Cancel``; ``library.js`` writes the existing
+    name into the question with ``textContent`` and opens the dialog."""
+    return (
+        '<dialog id="replace-upload" aria-labelledby="replace-question"><form method="dialog">'
+        f'<p id="replace-question" data-template="{esc(REPLACE_QUESTION)}"></p>'
+        f'<p><button type="button" id="replace-confirm">{esc(REPLACE_LABEL)}</button> '
+        f'<button type="button" id="replace-cancel">{esc(CANCEL_LABEL)}</button></p></form></dialog>'
     )
 
 

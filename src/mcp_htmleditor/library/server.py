@@ -490,7 +490,7 @@ class LibraryHandler(_EditorHandler):
 
     def _upload_headers(self) -> dict[str, str]:
         """The headers of an upload the handler reads, lower case names, only those present."""
-        names = (UPLOAD_NAME_HEADER, "Content-Length", "Transfer-Encoding")
+        names = (UPLOAD_NAME_HEADER, "Content-Length", "Transfer-Encoding", "X-Replace")
         return {name.lower(): self.headers[name] for name in names if name in self.headers}
 
     @override
@@ -707,8 +707,6 @@ class LibraryServer(_EditorServer):
         self._thread: threading.Thread | None = None
         self.routes = ROUTES
         self.upload_slots = threading.BoundedSemaphore(UPLOAD_SLOTS)
-        self._locks: dict[str, threading.Lock] = {}
-        self._locks_guard = threading.Lock()
         self.database = Database(settings.library_dir / DATABASE_NAME)
         self.library = Library(self.database, clock, state_dir=settings.state_dir)
         google = GoogleClient(settings.google_credentials_file, settings.library_origin + CALLBACK_PATH)
@@ -717,9 +715,8 @@ class LibraryServer(_EditorServer):
         self.port = int(self.server_address[1])
 
     def lock_for(self, presentation_id: str) -> threading.Lock:
-        """The one lock of a presentation (created on first use): saves, replacements and deletions take it."""
-        with self._locks_guard:
-            return self._locks.setdefault(presentation_id, threading.Lock())
+        """The one lock of a presentation (``Library.lock_for``): saves, replacements and deletions take it."""
+        return self.library.lock_for(presentation_id)
 
     def save_lock(self, presentation_id: str) -> PresentationLock:
         """The context manager a save (or an upload replacement, or a deletion) holds while it writes."""

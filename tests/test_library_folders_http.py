@@ -235,9 +235,11 @@ def test_e2e_022_an_empty_folder_says_so(library_server: START, fake_google: Fak
         "All folders",
         PNEUMO,
         "Upload",
+        "Replace",
+        "Cancel",
         EMPTY_FOLDER,
         "Sign out",
-    ]  # the administrator uploads
+    ]  # (US-0144)
     assert not re.search(r"<(?:ul|ol|li|table|thead|th|tr|time)[\s>]", reply.text)
 
 

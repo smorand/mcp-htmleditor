@@ -106,7 +106,15 @@ class Collision:
     existing_name: str
 
 
-Outcome = Added | Collision
+@dataclass(frozen=True, slots=True)
+class Replaced:
+    """The outcome of a replacement: the existing presentation keeps its id and its name."""
+
+    id: str
+    name: str
+
+
+Outcome = Added | Collision | Replaced
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,8 +244,10 @@ class Library:
         self._clock = clock
         self._files = database.path.parent / FILES_DIRECTORY
         self._records = RequestStore(state_dir)
+        self._locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
 
-    def add_presentation(self, folder_id: str, name: str, data: bytes, actor: str) -> Outcome:
+    def add_presentation(self, folder_id: str, name: str, data: bytes, actor: str, *, replace: bool = False) -> Outcome:
         """Store ``data`` as the presentation ``name`` of the folder and write its line ``Uploaded "<name>" in
         "<folder>"`` (FR-NEW-028, FR-NEW-049, DEC-027, DEC-054).
 
@@ -246,7 +256,14 @@ class Library:
         inserts the row and the line. A taken name removes the new file and returns ``Collision``; any failure
         removes it too and the exception goes on, so a failed upload leaves nothing. ``FolderMissing`` when the
         folder is gone. Time O(n) in the size of the file for the write.
+
+        With ``replace`` and a name key that exists, the presentation is replaced instead (DEC-027, DEC-035): under
+        its lock, ``atomic_write(..., reason="replace")`` swaps the bytes in one step and keeps the previous ones in the
+        history, then a short transaction writes ``Replaced "<name>" in "<folder>"`` (only when the bytes changed). The
+        presentation keeps its id, its name, its requests and its suggestions. A name that vanished meanwhile is added.
         """
+        if replace and (replaced := self._replace_presentation(folder_id, name, data, actor)) is not None:
+            return replaced
         presentation_id = secrets.token_hex(ID_BYTES)
         path = self.presentation_path(folder_id, presentation_id)
         with trace_span("library.upload", {"file.size": len(data)}):
@@ -274,6 +291,32 @@ class Library:
             path.unlink(missing_ok=True)
             return Collision(str(taken[0]))
         return Added(presentation_id, name)
+
+    def _replace_presentation(self, folder_id: str, name: str, data: bytes, actor: str) -> Replaced | None:
+        """The replacement of the presentation of this name key, None when no presentation has it."""
+        key = name_key(name)
+        found = (
+            self._database.connection()
+            .execute("SELECT id, name FROM presentations WHERE folder_id = ? AND name_key = ?", (folder_id, key))
+            .fetchone()
+        )
+        if found is None:
+            return None
+        presentation_id, existing = str(found[0]), str(found[1])
+        with self.lock_for(presentation_id), trace_span("library.replace", {"file.size": len(data)}):
+            if self.presentation(presentation_id) is None:  # deleted while this upload waited for the lock
+                return None
+            changed = atomic_write(self.presentation_path(folder_id, presentation_id), data, reason="replace")
+            if changed:
+                with self._database.transaction(immediate=True) as connection:
+                    folder_name = _folder_name_in(connection, folder_id)
+                    self.record(connection, actor, pages.replaced_line(existing, folder_name))
+        return Replaced(presentation_id, existing)
+
+    def lock_for(self, presentation_id: str) -> threading.Lock:
+        """The one lock of a presentation (created on first use): a save, a replacement and a deletion hold it."""
+        with self._locks_guard:
+            return self._locks.setdefault(presentation_id, threading.Lock())
 
     def activity(self) -> list[ActivityLine]:
         """The 500 newest lines, newest first (FR-NEW-050)."""

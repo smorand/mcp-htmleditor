@@ -213,3 +213,4 @@ Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for
 - Upload pipeline and the Upload control: `library-pages.md` § Upload.
 - File name rules (allow list, 100 characters, composed form): `library-pages.md` § Upload.
 - Upload limits, chunked rule, slots, progress: `library-pages.md` § Upload limits.
+- Collision question and replace: `library-pages.md` § Collision and replace.

@@ -15,7 +15,7 @@ from . import pages, uploads
 from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Role, Route, SetCookie, authorize, json_answer
 from .names import NameRefused, check_file_name
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, SESSION_SECONDS, SignInUnavailable, safe_destination
-from .store import Collision
+from .store import Collision, Replaced
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,8 @@ def _store_upload(context: Context, folder_id: str, stem: str, data: bytes) -> A
     """The validity check, then the store: ``201``, the first problem, the collision or a failed upload."""
     try:
         uploads.check_validity(data)
-        outcome = context.library.add_presentation(folder_id, stem, data, context.person_email or "")
+        replace = context.headers.get(uploads.REPLACE_HEADER) == "1"
+        outcome = context.library.add_presentation(folder_id, stem, data, context.person_email or "", replace=replace)
     except uploads.UploadRefused as exc:
         return _refuse(400, str(exc))
     except (OSError, WriteError) as exc:
@@ -135,8 +136,8 @@ def _store_upload(context: Context, folder_id: str, stem: str, data: bytes) -> A
         return _refuse(500, pages.UPLOAD_FAILED)
     if isinstance(outcome, Collision):
         return json_answer(409, {"ok": False, "collision": outcome.existing_name})
-    logger.info("Uploaded a presentation of %d bytes", len(data))
-    return json_answer(201, {"ok": True, "name": stem, "message": pages.uploaded_message(stem)})
+    logger.info("%s a presentation of %d bytes", "Replaced" if isinstance(outcome, Replaced) else "Uploaded", len(data))
+    return json_answer(201, {"ok": True, "name": outcome.name, "message": pages.uploaded_message(outcome.name)})
 
 
 def _checked_stem(context: Context) -> str | Answer:

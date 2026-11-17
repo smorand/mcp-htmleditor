@@ -21,6 +21,7 @@ NO_SLIDE: Final = "the file has no slide"
 NAME_HEADER: Final = "x-file-name"
 LENGTH_HEADER: Final = "content-length"
 ENCODING_HEADER: Final = "transfer-encoding"
+REPLACE_HEADER: Final = "x-replace"
 EXTENSION: Final = ".html"
 MAX_BYTES: Final = 26_214_400  # 25 MB exactly (FR-NEW-030)
 CHUNK_LINE_MAX: Final = 32  # the longest chunk size line read (DEC-033)

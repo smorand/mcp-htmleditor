@@ -132,3 +132,17 @@ storage and test support are in `.agent_docs/library.md`.
 - Tests: `test_library_limits_http.py` (raw socket helpers `Browser.upload_streaming`, `UploadPlan`, `disk_full`,
   `CountingReader`), `test_library_limits_e2e.py` (CDP throttle 10 Mbit), `test_library_limits_slow.py` (`-m slow`).
 
+## Collision and replace (US-0144, DEC-027, DEC-028, DEC-035)
+
+- A valid file whose `name_key` exists answers `409 {"ok": false, "collision": "<existing name>"}` and stores nothing (the
+  validity message always wins, the question comes last). The page opens `<dialog id="replace-upload">` with
+  `A presentation named "<name>" already exists. Replace it?` (name written with `textContent`), `Replace` and `Cancel`; Cancel
+  changes nothing, Replace sends the file again with `X-Replace: 1`.
+- `Library.add_presentation(..., replace=True)` -> `Replaced(id, name)`: under `Library.lock_for(pid)` (the same lock a save
+  and a deletion hold; `LibraryServer.lock_for` delegates), `atomic_write(path, data, reason="replace")` swaps the bytes in
+  one step and stages the old ones in the history; then a short transaction writes `Replaced "<name>" in "<folder>"`, only if
+  the bytes changed (a second identical Replace adds neither a version nor a line). The row, id, name, requests and
+  suggestions stay; a name that vanished meanwhile is added as new. Span `library.replace` (size only).
+- Two uploads of the same new name: both write their own file, the second transaction sees the row, removes its file and
+  answers the collision. A replacement during an edit changes the file mtime, so the editor's next save meets the conflict notice.
+

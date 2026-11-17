@@ -777,7 +777,9 @@ class Browser:
         address = f"{self.running.content_origin}/d/{presentation_id}/{route}"
         return self._navigate("GET", address, _header_names(headers), follow=follow)
 
-    def upload(self, folder_id: str, name: str, data: bytes, *, headers: dict[str, str] | None = None) -> LibraryReply:
+    def upload(
+        self, folder_id: str, name: str, data: bytes, *, headers: dict[str, str] | None = None, replace: bool = False
+    ) -> LibraryReply:
         """What the Upload control sends: ``POST /api/folders/<fid>/presentations`` with the raw bytes, the percent
         encoded name in ``X-File-Name`` and the headers of a same origin ``XMLHttpRequest`` (``headers`` replaces
         them)."""
@@ -791,6 +793,8 @@ class Browser:
                 "Content-Type": "text/html",
             }
         )
+        if replace:
+            sent = {**sent, "X-Replace": "1"}
         if self.cookies:
             sent = {**sent, "Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items())}
         reply = self.running.client().request(
@@ -825,6 +829,8 @@ class Browser:
             "Content-Type: text/html",
             f"Cookie: {'; '.join(f'{k}={v}' for k, v in self.cookies.items())}",
         ]
+        if plan.replace:
+            headers.append("X-Replace: 1")
         if plan.chunked:
             headers.append("Transfer-Encoding: chunked")
         if plan.declared is not None:
@@ -1213,6 +1219,7 @@ class UploadPlan:
     resume: threading.Event | None = None
     bytes_per_second: int | None = None
     chunked: bool = False
+    replace: bool = False
 
 
 def _feed(  # noqa: PLR0913, PLR0917 - the thread target of one sender, each argument is one piece of its state
