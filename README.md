@@ -510,6 +510,38 @@ modified times kept) and lamya.chrif@gmail.com as `Read and write`. It is create
 (`HTMLEDITOR_LIBRARY_SEED_DIR` overrides the directory): later starts add and reset nothing, even when every folder was
 deleted, and the seeding is not an entry of the activity list.
 
+### Deploying the web library mode
+
+The image runs `webserve` behind the VPS nginx (`docker-compose.prod.yml`: service `mcp-htmleditor`, `expose` 7842, no
+published port, network `proxy-network`, data in `/app/data/mcp-htmleditor`). Nothing here is done by a test or by `make
+check`; the first deployment is the owner's act, in this order:
+
+1. Google console: add the authorized redirect address `https://slides.scm-platform.org/auth/callback` to the OAuth client
+   of the project that owns `~/.credentials/scm-pwd-web.json`. Until then every sign in ends with `Sign-in is unavailable.
+   Try again later.`
+2. DNS: `*.scm-platform.org` already points at the VPS; check `dig +short slides.scm-platform.org
+   slides-content.scm-platform.org`.
+3. Certificate of the content host (the library host one is obtained by `vps-deploy.sh`, as for every app): `ssh vps "cd
+   /app/vps-management && LETSENCRYPT_EMAIL=seb.morand@gmail.com ./scripts/letsencrypt.sh obtain
+   slides-content.scm-platform.org && ./scripts/proxy.sh reload"`.
+4. Data (never in the repository): `ssh vps "mkdir -p /app/data/mcp-htmleditor"`, copy `environments/prod/.env.example` to
+   `/app/data/mcp-htmleditor/.env` (a deploy copies `environments/<env>/*`, which skips dotfiles), and copy the credentials
+   file to `/app/data/mcp-htmleditor/google-oauth.json`, mode 0600.
+5. `make deploy-vps TAG=vX.Y.Z`: pushes the tag, runs `vps-deploy.sh smorand/mcp-htmleditor@<tag> prod
+   slides.scm-platform.org:7842 ./environments`, adds the content host route once (`proxy.sh add
+   slides-content.scm-platform.org 7842 mcp-htmleditor`), gives `/app/data/mcp-htmleditor` to uid 10001, then builds and
+   starts the container. Every variable of the target (`VPS_HOST`, `VPS_APP_NAME`, `VPS_ENDPOINT`, `VPS_CONTENT_HOST`,
+   `VPS_GIT_ORG`, `VPS_GIT_REPO`, `VPS_MANAGEMENT_DIR`) can be overridden. `make undeploy-vps` removes the container and keeps
+   the data.
+6. Verify: `curl -s https://slides.scm-platform.org/health` answers `{"ok": true, ...}`; `curl -sI
+   http://slides.scm-platform.org/` shows a `301` to https; `curl -s -H 'Host: other.example'
+   https://slides.scm-platform.org/` is refused; sign in in a browser.
+7. The public static site `lamya-slides.scm-platform.org` is not touched: `curl -sI https://lamya-slides.scm-platform.org/`
+   before and after must answer the same.
+
+The library database, the presentation files, the history and the sessions live in `/data` (the host directory above), so
+they survive a redeploy; the first start of an empty `/data/library` creates the initial content (see above).
+
 ## Templates
 
 Templates are resolved in priority order:

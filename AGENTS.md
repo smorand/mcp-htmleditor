@@ -19,6 +19,7 @@ make install     # uv tool install (with the render extra) + templates + log dir
 make install-browser  # Chromium for `render` (needs the render extra)
 make run ARGS='export pptx in.html out.pptx'
 make docker-build / run-up / run-down
+make deploy-vps TAG=vX.Y.Z   # web library mode to the VPS (see README "Deploying the web library mode"); undeploy-vps keeps the data
 make bootstrap-ei  # regenerate the EI bootstrap from the EI reference
 make pptx-fidelity  # score the PPTX export of every presentation template against the HTML (needs soffice, pdftoppm, Chromium; ARGS='--only breathe')
 make sync-medical-css  # propagate the medical charter CSS to the reference decks

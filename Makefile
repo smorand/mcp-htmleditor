@@ -3,7 +3,7 @@
 
 .PHONY: sync run run-dev test test-cov lint lint-fix format format-check typecheck \
         security check build install install-browser install-skill uninstall docker-build docker-push \
-        docker run-up run-down bootstrap-ei sync-medical-css sync-deck-pointer pptx-fidelity breathe-assets sync-breathe-layouts check-generated clean clean-all info help
+        docker run-up run-down deploy-vps undeploy-vps bootstrap-ei sync-medical-css sync-deck-pointer pptx-fidelity breathe-assets sync-breathe-layouts check-generated clean clean-all info help
 
 PROJECT_NAME=$(shell grep -m1 '^name' pyproject.toml 2>/dev/null | sed 's/.*= *"\([^"]*\)".*/\1/')
 PACKAGE := mcp_htmleditor
@@ -26,6 +26,15 @@ HAS_UV=$(shell command -v uv >/dev/null 2>&1 && echo "yes" || echo "no")
 # Docker configuration
 MAKE_DOCKER_PREFIX ?=
 DOCKER_TAG ?= latest
+
+# VPS deployment (the owner's convention, shared with the sibling projects); every value is overridable
+VPS_HOST ?= vps
+VPS_APP_NAME ?= mcp-htmleditor
+VPS_ENDPOINT ?= slides.scm-platform.org:7842
+VPS_CONTENT_HOST ?= slides-content.scm-platform.org
+VPS_GIT_ORG ?= smorand
+VPS_GIT_REPO ?= mcp-htmleditor
+VPS_MANAGEMENT_DIR ?= /app/vps-management
 
 # XDG-compliant install targets (all overridable by env)
 BIN_DIR       ?= $(HOME)/.local/bin
@@ -244,6 +253,31 @@ run-down:
 	  docker compose down
 	@echo "Services stopped!"
 
+## deploy-vps: Deploy the web library mode to the VPS (TAG=vX.Y.Z required; data in /app/data is kept)
+deploy-vps:
+ifndef TAG
+	$(error TAG is required: make deploy-vps TAG=vX.Y.Z)
+endif
+	@echo "Deploying $(VPS_APP_NAME) $(TAG) to $(VPS_HOST)..."
+	@echo "1. Pushing tag $(TAG)..."
+	@git tag -f $(TAG) && git push origin $(TAG) --force
+	@echo "2. Running vps-deploy on $(VPS_HOST), then the content host route (idempotent) and the data owner..."
+	@ssh $(VPS_HOST) "cd $(VPS_MANAGEMENT_DIR) && \
+		./scripts/vps-undeploy.sh $(VPS_APP_NAME) 2>/dev/null; \
+		./scripts/vps-deploy.sh $(VPS_GIT_ORG)/$(VPS_GIT_REPO)@$(TAG) prod $(VPS_ENDPOINT) ./environments && \
+		(./scripts/proxy.sh list | grep -q $(VPS_CONTENT_HOST) || ./scripts/proxy.sh add $(VPS_CONTENT_HOST) 7842 $(VPS_APP_NAME)) && \
+		chown -R 10001:10001 /app/data/$(VPS_APP_NAME) && \
+		cd /app/services/$(VPS_APP_NAME) && \
+		APP_VERSION=$(TAG) docker compose -f docker-compose.prod.yml build --no-cache && \
+		docker compose -f docker-compose.prod.yml up -d"
+	@echo "Deploy complete. Verify with: curl -s https://slides.scm-platform.org/health"
+
+## undeploy-vps: Remove the web library mode from the VPS (the data in /app/data is kept)
+undeploy-vps:
+	@echo "Undeploying $(VPS_APP_NAME) from $(VPS_HOST)..."
+	@ssh $(VPS_HOST) "cd $(VPS_MANAGEMENT_DIR) && ./scripts/vps-undeploy.sh $(VPS_APP_NAME)"
+	@echo "Undeploy complete. Data preserved in /app/data/$(VPS_APP_NAME)/"
+
 # ============================================================================
 # PROJECT SPECIFIC
 # ============================================================================
@@ -357,6 +391,8 @@ help:
 	@echo "  docker           - Build and push"
 	@echo "  run-up           - Build and start docker compose"
 	@echo "  run-down         - Stop docker compose"
+	@echo "  deploy-vps       - Deploy the web library mode to the VPS (TAG=vX.Y.Z)"
+	@echo "  undeploy-vps     - Remove it from the VPS (the data stays)"
 	@echo ""
 	@echo "Project specific:"
 	@echo "  bootstrap-ei     - Regenerate the EI bootstrap from the EI reference"

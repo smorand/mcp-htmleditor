@@ -80,6 +80,8 @@ again to refresh the installed CLI (development uses `make run`, `make run-dev` 
 | `docker` | `docker-build` then `docker-push` |
 | `run-up` | Builds, then `docker compose up -d` |
 | `run-down` | `docker compose down` |
+| `deploy-vps` | `TAG=vX.Y.Z` required (`$(error)` without it, even under `make -n`): `git tag -f` and push, then over `ssh $(VPS_HOST)`: `vps-undeploy.sh`, `vps-deploy.sh $(VPS_GIT_ORG)/$(VPS_GIT_REPO)@$(TAG) prod $(VPS_ENDPOINT) ./environments`, the content host route `proxy.sh add $(VPS_CONTENT_HOST) 7842 $(VPS_APP_NAME)` unless listed, `chown -R 10001:10001 /app/data/$(VPS_APP_NAME)`, `docker compose -f docker-compose.prod.yml build --no-cache` and `up -d`. Variables `VPS_HOST`, `VPS_APP_NAME`, `VPS_ENDPOINT`, `VPS_CONTENT_HOST`, `VPS_GIT_ORG`, `VPS_GIT_REPO`, `VPS_MANAGEMENT_DIR` are overridable. Never run by a test (`make -n` only) |
+| `undeploy-vps` | `vps-undeploy.sh` over ssh; the data in `/app/data/$(VPS_APP_NAME)` is kept |
 
 ```bash
 MAKE_DOCKER_PREFIX=ghcr.io/smorand/ DOCKER_TAG=v1.0.0 make docker
