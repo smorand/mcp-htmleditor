@@ -15,7 +15,7 @@ from . import pages, uploads
 from .access import JSON_CONTENT_TYPE, Answer, Context, Permission, Role, Route, SetCookie, authorize, json_answer
 from .names import NameRefused, check_file_name
 from .signin import BROWSER_COOKIE, SESSION_COOKIE, SESSION_SECONDS, SignInUnavailable, safe_destination
-from .store import Collision, Replaced
+from .store import Collision, PresentationMissing, Replaced
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +177,18 @@ def _read_chunked(context: Context) -> bytes | Answer:
     return _refuse(413, pages.TOO_LARGE) if len(data) > uploads.MAX_BYTES else data
 
 
+def delete_presentation(context: Context) -> Answer:
+    """``DELETE /api/presentations/<pid>`` (and the form variant ``POST .../delete``): ``200 {"ok": true}`` once the
+    presentation, its history and its requests are gone; a presentation that does not exist, which the administrator's
+    role does not rule out, is the same ``Access denied.`` as a forbidden one (DEC-023)."""
+    try:
+        context.library.delete_presentation(context.presentation_id or "", context.person_email or "")
+    except PresentationMissing:
+        return Answer(403, pages.access_denied())
+    logger.info("Deleted a presentation")
+    return json_answer(200, {"ok": True})
+
+
 def open_presentation(context: Context) -> Answer:
     """``VIEW`` already authorized on the presentation's folder: a one time ticket and ``302`` to ``/enter`` on the
     content origin; a presentation that does not exist, which the administrator's role does not rule out, is the
@@ -187,6 +199,8 @@ def open_presentation(context: Context) -> Answer:
     ticket = context.accounts.issue_ticket(context.session, presentation_id)
     return Answer(302, location=f"{context.content_origin}/enter?t={ticket}")
 
+
+PRESENTATION_API: Final = re.compile(r"/api/presentations/(?P<pid>[0-9a-f]{32})")
 
 ROUTES: tuple[Route, ...] = (
     Route(
@@ -205,6 +219,8 @@ ROUTES: tuple[Route, ...] = (
     Route("library", "GET", re.compile(r"/"), Permission.SIGNED_IN, home),
     Route("library", "GET", re.compile(r"/f/(?P<fid>[0-9a-f]{32})"), Permission.VIEW, folder),
     Route("library", "GET", re.compile(r"/open/(?P<pid>[0-9a-f]{32})"), Permission.VIEW, open_presentation),
+    Route("library", "DELETE", PRESENTATION_API, Permission.EDIT, delete_presentation),
+    Route("library", "POST", re.compile(PRESENTATION_API.pattern + r"/delete"), Permission.EDIT, delete_presentation),
     Route(
         "library",
         "POST",

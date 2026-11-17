@@ -146,3 +146,15 @@ storage and test support are in `.agent_docs/library.md`.
 - Two uploads of the same new name: both write their own file, the second transaction sees the row, removes its file and
   answers the collision. A replacement during an edit changes the file mtime, so the editor's next save meets the conflict notice.
 
+## Delete a presentation (US-0145, DEC-026, DEC-028)
+
+- Row: for `RW` and `Admin` each presentation row ends with `<button class="delete-presentation" data-presentation-id data-name>Delete</button>`.
+  One `<dialog id="confirm-dialog">` serves both questions (Replace / Cancel and Delete / Cancel): `library.js` writes the name
+  into the question with `textContent` and sets the first button's label from its `data-replace` or `data-delete`.
+- Routes (`EDIT`, library origin, the Origin rule of DEC-022 applies): `DELETE /api/presentations/<pid>` and the form variant
+  `POST /api/presentations/<pid>/delete`; an unknown, malformed or forbidden id is the same `Access denied.` page.
+- `Library.delete_presentation`: under `lock_for(pid)`, one transaction writes `Deleted "<name>" from "<folder>"` and deletes
+  the row; then the file and `<state_dir>/files/<key>/` (history, requests, suggestions) are removed, failures after the commit are
+  logged. A save that lost the race finds the row gone (`PresentationLock`) and writes nothing; the lock object is dropped.
+  Refused attempts, like sign ins, write no activity line. Span `library.delete_presentation`.
+

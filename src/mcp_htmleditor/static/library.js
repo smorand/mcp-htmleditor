@@ -18,7 +18,9 @@
    US-0143: while the file is sent the status reads "<file name> <percent>%" (progressText: a whole number rounded down,
    at most 99); the extension and the 25 MB are checked before anything is sent; a second choice made while one upload
    is in progress is ignored; an error or an abort reads the page's own failure text.
-   US-0144: a 409 with the existing name opens the Replace / Cancel question; Replace sends the file again with X-Replace. */
+   US-0144: a 409 with the existing name opens the Replace / Cancel question; Replace sends the file again with X-Replace.
+   US-0145: a row's Delete opens the same dialog as Delete / Cancel; Delete sends DELETE /api/presentations/<id>, then the list
+   is replaced by the server's (a refusal reads the page's own Access denied. text). */
 (function () {
   "use strict";
 
@@ -187,28 +189,58 @@
     uploading = false;
   }
 
-  /* The question of a name collision: the existing name goes into the question with textContent, Replace re sends
-     the same file with X-Replace: 1 (the bytes are sent again, DEC-035), Cancel changes nothing. */
-  function askReplace(file, existing, status, section, input) {
-    var dialog = document.getElementById("replace-upload");
-    var question = document.getElementById("replace-question");
-    question.textContent = question.dataset.template.replace("{name}", existing);
-    status.textContent = "";
-    input.value = "";
-    dialog.showModal();
-    document.getElementById("replace-confirm").onclick = function () {
-      if (uploading) {
-        return;
-      }
+  /* One question dialog for two questions: a name collision (Replace / Cancel, DEC-035) and a deletion (Delete /
+     Cancel). The name goes into the question with textContent; Cancel changes nothing and focus goes back. */
+  function ask(kind, name, onYes, back) {
+    var dialog = document.getElementById("confirm-dialog");
+    var question = document.getElementById("confirm-question");
+    var yes = document.getElementById("confirm-yes");
+    question.textContent = question.dataset[kind].replace("{name}", name);
+    yes.textContent = yes.dataset[kind];
+    yes.onclick = function () {
       dialog.close();
-      sendFile(file, status, section, input, true);
+      onYes();
     };
-    document.getElementById("replace-cancel").onclick = function () {
+    document.getElementById("confirm-no").onclick = function () {
       dialog.close();
     };
     dialog.onclose = function () {
-      input.focus();
+      back.focus();
     };
+    dialog.showModal();
+  }
+
+  function askReplace(file, existing, status, section, input) {
+    status.textContent = "";
+    input.value = "";
+    ask("replace", existing, function () {
+      sendFile(file, status, section, input, true);
+    }, input);
+  }
+
+  function deletePresentation(button, status) {
+    fetch("/api/presentations/" + button.dataset.presentationId, {method: "DELETE", credentials: "same-origin"})
+      .then(function (response) {
+        status.textContent = response.ok ? "" : status.dataset.denied;
+        refreshListing();
+      }, function () {
+        status.textContent = status.dataset.failed;
+      });
+  }
+
+  function bindDeletion() {
+    var status = document.getElementById("upload-status");
+    if (!status) {
+      return;
+    }
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest("button.delete-presentation");
+      if (button) {
+        ask("delete", button.dataset.name, function () {
+          deletePresentation(button, status);
+        }, document.getElementById("upload-file"));
+      }
+    });
   }
 
   function sendFile(file, status, section, input, replace) {
@@ -277,6 +309,7 @@
 
   document.addEventListener("DOMContentLoaded", localizeTimes);
   document.addEventListener("DOMContentLoaded", bindUpload);
+  document.addEventListener("DOMContentLoaded", bindDeletion);
   document.addEventListener("DOMContentLoaded", bindAdministration);
   window.addEventListener("pageshow", function (event) {
     if (event.persisted) {

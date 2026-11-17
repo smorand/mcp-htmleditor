@@ -35,6 +35,8 @@ NAME_MISMATCH: Final = "The name does not match. Nothing was deleted."
 FOLDER_NAME_REFUSED: Final = "Folder names use 1 to 60 letters, digits, spaces or hyphens."
 UPLOAD_LABEL: Final = "Upload"
 REPLACE_LABEL: Final = "Replace"
+DELETE_LABEL: Final = "Delete"
+DELETE_QUESTION: Final = 'Delete "{name}"? This cannot be undone.'  # {name}: written by library.js
 REPLACE_QUESTION: Final = 'A presentation named "{name}" already exists. Replace it?'  # {name}: written by library.js
 ONLY_HTML: Final = "Only .html files are accepted."
 UPLOAD_FAILED: Final = "The upload failed. Nothing was changed."
@@ -105,6 +107,11 @@ def deleted_folder_line(name: str) -> str:
 def uploaded_line(name: str, folder: str) -> str:
     """The activity line of an upload (FR-NEW-049)."""
     return f'Uploaded "{name}" in "{folder}"'
+
+
+def deleted_line(name: str, folder: str) -> str:
+    """The activity line of a presentation deletion (FR-NEW-049)."""
+    return f'Deleted "{name}" from "{folder}"'
 
 
 def replaced_line(name: str, folder: str) -> str:
@@ -190,7 +197,8 @@ def folder_page(
     rows = "".join(
         f'<li><span class="name"><a href="/open/{esc(presentation.id)}">{esc(presentation.name)}</a></span> '
         f"{_time(presentation.modified)} "
-        f'<span class="size">{esc(format_size(presentation.size))}</span></li>'
+        f'<span class="size">{esc(format_size(presentation.size))}</span>'
+        f"{_delete_button(presentation, can_upload)}</li>"
         for presentation in presentations
     )
     listing = f'<ul class="presentations">{rows}</ul>' if rows else f"<p>{esc(NO_PRESENTATION_YET)}</p>"
@@ -252,6 +260,16 @@ def _alert(alert_id: str) -> str:
     )
 
 
+def _delete_button(presentation: PresentationView, can_delete: bool) -> str:
+    """``Delete`` on the row of a person who can edit; ``library.js`` asks the question and sends the request."""
+    if not can_delete:
+        return ""
+    return (
+        f' <button type="button" class="delete-presentation" data-presentation-id="{esc(presentation.id)}" '
+        f'data-name="{esc(presentation.name)}">{esc(DELETE_LABEL)}</button>'
+    )
+
+
 def _upload_control(can_upload: bool, folder_id: str) -> str:
     """``Upload`` for a person who can edit: a labelled file field (``library.js`` sends the chosen file at once) and
     the status area that shows the message or the progress (FR-NEW-067)."""
@@ -262,18 +280,20 @@ def _upload_control(can_upload: bool, folder_id: str) -> str:
         '<input id="upload-file" type="file" accept=".html,text/html" aria-label="Upload">'
         f'<p role="status" id="upload-status" data-denied="{esc(ACCESS_DENIED_TEXT)}" '
         f'data-failed="{esc(UPLOAD_FAILED)}" data-only-html="{esc(ONLY_HTML)}" '
-        f'data-too-large="{esc(TOO_LARGE)}"></p>{_replace_dialog()}</section>'
+        f'data-too-large="{esc(TOO_LARGE)}"></p>{_confirm_dialog()}</section>'
     )
 
 
-def _replace_dialog() -> str:
-    """The question of a name collision (FR-NEW-033): ``Replace`` and ``Cancel``; ``library.js`` writes the existing
-    name into the question with ``textContent`` and opens the dialog."""
+def _confirm_dialog() -> str:
+    """The one question dialog of the folder page, for a name collision (``Replace`` and ``Cancel``, FR-NEW-033) and for
+    a deletion (``Delete`` and ``Cancel``, FR-NEW-039); ``library.js`` writes the name into the question with
+    ``textContent`` and the labels of the two buttons from these attributes."""
     return (
-        '<dialog id="replace-upload" aria-labelledby="replace-question"><form method="dialog">'
-        f'<p id="replace-question" data-template="{esc(REPLACE_QUESTION)}"></p>'
-        f'<p><button type="button" id="replace-confirm">{esc(REPLACE_LABEL)}</button> '
-        f'<button type="button" id="replace-cancel">{esc(CANCEL_LABEL)}</button></p></form></dialog>'
+        '<dialog id="confirm-dialog" aria-labelledby="confirm-question"><form method="dialog">'
+        f'<p id="confirm-question" data-replace="{esc(REPLACE_QUESTION)}" data-delete="{esc(DELETE_QUESTION)}"></p>'
+        f'<p><button type="button" id="confirm-yes" data-replace="{esc(REPLACE_LABEL)}" '
+        f'data-delete="{esc(DELETE_LABEL)}">{esc(REPLACE_LABEL)}</button> '
+        f'<button type="button" id="confirm-no">{esc(CANCEL_LABEL)}</button></p></form></dialog>'
     )
 
 

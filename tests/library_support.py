@@ -103,7 +103,7 @@ FOLDER_ROW = re.compile(r'<li><a href="/f/([0-9a-f]{32})">([^<]*)</a> <span>([^<
 PRESENTATION_ROW = re.compile(
     r'<li><span class="name"><a href="/open/[0-9a-f]{32}">([^<]*)</a></span> '
     r'<time datetime="([^"]*)">([^<]*)</time> <span class="size">([^<]*)</span>'
-    r"</li>"
+    r"(?: <button [^>]*>[^<]*</button>)?</li>"
 )
 ACTIVITY_ROW = re.compile(
     r'<li><time datetime="([^"]*)">[^<]*</time> <span class="actor">([^<]*)</span> <span class="text">([^<]*)</span>'
@@ -800,6 +800,20 @@ class Browser:
         reply = self.running.client().request(
             "POST", f"/api/folders/{folder_id}/presentations", headers=sent, body=data
         )
+        self._keep_cookies(reply)
+        self.replies.append(reply)
+        return reply
+
+    def delete_presentation(
+        self, presentation_id: str, *, method: str = "DELETE", headers: dict[str, str] | None = None
+    ) -> LibraryReply:
+        """What the Delete button sends (``DELETE /api/presentations/<pid>``) or what a plain form posts
+        (``method="POST"``, ``.../delete``); ``headers`` replaces the headers of a same origin request."""
+        path = f"/api/presentations/{presentation_id}" + ("/delete" if method == "POST" else "")
+        sent = headers if headers is not None else {"Origin": self.running.origin, "Sec-Fetch-Site": "same-origin"}
+        if self.cookies:
+            sent = {**sent, "Cookie": "; ".join(f"{k}={v}" for k, v in self.cookies.items())}
+        reply = self.running.client().request(method, path, headers=sent)
         self._keep_cookies(reply)
         self.replies.append(reply)
         return reply

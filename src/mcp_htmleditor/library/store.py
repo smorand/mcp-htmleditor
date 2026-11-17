@@ -91,6 +91,10 @@ class FolderMissing(Exception):  # noqa: N818 - a domain outcome, not an error o
     """No folder has this id."""
 
 
+class PresentationMissing(Exception):  # noqa: N818 - a domain outcome, not an error of the program
+    """No presentation has this id (never existed, or already deleted)."""
+
+
 @dataclass(frozen=True, slots=True)
 class Added:
     """The outcome of a stored upload: the new presentation's id and name."""
@@ -368,6 +372,35 @@ class Library:
             record_dirs = [self._record_dir(folder_id, presentation_id) for presentation_id in presentation_ids]
             for directory in (self._files / folder_id, *filter(None, record_dirs)):
                 _remove_directory(directory)
+
+    def delete_presentation(self, presentation_id: str, actor: str) -> None:
+        """Delete the presentation for good (FR-NEW-039, DEC-026, DEC-028): under its lock, one ``BEGIN IMMEDIATE``
+        transaction writes the line ``Deleted "<name>" from "<folder>"`` and deletes the row; only then the file and
+        the state directory of the presentation (history, requests, AI suggestions) are removed. A directory that
+        cannot be removed is a warning, never an error: nothing reaches it any more and ids are never reused. A save
+        that lost the race finds the row gone and creates nothing. ``PresentationMissing`` writes nothing.
+        """
+        if not ID_PATTERN.fullmatch(presentation_id):  # no presentation has it, and it never becomes a path
+            raise PresentationMissing
+        with self.lock_for(presentation_id), trace_span("library.delete_presentation", {}):
+            with self._database.transaction(immediate=True) as connection:
+                row = connection.execute(
+                    "SELECT folder_id, name FROM presentations WHERE id = ?", (presentation_id,)
+                ).fetchone()
+                if row is None:
+                    raise PresentationMissing
+                folder_id, name = str(row[0]), str(row[1])
+                self.record(connection, actor, pages.deleted_line(name, _folder_name_in(connection, folder_id)))
+                connection.execute("DELETE FROM presentations WHERE id = ?", (presentation_id,))
+            record_dir = self._record_dir(folder_id, presentation_id)
+            try:
+                self.presentation_path(folder_id, presentation_id).unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning("Could not remove the file of a deleted presentation: %s", type(exc).__name__)
+            if record_dir is not None:
+                _remove_directory(record_dir)
+        with self._locks_guard:
+            self._locks.pop(presentation_id, None)  # a waiter holds the lock object and finds the row gone
 
     def folders_for(self, email: str) -> list[FolderView]:
         """The folders ``email`` can open with its role, in ``order_key`` order: every folder (Admin) for the

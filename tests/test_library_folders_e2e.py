@@ -145,8 +145,10 @@ def test_e2e_020_a_folder_lists_its_presentations_newest_first(
     assert shown_rows(page) == UTC_ROWS
     order = assert_controls_are_named_links_and_buttons(page)
     assert order.count("Upload") == 1  # Dan is RW: the Upload field is the one control that is not a link (US-0141)
-    for control in ("Upload", "Replace", "Cancel"):  # Replace and Cancel: the closed collision question (US-0144)
+    for control in ("Upload", "Replace", "Cancel"):  # Replace and Cancel: the closed question (US-0144)
         order.remove(control)
+    assert order.count("Delete") == len(UTC_ROWS)  # one Delete button on each row of a writer (US-0145)
+    order = [control for control in order if control != "Delete"]
     assert [order[0], order[-1]] == ["/", "Sign out"]  # the presentation names in between are links (US-0134)
     assert [link.rsplit("/", 1)[0] for link in order[1:-1]] == ["/open"] * len(UTC_ROWS)
     assert page.get_by_role("link", name="All folders").count() == 1

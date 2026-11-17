@@ -65,7 +65,7 @@ def choose(page: Page, name: str, data: bytes) -> None:
 
 
 def question(page: Page) -> str:
-    return page.locator("#replace-question").inner_text() if page.locator("#replace-upload").is_visible() else ""
+    return page.locator("#confirm-question").inner_text() if page.locator("#confirm-dialog").is_visible() else ""
 
 
 def lines(library: EditorLibrary) -> list[str]:
@@ -119,7 +119,7 @@ def test_e2e_067_cancel_changes_nothing(library: EditorLibrary) -> None:
     page.get_by_role("button", name="Cancel").click()
 
     wait_until(
-        page, lambda: page.locator("#replace-upload").is_visible(), lambda shown: not shown, what="dialog closed"
+        page, lambda: page.locator("#confirm-dialog").is_visible(), lambda shown: not shown, what="dialog closed"
     )
     settle(page)
     assert page.evaluate(NAMES) == before

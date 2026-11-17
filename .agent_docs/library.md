@@ -209,8 +209,4 @@ Modules: `tests/test_library_<area>_http.py` (HTTP) and `_e2e.py` (Chromium) for
   `X-Frame-Options` removed. Serve the hostile page from a loopback listener (`RecordingListener.page`, `EVIL_HOST`
   in `launch_chromium`); then removing the headers makes the frame show `Sign in with Google` (a cross site frame has
   no `SameSite=Lax` cookie, so it is a visitor's view).
-- The editor shell, the read only form, saving a change and the per presentation lock: `library-editor.md`.
-- Upload pipeline and the Upload control: `library-pages.md` § Upload.
-- File name rules (allow list, 100 characters, composed form): `library-pages.md` § Upload.
-- Upload limits, chunked rule, slots, progress: `library-pages.md` § Upload limits.
-- Collision question and replace: `library-pages.md` § Collision and replace.
+- Pages added by the upload and editing stories: `library-pages.md` § Upload, § Upload limits, § Collision and replace, § Delete a presentation (names, limits, chunked rule, slots, shared question dialog); the editor shell, read only form, saving and the per presentation lock: `library-editor.md`.
