@@ -498,6 +498,12 @@ problem>.`), then shows `<name> <percent>%` and `Uploaded <name>.`; a name that 
 count) asks `A presentation named "<name>" already exists. Replace it?` with `Replace` and `Cancel`. `Delete` on a row asks
 `Delete "<name>"? This cannot be undone.` and removes the presentation, its history and its requests for good.
 
+For the operator, stored file names are opaque ids: `mcp-htmleditor library-list` prints one tab separated line per
+presentation (`<folder>`, `<presentation>`, `<stored path>`, `<bytes>`, ordered by folder then name), read only, and
+`mcp-htmleditor history <stored path>` and `restore <stored path> <id>` then work on that file as on any other (the
+previous versions of a presentation are kept by every save and replacement); `No library at <path>` and exit 1 when
+there is none.
+
 On the first start of a new library the product creates the folder `WCBIP Melbourne Décembre 2026` with the two conference
 decks `From Challenges to Change` and `Bridging the Gap` (copied unchanged from `library-seed/`, shipped in the wheel, their
 modified times kept) and lamya.chrif@gmail.com as `Read and write`. It is created once and remembered

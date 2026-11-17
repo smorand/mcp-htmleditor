@@ -169,6 +169,32 @@ class PresentationRow:
     name: str
 
 
+@dataclass(frozen=True, slots=True)
+class InventoryRow:
+    """One stored presentation for the operator: folder name, presentation name, stored file and its size."""
+
+    folder: str
+    presentation: str
+    path: Path
+    bytes: int
+
+
+def read_inventory(connection: sqlite3.Connection, files_dir: Path) -> list[InventoryRow]:
+    """Every presentation of the library with its stored file, by folder name then presentation name (character
+    code order, like the operator's tools); one query and one ``stat`` each, nothing is written (DEC-051)."""
+    rows = connection.execute(
+        "SELECT folders.name, presentations.name, folders.id, presentations.id FROM presentations"
+        " JOIN folders ON folders.id = presentations.folder_id ORDER BY folders.name, presentations.name"
+    ).fetchall()
+    found = []
+    for folder, presentation, folder_id, presentation_id in rows:
+        if not (ID_PATTERN.fullmatch(folder_id) and ID_PATTERN.fullmatch(presentation_id)):
+            continue  # a damaged row never becomes a path
+        path = files_dir / folder_id / f"{presentation_id}{PRESENTATION_SUFFIX}"
+        found.append(InventoryRow(str(folder), str(presentation), path, path.stat().st_size if path.is_file() else 0))
+    return found
+
+
 class Database:
     """The library database file; created ``0600`` in a ``0700`` directory, migrated at construction."""
 
@@ -319,6 +345,10 @@ class Library:
                     folder_name = _folder_name_in(connection, folder_id)
                     self.record(connection, actor, pages.replaced_line(existing, folder_name))
         return Replaced(presentation_id, existing)
+
+    def inventory(self) -> list[InventoryRow]:
+        """The stored presentations for the operator (``library-list``)."""
+        return read_inventory(self._database.connection(), self._files)
 
     def is_seeded(self) -> bool:
         """Whether the initial content was created (or decided) already: ``meta('seeded')`` exists."""

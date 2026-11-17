@@ -286,6 +286,37 @@ def _serve_file(file: str, port: int | None, poll: int | None, host: str, *, ope
         stop_http_server()
 
 
+@main.command("library-list")
+def library_list_cmd() -> None:
+    """List the stored web library: one tab separated line per presentation (folder, presentation, stored path, bytes).
+
+    The stored file names are opaque; this is how an operator reaches the file whose `history` and `restore` apply
+    (SPEC-0025). Read only: the database is opened with mode=ro and nothing is written.
+    """
+    import sqlite3
+
+    from .library.store import FILES_DIRECTORY, read_inventory
+
+    library_dir = get_settings().library_dir
+    database = library_dir / "library.db"
+    if not database.is_file():
+        click.echo(f"No library at {database}", err=True)
+        raise SystemExit(1)
+    # A running server keeps ``library.db-wal``: read through it, read only. Without it nothing writes, and a plain
+    # read only open of a WAL database would create the ``-shm`` and ``-wal`` files: ``immutable`` creates nothing.
+    mode = "mode=ro" if database.with_name(f"{database.name}-wal").exists() else "immutable=1"
+    connection = sqlite3.connect(f"{database.resolve().as_uri()}?{mode}", uri=True)
+    try:
+        rows = read_inventory(connection, library_dir / FILES_DIRECTORY)
+    except sqlite3.Error as exc:
+        click.echo(f"The library at {database} cannot be read: {exc}", err=True)
+        raise SystemExit(1) from exc
+    finally:
+        connection.close()
+    for row in rows:
+        click.echo(f"{row.folder}\t{row.presentation}\t{row.path}\t{row.bytes}")
+
+
 @main.command("arch-checklist")
 def arch_checklist_cmd() -> None:
     """Print the resolved arch-diagram QA checklist and where it lives.

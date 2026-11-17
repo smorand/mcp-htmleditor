@@ -146,6 +146,6 @@
 | US-0144 | SPEC-0025 | Replace an existing presentation after a collision question | US-0143, US-0138 | 1 | done | feat/0049-web-library-mode | US-0143 |
 | US-0145 | SPEC-0025 | Delete a presentation for good | US-0144, US-0138, US-0140 | 1 | done | feat/0049-web-library-mode | US-0144 |
 | US-0146 | SPEC-0025 | Create the initial content on the first start | US-0145 | 1 | done | feat/0049-web-library-mode | US-0145 |
-| US-0147 | SPEC-0025 | The operator can list the stored library and find a file's history | US-0146 | 2 | todo | feat/0049-web-library-mode | |
+| US-0147 | SPEC-0025 | The operator can list the stored library and find a file's history | US-0146 | 2 | done | feat/0049-web-library-mode | US-0146 |
 | US-0148 | SPEC-0025 | Deployment files and the VPS runbook | US-0147, US-0146 | 1 | todo | feat/0049-web-library-mode | |
 | US-0149 | SPEC-0025 | Closing journeys, documentation audit and acceptance of the whole spec | US-0148 | 1 | todo | feat/0049-web-library-mode | |

@@ -39,6 +39,7 @@ mcp-htmleditor new breathe talk.html
 mcp-htmleditor breathe-inline talk.html [--link]   # embed (or link) the Breathe decoration and pictures
 mcp-htmleditor serve file.html [-v|-q] [--host] [--port] [--poll] [--no-browser]
 mcp-htmleditor webserve [--host] [--port]  # web library mode (SPEC-0025): two host names, Google sign in (HTMLEDITOR_GOOGLE_CREDENTIALS_FILE), /health, SIGTERM stops
+mcp-htmleditor library-list                # web library: folder, presentation, stored path, bytes (read only, for history/restore)
 mcp-htmleditor mcp                         # MCP server (stdio)
 mcp-htmleditor export pptx in.html out.pptx
 mcp-htmleditor export docx in.html out.docx
