@@ -146,6 +146,22 @@ def remote_image_problems(scope: Tag) -> list[str]:
     return [message for image in scope.find_all("img") if (message := remote_image_message(image))]
 
 
+LARGE_IMAGE_BYTES = 5 * 1024 * 1024
+"""L012 threshold: decoded size above which an embedded image gets a warning (BL-0035 TBD-005)."""
+
+
+def large_image_message(image: Tag) -> str | None:
+    """Return the L012 message of ``image``, or ``None`` unless it is a base64 data URI over 5 MiB decoded."""
+    source = str(image.get("src") or "").strip()
+    head, _, payload = source.partition(",")
+    if not head.lower().startswith("data:") or not head.lower().endswith(";base64"):
+        return None
+    size = len(payload) * 3 // 4
+    if size <= LARGE_IMAGE_BYTES:
+        return None
+    return f"embedded image of {size / 1024 / 1024:.1f} MiB exceeds 5 MiB, shrink or link it"
+
+
 def remote_image_message(image: Tag) -> str | None:
     """Return the L010 message of ``image``, or ``None`` when its ``src`` is not an ``http(s)://`` url."""
     source = str(image.get("src") or "").strip()

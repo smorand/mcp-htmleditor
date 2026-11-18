@@ -216,5 +216,5 @@ story, otherwise `skill-audit` reports it. The skill text never states a tool co
 | `deck/patch.py` | `apply_patch`: atoms with `touched`, one atomic write; `problems` = lint of the assembled, renumbered text restricted to touched slides |
 | `deck/renumber.py` | Renumbering of ids, counters, `TOTAL`, `slideNames` after a structural patch |
 | `deck/lint.py` | `lint_deck`, `Problem`, rules L001 to L006, reports |
-| `deck/charter_rules.py` | Charter rules L007 to L011 |
+| `deck/charter_rules.py` | Charter rules L007 to L012 |
 | `deck/tools.py` | `create_file`, `export_file`, `template_listing` |

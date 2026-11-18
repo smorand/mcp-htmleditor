@@ -405,3 +405,15 @@ def test_relay_tolerates_a_deck_without_navigation(page: Page, deck_server: str,
 
     assert errors == []
     assert _inner(page, "doc.body.innerText") == before
+
+
+@needs_chromium
+def test_present_without_slide_says_so_and_stays_windowed(page: Page, deck_server: str) -> None:
+    """BL-0035 TBD-009: no slide in the deck, Present shows a notice and never enters full screen."""
+    page.set_viewport_size({"width": 1600, "height": 900})
+    page.goto(deck_server, wait_until="networkidle")
+    _inner(page, "doc.querySelectorAll('[data-type=slide]').forEach(s => s.remove())")
+    page.click("#present-btn")
+    wait_until(page, lambda: page.locator("#no-slide").is_visible(), lambda v: v is True, what="no slide notice")
+    assert page.evaluate("() => !document.fullscreenElement")
+    assert _inner(page, "!doc.fullscreenElement") is True

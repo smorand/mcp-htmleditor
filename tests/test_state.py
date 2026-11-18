@@ -309,7 +309,7 @@ def test_record_round_trip_and_last_json(fresh_state: EditorState, html_file: Pa
     """set_file writes last.json; a process with no file resolves the file and server record from it."""
     fresh_state.set_file(str(html_file))
     fresh_state.port = 6001
-    fresh_state.server_pid = 77
+    fresh_state.server_pid = os.getpid()
     fresh_state.save()
     assert json.loads((config.state_dir() / "last.json").read_text(encoding="utf-8")) == {
         "file": str(html_file.resolve())
@@ -320,7 +320,7 @@ def test_record_round_trip_and_last_json(fresh_state: EditorState, html_file: Pa
     assert other is not fresh_state
     snapshot = other.snapshot()
     assert snapshot["file"] == str(html_file.resolve())
-    assert (snapshot["port"], snapshot["pid"]) == (6001, 77)
+    assert (snapshot["port"], snapshot["pid"]) == (6001, os.getpid())
     other.start_update()
     assert fresh_state.update_in_progress is True
 
@@ -464,3 +464,15 @@ def test_state_dir_env_names_are_significant() -> None:
 def test_autouse_fixture_isolates_the_state_dir() -> None:
     """No test writes into the real ~/.local/state."""
     assert config.state_dir() != Path.home() / ".local" / "state" / "mcp-htmleditor"
+
+
+def test_snapshot_drops_a_dead_pid(fresh_state: EditorState, html_file: Path) -> None:
+    """BL-0035 TBD-007: the pid of a process that exited is not reported; a live one is."""
+    fresh_state.set_file(str(html_file))
+    fresh_state.port = 6001
+    fresh_state.server_pid = os.getpid()
+    assert fresh_state.snapshot()["pid"] == os.getpid()
+    child = subprocess.Popen([sys.executable, "-c", "pass"])
+    child.wait()
+    fresh_state.server_pid = child.pid
+    assert fresh_state.snapshot()["pid"] is None

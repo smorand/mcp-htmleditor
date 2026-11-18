@@ -104,7 +104,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
   `data-type` fires on decks where none has it. `tests/deck_support.py` mutators find slides by
   `<article\s`, because the bootstrap comments mention a bare `<article>`.
 
-## Charter rules L007 to L011 (`deck/charter_rules.py`, US-0043)
+## Charter rules L007 to L012 (`deck/charter_rules.py`, US-0043)
 
 - `lint_deck` adds per slide `charter_problems(slide, charter)` (L007, L008, L009, L011 with their
   severity, from the `deck.charter` key; unknown key: nothing) and L010 (`remote_image_problems`). The
@@ -117,6 +117,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
   `data-slide-type` `title` and `thanks`; any `img` needs a `.med-source` with non blank text.
 - L010: `src` of `img` (stripped, scheme case insensitive, shown stripped). Presentation: per slide, an
   image outside every slide gets slide `-`; other types: all images, slide `-`. `//host` is not remote.
+- L012 (every file type, `large_image_message`): base64 `data:` `img` above 5 MiB decoded (BL-0035 TBD-005), warning, slide of the image else `-`.
 - L011: hex colours of `style` attributes only (never `<style>`), after removing `url(...)` and `/* */`
   (a data URI or fragment id is not a colour). One warning per distinct colour per slide, identity is the
   upper case 6 digit form (`#abc` and `#AABBCC` are one), shown as first written. Accepted: palette,
@@ -196,3 +197,11 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
 - Closure test: acceptance ids E2E-001 to E2E-041 are read by `ast` from `tests/test_deck_*.py`, in the test
   function name, its docstring or the comment lines right above it (the older tests carry the id in a docstring or
   comment, not in the name; renaming them was more invasive). A new test of the spec must carry its id there.
+
+## Decisions of BL-0035 (2026-11-15, legacy SPEC-0001 TBD-005..009)
+
+- TBD-005: no hard limit on embedded images; L012 warns above 5 MiB decoded.
+- TBD-006: no cross process lock between human and agent writers. The contract stays `update_start`/`update_end`
+  plus the mtime reload; SPEC-0009 DEC-020 serializes browser saves inside one process only.
+- TBD-007: `EditorState.snapshot()` reports `pid` null when the recorded process is gone (`os.kill(pid, 0)`).
+- TBD-009: Present/Pointeur/F with no `[data-type="slide"]` shows the `#no-slide` notice (3 s), no full screen.

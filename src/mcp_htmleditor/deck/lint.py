@@ -18,7 +18,13 @@ from typing import Any
 from bs4.element import Comment, NavigableString, Tag
 
 from . import Deck, load_deck, slide_id
-from .charter_rules import WARNING, charter_problems, remote_image_message, remote_image_problems
+from .charter_rules import (
+    WARNING,
+    charter_problems,
+    large_image_message,
+    remote_image_message,
+    remote_image_problems,
+)
 from .renumber import COUNTER
 
 ERROR = "error"
@@ -50,7 +56,7 @@ FilePair = tuple[int | None, str]
 
 def lint_deck(deck: Deck) -> list[Problem]:
     """Return every problem of ``deck``, ordered whole file first, then slide by slide, then by code."""
-    problems = _image_problems(deck)
+    problems = _image_problems(deck) + _large_image_problems(deck)
     if deck.doc_type == "presentation":
         problems.extend(_structure_problems(deck))
         problems.extend(_charter_problems(deck))
@@ -92,6 +98,16 @@ def _image_problems(deck: Deck) -> list[Problem]:
     )
     problems.extend(_problem(deck, "L010", None, message, WARNING) for message in outside)
     return problems
+
+
+def _large_image_problems(deck: Deck) -> list[Problem]:
+    """L012 for every file type: slide of the image in a presentation, else slide ``-``."""
+    owner = {id(image): index for index, slide in enumerate(deck.slides) for image in slide.find_all("img")}
+    return [
+        _problem(deck, "L012", owner.get(id(image)), message, WARNING)
+        for image in deck.soup.find_all("img")
+        if (message := large_image_message(image))
+    ]
 
 
 def lint_file(file: str) -> dict[str, Any]:

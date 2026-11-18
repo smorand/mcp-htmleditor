@@ -273,6 +273,14 @@ window.addEventListener('blur', () => { if (!helpPanel.hidden && document.active
  * armed for a later presentation (SPEC-0017 DEC-013).
  */
 function presentDeck(withPointer) {
+  const doc = frame.contentDocument;
+  if (!doc || !doc.querySelector('[data-type="slide"]')) {
+    // BL-0035 TBD-009: nothing to present (empty deck or malformed HTML): say so, never enter full screen.
+    const notice = document.getElementById('no-slide');
+    notice.hidden = false;
+    setTimeout(() => { notice.hidden = true; }, 3000);
+    return;
+  }
   const win = frame.contentWindow;
   const arm = (value) => { if (win && typeof win.armPointer === 'function') win.armPointer(value); };
   const fallback = () => {

@@ -197,6 +197,8 @@ class EditorState:
         if target is not None and not self.current_file:
             server = _read_record(_file_dir(target) / _SERVER)
             port, pid = server.get("port", port), server.get("pid", pid)
+        if pid is not None and not _pid_alive(pid):
+            pid = None  # BL-0035 TBD-007: a record left by an exited process is not a running server
         expires_in = self.update_expires_in
         return {
             "file": target,
@@ -212,6 +214,19 @@ def _file_dir(file: str) -> Path:
     """Directory holding the records of ``file``, keyed by its resolved absolute path."""
     key = hashlib.sha256(str(Path(file).resolve()).encode("utf-8")).hexdigest()[:_KEY_LENGTH]
     return config.state_dir() / "files" / key
+
+
+def _pid_alive(pid: Any) -> bool:
+    """True when ``pid`` names a live process (signal 0 probes without sending anything)."""
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True  # PermissionError: the process exists, owned by someone else
+    return True
 
 
 def _is_number(value: Any) -> TypeGuard[int | float]:

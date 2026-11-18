@@ -407,3 +407,16 @@ def test_deck_lint_charter_palettes_live_in_one_module() -> None:
     folder = Path(charter_rules.__file__).parent
     holders = [p.name for p in folder.glob("*.py") if "#003A8D" in p.read_text(encoding="utf-8")]
     assert holders == ["charter_rules.py"]
+
+
+def _data_image(megabytes: float) -> str:
+    """An ``img`` whose base64 payload decodes to about ``megabytes`` MiB."""
+    payload = "A" * int(megabytes * 1024 * 1024 * 4 / 3)
+    return f'<img src="data:image/png;base64,{payload}" alt="big">'
+
+
+def test_deck_lint_large_embedded_image_warns(tmp_path: Path) -> None:
+    """BL-0035 TBD-005: a base64 image over 5 MiB gives an L012 warning on its slide; 1 MiB stays clean."""
+    lines, _ = lint(tmp_path, with_class(deck_ei(), 1, _data_image(6)))
+    assert lines[0] == "warning L012 slide-1 embedded image of 6.0 MiB exceeds 5 MiB, shrink or link it"
+    assert lint(tmp_path, with_class(deck_ei(), 1, _data_image(1)))[0] == [OK]

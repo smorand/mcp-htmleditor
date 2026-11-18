@@ -722,7 +722,7 @@ Anything else answers `403 {"error": "forbidden host"}`, `403 {"error": "forbidd
 `415 {"error": "unsupported content type"}`, and is logged as a warning. `GET /health` stays open
 for health checks: it answers `{"ok": true, "status": "ok", "pid", "file", "page", "port", "version", "started" (UTC ISO), "uptime_seconds"}`
 (`file` and `page` are null when no file is loaded), reads no file and writes nothing. Limitation: in a container bound to `0.0.0.0`, a client on the network that sets
-`Host: localhost` is not stopped; do not publish the port beyond the machine (tracked as BL-0019).
+`Host: localhost` is not stopped; do not publish the port beyond the machine (the container image is for local development; the web library mode is the one to expose).
 
 The server also protects itself from malformed or stalled requests. A request with a duplicated or
 ambiguous `Host`, `Origin`, `Content-Length` or `Content-Type` header, a `Transfer-Encoding` header or a folded
