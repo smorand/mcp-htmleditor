@@ -419,6 +419,135 @@ server runs at a time: calling `start_server` on a second file switches the serv
 (use `open_file` for that) rather than opening a second server — run a separate agent
 session per presentation if you need several displayed simultaneously.
 
+## Web library mode
+
+`mcp-htmleditor webserve [--host HOST] [--port PORT]` starts one process meant to run behind nginx at
+`slides.scm-platform.org` (SPEC-0025, being built story by story). It answers only the host names of
+`HTMLEDITOR_LIBRARY_ORIGIN` (default `https://slides.scm-platform.org`) and `HTMLEDITOR_LIBRARY_CONTENT_ORIGIN`
+(default `https://slides-content.scm-platform.org`, the two must differ, else the command exits 1); any other host
+name gets `403 {"error": "forbidden host"}`, a request that reached nginx in plain http
+(`X-Forwarded-Proto: http`) gets `308` to the same path on the secure origin, and `GET /health` answers
+`{"ok": true, "status": "ok", "version"}` on any host name, nothing more. `HTMLEDITOR_LIBRARY_DIR` (default
+`<state dir>/library`) holds the library database `library.db` (folders, members, presentations, activity, sign in
+attempts, sessions) and the presentation files `files/<folder id>/<presentation id>.html` (random ids, never names). It
+stops on SIGINT or SIGTERM. The local `serve` is unchanged and never shows a library page.
+
+Sign in is `Sign in with Google` (OpenID Connect code flow with PKCE, the account chooser every time, a verified
+address required). `HTMLEDITOR_GOOGLE_CREDENTIALS_FILE` names the OAuth client file downloaded from the Google console
+(`{"web": {"client_id", "client_secret", "auth_uri", "token_uri", "redirect_uris"}}`); register
+`<HTMLEDITOR_LIBRARY_ORIGIN>/auth/callback` (for example `https://slides.scm-platform.org/auth/callback`) as an
+authorized redirect address in that console first. Without the file, or with the address missing, the server still
+starts, logs an error or a warning, and every sign in shows `Sign-in is unavailable. Try again later.` A session lasts
+exactly 30 days from the sign in, never extended by use, and survives closing the browser and restarting `webserve`;
+`Sign out` ends it in that browser only. While `library.db` cannot be read every library page answers `503` with
+`The library is unavailable. Try again later.` and nothing else; it works again, with no restart, as soon as the file
+is readable. The home page lists the folders where the account
+holds a role (`Read and write` or `Read only`), ordered without regard to case or accents (digits, then Latin letters,
+then other alphabets); an account with none sees `Access denied.`, and so does a signed in person at any address that
+names no page. seb.morand@gmail.com, in any letter case, is the administrator: every folder labelled `Admin`, the
+`Administration` entry, and `You have no access to any folder yet.` when no folder exists. A folder (`/f/<folder id>`)
+lists its presentations, newest first (same minute: by name), each with its name, its last modified date in the
+browser's time zone (`16 Nov 2026 14:32`) and its size (`1 byte`, `900 bytes`, `1.5 KB`, `2.0 MB`), with `All
+folders` back to the home page, or `This folder has no presentations yet.`; a folder that does not exist and a folder
+where the person holds no role give the same `Access denied.` page, byte for byte. No library page can be shown inside
+a page of another site. `/lib/library.css`, `/lib/library.js` and `/lib/theme.js` are the only files served without a session.
+
+A presentation opens at `/open/<presentation id>` for anyone holding a role in its folder: the library hands out a
+one time ticket (60 s) and sends the browser to the content origin, which trades it for a cookie valid for that one
+presentation (`/d/<presentation id>/`) as long as the session lives. There the deck itself, its status (change marker
+and `<name>.html`, no storage location) and the HTML download (the stored file unchanged, under its own name, accents
+and apostrophes kept) answer that person only; a DOCX export or any other address under `/d/<id>/` is `Access
+denied.`. After `Sign out` a copy of the session or of the presentation cookie gets the sign in page and no byte of the
+presentation; a stale, unknown or forbidden presentation link gives the same `Access denied.` page.
+
+`Administration` (`/admin`, the administrator only; anyone else gets `Access denied.`) lists the folders, the field
+`Folder name` with `Create folder`, and the `Activity` list. A folder name is trimmed, brought to its composed form, and
+holds 1 to 60 letters of any alphabet, digits, spaces or hyphens (`Folder names use 1 to 60 letters, digits, spaces or
+hyphens.` otherwise); a name equal to an existing one without regard to case is refused with `A folder named "<name>"
+already exists.` (an accent makes another name). The activity list shows the 500 newest successful actions, newest
+first (`Created folder "Oncology 2030"`, `Deleted folder "Pneumo Été"`, who, when), or `No activity yet.`; sign ins and refused attempts are not
+listed. Every request that changes the library must come from the library's own pages (`Origin` equal to the library
+origin; JSON calls with `Content-Type: application/json`), else `Access denied.`, even with a valid session.
+
+`Delete folder` next to a folder asks `Type the folder name to confirm.`; only the exact name (case, accents and spaces
+count; accents typed as separate marks are composed first) deletes the folder, all its presentations with their
+history, requests and AI suggestions, and its members, for good. Any other text shows `The name does not match.
+Nothing was deleted.`; `Cancel` closes the prompt. A folder created later with the same name is empty and has no
+member; former members get `Access denied.`.
+
+Each folder of the administration has its `Members`: the field `Email address`, the chooser `Role` (`Read and write` or
+`Read only`, nothing else) and `Add member`; each member, listed by address, has a role chooser and `Remove`. The address
+is trimmed and stored in lower case; it must be one address `local@domain` (letters, digits and `. _ % + -` before the
+`@`, a dot in the domain), else `This is not a valid email address.`; any role but the two is `This is not a valid
+role.`. An address already listed, in any letter case, keeps one entry: the same role changes nothing, the other role
+updates it. A change applies to that folder only, at the person's next page, with no new sign in; the activity list
+reads `Added <email> as RW to "<folder>"`, `Changed <email> to RO in "<folder>"`, `Removed <email> from "<folder>"`.
+The administrator's rights never come from a member list.
+
+A person with `Read and write` (or the administrator) edits a presentation in the same editor as the local mode: each
+change is stored 0.8 s after typing stops, at once when the field is left, 0.6 s after a slide action, the previous version
+goes to the history, and a conflict with someone else's change shows the editor's own `Keep mine` / `Reload` notice. A
+person with `Read only` gets the same screen with no control that changes anything (full screen, pointer, presenter window
+and the HTML and PPTX downloads stay; the PPTX is the flow output, no script of the deck runs on the server). When a
+session ends or a right is removed while a presentation is open, the editor keeps its text and shows `Your session has
+expired. Sign in again to save.` or `Access denied.` at the next store, and stays silent until the person acts if nothing
+is unsaved. `Upload` on a folder page (writers only) takes a `.html` file of at most 25 MB (`The file is larger than 25
+MB.`), checks the name (`This file name is not allowed.`: Latin letters, digits, spaces and `. _ - ( ) '`, 100 characters
+at most), and that it is a valid presentation by the editor's own checks (`This file is not a valid presentation: <first
+problem>.`), then shows `<name> <percent>%` and `Uploaded <name>.`; a name that exists (without regard to case, accents
+count) asks `A presentation named "<name>" already exists. Replace it?` with `Replace` and `Cancel`. `Delete` on a row asks
+`Delete "<name>"? This cannot be undone.` and removes the presentation, its history and its requests for good.
+
+For the operator, stored file names are opaque ids: `mcp-htmleditor library-list` prints one tab separated line per
+presentation (`<folder>`, `<presentation>`, `<stored path>`, `<bytes>`, ordered by folder then name), read only, and
+`mcp-htmleditor history <stored path>` and `restore <stored path> <id>` then work on that file as on any other (the
+previous versions of a presentation are kept by every save and replacement); `No library at <path>` and exit 1 when
+there is none.
+
+On the first start of a new library the product creates the folder `WCBIP Melbourne Décembre 2026` with the two conference
+decks `From Challenges to Change` and `Bridging the Gap` (copied unchanged from `library-seed/`, shipped in the wheel, their
+modified times kept) and lamya.chrif@gmail.com as `Read and write`. It is created once and remembered
+(`HTMLEDITOR_LIBRARY_SEED_DIR` overrides the directory): later starts add and reset nothing, even when every folder was
+deleted, and the seeding is not an entry of the activity list.
+
+The pages follow the design system of `~/projects/perso/app-design` in a light and a dark theme (the system's at first, then the choice
+of the button in the bar, kept in the browser). Folders and presentations are galleries: a folder is a card with the shape of a folder, its
+role and its number of presentations; a presentation is a card showing the first picture of its first slide (read from the file, no
+rendering) or the ridge of the design system when it has none. `make sync-library-design` rebuilds `static/library.css` from the design
+system; see `.agent_docs/library-design.md`.
+
+### Deploying the web library mode
+
+The image runs `webserve` behind the VPS nginx (`docker-compose.prod.yml`: service `mcp-htmleditor`, `expose` 7842, no
+published port, network `proxy-network`, data in `/app/data/mcp-htmleditor`). Nothing here is done by a test or by `make
+check`; the first deployment is the owner's act, in this order:
+
+1. Google console: add the authorized redirect address `https://slides.scm-platform.org/auth/callback` to the OAuth client
+   of the project that owns `~/.credentials/scm-pwd-web.json`. Until then every sign in ends with `Sign-in is unavailable.
+   Try again later.`
+2. DNS: `*.scm-platform.org` already points at the VPS; check `dig +short slides.scm-platform.org
+   slides-content.scm-platform.org`.
+3. Certificate of the content host (the library host one is obtained by `vps-deploy.sh`, as for every app): `ssh vps "cd
+   /app/vps-management && LETSENCRYPT_EMAIL=seb.morand@gmail.com ./scripts/letsencrypt.sh obtain
+   slides-content.scm-platform.org && ./scripts/proxy.sh reload"`.
+4. Data (never in the repository): `ssh vps "mkdir -p /app/data/mcp-htmleditor"`, copy `environments/prod/.env.example` to
+   `/app/data/mcp-htmleditor/.env` (a deploy copies `environments/<env>/*`, which skips dotfiles), and copy the credentials
+   file to `/app/data/mcp-htmleditor/google-oauth.json`, mode 0600.
+5. `make deploy-vps TAG=vX.Y.Z`: pushes the tag, runs `vps-deploy.sh smorand/mcp-htmleditor@<tag> prod
+   slides.scm-platform.org:7842 ./environments`, adds the content host route once (`proxy.sh add
+   slides-content.scm-platform.org 7842 mcp-htmleditor`), gives `/app/data/mcp-htmleditor` to uid 10001, then builds and
+   starts the container. Every variable of the target (`VPS_HOST`, `VPS_APP_NAME`, `VPS_ENDPOINT`, `VPS_CONTENT_HOST`,
+   `VPS_GIT_ORG`, `VPS_GIT_REPO`, `VPS_MANAGEMENT_DIR`) can be overridden. `make undeploy-vps` removes the container and keeps
+   the data.
+6. Verify: `curl -s https://slides.scm-platform.org/health` answers `{"ok": true, ...}`; `curl -sI
+   http://slides.scm-platform.org/` shows a `301` to https; `curl -s -H 'Host: other.example'
+   https://slides.scm-platform.org/` is refused; sign in in a browser.
+7. The public static site `lamya-slides.scm-platform.org` is not touched: `curl -sI https://lamya-slides.scm-platform.org/`
+   before and after must answer the same.
+
+The library database, the presentation files, the history and the sessions live in `/data` (the host directory above), so
+they survive a redeploy; the first start of an empty `/data/library` creates the initial content (see above).
+
 ## Templates
 
 Templates are resolved in priority order:
@@ -566,6 +695,11 @@ Every variable is read through the `Settings` class (pydantic-settings,
 | `HTMLEDITOR_BIN_DIR` | `~/.local/bin` | CLI install target |
 | `HTMLEDITOR_OTEL_DESTINATION` | unset | OTLP/HTTP endpoint for spans; unset means local JSONL |
 | `HTMLEDITOR_OTEL_API_KEY` | unset | Sent as `Authorization: Bearer <key>` on OTLP exports |
+| `HTMLEDITOR_LIBRARY_ORIGIN` | `https://slides.scm-platform.org` | `webserve` library origin, `http(s)://host[:port]` without a path |
+| `HTMLEDITOR_LIBRARY_CONTENT_ORIGIN` | `https://slides-content.scm-platform.org` | `webserve` content origin, another host name |
+| `HTMLEDITOR_LIBRARY_DIR` | `<state dir>/library` | `webserve` library data |
+| `HTMLEDITOR_GOOGLE_CREDENTIALS_FILE` | unset | `webserve` Google OAuth client file (secret, read only by `library/signin.py`) |
+| `HTMLEDITOR_LIBRARY_SEED_DIR` | repo `library-seed/`, else the package's | `webserve` initial content (manifest and the two decks) |
 | `XDG_CONFIG_HOME` | `~/.config` | Base for config |
 | `XDG_CACHE_HOME` | `~/.cache` | Base for cache |
 
@@ -625,7 +759,15 @@ src/mcp_htmleditor/
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
 ├── mcp_server.py    FastMCP server with 22 tools
-├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck)
+├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck; DEC-003 hooks for the library)
+├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
+├── library/signin.py  Google sign in (GoogleClient, claims), login attempts, sessions, presentation tickets and grants (Accounts)
+├── library/store.py   library.db: Database (migrations), Library repository (role_in, folders_for, is_admin, presentations_in, presentation, presentation_path, create_folder, delete_folder, set_member, remove_member, members_by_folder, activity, record)
+├── library/names.py   compose, name_key, order_key (folder order), check_folder_name, check_email, format_size
+├── library/pages.py   every page and English text of the library mode, esc()
+├── library/routes_library.py  /lib/library.css and .js, /auth/start, /auth/callback, /auth/logout, home page, folder page, /open/<id>
+├── library/routes_deck.py  content origin: /enter, /d/<id>/content-frame, /status, /content, /download
+├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder), POST /api/folders/<id>/delete, POST /api/folders/<id>/members (add or change), POST /api/folders/<id>/members/remove
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)

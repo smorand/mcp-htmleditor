@@ -17,6 +17,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
 COPY templates/ ./templates/
 COPY skill/ ./skill/
+COPY library-seed/ ./library-seed/
 
 # Version is injected the same way `make build` does it.
 RUN printf '"""Application version.\n\nThe committed value is a placeholder; "make build" and "make docker-build"\noverwrite it from the git tag (git describe --tags --always --dirty).\n"""\n\nfrom __future__ import annotations\n\n__version__: str = "%s"\n' "${APP_VERSION}" > src/mcp_htmleditor/version.py

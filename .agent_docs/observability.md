@@ -45,6 +45,9 @@ Names follow `category.operation`.
 | `render.cleanup` | `render/files.remove_stale`, after a successful picture | `file.count` (pictures removed) |
 | `mcp.render` | `mcp_server.render` | `file.path` |
 | `file.write` | editor save, `new` from a template, PPTX save, `fileio.atomic_write` (`patch`) | `file.path`, `file.size`, `export.format`, `template.key` |
+| `auth.google_token` | `library/signin.GoogleClient.exchange`, the code exchange at Google's `token_uri` | `http.status_code` (absent when Google was unreachable) |
+| `session.create` | `library/signin.Accounts`, the session row of a successful sign in | none |
+| `library.delete_folder` | `library/store.Library.delete_folder`, the removal of the files and state directories once the rows are gone (no span for a refusal) | `presentations` (count) |
 
 The deck service (`src/mcp_htmleditor/deck/`) opens no span of its own (no `deck.*` span exists yet); a `patch`
 shows up as `mcp.patch` around one `file.write` from `fileio.atomic_write`, absent for a dry run or a no change patch.
@@ -54,6 +57,15 @@ is recorded and the span status becomes `ERROR`; the exception is re-raised unto
 
 Never trace document content, prompts, HTML fragments or credentials. Paths, counts,
 sizes, charter keys and durations only.
+
+Web library (SPEC-0025, DEC-048): no address, name, cookie, token, `state`, `nonce`, PKCE verifier, code or client
+secret in a log line or a span attribute. A refused sign in logs `Sign in refused: <fixed reason>` (WARNING,
+`library.routes_library`); a refused state change logs `Refused <METHOD> <path>: origin` (or `: content type` for a
+JSON route without `application/json`). Administration (US-0130, no new span: one SQLite transaction, no external
+call): `Created a folder` (INFO), `Refused POST /api/folders: folder name` and `: duplicate folder name` (WARNING,
+`library.routes_admin`), never the name. Folder deletion (US-0131): `Deleted a folder` (INFO), `Refused POST
+/api/folders/<fid>/delete: name mismatch` (WARNING), `Could not remove a directory of a deleted folder: <ExcType>` and
+`Skipped a malformed presentation id of a deleted folder` (WARNING, `library.store`).
 
 ## Exporting somewhere else
 
@@ -108,3 +120,7 @@ with trace_span("export.pdf", {"file.path": str(path)}) as span:
 
 `trace_span` is safe without `configure_tracing()`: the OpenTelemetry API hands back a
 no-op tracer, so a library user pays nothing.
+- `library.upload` (US-0141): one span per stored upload, attribute `file.size` only; no name, address or path.
+- `library.replace` (US-0144): one span per replacement, attribute `file.size` only.
+- `library.seed` (US-0146): one span on the first start, attribute `presentations` only.
+- `library.delete_presentation` (US-0145): one span per presentation deletion, no attribute; `library.delete_folder` carries the count of presentations only.

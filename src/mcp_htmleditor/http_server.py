@@ -24,6 +24,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -330,6 +331,30 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._not_found()
 
     # ------------------------------------------------------------------
+    # Hooks (SPEC-0025 DEC-003): the library handler serves one stored presentation per request through these
+    # ------------------------------------------------------------------
+
+    def _served_file(self) -> str | None:
+        """The file the editor routes read and write."""
+        return get_state().current_file
+
+    def _served_name(self) -> str:
+        """The name of the download and of the export stem."""
+        return Path(self._served_file() or "").name
+
+    def _save_lock(self) -> AbstractContextManager[object]:
+        """Held while a save writes the file."""
+        return get_state().save_lock
+
+    def _failure_reason(self, exc: Exception) -> str:
+        """The text of a failed read, download or export answer."""
+        return str(exc)
+
+    def _pptx_options(self) -> dict[str, bool]:
+        """Keyword arguments of ``to_pptx`` for the PPTX export route."""
+        return {}
+
+    # ------------------------------------------------------------------
     # Route handlers
     # ------------------------------------------------------------------
 
@@ -375,21 +400,21 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
 
     def _serve_content(self) -> None:
         """Return the raw HTML of the current file (for POST saves)."""
-        state = get_state()
-        if not state.current_file:
+        served = self._served_file()
+        if not served:
             self._send_json({"error": "No file loaded"}, status=404)
             return
         try:
-            html = Path(state.current_file).read_text(encoding="utf-8")
+            html = Path(served).read_text(encoding="utf-8")
         except OSError as exc:
-            self._send_json({"error": str(exc)}, status=500)
+            self._send_json({"error": self._failure_reason(exc)}, status=500)
             return
         self._send_bytes(html.encode("utf-8"), "text/html")
 
     def _serve_content_frame(self) -> None:
         """Serve the current HTML file as-is for the iframe (full document)."""
-        state = get_state()
-        if not state.current_file:
+        served = self._served_file()
+        if not served:
             placeholder = (
                 b"<html><body>"
                 b"<p style='font-family:sans-serif;padding:40px;color:#525252'>"
@@ -400,29 +425,30 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._send_bytes(placeholder, "text/html")
             return
         try:
-            html = Path(state.current_file).read_text(encoding="utf-8")
+            html = Path(served).read_text(encoding="utf-8")
         except OSError as exc:
-            self._send_json({"error": str(exc)}, status=500)
+            self._send_json({"error": self._failure_reason(exc)}, status=500)
             return
         self._send_bytes(html.encode("utf-8"), "text/html")
 
     def _serve_download(self) -> None:
         """Send the loaded file byte for byte as an attachment named like the file; writes no state."""
-        state = get_state()
-        if not state.current_file:
+        served = self._served_file()
+        if not served:
             self._send_json({"error": "No file loaded"}, status=404)
             return
-        file = Path(state.current_file)
+        file = Path(served)
         try:
             data = file.read_bytes()
         except OSError as exc:
             logger.warning("Download of %s failed: %s", file.name, exc)
-            self._send_json({"error": str(exc)}, status=500)
+            self._send_json({"error": self._failure_reason(exc)}, status=500)
             return
-        ascii_name = re.sub(r"[^A-Za-z0-9._ -]", "_", file.name)
+        name = self._served_name()
+        ascii_name = re.sub(r"[^A-Za-z0-9._ -]", "_", name)
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
-        encoded = quote(file.name, safe="")
+        encoded = quote(name, safe="")
         self.send_header("Content-Disposition", f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{encoded}")
         self.send_header("Content-Length", str(len(data)))
         self._send_no_store_headers()
@@ -433,21 +459,21 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         """Generate a PPTX from the current file and return it as a download."""
         from .export.to_pptx import to_pptx
 
-        state = get_state()
-        if not state.current_file:
+        served = self._served_file()
+        if not served:
             self._send_json({"error": "No file loaded"}, status=404)
             return
-        src = Path(state.current_file)
-        stem = src.stem
+        src = Path(served)
+        stem = Path(self._served_name()).stem
         with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
             tmp_path = tmp.name
         try:
             with trace_span("export.pptx", {"file.path": str(src)}):
-                to_pptx(str(src), tmp_path)
+                to_pptx(str(src), tmp_path, **self._pptx_options())
             data = Path(tmp_path).read_bytes()
         except Exception as exc:
             logger.error("PPTX export failed: %s", exc)
-            self._send_json({"error": str(exc)}, status=500)
+            self._send_json({"error": self._failure_reason(exc)}, status=500)
             return
         finally:
             Path(tmp_path).unlink(missing_ok=True)
@@ -459,12 +485,12 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         """Generate a DOCX from the current file and return it as a download."""
         from .export.to_docx import to_docx
 
-        state = get_state()
-        if not state.current_file:
+        served = self._served_file()
+        if not served:
             self._send_json({"error": "No file loaded"}, status=404)
             return
-        src = Path(state.current_file)
-        stem = src.stem
+        src = Path(served)
+        stem = Path(self._served_name()).stem
         with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
             tmp_path = tmp.name
         try:
@@ -473,7 +499,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             data = Path(tmp_path).read_bytes()
         except Exception as exc:
             logger.error("DOCX export failed: %s", exc)
-            self._send_json({"error": str(exc)}, status=500)
+            self._send_json({"error": self._failure_reason(exc)}, status=500)
             return
         finally:
             Path(tmp_path).unlink(missing_ok=True)
@@ -577,7 +603,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
 
     def _loaded_file(self) -> Path | None:
         """The file this server serves, else answer 404 and return None."""
-        current = get_state().current_file
+        current = self._served_file()
         if not current:
             self._send_json({"error": "No file loaded"}, status=404)
             return None
@@ -624,21 +650,21 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
 
     def _receive_content(self) -> None:
         """Receive updated HTML from the editor and write it to disk (SPEC-0009 save pipeline)."""
-        state = get_state()
-        if not state.current_file:
+        served = self._served_file()
+        if not served:
             self._send_json({"error": "No file loaded"}, status=404)
             return
         try:
             request = self._read_save_request()
-            refuse_template(state.current_file)
-            with state.save_lock:
-                mtime = write_save(Path(state.current_file), request)
+            refuse_template(served)
+            with self._save_lock():
+                mtime = write_save(Path(served), request)
         except SaveRefusal as refusal:
             logger.warning("Refused %s %s: %s", self.command, urlparse(self.path).path, refusal.payload["error"])
             self._send_json(refusal.payload, status=refusal.status)
             return
         except (OSError, WriteError) as exc:
-            logger.error("Save failed for %s: %s", state.current_file, exc)
+            logger.error("Save failed for %s: %s", served, exc)
             self._send_json({"error": failure_text(exc)}, status=500)
             return
         self._send_json({"ok": True, "mtime": mtime})
@@ -662,8 +688,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         """
         from .arch_layout import layout_file
 
-        state = get_state()
-        if not state.current_file:
+        served = self._served_file()
+        if not served:
             self._send_json({"error": "No file loaded"}, status=404)
             return
 
@@ -673,7 +699,7 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._refuse_request(refusal.status, refusal.payload["error"])
             return
 
-        target = Path(state.current_file)
+        target = Path(served)
         with trace_span("mcp.layout_arch_diagram", {"file.path": str(target)}) as span:
             try:
                 report = layout_file(target)
@@ -1027,9 +1053,9 @@ _WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})  # noqa: S104  # nosec B104
 class _EditorServer(ThreadingHTTPServer):
     """HTTP server that remembers the host it was asked to bind (SPEC-0005 host gate) and its open connections."""
 
-    def __init__(self, bind_host: str, port: int) -> None:
+    def __init__(self, bind_host: str, port: int, handler: type[BaseHTTPRequestHandler] = _EditorHandler) -> None:
         self.connections = ConnectionRegistry()  # before the bind: a handler may look it up as soon as one exists
-        super().__init__((bind_host, port), _EditorHandler)
+        super().__init__((bind_host, port), handler)
         self.bind_host = bind_host
 
 

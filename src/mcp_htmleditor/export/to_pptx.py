@@ -63,7 +63,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def to_pptx(input_html: str, output_pptx: str, *, paint: bool = True) -> ExportReport:
+def to_pptx(
+    input_html: str, output_pptx: str, *, paint: bool = True, embedded_pictures_only: bool = False
+) -> ExportReport:
     """Convert an HTML presentation to a PPTX file.
 
     Args:
@@ -71,13 +73,15 @@ def to_pptx(input_html: str, output_pptx: str, *, paint: bool = True) -> ExportR
         output_pptx: Destination path of the generated ``.pptx``.
         paint: Repaint the slides from the rendered HTML (needs Chromium). ``False`` keeps the flow build, which is
             also the degraded result when the render is unavailable.
+        embedded_pictures_only: Read a picture only from a ``data:`` address; any other address is skipped with a
+            warning and nothing is read from disk (the web library, SPEC-0025 DEC-043).
 
     Returns:
         An :class:`ExportReport` with the number of slides written and the list
         of warnings (missing images, unsupported components, empty documents).
     """
     with trace_span("export.pptx", {"file.path": str(Path(input_html).resolve())}) as span:
-        report = _build_pptx(input_html, output_pptx, paint)
+        report = _build_pptx(input_html, output_pptx, paint, embedded_pictures_only)
         span.set_attribute("slide.count", report.slide_count)
         span.set_attribute("warning.count", len(report.warnings))
         logger.info(
@@ -90,7 +94,9 @@ def to_pptx(input_html: str, output_pptx: str, *, paint: bool = True) -> ExportR
         return report
 
 
-def _build_pptx(input_html: str, output_pptx: str, paint: bool = True) -> ExportReport:
+def _build_pptx(
+    input_html: str, output_pptx: str, paint: bool = True, embedded_pictures_only: bool = False
+) -> ExportReport:
     """Do the actual HTML to PPTX conversion (see :func:`to_pptx`)."""
     source = Path(input_html)
     soup = BeautifulSoup(source.read_text(encoding="utf-8"), "html.parser")
@@ -116,6 +122,7 @@ def _build_pptx(input_html: str, output_pptx: str, paint: bool = True) -> Export
         theme=resolver.theme,
         base_dir=source.resolve().parent,
         report=report,
+        embedded_pictures_only=embedded_pictures_only,
     )
     vector_warnings: list[str] = []
     for index, article in enumerate(articles):
@@ -125,7 +132,12 @@ def _build_pptx(input_html: str, output_pptx: str, paint: bool = True) -> Export
         slide = prs.slides.add_slide(blank_layout)
         _SlideBuilder(context, slide, article, index).build()
 
-    if paint and articles and articles[0] is not soup.body and paint_presentation(prs, source, report):
+    if (
+        paint
+        and articles
+        and articles[0] is not soup.body
+        and paint_presentation(prs, source, report, embedded_pictures_only)
+    ):
         # SPEC-0024: every presentation is repainted from the rendered HTML; the flowed slides stay when Chromium is
         # unavailable (degraded export, one warning). The notes pages are kept either way. The painted slides carry
         # the vector figures as pictures, so their "ignored" warnings no longer apply.

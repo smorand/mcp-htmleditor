@@ -1,16 +1,32 @@
-# Production overlay: builds the image locally with the version injected.
-# Usage: APP_VERSION=$(git describe --tags --always) \
-#          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Standalone file of the owner's VPS convention (web library mode, SPEC-0025): the image runs `webserve`, nginx on the
+# `proxy-network` reaches it on port 7842, nothing is published on the host. The data (library database, presentation
+# files, editor state, Google credentials file) lives in /app/data/mcp-htmleditor on the host.
+# Deployed by `make deploy-vps TAG=vX.Y.Z` (see "Deploying the web library mode" in README.md); the local stack stays
+# docker-compose.yml (`make run-up`).
 
 services:
-  htmleditor:
+  mcp-htmleditor:
     build:
       context: .
       args:
         APP_VERSION: ${APP_VERSION:-dev}
-    image: ${DOCKER_PREFIX:-}${PROJECT_NAME:-mcp-htmleditor}:${DOCKER_TAG:-latest}
-    restart: always
-    environment:
-      HTMLEDITOR_HOST: 0.0.0.0
-      HTMLEDITOR_OTEL_DESTINATION: ${HTMLEDITOR_OTEL_DESTINATION:-}
-      HTMLEDITOR_OTEL_API_KEY: ${HTMLEDITOR_OTEL_API_KEY:-}
+    container_name: mcp-htmleditor
+    command: ["webserve"]
+    restart: unless-stopped
+    expose:
+      - "7842"
+    volumes:
+      - /app/data/mcp-htmleditor:/data
+    env_file:
+      - /app/data/mcp-htmleditor/.env
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    external: true

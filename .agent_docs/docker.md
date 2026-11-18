@@ -39,13 +39,18 @@ command:
 command: ["serve", "--no-browser", "/data/ma-presentation.html"]
 ```
 
-`docker-compose.prod.yml` is the overlay that builds locally with the version injected
-and forwards the OTel variables:
+`docker-compose.prod.yml` is the standalone file of the owner's VPS convention (web library mode, SPEC-0025): service
+`mcp-htmleditor`, `command: ["webserve"]`, `expose: 7842` (no published port), network `proxy-network` (external), data
+`/app/data/mcp-htmleditor` on `/data`, `env_file: /app/data/mcp-htmleditor/.env` (copied once from
+`environments/prod/.env.example`), json-file logs, build arg `APP_VERSION`. It no longer extends `docker-compose.yml`; the
+local stack stays `docker-compose.yml` (`make run-up`). `make deploy-vps TAG=vX.Y.Z` deploys it (`.agent_docs/makefile.md`).
 
-```bash
-APP_VERSION=$(git describe --tags --always) \
-  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
+The Dockerfile copies `library-seed/` into the builder stage (the wheel force-includes it as `mcp_htmleditor/library_seed`,
+so the first start of an empty library creates the initial content); no Chromium is added (the library PPTX is the flow
+output); `.dockerignore` drops `.git`, `.env*`, `sdlc/`, `tests/`, `docs/`, `data/` and keeps `src/`, `templates/`, `skill/`,
+`library-seed/`, `pyproject.toml`, `uv.lock` and `README.md`. Checked by `tests/test_library_deploy.py` (static, nothing runs).
+`webserve` in the image: `docker run -d -p 7842:7842 -e HTMLEDITOR_HOST=0.0.0.0 -e HTMLEDITOR_LIBRARY_DIR=/data/library
+mcp-htmleditor:latest webserve`, then `curl -s -H 'Host: slides.scm-platform.org' http://127.0.0.1:7842/health`.
 
 ## Checks worth running after touching the image
 

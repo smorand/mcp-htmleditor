@@ -28,3 +28,8 @@ Les contrôles sont des icônes sans texte; le nom et la touche s'affichent apr�
 ## GET /health
 
 Sur le port du serveur, sans condition d'hôte: `{"ok": true, "pid", "file", "page", "port", "version", "started", "uptime_seconds"}`. `file` (chemin absolu) et `page` (son nom) valent `null` sans fichier chargé. Rien n'est lu ni écrit. Avant de démarrer, d'arrêter ou de redémarrer un serveur, vérifier avec `get_status` ou `/health` quel fichier il sert et son pid; ne jamais arrêter un serveur qu'on n'a pas lancé.
+
+## L'éditeur en mode bibliothèque web
+
+Sous `mcp-htmleditor webserve`, la même fenêtre s'ouvre sur `/d/<id>/` après la connexion Google, et chaque présentation est un fichier de la bibliothèque, pas un chemin. Une personne en lecture seule (`Read only`) n'a aucun contrôle qui modifie (pas d'édition, d'annulation, de notes, de demandes, d'Ask AI, d'actions de slide; la touche `E` ne fait rien) mais garde plein écran, pointeur, fenêtre présentateur, téléchargements HTML et PPTX. Un agent n'écrit jamais dans la bibliothèque: il édite un fichier local avec `serve`, puis la personne le téléverse (`Upload`, 25 Mo, `.html` valide). Si la session ou le droit prend fin, l'éditeur garde le texte et affiche `Your session has expired. Sign in again to save.` ou `Access denied.` à la prochaine sauvegarde.
+

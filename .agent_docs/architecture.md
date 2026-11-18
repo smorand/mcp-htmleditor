@@ -36,6 +36,9 @@ LLM agent ──MCP(stdio)──▶ mcp_server ──▶ state ◀── http_se
 
 `_EditorHandler` and the server lifecycle functions are the I/O boundary and are marked `# pragma: no cover`; the
 pure helpers next to them (`_strip_editor_artifacts`, `_rebuild_full_html`, `health_payload`) are fully tested.
+Hooks (2026-11-16, SPEC-0025 DEC-003): the routes read the file through `_served_file()` (default `get_state().current_file`), Web library module map and flows: `library.md`, `library-pages.md`, `library-editor.md`, `library-tests.md`.
+name downloads and export stems with `_served_name()`, save under `_save_lock()`, answer read, download and export
+failures with `_failure_reason(exc)` (default `str(exc)`), export with `to_pptx(..., **_pptx_options())` (default `{}`).
 
 ## Request gate
 
@@ -79,7 +82,7 @@ previous content goes to the history first (`history.snapshot`) and is discarded
 `patch` and `restore` use the same writer (reasons `patch`, `restore`).
 
 ## Export pipeline
-
+ `to_pptx(..., embedded_pictures_only=True)` (SPEC-0025 DEC-043, library only, no CLI flag): a picture is read only from a `data:` address; any other `src` is skipped with `NOT_EMBEDDED` (`pptx_vectors.py`) in both the flow (`ImagesMixin._image_source`) and the painter (`ShapesMixin._bytes`). Default `False`.
 | Module | Role |
 |--------|------|
 | `export/to_pptx.py` | HTML to PPTX entry point. Keeps `ExportReport` (re-exported from `pptx_model.py`), `to_pptx`, `_build_pptx`, `find_slides` and the composed `_SlideBuilder` (`__init__`, `build`, `_slide_kind`), built from the mixins below. Slide detection (`data-type="slide"` on any tag, `article.slide` fallback). Returns an `ExportReport` (slide count, charter, warnings); the CLI prints it and exits non zero when nothing was exported. Traced as `export.pptx` |
@@ -173,10 +176,9 @@ charter CSS: never hand edit the bootstrap. `tools/check_ei_insert.py` drives a 
 insertion (footer logo, `.logo-disc`, renumbering) and writes PNG captures; it stays out of `make check` on
 purpose. Run it after touching the EI bootstrap, `slide-layouts.js` or `renumberSlides` / `resolveTemplateAssets`.
 
-**`mail` template.** Document family charter (`data-doc-template="mail"`). Email clients ignore `<head><style>`,
-so every colour and spacing that matters is inline `style=""` and the layout is nested `<table>` (no flexbox, grid
-or `position:absolute`). `charter_for("mail")` returns `None`: no `reference.docx`, a mail is sent as is. Blocks
-from the `+ Bloc` picker land unstyled; clone a styled section instead (`skill/topics/mail.md`).
+**`mail` template.** Document family charter (`data-doc-template="mail"`): inline `style=""` and nested `<table>`
+only (email clients ignore `<head><style>`, flexbox, grid). `charter_for("mail")` is `None` (no `reference.docx`).
+Blocks from the `+ Bloc` picker land unstyled; clone a styled section instead (`skill/topics/mail.md`).
 
 **`website` template.** `data-doc-type="website"` is tracked by an `isWebsite` flag in `editor.js`: it reuses the
 document block insert and drag machinery (`article[data-type="document"]`) but shows neither export button
@@ -186,9 +188,7 @@ document block insert and drag machinery (`article[data-type="document"]`) but s
 
 ## LLM workflow
 
-`update_start()` → write the HTML file → `update_end()`. `update_start()` raises the overlay in the browser and
-suppresses mtime reloads, `update_end()` clears it and lets the next poll reload the content. Never write the file
-without those flanking calls.
+`update_start()` (overlay up, mtime reloads off) → write the HTML file → `update_end()` (next poll reloads); always.
 
 SPEC-0012 (DEC-001, DEC-002): the `_SlideBuilder` mixins of § Export pipeline inherit `_BuilderBase`, which stubs
 every method called across mixins (strict typing without `type: ignore`). The editor is split into classic scripts,

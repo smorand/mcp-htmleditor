@@ -56,6 +56,7 @@ include = [
 [tool.hatch.build.targets.wheel.force-include]
 "templates" = "mcp_htmleditor/templates"
 "skill" = "mcp_htmleditor/skill"
+"library-seed" = "mcp_htmleditor/library_seed"
 
 [tool.ruff]
 target-version = "py313"

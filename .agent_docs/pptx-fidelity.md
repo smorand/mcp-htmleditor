@@ -50,3 +50,5 @@ does not gate: exit 0 unless a tool failed (1) or a prerequisite is missing or t
 - Clipped footers of `ibm-carbon`: the catalogue slides were taller than the viewport cap (`max-height:100%` and
   `overflow-y:auto`), so the browser scrolled the footer out. Fixed in the template (`dense` on slides 3, 5, 7, 9,
   `compact` list on slide 7, narrower screenshot on slide 9), checked with the box measure of `render`.
+- `embedded_pictures_only` (US-0139) is not scored here: the library build skips every non `data:` picture, so a fidelity run keeps the default.
+- The web library PPTX download is the flow output (`paint=False`, `embedded_pictures_only=True`), never the painted one, so no fidelity score applies to it.

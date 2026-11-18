@@ -20,6 +20,9 @@ Other variables:
     HTMLEDITOR_POLL_INTERVAL     browser polling interval in ms (default 1000)
     HTMLEDITOR_OTEL_DESTINATION  OTLP endpoint; unset means local JSONL export
     HTMLEDITOR_OTEL_API_KEY      bearer token sent to the OTLP endpoint
+    HTMLEDITOR_LIBRARY_ORIGIN    web library origin (default https://slides.scm-platform.org)
+    HTMLEDITOR_LIBRARY_CONTENT_ORIGIN  web library content origin (default https://slides-content.scm-platform.org)
+    HTMLEDITOR_LIBRARY_DIR       web library data (default <state>/library)
     XDG_CONFIG_HOME              base for config (default ~/.config)
     XDG_CACHE_HOME               base for cache  (default ~/.cache)
     XDG_STATE_HOME               base for state  (default ~/.local/state)
@@ -37,6 +40,7 @@ import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -46,7 +50,10 @@ APP_NAME = "mcp-htmleditor"
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 7842
 DEFAULT_POLL_INTERVAL = 1000  # ms
+DEFAULT_LIBRARY_ORIGIN = "https://slides.scm-platform.org"
+DEFAULT_LIBRARY_CONTENT_ORIGIN = "https://slides-content.scm-platform.org"
 
+_DEFAULT_PORTS = {"http": 80, "https": 443}
 _INT_FALLBACKS = {"port": DEFAULT_PORT, "poll_interval": DEFAULT_POLL_INTERVAL}
 
 # Every field holding a filesystem path override, validated the same way.
@@ -63,6 +70,9 @@ _PATH_FIELDS = (
     "xdg_cache_home_override",
     "state_dir_override",
     "xdg_state_home_override",
+    "library_dir_override",
+    "google_credentials_override",
+    "library_seed_dir_override",
 )
 
 # Environment variables that change the resolved configuration. Used only to key
@@ -85,6 +95,11 @@ _SIGNIFICANT_ENV_VARS = (
     "XDG_CACHE_HOME",
     "HTMLEDITOR_STATE_DIR",
     "XDG_STATE_HOME",
+    "HTMLEDITOR_LIBRARY_ORIGIN",
+    "HTMLEDITOR_LIBRARY_CONTENT_ORIGIN",
+    "HTMLEDITOR_LIBRARY_DIR",
+    "HTMLEDITOR_GOOGLE_CREDENTIALS_FILE",
+    "HTMLEDITOR_LIBRARY_SEED_DIR",
 )
 
 
@@ -114,6 +129,9 @@ class Settings(BaseSettings):
     otel_destination: str | None = None
     otel_api_key: str | None = None
 
+    library_origin: str = DEFAULT_LIBRARY_ORIGIN
+    library_content_origin: str = DEFAULT_LIBRARY_CONTENT_ORIGIN
+
     templates_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_TEMPLATES_DIR")
     arch_checks_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_ARCH_CHECKS_DIR")
     skill_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_SKILL_DIR")
@@ -126,6 +144,11 @@ class Settings(BaseSettings):
     xdg_cache_home_override: Path | None = Field(default=None, validation_alias="XDG_CACHE_HOME")
     state_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_STATE_DIR")
     xdg_state_home_override: Path | None = Field(default=None, validation_alias="XDG_STATE_HOME")
+    library_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LIBRARY_DIR")
+    google_credentials_override: Path | None = Field(
+        default=None, validation_alias="HTMLEDITOR_GOOGLE_CREDENTIALS_FILE"
+    )
+    library_seed_dir_override: Path | None = Field(default=None, validation_alias="HTMLEDITOR_LIBRARY_SEED_DIR")
 
     @field_validator("port", "poll_interval", mode="before")
     @classmethod
@@ -248,9 +271,53 @@ class Settings(BaseSettings):
             return Path(tempfile.gettempdir()) / f"{APP_NAME}-{os.getuid()}"
 
     @property
+    def library_dir(self) -> Path:
+        """Web library database and presentation files: HTMLEDITOR_LIBRARY_DIR, else <state_dir>/library."""
+        return self.library_dir_override or self.state_dir / "library"
+
+    @property
+    def library_seed_dir(self) -> Path:
+        """Initial content of a new library: HTMLEDITOR_LIBRARY_SEED_DIR, else library-seed/ of the repo or package."""
+        if self.library_seed_dir_override:
+            return self.library_seed_dir_override
+        candidates = (
+            Path(__file__).resolve().parents[2] / "library-seed",
+            Path(__file__).resolve().parent / "library_seed",
+        )
+        return next((c for c in candidates if c.is_dir()), candidates[0])
+
+    @property
+    def google_credentials_file(self) -> Path | None:
+        """The operator's Google OAuth client file (HTMLEDITOR_GOOGLE_CREDENTIALS_FILE), read by ``library/signin``."""
+        return self.google_credentials_override
+
+    @property
     def bin_dir(self) -> Path:
         """Executable install target: ~/.local/bin."""
         return self.bin_dir_override or Path.home() / ".local" / "bin"
+
+
+def is_origin(value: str) -> bool:
+    """True for ``http://host[:port]`` or ``https://host[:port]`` and nothing more.
+
+    The netloc is compared with the ``Host`` header as is, so the forms a browser never sends are refused too: an
+    empty or default port, a trailing dot.
+    """
+    try:
+        parts = urlsplit(value)
+        port = parts.port  # raises ValueError on a port out of range
+    except ValueError:
+        return False
+    return (
+        parts.scheme in _DEFAULT_PORTS
+        and bool(parts.hostname)
+        and not str(parts.hostname).endswith(".")
+        and "@" not in parts.netloc
+        and not parts.netloc.endswith(":")
+        and port != _DEFAULT_PORTS[parts.scheme]
+        and not (parts.path or parts.query or parts.fragment)
+        and value == f"{parts.scheme}://{parts.netloc}"
+    )
 
 
 def _env_signature() -> tuple[str, ...]:
