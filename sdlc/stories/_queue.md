@@ -154,3 +154,6 @@
 | US-0152 | SPEC-0026 | DOCX export drops outside pictures | US-0150 | 2 | landed | | |
 | US-0153 | SPEC-0026 | render aborts outside file requests | US-0150, US-0151 | 2 | landed | | |
 | US-0154 | SPEC-0026 | no opt in, non regression and documentation | US-0151, US-0152, US-0153 | 2 | landed | | |
+| US-0155 | SPEC-0027 | browser tests for the bars, the typing keys and the export buttons | main | 2 | landed | | |
+| US-0156 | SPEC-0027 | browser tests for autosave, status dots and the agent update window | US-0155 | 2 | landed | | |
+| US-0157 | SPEC-0027 | undo depth test and the test step budget rule | US-0155, US-0156 | 2 | landed | | |

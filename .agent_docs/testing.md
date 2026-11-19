@@ -33,12 +33,14 @@ whole process and name nothing). An overrun fails alone with `Timeout (>60.0s) f
 `--confcutdir` at the throwaway folder and an own `--basetemp` (without them collection walks `$TMPDIR`, 5 to 35 s).
 Judge a timed out child on its JUnit call time, never on wall time. `pytest-timeout>=2.4.0`: 2.5.0 is yanked on PyPI.
 
-### Test step budget (at most 330 s)
+### Test step budget (at most 650 s)
 
-* The `make check` test step stays at or below 330 s. A step above 330 s at load average above 30 is machine noise:
-  re run once before trimming (two unrelated tests that failed at load 35 to 42 passed alone).
+* The `make check` test step stays at or below 650 s (measured 575 s on a quiet machine on 2026-11-18, after SPEC-0025 and
+  before SPEC-0027). A step above 650 s at load average above 30 is machine noise: re run once before trimming (unrelated
+  e2e tests with 10 s waits fail at load 20 to 40 and pass alone).
 * Per spec browser budgets: SPEC-0016 tests (decks, guard, vectors, arbitrations, relay) at most 40 s (DEC-014);
   SPEC-0017 browser tests at most 40 s together (DEC-018).
+  SPEC-0027 browser tests at most 60 s together (DEC-002; measured about 23 s).
 * Trims kept (SPEC-0014 BT-022): `save_delay` (autosave and undo/redo e2e files) is parametrized per test by
   `pytest_generate_tests`; the 2000 ms late variant runs only where the delay matters (autosave: the four tests that
   failed RED late in `.implement/US-0084-red.log`; undo/redo: `arch_node_reposition` and `document_block_reorder`, per
@@ -102,6 +104,7 @@ accepted before the stop opens a later request first (the kernel resets one stil
 | `breathe_support.py`, `test_breathe_*.py`, `test_http_deck_files_e2e.py` | SPEC-0023: Breathe fixtures (`breathe_deck`, `breathe_slide`, `reference_slide`, `legacy_deck`, `wcbip_or_skip` reads the private WCBIP deck in place and skips when absent); charter and lint, `breathe-inline` with exploits, reference deck and picker e2e, painted PPTX (independent 1 point picture geometry, degraded reasons), assets generator (full run `slow`), skill topic; served deck files with raw socket exploits |
 | `deck_support.py` | Deck fixtures (US-0035 to US-0040): `deck_ei`, `deck_carbon`, `deck_med`, `doc_perso` built from the real `templates/bootstrap` files (never committed); `slide_html(charter, title, ...)` returns one valid `ei` or `carbon` slide as an agent would send it; `write_deck` forces the modification time with `os.utime(path, (1_000_000_000, 1_000_000_000))` (no clock in tests); `assert_only_region_changed(before, after, marker)` proves byte identity outside an element found by plain substring search; `run_cli` and `call_tool` |
 | `test_deck_patch.py`, `test_deck_patch_delete.py`, `test_deck_patch_structure.py` | deck_patch: `patch` with `set_text`, atomic write, path guard, check order, documents (US-0038); deck_patch_delete: `delete_slide`, the one pass renumbering on the three fixtures, dry run (US-0039); counters checked with plain regexes; deck_patch_structure: `insert_slide`, `move_slide`, `replace_slide` (US-0040): E2E-005, 007, 008, 014, 017, 018, 029, 030, check order, byte exact splice against a literal `hand()` builder (LF and CRLF, comment between slides, tab indentation), image restore, idempotence, original ids after move and replace |
+| `test_format_insert_bars_e2e.py`, `test_typing_keys_e2e.py`, `test_export_buttons_e2e.py`, `test_autosave_timing_e2e.py`, `test_update_window_e2e.py`, `test_undo_depth_e2e.py` | SPEC-0027 coverage of SPEC-0001 and SPEC-0002 rows: bars (the click outside hide is a strict xfail, FR-002 defect), keys typed in a zone, export buttons and downloads, autosave and dot states and no reload (pending test holds the save with an init script), the agent update window (overlay, one reload), the undo depth of 50 and redo cleared |
 | `test_save_safety_e2e.py`, `test_save_ui_e2e.py` | save_safety_e2e: SPEC-0009: atomic save, 409 conflict check, no leftover file, update flag expiry (real server, `served_deck`, `FakeClock`); save_ui_e2e: SPEC-0009: conflict notice (Reload, Keep mine), save error notice, in real Chromium (`needs_chromium`) |
 | `test_history_e2e.py`, `test_history_tools.py` | history_e2e: SPEC-0009: history snapshots, `history` / `restore` commands, limit of 20, concurrent ids; history_tools: SPEC-0009: tools `history` / `restore` through `fastmcp.Client` (E2E-006), patch snapshot (E2E-026), tool errors equal the CLI lines, core lines, stdout clean |
 | `test_config.py`, `test_settings.py` | config: Backward compatible accessors: XDG defaults, env overrides, invalid port; settings: The `Settings` model: defaults, memoization per environment signature, `HTMLEDITOR_LOG_DIR` over `HTMLEDITOR_LOGS`, `~` expansion, blank value means unset, OTel fields, unknown prefixed variable ignored |
