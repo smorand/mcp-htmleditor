@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import FrameLocator, Page
 
-from tests.browser_wait import wait_for_js
+from tests.browser_wait import settle, wait_for_js
 from tests.conftest import ServedDeck, needs_chromium
 from tests.deck_support import build_deck, write_deck
 
@@ -81,12 +81,19 @@ def test_format_bar_follows_the_selection(page: Page, deck: ServedDeck) -> None:
 
 
 @needs_chromium
-@pytest.mark.xfail(
-    strict=True, reason="SPEC-0002 FR-002: no hide on a click outside, editor-format.js:162-173 handler is empty"
-)
 def test_format_bar_hides_on_a_click_outside_every_zone(page: Page, deck: ServedDeck) -> None:
-    """E2E-013: a click outside every editable zone hides the bar (defect, see the xfail reason)."""
+    """E2E-013 (FR-002): a click outside every editable zone hides the bar."""
     frame = _open_in_edit_mode(page, deck)
     _select_cover_text(page, frame)
     frame.locator("body").click(position=OUTSIDE_FRAME_POINT)
     wait_for_js(page, FORMAT_BAR_SHOWN, False, what="the format bar hidden after a click outside", bound=2.0)
+
+
+@needs_chromium
+def test_format_bar_stays_when_the_bar_itself_is_pressed(page: Page, deck: ServedDeck) -> None:
+    """A press on a button of the bar is not a click outside: the bar stays visible."""
+    frame = _open_in_edit_mode(page, deck)
+    _select_cover_text(page, frame)
+    frame.locator('#_mcp_format_bar [data-cmd="bold"]').click()
+    settle(page)
+    assert frame.locator("#_mcp_format_bar").is_visible()

@@ -158,19 +158,13 @@ function updateFormatBarState(doc) {
   });
 }
 
-// Hide format bar when clicking outside selection
-document.addEventListener('mousedown', e => {
-  const bar = frame.contentDocument?.getElementById('_mcp_format_bar');
-  if (bar && bar.style.display !== 'none') {
-    // Don't hide if clicking inside the bar (handled by mousedown on buttons)
-    const iframeRect = frame.getBoundingClientRect();
-    const barRect    = bar.getBoundingClientRect();
-    // barRect is in iframe coords, convert to page coords
-    const absTop  = iframeRect.top  + parseFloat(bar.style.top  || 0);
-    // bar is fixed in iframe viewport which maps to page differently;
-    // simpler: just let the selection event re-evaluate visibility
-  }
-});
+// Hide the format bar on a press outside every editable zone and outside the bar (SPEC-0002 FR-002). The listener sits on
+// the iframe's own document: a press inside the iframe never reaches the outer document.
+function hideFormatBarOnOutsidePress(doc) {
+  doc.addEventListener('mousedown', e => {
+    if (!e.target.closest('[data-editable~="text"], #_mcp_format_bar')) hideFormatBar();
+  });
+}
 
 /* ============================================================
    Insert bar (shown at top-right of focused editable)

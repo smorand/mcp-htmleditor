@@ -51,6 +51,7 @@ function injectEditMode(doc) {
   });
   injectEditorStyles(doc);
   createFormatBar(doc);
+  hideFormatBarOnOutsidePress(doc);
   createInsertBar(doc);
   enableImageDrop(doc);
   if (isDocument || isWebsite) injectDocDragHandles(doc);
