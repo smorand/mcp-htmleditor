@@ -1,6 +1,6 @@
 """MCP server for html-editor.
 
-Exposes 22 tools for LLM agents to control the WYSIWYG editor. Every tool call is
+Exposes 23 tools for LLM agents to control the WYSIWYG editor. Every tool call is
 traced as ``mcp.<tool>`` (see :mod:`.tracing`).
 """
 
@@ -17,6 +17,7 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from .arch_layout import layout_file
+from .breathe.inline import embed_assets
 from .config import default_host
 from .deck import DeckError
 from .deck.lint import lint_file
@@ -398,6 +399,39 @@ def export(file: str, format: str, output: str) -> dict[str, Any]:  # noqa: A002
         except DeckError as exc:
             raise ToolError(str(exc)) from exc
         return {"ok": True, "output": outcome.output, "warnings": outcome.warnings}
+
+
+@mcp.tool()
+def breathe_inline(file: str, link: bool = False) -> dict[str, Any]:
+    """Embed (or link) the Breathe decoration and pictures a deck uses.
+
+    Same operation as ``mcp-htmleditor breathe-inline``: the file is rewritten in place.
+
+    Args:
+        file: Path to the Breathe deck.
+        link: Refer to ``assets/<file>`` next to the deck (the files are copied there) instead of embedding.
+
+    Returns:
+        Dict with keys: ok, summary (the line the command prints), classes, pictures, copied, size_kb, folder.
+
+    Raises:
+        ToolError: the command line error line without ``error: `` (missing file, template file, no
+            ``breathe:assets`` block, bad asset name, asset not found).
+    """
+    with trace_span("mcp.breathe_inline", {"file.path": file, "breathe.link": link}):
+        try:
+            outcome = embed_assets(file, link=link)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+        return {
+            "ok": True,
+            "summary": outcome.summary(),
+            "classes": outcome.classes,
+            "pictures": outcome.pictures,
+            "copied": outcome.copied,
+            "size_kb": outcome.size_kb,
+            "folder": str(outcome.folder),
+        }
 
 
 @mcp.tool()

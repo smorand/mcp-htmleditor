@@ -157,3 +157,5 @@
 | US-0155 | SPEC-0027 | browser tests for the bars, the typing keys and the export buttons | main | 2 | landed | | |
 | US-0156 | SPEC-0027 | browser tests for autosave, status dots and the agent update window | US-0155 | 2 | landed | | |
 | US-0157 | SPEC-0027 | undo depth test and the test step budget rule | US-0155, US-0156 | 2 | landed | | |
+| US-0158 | SPEC-0028 | the breathe_inline tool, its skill line and tests | main | 2 | landed | | |
+| US-0159 | SPEC-0028 | documentation of the twenty three tools | US-0158 | 2 | landed | | |

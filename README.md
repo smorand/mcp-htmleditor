@@ -631,6 +631,7 @@ mcp-htmleditor new breathe talk.html               # one cover slide, decoration
 # add layouts from the editor's picker or from templates/reference/slides/breathe.html, then:
 mcp-htmleditor breathe-inline talk.html            # one CSS rule per decoration class used, pictures as data URIs
 mcp-htmleditor breathe-inline talk.html --link     # or refer to assets/<file> next to the deck (copied there)
+# agent tool: breathe_inline(file, link=false), same summary line and same errors
 mcp-htmleditor lint talk.html                      # Breathe palette, foreign classes, L008 rows, L009 sources
 mcp-htmleditor export pptx talk.html talk.pptx     # painted from the rendered slides, notes included
 ```
@@ -763,7 +764,7 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 22 tools
+├── mcp_server.py    FastMCP server with 23 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck; DEC-003 hooks for the library)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
 ├── library/signin.py  Google sign in (GoogleClient, claims), login attempts, sessions, presentation tickets and grants (Accounts)

@@ -43,6 +43,7 @@ FINAL_TOOLS = {
     "complete_request",
     "write_review",
     "render",
+    "breathe_inline",
 }
 SPEC_IDS = range(1, 42)
 ID_PATTERN = re.compile(r"E2E[-_]0(\d\d)", re.IGNORECASE)
@@ -205,7 +206,7 @@ def test_the_server_core_and_audit_agree_on_the_final_tools() -> None:
     names = registered_tool_names()
     stdout, _, status = run_cli("skill-audit")
 
-    assert len(names) == 22
+    assert len(names) == 23
     assert set(names) == FINAL_TOOLS
     assert _core_tool_names() == FINAL_TOOLS
     assert status == 0, stdout

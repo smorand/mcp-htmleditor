@@ -57,6 +57,7 @@ mcp-htmleditor new <template> <file> [--serve]
 - clear_requests: Remove the done and skipped requests of a file, or every request with scope all; returns the count removed
 - complete_request: Mark a request done, or skipped with a reason
 - write_review: Replace the AI suggestions shown in the editor (at most 6)
+- breathe_inline: Embed or link the assets of a Breathe deck.
 - render: Picture of one slide plus a layout report (overflow, clipped, font, script, image); needs Chromium (make install-browser).
 
 ## Topics
