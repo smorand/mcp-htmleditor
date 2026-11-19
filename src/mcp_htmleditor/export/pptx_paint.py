@@ -24,6 +24,7 @@ import threading
 from pathlib import Path
 from typing import Any, Final
 
+from ..deck_folder import guard_browser
 from ..render.scripts import SHOW_SLIDE_JS
 from ..tracing import trace_span
 from .pptx_model import ExportReport
@@ -154,6 +155,7 @@ def _measure_pages(
     page = browser.new_page(viewport=VIEWPORT, device_scale_factor=RASTER_SCALE, color_scheme="light")
     page.set_default_timeout(TIMEOUT_MS)
     page.route(REMOTE, lambda route: route.abort())
+    guard_browser(page, html_path.resolve().parent)
     page.goto(html_path.resolve().as_uri(), wait_until="load", timeout=TIMEOUT_MS)
     page.add_style_tag(content=FREEZE_CSS)
     page.evaluate("document.fonts.ready")

@@ -15,6 +15,7 @@ from typing import Any
 from bs4 import Tag
 from pptx.util import Inches
 
+from ..deck_folder import is_inside, outside_warning
 from .pptx_components import color_of, first_pct, inches
 from .pptx_model import _ANNOT_CLASS_COLORS, FILL_KEYS, _BuilderBase, _Para
 from .pptx_style import Box, TextStyle, classes, parse_color, style_props
@@ -118,6 +119,9 @@ class ImagesMixin(_BuilderBase):
         path = Path(src)
         if not path.is_absolute():
             path = self.ctx.base_dir / path
+        if not is_inside(self.ctx.base_dir, path):
+            self.ctx.report.warn(outside_warning(src))
+            return None
         if not path.exists():
             self.ctx.report.warn(f"Image introuvable, ignoree: {path}")
             return None

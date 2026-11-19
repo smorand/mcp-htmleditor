@@ -22,6 +22,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.oxml.ns import qn
 from pptx.util import Emu
 
+from ..deck_folder import is_inside, outside_warning
 from .pptx_paint_style import (
     EMU_PER_POINT,
     OOXML_PERCENT,
@@ -198,6 +199,9 @@ class ShapesMixin:
             return None
         parsed = urlparse(src)
         path = Path(url2pathname(unquote(parsed.path))) if parsed.scheme == "file" else self.base_dir / src
+        if not is_inside(self.base_dir, path):
+            self.report.warn(outside_warning(src))
+            return None
         if not path.is_file():
             self.report.warn(f"Image introuvable, ignoree: {path}")
             return None

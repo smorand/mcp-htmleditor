@@ -40,9 +40,11 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import unquote
 
 from bs4 import BeautifulSoup
 
+from ..deck_folder import is_inside, outside_warning, url_to_path
 from ..tracing import trace_span
 from .reference_docx import charter_for, has_page_furniture, reference_docx_for
 
@@ -123,7 +125,9 @@ def to_docx(input_html: str, output_docx: str) -> DocxExportResult:
         strip = reference is not None and has_page_furniture(charter_key)
         prepared = preprocess_html(source, strip_page_furniture=strip)
 
+        body_html, dropped = _drop_outside_pictures(prepared.html, input_path.parent)
         warnings = list(prepared.warnings)
+        warnings.extend(dropped)
         if charter_key and reference is None:
             warnings.append(_charter_warning(charter_key))
 
@@ -131,7 +135,7 @@ def to_docx(input_html: str, output_docx: str) -> DocxExportResult:
         os.close(handle)
         staging = Path(staging_name)
         try:
-            staging.write_text(prepared.html, encoding="utf-8")
+            staging.write_text(body_html, encoding="utf-8")
             command = [
                 "pandoc",
                 "-f",
@@ -225,6 +229,27 @@ def preprocess_html(html: str, *, strip_page_furniture: bool = False) -> Preproc
         warnings=warnings,
         stripped_furniture=stripped,
     )
+
+
+_NOT_LOCAL = ("data:", "http://", "https://", "//")
+
+
+def _drop_outside_pictures(html: str, root: Path) -> tuple[str, list[str]]:
+    """Remove every `<img>` whose local picture lies outside ``root`` (pandoc embeds whatever the HTML names).
+
+    Returns the HTML (unchanged when nothing was removed) and one warning per removed picture. O(n) in the HTML.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    dropped: list[str] = []
+    for image in soup.find_all("img"):
+        src = str(image.get("src") or "").strip()
+        if not src or src.lower().startswith(_NOT_LOCAL):
+            continue
+        paths = [url_to_path(src)] if src.lower().startswith("file:") else [root / src, root / unquote(src)]
+        if any(path is not None and not is_inside(root, path) for path in paths):
+            dropped.append(outside_warning(src))
+            image.decompose()
+    return (str(soup), dropped) if dropped else (html, dropped)
 
 
 def _charter_of(soup: BeautifulSoup) -> str | None:

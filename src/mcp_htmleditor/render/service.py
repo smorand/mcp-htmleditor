@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Final
 from bs4.element import Tag
 
 from ..deck import load_deck, slide_id
+from ..deck_folder import guard_browser
 from ..tracing import trace_span
 from . import CANVAS_HEIGHT, CANVAS_WIDTH, RenderError, RenderProblem, RenderResult
 from .files import picture_path, remove_stale, write_picture
@@ -201,6 +202,7 @@ def _only_rendered(measured: Measured, target: SlideRef) -> Measured:
 def _open_page(browser: Browser, file: str, device_scale: float) -> tuple[Page, PageSignals]:
     viewport: ViewportSize = {"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT}
     context = browser.new_context(viewport=viewport, device_scale_factor=device_scale, color_scheme="light")
+    guard_browser(context, Path(file).resolve().parent)
     page = context.new_page()
     signals = PageSignals()
 

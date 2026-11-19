@@ -287,7 +287,9 @@ def test_pointer_served_pointeur_control(pointer_file_page: Page, served_p: Serv
     served_p.path.write_text(text.replace("Plain <strong>", "Changed <strong>", 1), encoding="utf-8")
     wait_until(
         page,
-        lambda: page.evaluate(f"(d => !!d && !!d.body && d.body.textContent.includes('Changed paragraph'))({FRAME_DOC})"),
+        lambda: page.evaluate(
+            f"(d => !!d && !!d.body && d.body.textContent.includes('Changed paragraph'))({FRAME_DOC})"
+        ),
         bool,
         what="the agent's write reloaded the deck",
     )

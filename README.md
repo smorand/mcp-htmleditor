@@ -244,6 +244,11 @@ mcp-htmleditor export pptx input.html output.pptx
 mcp-htmleditor export docx input.html output.docx
 ```
 
+A picture is read only from the deck's own folder (subfolders included, symlinks followed). A picture named by an absolute
+path, a `../` climb, a `file://` address or a symlink that leads outside is left out of the PPTX and the DOCX, with the
+warning `Image hors du dossier du deck, ignoree: <address>`, and `render` does not paint it (the report says
+`<address> did not load`). There is no option to allow it: put the picture in the deck's folder or embed it as `data:`.
+
 ### Visual render
 
 See a slide as a picture and find layout problems without opening the editor. It needs Chromium,

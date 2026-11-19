@@ -98,6 +98,10 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   `make check-generated`). Never edit `LAYOUT_SETS.breathe` by hand. See `.agent_docs/html-conventions.md` § Breathe.
 - The editor server answers files next to the open deck (`deck_files.py`): containment rules there, exploit tests in
   `tests/test_http_deck_files_e2e.py`.
+- Pictures are read only from the deck's own folder (SPEC-0026): the one rule is `deck_folder.py` (`is_inside`,
+  `guard_browser`); the five read sites (`export/pptx_images.py`, `pptx_paint_shapes.py`, `pptx_paint.py`, `to_docx.py`,
+  `render/service.py`) call it, no option allows an outside read, exploit tests in `tests/test_export_pptx_outside*.py`,
+  `test_export_docx_outside.py`, `test_render_outside.py`.
 - Every slide template (current and future) must ship fullscreen support (`:fullscreen`
   CSS, `#btn-present` button, `enterPresentation`/`exitPresentation`/
   `updateFullscreenScale` JS): see `.agent_docs/html-conventions.md` § Fullscreen. A

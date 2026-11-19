@@ -78,6 +78,7 @@ Après export: relire dans PowerPoint ou LibreOffice, vérifier les avertissemen
 - Figures en PNG, **jamais en SVG**: pandoc ne dimensionne pas un SVG; l'export avertit sur tout SVG (fichier, base64, balise `<svg>`). Les PNG base64 sont embarqués dans `word/media/`.
 - Gantt et `arch-diagram` peuvent être mal rendus; styles CSS inline (fonds de bloc, filets) approximés.
 - Les images en chemin relatif doivent exister sur disque (résolues depuis le dossier du HTML, `--resource-path`).
+- Une image n'est lue que dans le dossier du HTML (sous-dossiers compris): chemin absolu, `../`, `file://` ou lien symbolique qui sort du dossier = image omise (PPTX et DOCX) avec l'avertissement `Image hors du dossier du deck, ignoree: <adresse>`; aucune option pour l'autoriser, mettre l'image dans le dossier ou en `data:`.
 - Tableau destiné au DOCX: toujours un `<colgroup>` avec `style="width:X%"` (pandoc ignore `data-col-width`).
 
 | `data-doc-template` | Charte |

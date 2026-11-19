@@ -149,3 +149,8 @@
 | US-0147 | SPEC-0025 | The operator can list the stored library and find a file's history | US-0146 | 2 | done | feat/0049-web-library-mode | US-0146 |
 | US-0148 | SPEC-0025 | Deployment files and the VPS runbook | US-0147, US-0146 | 1 | done | feat/0049-web-library-mode | US-0147 |
 | US-0149 | SPEC-0025 | Closing journeys, documentation audit and acceptance of the whole spec | US-0148 | 1 | done | feat/0049-web-library-mode | US-0148 |
+| US-0150 | SPEC-0026 | folder rule and the PPTX flow export | main | 2 | landed | | |
+| US-0151 | SPEC-0026 | painted PPTX export refuses outside pictures | US-0150 | 2 | landed | | |
+| US-0152 | SPEC-0026 | DOCX export drops outside pictures | US-0150 | 2 | landed | | |
+| US-0153 | SPEC-0026 | render aborts outside file requests | US-0150, US-0151 | 2 | landed | | |
+| US-0154 | SPEC-0026 | no opt in, non regression and documentation | US-0151, US-0152, US-0153 | 2 | landed | | |
