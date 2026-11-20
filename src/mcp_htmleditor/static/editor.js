@@ -324,6 +324,7 @@ function onFrameLoad() {
     widthBarOnFrameLoad();
     const doc = frame.contentDocument;
     if (!doc) return;
+    if (!restoringFromUndo) loadedHtmlStyle = doc.documentElement.getAttribute('style');
     // Detect presentation mode from <html data-doc-type>
     const docType = doc.documentElement.getAttribute('data-doc-type');
     isPresentation = docType === 'presentation';

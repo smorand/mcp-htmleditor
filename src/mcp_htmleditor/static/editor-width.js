@@ -128,6 +128,39 @@ function styleWithoutWidth(text) {
   return others.length ? others.join('; ') : null;
 }
 
+/** `text` with each declaration of `values` ({name: value}, names lower case) set: the first declaration of that name is
+ *  replaced in place by `name:value`, later ones of the same name are dropped, a name not found is appended in the order
+ *  of `values`; every other declaration keeps its text; joined with '; ' (SPEC-0030). */
+function styleWithDeclarations(text, values) {
+  const names = Object.keys(values);
+  const done = new Set();
+  const out = [];
+  splitStyleDeclarations(text || '').forEach(declaration => {
+    const name = styleDeclarationName(declaration);
+    if (!names.includes(name)) { out.push(declaration); return; }
+    if (done.has(name)) return;
+    done.add(name);
+    out.push(`${name}:${values[name]}`);
+  });
+  names.filter(name => !done.has(name)).forEach(name => out.push(`${name}:${values[name]}`));
+  return out.join('; ');
+}
+
+/** Set declarations of an element as text, never through the style object (which reserializes the whole attribute and
+ *  rewrites the author's other declarations). Nothing is written when each name already has one declaration holding
+ *  the wanted value. */
+function setStyleDeclarations(el, values) {
+  const before = el.getAttribute('style') || '';
+  const declarations = splitStyleDeclarations(before);
+  const upToDate = Object.keys(values).every(name => {
+    const found = declarations.filter(d => styleDeclarationName(d) === name);
+    if (found.length !== 1) return false;
+    const clean = styleTextWithoutComments(found[0]);
+    return clean.slice(clean.indexOf(':') + 1).trim() === values[name];
+  });
+  if (!upToDate) el.setAttribute('style', styleWithDeclarations(before, values));
+}
+
 /* ── Text block under the pointer ─────────────────────────── */
 
 /** Innermost paragraph, heading, list item, quotation, caption or zone holding `target`, laid out as a block. */

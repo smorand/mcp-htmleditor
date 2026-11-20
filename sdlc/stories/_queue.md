@@ -166,3 +166,5 @@
 | US-0164 | SPEC-0020 | width actions and the presenting strip read comments | US-0163 | 2 | landed | | |
 | US-0165 | SPEC-0020 | connect mode leaves no mark | US-0163 | 2 | landed | | |
 | US-0166 | SPEC-0020 | the drop indicator leaves no mark, documentation | US-0164, US-0165 | 2 | landed | | |
+| US-0167 | SPEC-0030 | actions set one declaration as text | main | 2 | landed | | |
+| US-0168 | SPEC-0030 | the loaded html style text survives presenting | US-0167 | 2 | landed | | |

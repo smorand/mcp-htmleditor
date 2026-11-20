@@ -192,12 +192,12 @@ function getContextMenuItems(dtype, el, doc) {
       return [
         { label: 'Agrandir (+20%)', action: () => {
           snapshotForUndo();
-          el.style.width = Math.min(100, (parseFloat(el.style.width) || 30) * 1.2).toFixed(1) + '%';
+          setStyleDeclarations(el, { width: Math.min(100, (parseFloat(el.style.width) || 30) * 1.2).toFixed(1) + '%' });
           scheduleSave();
         }},
         { label: 'Réduire (-20%)',  action: () => {
           snapshotForUndo();
-          el.style.width = Math.max(5,   (parseFloat(el.style.width) || 30) * 0.8).toFixed(1) + '%';
+          setStyleDeclarations(el, { width: Math.max(5, (parseFloat(el.style.width) || 30) * 0.8).toFixed(1) + '%' });
           scheduleSave();
         }},
         { label: 'Renommer', action: () => {
@@ -279,7 +279,7 @@ function getContextMenuItems(dtype, el, doc) {
           + 'border:2px solid #333; padding:8px 16px; border-radius:4px; background:#f5f5f5;';
         node.textContent = label;
         // Container must be a positioning context for percentage coords.
-        if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+        if (getComputedStyle(el).position === 'static') setStyleDeclarations(el, { position: 'relative' });
         el.appendChild(node);
         if (editMode) makeArchNodeDraggable(doc, node);
         scheduleSave();

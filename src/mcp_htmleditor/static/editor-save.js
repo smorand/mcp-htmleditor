@@ -5,6 +5,10 @@ function onEditableInput()  { markPending(); clearTimeout(saveTimer); saveTimer 
 function onEditableBlur()   { clearTimeout(saveTimer); saveContent(); }
 function scheduleSave()     { markPending(); clearTimeout(saveTimer); saveTimer = setTimeout(saveContent, 600); }
 
+/* `<html>`'s style text when the document was last loaded (null: no style attribute; undefined: not loaded yet). Kept
+   outside the document: the deck's presenting scale and an Undo rewrite the attribute in the document (SPEC-0030). */
+let loadedHtmlStyle;
+
 /* Saves run one after the other, so a save never sends a base mtime that an earlier one is about to replace. */
 function saveContent(options) {
   saveChain = saveChain.then(() => runSave(options));
@@ -84,13 +88,19 @@ function stripEditorArtifacts(root) {
 }
 
 /** A save while presenting (or after) writes none of the deck's runtime state (SPEC-0016 R2):
- *  `data-fs-current` goes, and `--fs-scale` leaves <html>'s style as text, so every other declaration
- *  keeps its bytes (SPEC-0015 DEC-003); a style left empty is removed. The pointer's layer (dot and ring) and
+ *  `data-fs-current` goes, and `<html>`'s style is the text the document was loaded with (`loadedHtmlStyle`, kept by
+ *  onFrameLoad): the deck's own runtime sets `--fs-scale` through the style object, which reserializes every other
+ *  declaration (SPEC-0030), so the saved text is the loaded one, minus a top level `--fs-scale` declaration as text
+ *  (SPEC-0020 BR-004); a style left empty is removed. The pointer's layer (dot and ring) and
  *  its state on <html> go too (SPEC-0017 DEC-014); the deck's own pointer code and CSS stay. */
 function stripPresentingState(root) {
   root.querySelectorAll('[data-fs-current]').forEach(el => el.removeAttribute('data-fs-current'));
   root.querySelectorAll('#deck-pointer-layer').forEach(node => node.remove());
   root.removeAttribute('data-deck-pointer');
+  if (loadedHtmlStyle !== undefined) {
+    if (loadedHtmlStyle === null) root.removeAttribute('style');
+    else root.setAttribute('style', loadedHtmlStyle);
+  }
   const style = root.getAttribute('style');
   if (style === null) return;
   const pieces = splitStyleRaw(style);

@@ -82,3 +82,30 @@ def type_in_first_paragraph(page: Page, selector: str, text: str) -> None:
     page.frame_locator("#content-frame").locator(selector).click()
     page.keyboard.press("End")
     page.keyboard.type(text)
+
+
+GANTT_OLD = 'style="left:0%; width:25%; background:#0f62fe;"'
+GANTT_NEW = 'style="left:0%; width:25%; background:#0F62FE"'
+N2_STYLE = "position:absolute; left:10%; top:10%; width:20%; height:20%"
+LEGACY_DIAGRAM = (
+    '<div data-type="arch-diagram" style="width:100%; height:200px;">'
+    '<div data-type="arch-node" data-label="Ancien" data-shape="box" '
+    'style="position:absolute; left:10%; top:10%; width:20%;">Ancien</div></div>\n'
+)
+
+
+def deck_s2(*, html_style: str | None = "color:#161616") -> str:
+    """Deck S2 (SPEC-0030): Deck S plus a Gantt task with an uppercase colour, a styled ``n2``, a legacy diagram."""
+    html = deck_s(html_style=html_style)
+    end = html.index(DIAGRAM) + len(DIAGRAM)
+    html = html[:end] + "        " + LEGACY_DIAGRAM + html[end:]
+    assert GANTT_OLD in html
+    html = html.replace(GANTT_OLD, GANTT_NEW, 1)
+    old_n2 = '<div data-type="arch-node" data-id="n2" data-label="Base">Base</div>'
+    assert old_n2 in html
+    styled = f'<div data-type="arch-node" data-id="n2" data-label="Base" style="{N2_STYLE}">Base</div>'
+    return html.replace(old_n2, styled, 1)
+
+
+def serve_deck_s2(tmp_path: Path, serve_deck: Callable[[Path], ServedDeck], **kwargs: object) -> ServedDeck:
+    return serve_deck(write_fixture(tmp_path, deck_s2(**kwargs)))  # type: ignore[arg-type]

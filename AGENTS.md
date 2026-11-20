@@ -100,6 +100,8 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   author's declaration and reserializes the attribute (hex colours to `rgb(...)`, comments dropped). Style text is edited
   as text with `splitStyleRaw` (`editor-width.js`, comment aware); the editor's transient marks (connect mode, drop
   indicator) are the attribute `data-mcp-mark`, styled by the injected sheet and removed by `stripEditorArtifacts`.
+  A single declaration is set with `setStyleDeclarations(el, {name: value})` (`editor-width.js`, SPEC-0030). The deck's
+  presenting scale reserializes `<html>`'s style, so the save writes the text it had at load (`loadedHtmlStyle`).
   Tests: `tests/test_style_text_*_e2e.py`, fixture Deck S in `tests/style_text_support.py`.
 - The editor server answers files next to the open deck (`deck_files.py`): containment rules there, exploit tests in
   `tests/test_http_deck_files_e2e.py`.

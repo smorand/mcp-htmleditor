@@ -156,7 +156,7 @@ function reattachDragArtifacts(state) {
 /** Wire drag on every arch-node of every arch-diagram in the doc. */
 function enableArchNodeDrag(doc) {
   doc.querySelectorAll('[data-type="arch-diagram"]').forEach(diagram => {
-    if (getComputedStyle(diagram).position === 'static') diagram.style.position = 'relative';
+    if (getComputedStyle(diagram).position === 'static') setStyleDeclarations(diagram, { position: 'relative' });
     diagram.querySelectorAll('[data-type="arch-node"]').forEach(node => makeArchNodeDraggable(doc, node));
   });
 }
@@ -176,7 +176,7 @@ function removeArchNodeDrag(doc) {
 function makeArchNodeDraggable(doc, node) {
   const diagram = node.closest('[data-type="arch-diagram"]');
   if (!diagram) return;
-  if (getComputedStyle(diagram).position === 'static') diagram.style.position = 'relative';
+  if (getComputedStyle(diagram).position === 'static') setStyleDeclarations(diagram, { position: 'relative' });
   if (node._mcpArchDown) return; // already wired
   node.classList.add('_mcp_arch_draggable');
 
@@ -192,7 +192,6 @@ function makeArchNodeDraggable(doc, node) {
     const wasEditable = node.getAttribute('contenteditable');
     node.setAttribute('contenteditable', 'false');
     node.classList.add('_mcp_arch_grabbing');
-    node.style.position = 'absolute';
 
     let moved = false;
     const onMove = ev => {
@@ -233,7 +232,5 @@ function clampPct(v) {
 function applyArchNodePosition(node, x, y) {
   node.dataset.x = x.toFixed(1);
   node.dataset.y = y.toFixed(1);
-  node.style.position = 'absolute';
-  node.style.left = x.toFixed(1) + '%';
-  node.style.top  = y.toFixed(1) + '%';
+  setStyleDeclarations(node, { position: 'absolute', left: x.toFixed(1) + '%', top: y.toFixed(1) + '%' });
 }
