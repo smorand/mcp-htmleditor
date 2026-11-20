@@ -51,7 +51,7 @@ L'`<aside data-role="speaker-notes">` enfant direct d'une slide n'est jamais une
 ### Perdu
 
 - Animations et transitions CSS, filtres, `mix-blend-mode`, ombres avec étalement ou `inset`, dégradés radiaux.
-- Le `max-width` d'un texte (barre de largeur de l'éditeur): la zone de texte garde la largeur de son bloc.
+- Le `max-width` d'un texte (barre de largeur de l'éditeur): repris par l'export peint (Chromium); en mode dégradé et dans le DOCX la zone garde la largeur de son bloc.
 - SVG: pas de conversion vectorielle, l'image est un PNG (en mode dégradé, utiliser un `<img>` PNG).
 - Images distantes (`http://`, `https://`): signalées et ignorées, les télécharger ou passer en base64.
 

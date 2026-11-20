@@ -48,7 +48,8 @@ CREATE_LINE = (
     "double clic: largeur du modèle). Écrit `max-width:Npx` dans son `style`."
 )
 EXPORT_LINE = (
-    "- Le `max-width` d'un texte (barre de largeur de l'éditeur): la zone de texte garde la largeur de son bloc."
+    "- Le `max-width` d'un texte (barre de largeur de l'éditeur): repris par l'export peint (Chromium); "
+    "en mode dégradé et dans le DOCX la zone garde la largeur de son bloc."
 )
 
 
