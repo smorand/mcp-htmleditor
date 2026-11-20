@@ -53,31 +53,32 @@ async function runSave(options) {
 
 /** Take the editor's artifacts out of `root` (a document or a detached element), the one list shared by the
  *  save (on a clone) and the undo snapshot (on the live document, see editor-undo.js captureDomSnapshot):
- *  contenteditable with its outline and cursor, the format and insert bars hidden, the drag handles, drop
- *  indicator and drag hosts (see editor-drag.js detachDragArtifacts). Returns a function putting every
- *  artifact back as it was. */
+ *  contenteditable, the format and insert bars hidden, the drag handles, drop
+ *  indicator and drag hosts (see editor-drag.js detachDragArtifacts). The editor's look of an editable zone is a
+ *  class styled by the injected sheet, never an inline style, so no `style` attribute is written here: a write
+ *  through the style object would delete the author's `outline` or `cursor` and reserialize the attribute
+ *  (SPEC-0020). Returns a function putting every artifact back as it was. */
 function stripEditorArtifacts(root) {
   const editables = [...root.querySelectorAll('[contenteditable]')];
-  const backup = editables.map(el => ({
-    el, ce: el.contentEditable,
-    outline: el.style.outline, cursor: el.style.cursor,
-  }));
-  editables.forEach(el => {
-    el.removeAttribute('contenteditable');
-    el.style.outline = ''; el.style.cursor = '';
-  });
+  const backup = editables.map(el => ({ el, ce: el.contentEditable }));
+  editables.forEach(el => el.removeAttribute('contenteditable'));
 
   // querySelectorAll, not getElementById: a detached clone has no getElementById.
   const bars = [...root.querySelectorAll('#_mcp_format_bar, #_mcp_insert_bar')].map(bar => ({ bar, display: bar.style.display }));
   bars.forEach(({ bar }) => { bar.style.display = 'none'; });
 
+  // Transient marks (connect mode, drop indicator): an attribute the injected sheet styles, never a style write.
+  const marks = [...root.querySelectorAll('[data-mcp-mark]')];
+  if (root.hasAttribute && root.hasAttribute('data-mcp-mark')) marks.push(root);
+  const markValues = marks.map(el => ({ el, value: el.getAttribute('data-mcp-mark') }));
+  marks.forEach(el => el.removeAttribute('data-mcp-mark'));
+
   const detachedDrag = detachDragArtifacts(root);
 
   return function restore() {
-    backup.forEach(({ el, ce, outline, cursor }) => {
-      el.contentEditable = ce; el.style.outline = outline; el.style.cursor = cursor;
-    });
+    backup.forEach(({ el, ce }) => { el.contentEditable = ce; });
     bars.forEach(({ bar, display }) => { bar.style.display = display; });
+    markValues.forEach(({ el, value }) => el.setAttribute('data-mcp-mark', value));
     reattachDragArtifacts(detachedDrag);
   };
 }
@@ -92,7 +93,8 @@ function stripPresentingState(root) {
   root.removeAttribute('data-deck-pointer');
   const style = root.getAttribute('style');
   if (style === null) return;
-  const kept = style.split(';').filter(part => !/^\s*--fs-scale\s*:/.test(part)).join(';');
+  const pieces = splitStyleRaw(style);
+  const kept = pieces.filter(piece => styleDeclarationName(piece, true) !== '--fs-scale').join(';');
   if (kept.trim() === '' || kept.trim() === ';') root.removeAttribute('style');
   else if (kept !== style) root.setAttribute('style', kept);
 }

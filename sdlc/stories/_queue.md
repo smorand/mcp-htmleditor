@@ -162,3 +162,7 @@
 | US-0160 | SPEC-0029 | the decoration rules route | main | 2 | landed | | |
 | US-0161 | SPEC-0029 | the picker adds the decoration | US-0160 | 2 | landed | | |
 | US-0162 | SPEC-0029 | documentation of the picker decoration | US-0161 | 2 | landed | | |
+| US-0163 | SPEC-0020 | a save and an undo snapshot keep every style text | main | 2 | landed | | |
+| US-0164 | SPEC-0020 | width actions and the presenting strip read comments | US-0163 | 2 | landed | | |
+| US-0165 | SPEC-0020 | connect mode leaves no mark | US-0163 | 2 | landed | | |
+| US-0166 | SPEC-0020 | the drop indicator leaves no mark, documentation | US-0164, US-0165 | 2 | landed | | |

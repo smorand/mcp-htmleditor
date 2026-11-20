@@ -119,8 +119,10 @@ function removeArchNode(doc, diagram, node) {
 function startArchConnect(doc, sourceNode) {
   cancelArchConnect(doc);
   archConnectSource = { node: sourceNode, doc };
-  sourceNode.style.outline = '3px solid #0f62fe';
-  doc.body.style.cursor = 'crosshair';
+  // Marks, not style writes: the look is the injected sheet's, and stripEditorArtifacts keeps the attribute out of
+  // the saved file and of the undo snapshots, so the author's own style text is never touched (SPEC-0020).
+  sourceNode.setAttribute('data-mcp-mark', 'connect-source');
+  doc.body.setAttribute('data-mcp-mark', 'connect-pointer');
 
   const onClick = e => {
     const target = e.target.closest && e.target.closest('[data-type="arch-node"]');
@@ -139,8 +141,8 @@ function startArchConnect(doc, sourceNode) {
 
 function cancelArchConnect(doc) {
   if (!archConnectSource) return;
-  archConnectSource.node.style.outline = '';
-  doc.body.style.cursor = '';
+  archConnectSource.node.removeAttribute('data-mcp-mark');
+  doc.body.removeAttribute('data-mcp-mark');
   doc.removeEventListener('click', archConnectSource.onClick, { capture: true });
   doc.removeEventListener('keydown', archConnectSource.onKey);
   archConnectSource = null;

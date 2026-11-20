@@ -261,12 +261,12 @@ function enableImageDrop(doc) {
     el.addEventListener('dragover', e => {
       if (e.dataTransfer && [...e.dataTransfer.items].some(i => i.kind === 'file')) {
         e.preventDefault();
-        el.style.boxShadow = 'inset 0 0 0 3px #0f62fe';
+        el.setAttribute('data-mcp-mark', 'drop');
       }
     });
-    el.addEventListener('dragleave', () => { el.style.boxShadow = ''; });
+    el.addEventListener('dragleave', () => el.removeAttribute('data-mcp-mark'));
     el.addEventListener('drop', e => {
-      el.style.boxShadow = '';
+      el.removeAttribute('data-mcp-mark');
       if (!e.dataTransfer) return;
       const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
       if (!files.length) return;

@@ -96,6 +96,11 @@ mcp-htmleditor render file.html --report-only [--json]  # layout problems of eve
   Decoration lives in `templates/assets/breathe/` (git LFS, `make breathe-assets`); the reference deck
   `templates/reference/slides/breathe.html` is the source of the picker set (`make sync-breathe-layouts`, checked by
   `make check-generated`). Never edit `LAYOUT_SETS.breathe` by hand. See `.agent_docs/html-conventions.md` § Breathe.
+- The editor never writes the `style` object of the author's content (SPEC-0020): a write through `el.style` deletes the
+  author's declaration and reserializes the attribute (hex colours to `rgb(...)`, comments dropped). Style text is edited
+  as text with `splitStyleRaw` (`editor-width.js`, comment aware); the editor's transient marks (connect mode, drop
+  indicator) are the attribute `data-mcp-mark`, styled by the injected sheet and removed by `stripEditorArtifacts`.
+  Tests: `tests/test_style_text_*_e2e.py`, fixture Deck S in `tests/style_text_support.py`.
 - The editor server answers files next to the open deck (`deck_files.py`): containment rules there, exploit tests in
   `tests/test_http_deck_files_e2e.py`.
 - Pictures are read only from the deck's own folder (SPEC-0026): the one rule is `deck_folder.py` (`is_inside`,

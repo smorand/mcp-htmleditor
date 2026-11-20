@@ -5,7 +5,7 @@
 > Nature: BUG
 > Depth: M
 > Depth evidence: one module (the editor scripts, `src/mcp_htmleditor/static/`), 6 requirements, no public contract or data model change; several observable behaviors defective (save, undo snapshot, width action, presenting strip, connect mode, image drop), which rules out S
-> Status: specified
+> Status: implemented
 > Verdict: authority exists
 > Defect class: n/a (code violates a clear authority)
 > Severity: Medium

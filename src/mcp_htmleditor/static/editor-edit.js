@@ -86,6 +86,9 @@ function injectEditorStyles(doc) {
   s.textContent = `
     ._mcp_editable { outline: 2px dashed #0f62fe !important; cursor: text; min-height: 1em; }
     ._mcp_editable:focus { outline: 2px solid #0f62fe !important; background: rgba(15,98,254,0.03); }
+    [data-mcp-mark="connect-source"] { outline: 3px solid #0f62fe !important; }
+    body[data-mcp-mark="connect-pointer"] { cursor: crosshair; }
+    [data-mcp-mark="drop"] { box-shadow: inset 0 0 0 3px #0f62fe !important; }
     #_mcp_format_bar {
       position: fixed; z-index: 99999; display: none;
       background: #161616; border-radius: 3px;

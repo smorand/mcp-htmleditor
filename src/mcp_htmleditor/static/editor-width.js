@@ -30,10 +30,12 @@ let widthBarDoc = null; // framed document the hover listener is attached to
 
 /* ── Style text (pure, no DOM) ────────────────────────────── */
 
-/** Trimmed non empty declarations; a ';' inside (...), '...' or "..." (backslash escapes honoured) is not a separator. */
-function splitStyleDeclarations(text) {
-  const declarations = [];
-  if (!text) return declarations;
+/** The pieces of `text` cut at each top level ';', untrimmed, empty pieces kept, so `pieces.join(';') === text`.
+ *  A ';' inside (...), '...' or "..." (backslash escapes honoured) or inside a comment is not a separator. A comment
+ *  opens at '/*' outside quotes and parentheses and runs to the next '*\/' (or to the end of the text); inside it
+ *  quotes, parentheses and ';' are plain text (SPEC-0020 BR-003). */
+function splitStyleRaw(text) {
+  const pieces = [];
   let current = '';
   let depth = 0;
   let quote = null;
@@ -43,6 +45,11 @@ function splitStyleDeclarations(text) {
       current += c;
       if (c === '\\' && i + 1 < text.length) current += text[++i];
       else if (c === quote) quote = null;
+    } else if (c === '/' && text[i + 1] === '*' && depth === 0) {
+      const close = text.indexOf('*/', i + 2);
+      const stop = close < 0 ? text.length : close + 2;
+      current += text.slice(i, stop);
+      i = stop - 1;
     } else if (c === '"' || c === "'") {
       quote = c; current += c;
     } else if (c === '(') {
@@ -50,19 +57,54 @@ function splitStyleDeclarations(text) {
     } else if (c === ')') {
       depth = Math.max(0, depth - 1); current += c;
     } else if (c === ';' && depth === 0) {
-      declarations.push(current); current = '';
+      pieces.push(current); current = '';
     } else {
       current += c;
     }
   }
-  declarations.push(current);
-  return declarations.map(d => d.trim()).filter(d => d !== '');
+  pieces.push(current);
+  return pieces;
 }
 
-/** Property name of one declaration: text before its first ':', trimmed, lower case. */
-function styleDeclarationName(declaration) {
-  const colon = declaration.indexOf(':');
-  return (colon < 0 ? declaration : declaration.slice(0, colon)).trim().toLowerCase();
+/** Trimmed non empty declarations (see splitStyleRaw for the separators). */
+function splitStyleDeclarations(text) {
+  if (!text) return [];
+  return splitStyleRaw(text).map(d => d.trim()).filter(d => d !== '');
+}
+
+/** `text` with its comments taken out (a '/*' inside quotes or parentheses is not a comment). */
+function styleTextWithoutComments(text) {
+  let out = '';
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      out += c;
+      if (c === '\\' && i + 1 < text.length) out += text[++i];
+      else if (c === quote) quote = null;
+    } else if (c === '/' && text[i + 1] === '*' && depth === 0) {
+      const close = text.indexOf('*/', i + 2);
+      i = (close < 0 ? text.length : close + 2) - 1;
+    } else {
+      if (c === '"' || c === "'") quote = c;
+      else if (c === '(') depth++;
+      else if (c === ')') depth = Math.max(0, depth - 1);
+      out += c;
+    }
+  }
+  return out;
+}
+
+/** Property name of one declaration: its text before the first ':' outside a comment, comments removed, trimmed,
+ *  lower case unless `keepCase` (custom property names are case sensitive). A piece with no ':' has no name ('').
+ */
+function styleDeclarationName(declaration, keepCase) {
+  const clean = styleTextWithoutComments(declaration);
+  const colon = clean.indexOf(':');
+  if (colon < 0) return '';
+  const name = clean.slice(0, colon).trim();
+  return keepCase ? name : name.toLowerCase();
 }
 
 /** The declarations of `text` other than max-width, verbatim and in order. */
