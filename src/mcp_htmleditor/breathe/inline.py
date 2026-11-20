@@ -17,6 +17,7 @@ import logging
 import mimetypes
 import re
 import shutil
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -125,6 +126,40 @@ def _embed(file: str, link: bool) -> InlineOutcome:
         raise
     size = len(html.encode("utf-8")) // 1024
     return InlineOutcome(file, link, len(classes), len(pictures), len(copied), folder, size)
+
+
+@dataclass(frozen=True, slots=True)
+class RulesOutcome:
+    """The rules of the classes asked for, sorted by class name as the command writes them, and the files copied."""
+
+    rules: list[str]
+    copied: int
+
+
+def decoration_rules(deck: Path, classes: Sequence[str], *, link: bool) -> RulesOutcome:
+    """The rules `embed_assets` would write for ``classes``, without touching the deck (SPEC-0029 DEC-002).
+
+    Link mode copies the files missing from the deck's ``assets`` folder, as the command does, and undoes the copies
+    when one fails. Raises ``DeckError`` with the command's messages. Time O(k·s) for k classes of s bytes.
+    """
+    needs: dict[str, _Need] = {}
+    for name in classes:
+        for prefix, file_prefix in CLASS_FILES:
+            if name.startswith(prefix):
+                suffix = name[len(prefix) :]
+                needs.setdefault(name, _Need(suffix, f"{file_prefix}{suffix}.png", 0))
+                break
+        else:
+            raise DeckError(f"class {name} is not a decoration class")
+    folder = deck.resolve().parent / ASSETS
+    wanted = list(needs.values())
+    _check_names(wanted)
+    _check_links(wanted, folder)
+    sources = _locate(wanted, folder, catalogue_dir())
+    rules = [_rule(name, need.file_name, sources, link) for name, need in sorted(needs.items())]
+    created = link and not folder.exists()
+    copied = _copy_missing(sources, folder, created) if link else []
+    return RulesOutcome(rules, len(copied))
 
 
 def _is_template(deck: Path) -> bool:

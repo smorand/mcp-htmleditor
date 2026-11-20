@@ -2,7 +2,7 @@ Charter `breathe`: congress template of Dr Lamya CHRIF MORAND, direction B "Edit
 
 ```bash
 mcp-htmleditor new breathe talk.html          # one cover slide, decoration inline
-mcp-htmleditor breathe-inline talk.html       # after any new layout, picture, background or icon class
+mcp-htmleditor breathe-inline talk.html       # after a new picture or after copying slides (the picker adds its own decoration)
 mcp-htmleditor breathe-inline talk.html --link   # refer to assets/<file> next to the deck instead
 mcp-htmleditor lint talk.html                 # 0 error before export
 mcp-htmleditor render talk.html --report-only # no overflow

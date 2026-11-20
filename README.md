@@ -628,7 +628,7 @@ PNGs (`med-ico-<glyph>-<variant>`) from the catalogue `templates/assets/breathe/
 
 ```bash
 mcp-htmleditor new breathe talk.html               # one cover slide, decoration inline
-# add layouts from the editor's picker or from templates/reference/slides/breathe.html, then:
+# layouts from the editor's picker bring their own decoration (SPEC-0029); for pictures and copied slides:
 mcp-htmleditor breathe-inline talk.html            # one CSS rule per decoration class used, pictures as data URIs
 mcp-htmleditor breathe-inline talk.html --link     # or refer to assets/<file> next to the deck (copied there)
 # agent tool: breathe_inline(file, link=false), same summary line and same errors

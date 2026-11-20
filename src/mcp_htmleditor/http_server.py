@@ -85,6 +85,8 @@ _EXTENSION_ATTR_PREFIXES = ("_msthash", "_msttexthash", "_msthidden", "data-gr-"
 # the cap, so it never reaches ``int()``.
 MAX_SAVE_BYTES = 52_428_800
 LAYOUT_BODY_MAX_BYTES = BODY_MAX_BYTES
+MAX_DECORATION_CLASSES = 64
+"""Most classes one `POST /breathe-assets` may name (a layout uses fewer than ten)."""
 MAX_LENGTH_DIGITS = 10
 
 # Headers read once to decide a request; a repeated line is refused, in this order (SPEC-0013/BR-001).
@@ -321,6 +323,8 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
             self._receive_content()
         elif path == "/arch-layout":
             self._run_arch_layout()
+        elif path == "/breathe-assets":
+            self._breathe_assets()
         elif path == "/requests":
             self._queue_request()
         elif path == "/requests/delete":
@@ -675,6 +679,44 @@ class _EditorHandler(BaseHTTPRequestHandler):  # pragma: no cover - network I/O 
         body = self.rfile.read(length)
         check_content_type(self.headers.get("Content-Type", ""))
         return parse_save_body(body)
+
+    def _breathe_assets(self) -> None:
+        """Give the editor page the decoration rules of Breathe classes (SPEC-0029 DEC-001, DEC-002, DEC-008).
+
+        The page asks for the classes a freshly inserted layout needs; the answer is what ``breathe-inline`` would
+        write for them, embedded or linked (link mode copies the files next to the deck). The deck is not modified.
+        """
+        from .breathe.inline import decoration_rules
+        from .deck import DeckError
+
+        served = self._served_file()
+        if not served:
+            self._send_json({"error": "No file loaded"}, status=404)
+            return
+        body = self._read_json_object()
+        if body is None:
+            return
+        classes, link = body.get("classes"), body.get("link", False)
+        if (
+            not isinstance(classes, list)
+            or len(classes) > MAX_DECORATION_CLASSES
+            or not all(isinstance(name, str) for name in classes)
+            or not isinstance(link, bool)
+        ):
+            self._refuse_request(400, "Invalid request body")
+            return
+        attributes: dict[str, str | bool | int | float] = {
+            "file.path": served,
+            "breathe.link": link,
+            "breathe.classes": len(classes),
+        }
+        with trace_span("mcp.breathe_assets", attributes):
+            try:
+                outcome = decoration_rules(Path(served), classes, link=link)
+            except DeckError as exc:
+                self._refuse_request(422, str(exc))
+                return
+        self._send_json({"rules": outcome.rules, "copied": outcome.copied})
 
     def _run_arch_layout(self) -> None:
         """Recompute every declarative arch-diagram in the current file.

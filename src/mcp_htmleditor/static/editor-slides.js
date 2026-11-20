@@ -53,6 +53,7 @@ function insertSlide(layoutKey, position) {
   const layout = getLayouts(doc)[layoutKey];
   if (!layout) return;
 
+  hideNotice('decoration-error');
   snapshotForUndo();
   const slides = getSlides(doc);
   const curIdx = getCurrentSlideIndex(doc);
@@ -77,6 +78,47 @@ function insertSlide(layoutKey, position) {
   renumberSlides(doc);
   makeEditableIfNeeded(doc, newSlide);
   saveContent();
+  addBreatheDecoration(doc, newSlide);
+}
+
+/** SPEC-0029: a Breathe layout brings background and icon classes; give the deck the rules it lacks.
+ *
+ *  The server builds the rules (it reads the catalogue and copies files in the linked form); the page adds them to the
+ *  live style block, so nothing reloads and the undo snapshot (taken before the insertion) stays valid, then saves. */
+const BREATHE_ASSETS_BEGIN = '/* breathe:assets:begin */';
+const BREATHE_ASSETS_END = '/* breathe:assets:end */';
+const DECORATION_RULE = /\.(med-(?:bg|ico)-[A-Za-z0-9_-]+)\s*\{/g;
+const DECORATION_NOT_ANSWERED = 'the editor server did not answer';
+
+async function addBreatheDecoration(doc, slide) {
+  const style = Array.from(doc.querySelectorAll('style')).find(s => s.textContent.includes(BREATHE_ASSETS_BEGIN));
+  if (!style) return;
+  const have = new Set(Array.from(style.textContent.matchAll(DECORATION_RULE), m => m[1]));
+  const needed = new Set();
+  [slide, ...slide.querySelectorAll('*')].forEach(el => el.classList.forEach(name => {
+    if (/^med-(?:bg|ico)-/.test(name) && !have.has(name)) needed.add(name);
+  }));
+  if (needed.size === 0) return;
+  const link = /url\(\s*assets\//.test(style.textContent);
+  try {
+    const res = await fetch('/breathe-assets', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({classes: Array.from(needed), link}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data.rules)) {
+      showNotice('decoration-error', 'Decoration not added: ' + (data.error || DECORATION_NOT_ANSWERED));
+      return;
+    }
+    const text = style.textContent;
+    const end = text.indexOf(BREATHE_ASSETS_END);
+    if (end < 0) return;
+    style.textContent = text.slice(0, end).replace(/[ \t]*$/, '') + data.rules.join('\n') + '\n  ' + text.slice(end);
+    saveContent();
+  } catch (e) {
+    showNotice('decoration-error', 'Decoration not added: ' + DECORATION_NOT_ANSWERED);
+  }
 }
 
 /** Replace EI template asset placeholders with data URIs already embedded

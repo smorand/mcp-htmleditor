@@ -144,15 +144,19 @@ BACKGROUND = (
 
 @needs_chromium
 def test_inserted_layout_before_and_after_embedding(tmp_path: Path, page: Page, serve_deck: Serve) -> None:
-    """E2E-052."""
+    """E2E-008 (modified from E2E-052): the inserted layout shows its background without the command."""
     deck = tmp_path / "talk.html"
     shutil.copyfile(BOOTSTRAP, deck)
     open_picker(page, serve_deck(deck))
     page.click("#slide-picker .picker-card:has(.picker-card-label:text-is('Pathway'))")
     wait_until(page, lambda: len(slides_on_disk(deck)), lambda n: n == 2, what="the inserted slide saved")
-    assert page.evaluate(BACKGROUND) == "none"
+    wait_until(
+        page, lambda: page.evaluate(BACKGROUND), lambda bg: bool(bg) and bg != "none", what="background loaded", bound=3
+    )
     stdout, _, code = run_cli("breathe-inline", str(deck))
     assert code == 0, stdout
+    page.reload()
+    wait_until(page, lambda: page.evaluate(READY), bool, what="the deck loaded again")
     wait_until(page, lambda: page.evaluate(BACKGROUND), lambda bg: bool(bg) and bg != "none", what="background loaded")
 
 

@@ -159,3 +159,6 @@
 | US-0157 | SPEC-0027 | undo depth test and the test step budget rule | US-0155, US-0156 | 2 | landed | | |
 | US-0158 | SPEC-0028 | the breathe_inline tool, its skill line and tests | main | 2 | landed | | |
 | US-0159 | SPEC-0028 | documentation of the twenty three tools | US-0158 | 2 | landed | | |
+| US-0160 | SPEC-0029 | the decoration rules route | main | 2 | landed | | |
+| US-0161 | SPEC-0029 | the picker adds the decoration | US-0160 | 2 | landed | | |
+| US-0162 | SPEC-0029 | documentation of the picker decoration | US-0161 | 2 | landed | | |
