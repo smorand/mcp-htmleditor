@@ -71,3 +71,10 @@ Unknown id: `Unknown slide id "slide-9". Valid ids: slide-0, slide-1, ...` (all 
   `naturalWidth` 0. The `src` is printed as written; a data address longer than 40 characters is cut to 40 plus `...`
   (`shorten_source`). `requestfailed` is not used. A viewBox only SVG has a non zero `naturalWidth`, but without
   width and height it is drawn very large and gives an `overflow`, so give it a size in tests.
+
+## 2026-11-20 SPEC-0033: render limits (US-0171)
+
+- The slide is scrolled into view before its box is read (`service.py` `_shoot`): a first slide below the 900 pixel window has a box the clip could not reach.
+- The font check never reports the CSS generic families nor `-apple-system` and `BlinkMacSystemFont` (`scripts.py`, `generic`, compared lower case). Chromium rewrites `BlinkMacSystemFont` to the quoted `"system-ui"`, and the family pattern now skips the space after a comma, so quoted names after the first no longer keep their quotes.
+- One report line per script error: runs of white space (line breaks, tabs, non breaking spaces) become one space (`PageSignals.record`); one `image` line per slide and full address in order of first use, `(empty address)` for `src=""` (`_failed_images`, `EMPTY_ADDRESS`).
+- Tests: `tests/test_render_limits_e2e.py` (a minimal two slide deck built by `mini_deck`, the tall block as first child of `<body>`).

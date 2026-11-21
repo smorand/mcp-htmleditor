@@ -33,6 +33,7 @@ VIEWPORT_WIDTH: Final = 1280
 VIEWPORT_HEIGHT: Final = 900
 LOAD_TIMEOUT_MS: Final = 15_000
 REASON_MAX_CHARS: Final = 200
+EMPTY_ADDRESS: Final = "(empty address)"
 PNG_SIGNATURE: Final = b"\x89PNG\r\n\x1a\n"
 IHDR_SIZE_OFFSET: Final = 16
 SLIDE_SELECTOR: Final = '[data-type="slide"]'
@@ -61,7 +62,7 @@ class PageSignals:
 
     def record(self, name: str, message: str) -> None:
         """Keep ``<name>: <message>`` for the slide being shown, unless the pair was already kept."""
-        text = f"{name}: {message}"
+        text = " ".join(f"{name}: {message}".split())  # one report line: runs of white space become one space
         if (self.current, text) not in self._seen:
             self._seen.add((self.current, text))
             self.errors.append(RenderProblem("script", self.current, text))
@@ -182,7 +183,9 @@ def _shoot(
     raw = _measure(page, target, signals) if report else None
     if raw is None:
         page.evaluate(SHOW_SLIDE_JS, target.index)
-    box = page.locator(SLIDE_SELECTOR).nth(target.index).bounding_box()
+    locator = page.locator(SLIDE_SELECTOR).nth(target.index)
+    locator.scroll_into_view_if_needed()  # a slide below the 900 pixel window has a box the clip cannot reach
+    box = locator.bounding_box()
     if box is None:
         raise RenderError("Rendering failed: the slide has no box")
     clip: FloatRect = {"x": round(box["x"]), "y": round(box["y"]), "width": CANVAS_WIDTH, "height": CANVAS_HEIGHT}
@@ -229,11 +232,13 @@ def _measure(page: Page, target: SlideRef, signals: PageSignals) -> RawSlide:
 
 
 def _failed_images(page: Page, slides: Sequence[SlideRef]) -> list[RenderProblem]:
+    """One problem per slide and address, in the order of first use; an empty address is named."""
     ids = {ref.index: ref.slide_id for ref in slides}
+    failed = dict.fromkeys((item["slide_index"], item["src"]) for item in page.evaluate(IMAGES_JS))
     return [
-        RenderProblem("image", ids[item["slide_index"]], f"{shorten_source(item['src'])} did not load")
-        for item in page.evaluate(IMAGES_JS)
-        if item["slide_index"] in ids
+        RenderProblem("image", ids[index], f"{shorten_source(src) or EMPTY_ADDRESS} did not load")
+        for index, src in failed
+        if index in ids
     ]
 
 

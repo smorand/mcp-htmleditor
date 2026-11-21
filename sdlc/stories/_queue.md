@@ -170,3 +170,4 @@
 | US-0168 | SPEC-0030 | the loaded html style text survives presenting | US-0167 | 2 | landed | | |
 | US-0169 | SPEC-0031 | the layout reload keeps the undo history | main | 2 | landed | | |
 | US-0170 | SPEC-0032 | style the AI suggestions block | main | 2 | landed | | |
+| US-0171 | SPEC-0033 | the four render limits | main | 2 | landed | | |

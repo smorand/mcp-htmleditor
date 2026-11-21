@@ -72,10 +72,11 @@ MEASURE_SLIDE_JS: Final = (
     reported.push(el);
     clipped.push(selector(el));
   }
-  const generic = ['sans-serif', 'serif', 'monospace', 'system-ui'];
+  const generic = ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif',
+    'ui-monospace', 'ui-rounded', 'emoji', 'math', 'fangsong', '-apple-system', 'blinkmacsystemfont'];
   const families = (el) => {
     const names = [];
-    const pattern = /"([^"]*)"|'([^']*)'|([^,]+)/g;
+    const pattern = /\\s*(?:"([^"]*)"|'([^']*)'|([^,]+?))\\s*(?=,|$)/g;
     for (const m of getComputedStyle(el).fontFamily.matchAll(pattern)) {
       const name = (m[1] ?? m[2] ?? m[3]).trim();
       if (name && !generic.includes(name.toLowerCase())) names.push(name);
