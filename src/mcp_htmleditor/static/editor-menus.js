@@ -33,11 +33,15 @@ function ensureNodeId(node, diagram) {
 
 /** Persist the DOM, then ask the server to recompute every declarative
     diagram in the file (the browser never computes positions itself). */
+/** How long after a layout run that updated a diagram the reload it causes keeps the undo history. */
+const ARCH_LAYOUT_RELOAD_MS = 5000;
+
 async function saveThenLayout() {
   await saveContent();
   try {
     const res = await fetch('/arch-layout', { method: 'POST' });
     const body = await res.json();
+    if (body.diagrams_updated > 0) keepUndoUntil = Date.now() + ARCH_LAYOUT_RELOAD_MS;
     if (body.warnings && body.warnings.length) {
       console.warn('arch-layout warnings:', body.warnings);
     }

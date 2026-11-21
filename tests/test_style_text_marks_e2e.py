@@ -96,10 +96,9 @@ def live_style_expression(selector: str) -> str:
 def test_bt018_connect_mode_the_undo_snapshot_holds_no_mark(
     width_page: Page, tmp_path: Path, serve_deck: Callable[[Path], ServedDeck]
 ) -> None:
-    """BT-018, as far as it can run: the layout run that follows an edge reloads the page and empties the undo
-    history (``#undo-btn`` is disabled then), so the snapshot is read while the mode is active, as ``snapshotForUndo``
-    would take it, and the file is read once the edge exists. The target node receives a click event (a real mouse
-    press lands on the row around the node here)."""
+    """BT-018: the snapshot taken while the mode is active holds no mark; after the edge and the layout reload (the
+    undo history survives it, SPEC-0031) Undo removes the edge and leaves the author's text and no mark. The target
+    node receives a click event (a real mouse press lands on the row around the node here)."""
     deck = serve_deck_s(tmp_path, serve_deck)
     width_page.once("dialog", lambda dialog: dialog.accept(""))
     _open_slide_3(width_page, deck)
@@ -118,6 +117,20 @@ def test_bt018_connect_mode_the_undo_snapshot_holds_no_mark(
 
     width_page.frame_locator("#content-frame").locator('[data-id="n2"]').dispatch_event("click")
     wait_for_file(width_page, deck.path, 'data-type="arch-edge"')
+    wait_for_js(
+        width_page,
+        "() => /left:/.test(document.getElementById('content-frame').contentDocument"
+        ".querySelector('[data-id=\"n1\"]').getAttribute('style') || '')",
+        True,
+        what="the diagram reloaded with its recomputed positions",
+    )
+    width_page.click("#undo-btn")
+    wait_until(
+        width_page,
+        lambda: 'data-type="arch-edge"' in deck.path.read_text(encoding="utf-8"),
+        lambda has_edge: not has_edge,
+        what="the edge undone in the file",
+    )
 
     text = deck.path.read_text(encoding="utf-8")
     style = _node_style(deck.path, "n1") or ""

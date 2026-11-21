@@ -350,7 +350,8 @@ function onFrameLoad() {
       doc.addEventListener('keydown', blockNavKeysInEditMode, true);
       return;
     }
-    resetUndoStacks();
+    // The reload after the editor's own layout run shows the same diagram, positions recomputed: keep the history.
+    if (Date.now() < keepUndoUntil) { keepUndoUntil = 0; updateUndoRedoButtons(); } else resetUndoStacks();
     doc.addEventListener('keydown', handleUndoRedoKeydown);
     doc.addEventListener('keydown', blockNavKeysInEditMode, true);
   } catch (e) {
@@ -487,6 +488,8 @@ function reloadFrame() {
 
 const UNDO_MAX_DEPTH = 50;
 let undoStack = [];
+/** Until this time (ms) the next frame load keeps the undo and redo stacks: opened by saveThenLayout (SPEC-0031). */
+let keepUndoUntil = 0;
 let redoStack = [];
 // True only during the doc.write() performed by restoreDomSnapshot(), so
 // onFrameLoad() (which Chromium fires again on every doc.write(), verified
