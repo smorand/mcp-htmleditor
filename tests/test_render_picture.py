@@ -188,3 +188,17 @@ def test_import_purity():
     code = "import sys, mcp_htmleditor.render;print('playwright' in sys.modules, 'pptx' in sys.modules)"
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True, cwd=ROOT)  # noqa: S603
     assert result.stdout.strip() == "False False"
+
+
+@NEEDS_CHROMIUM
+def test_a_carbon_slide_keeps_its_own_border_in_the_picture(tmp_path, out_dir):
+    """BL-0032 (SPEC-0008 FR-NEW-001 as amended): the picture shows the slide as styled, so the 1 px `#e0e0e0` border
+    of the Carbon bootstrap is the colour of the four corner pixels at scale 1."""
+    deck = write_deck(tmp_path / "carbon.html", (BOOTSTRAP / "slides-empty.html").read_text(encoding="utf-8"))
+    stdout, stderr, status = run_cli("render", deck, "--scale", "1")
+    picture = out_dir / "carbon-slide-0.png"
+    assert (stderr, status) == ("", 0), stdout
+    assert rs.png_size(picture) == (960, 540)
+    border = (224, 224, 224)
+    corners = [(0, 0), (959, 0), (0, 539), (959, 539)]
+    assert [rs.png_pixel(picture, x, y) for x, y in corners] == [border] * 4
