@@ -5,7 +5,7 @@
 > Nature: BUG
 > Depth: S
 > Depth evidence: 1 module (editor scripts), 4 requirements, no public contract or data change
-> Status: specified
+> Status: designed
 > Verdict: authority exists
 > Defect class: n/a (code violates a clear authority)
 > Severity: Low
@@ -28,10 +28,10 @@ authorization bypass, injection, data exposure, traversal or advisory).
   the new modification time as an external change and reloads the frame (`src/mcp_htmleditor/static/editor.js:465-475`); the load
   empties the undo and redo history (`editor.js:351`, `src/mcp_htmleditor/static/editor-undo.js:169-170`). `#undo-btn` is then
   disabled and Ctrl+Z does nothing.
-- **Expected per authority:** SPEC-0002/FR-009 (`sdlc/specs/SPEC-0002-browser-editing/spec.md:89`): "WHEN the human presses Ctrl or Cmd
+- **Expected per authority:** SPEC-0002/FR-009 (`sdlc/specs/SPEC-0002-browser-editing/spec.md:87`): "WHEN the human presses Ctrl or Cmd
   with Z, or the undo button, THE system SHALL revert the last structural action and save; Ctrl or Cmd with Shift Z, Ctrl Y, or the
   redo button reapplies it", and SC-002 (`:60-63`): structural actions on a diagram "save and can be undone". The editor itself takes
-  the snapshot for these edits (`editor-menus.js:93`, `:111`, `:157`).
+  the snapshot for these edits (`editor-menus.js:68`, `:159`, and the node removal).
 - **Reproduction (Chromium, 2026-11-20, Deck S of `tests/style_text_support.py`, slide 3):** edit mode on, right click `Serveur MCP`,
   `➜ Créer une arête depuis ce nœud`, click `Base`, accept the empty label, wait until the file holds `arch-edge`. Expected: `#undo-btn`
   enabled. Actual: disabled, `undoStack` holds 0 entries.

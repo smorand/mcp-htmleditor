@@ -168,3 +168,4 @@
 | US-0166 | SPEC-0020 | the drop indicator leaves no mark, documentation | US-0164, US-0165 | 2 | landed | | |
 | US-0167 | SPEC-0030 | actions set one declaration as text | main | 2 | landed | | |
 | US-0168 | SPEC-0030 | the loaded html style text survives presenting | US-0167 | 2 | landed | | |
+| US-0169 | SPEC-0031 | the layout reload keeps the undo history | main | 2 | todo | bug/0050-arch-edit-undo-kept | |
