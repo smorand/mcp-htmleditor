@@ -82,6 +82,7 @@ mcp-htmleditor new ei ma-presentation.html --serve # create + open editor
 mcp-htmleditor new medical talk.html --serve       # medical deck (congress, staff, teaching)
 mcp-htmleditor new breathe talk.html               # Breathe congress deck (see "Breathe template" below)
 mcp-htmleditor breathe-inline talk.html [--link]   # embed (or link) the Breathe decoration and pictures
+mcp-htmleditor add-pointer talk.html               # give a deck created before the pointer its code, Pointeur control and L key
 ```
 
 ### Visual editor
@@ -764,7 +765,7 @@ src/mcp_htmleditor/
 ├── skill_content.py assembles `mcp-htmleditor skill` output (core, topics, --all)
 ├── skill_audit.py   `mcp-htmleditor skill-audit`: sizes, budgets, tool list, stale statements
 ├── arch_layout.py   declarative arch-diagram layout engine (rows/nodes/edges/lanes → %)
-├── mcp_server.py    FastMCP server with 23 tools
+├── mcp_server.py    FastMCP server with 24 tools
 ├── http_server.py   stdlib HTTP server (routes /, /static, /content, /status, /download, /health, files next to the deck; DEC-003 hooks for the library)
 ├── library/server.py  `webserve`: LibraryServer, LibraryHandler (host gate, plain http redirect, /health, headers, route dispatch, cookies)
 ├── library/signin.py  Google sign in (GoogleClient, claims), login attempts, sessions, presentation tickets and grants (Accounts)
@@ -775,6 +776,7 @@ src/mcp_htmleditor/
 ├── library/routes_deck.py  content origin: /enter, /d/<id>/content-frame, /status, /content, /download
 ├── library/routes_admin.py  /admin (administration page), POST /api/folders (create a folder), POST /api/folders/<id>/delete, POST /api/folders/<id>/members (add or change), POST /api/folders/<id>/members/remove
 ├── deck_files.py    which file next to the open deck a request path names (containment, allowed types)
+├── deck/pointer.py  add-pointer: give an older deck the pointer (code, control, L key)
 ├── breathe/inline.py  breathe-inline: embed or link the Breathe decoration and pictures
 ├── fileio.py        atomic_write: the one writer (temp file, rename, history snapshot)
 ├── history.py       HistoryStore, list_versions, restore_version (history and restore)

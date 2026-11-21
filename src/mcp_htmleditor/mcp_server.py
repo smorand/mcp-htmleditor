@@ -22,6 +22,7 @@ from .config import default_host
 from .deck import DeckError
 from .deck.lint import lint_file
 from .deck.patch import apply_patch
+from .deck.pointer import add_pointer as add_pointer_to_deck
 from .deck.read import get_slide as read_slide
 from .deck.read import outline as read_outline
 from .deck.tools import create_file, export_file
@@ -432,6 +433,30 @@ def breathe_inline(file: str, link: bool = False) -> dict[str, Any]:
             "size_kb": outcome.size_kb,
             "folder": str(outcome.folder),
         }
+
+
+@mcp.tool()
+def add_pointer(file: str) -> dict[str, Any]:
+    """Add the presentation pointer (code, Pointeur control, L key) to a deck created before it existed.
+
+    Same operation as ``mcp-htmleditor add-pointer``: only the missing parts are inserted, in place.
+
+    Args:
+        file: Path to the presentation.
+
+    Returns:
+        Dict with keys: ok, summary (the line the command prints), added (false when the deck already had it).
+
+    Raises:
+        ToolError: the command line error line without ``error: `` (missing file, template file, not valid
+            UTF-8, not a presentation, no Présenter control to place the Pointeur control after).
+    """
+    with trace_span("mcp.add_pointer", {"file.path": file}):
+        try:
+            outcome = add_pointer_to_deck(file)
+        except DeckError as exc:
+            raise ToolError(str(exc)) from exc
+        return {"ok": True, "summary": outcome.summary(), "added": outcome.added}
 
 
 @mcp.tool()

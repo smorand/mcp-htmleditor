@@ -53,11 +53,12 @@ mcp-htmleditor new <template> <file> [--serve]
 - export: Export a presentation to pptx or a document to docx.
 - history: list the saved previous versions of a file, newest first (id, bytes, reason).
 - restore: put a previous version of a file back by id; the replaced content is kept in the history.
-- list_requests: List the requests the person queued in the editor for a file, oldest first, with the slide position; optional slide and status filters
-- clear_requests: Remove the done and skipped requests of a file, or every request with scope all; returns the count removed
+- list_requests: List the requests queued in the editor for a file, oldest first, with slide position; optional slide and status filters
+- clear_requests: Remove the done and skipped requests, or all with scope all; returns the count
 - complete_request: Mark a request done, or skipped with a reason
-- write_review: Replace the AI suggestions shown in the editor (at most 6)
+- write_review: Replace the editor's AI suggestions (at most 6)
 - breathe_inline: Embed or link the assets of a Breathe deck.
+- add_pointer: Add the pointer to an older presentation.
 - render: Picture of one slide plus a layout report (overflow, clipped, font, script, image); needs Chromium (make install-browser).
 
 ## Topics

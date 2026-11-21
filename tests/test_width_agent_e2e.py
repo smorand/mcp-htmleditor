@@ -41,7 +41,7 @@ SLIDE_2 = "slide-1"
 PALETTE_PROBLEM = "colour #123456 is not in the carbon palette"
 # The core changed on purpose: SPEC-0023 (breathe key and topic), then the editor interface section (shortcuts,
 # presenter, notes, Requests panel, /health, SPEC-0022) so agents know them
-CORE_SHA256 = "aa09360a0491ca09705b98dbfc5a55ee67824aa5fb5e5813820bc543d1bc93be"
+CORE_SHA256 = "a62b60e8c16a285b1cc5a073516708f41ae0eda7e6cdbb528a0e7a55e32fdf46"
 TOPIC_BUDGET_BYTES = 8000
 CREATE_LINE = (
     "- Largeur d'un texte: barre sur son bord droit (glisser par pas de 10px, Alt au pixel, flèches; "

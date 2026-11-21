@@ -164,7 +164,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
   alive): `call_tool` uses its own thread.
 - Nothing may reach the process stdout in the MCP process: it carries the protocol frames. Log to stderr only.
 
-## Tool surface (23 tools, SPEC-0028, US-0037, US-0041, US-0046, US-0051, US-0053, US-0057, US-0066)
+## Tool surface (24 tools, SPEC-0028, US-0037, US-0041, US-0046, US-0051, US-0053, US-0057, US-0066)
 
 | Tool | Service call | Result |
 |---|---|---|
@@ -181,6 +181,7 @@ line without its `error: ` prefix. Never a second implementation of a rule in a 
 | `complete_request(file, id, status, reason=None)` | `RequestService.complete` | `{"ok":true,"id","status"}`; `status` is a plain `str` (DEC-006); errors are `ToolError(exc.message)` |
 | `render(file, slide=None, scale=0.5, report=False, report_only=False)` | `render.service.render_deck` | `render.problems.result_to_dict`, the one JSON builder shared with `render --json`; plain `def` (fastmcp runs it in a worker thread, Playwright sync needs no event loop); `scale == DEFAULT_SCALE` is passed as `None` so the `report_only` conflict check sees "a scale other than the default"; errors are `ToolError(str(exc))`; never calls `get_state()` |
 | `breathe_inline(file, link)` | `breathe.inline.embed_assets` | dict ok, summary (the line `breathe-inline` prints), classes, pictures, copied, size_kb, folder; errors are the command's messages |
+| `add_pointer(file)` | `deck.pointer.add_pointer` | dict ok, summary (the line `add-pointer` prints), added; errors are the command's messages (SPEC-0034) |
 | `write_review(file, suggestions)` | `RequestService.write_review` | `{"ok":true,"count"}`; `suggestions` is a plain `list[Any]` (DEC-006); rules and messages in `request_service._check_review`; replaces the review, `applied` false |
 
 - The set is start_server, stop_server, get_status, open_file, update_start, update_end, layout_arch_diagram,

@@ -99,7 +99,7 @@ the mouse into a red dot while presenting, a click rings the box under it; off a
   `make check-generated`. Never edit a copy. A template without the begin marker is left alone.
 * **Guard** `tests/test_presentation_templates_fullscreen.py`, one line per missing part: `<stem>: missing pointer`
   (`window.togglePointer = function`), `<stem>: missing Pointeur control` (`id="btn-pointer"`),
-  `<stem>: missing L key` (`e.key === 'l' || e.key === 'L'`).
+  `<stem>: missing L key` (`e.key === 'l' || e.key === 'L'`). Older decks: `add-pointer` (SPEC-0034).
 * **Not a box:** `LAYOUT_AREAS` (in the block) lists the layout classes of every template (`.slide-header`,
   `.slide-body`, `.med-head`, `.slide-footer`, `.slide-inner`...); a new template's area classes go there or the
   ring surrounds the whole area. The ring rules (inside a tile or table, else headline or paragraph) are FR-NEW-005.

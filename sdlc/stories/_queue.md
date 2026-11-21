@@ -171,3 +171,5 @@
 | US-0169 | SPEC-0031 | the layout reload keeps the undo history | main | 2 | landed | | |
 | US-0170 | SPEC-0032 | style the AI suggestions block | main | 2 | landed | | |
 | US-0171 | SPEC-0033 | the four render limits | main | 2 | landed | | |
+| US-0172 | SPEC-0034 | add the pointer to an older deck | main | 2 | landed | | |
+| US-0173 | SPEC-0034 | the add_pointer agent operation, skill and documentation | US-0172 | 2 | landed | | |

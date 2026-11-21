@@ -39,6 +39,7 @@ mcp-htmleditor new ei pres.html --serve
 mcp-htmleditor new medical talk.html --serve
 mcp-htmleditor new breathe talk.html
 mcp-htmleditor breathe-inline talk.html [--link]   # embed (or link) the Breathe decoration and pictures
+mcp-htmleditor add-pointer talk.html               # give an older deck the pointer (code, Pointeur control, L key)
 mcp-htmleditor serve file.html [-v|-q] [--host] [--port] [--poll] [--no-browser]
 mcp-htmleditor webserve [--host] [--port]  # web library mode (SPEC-0025): two host names, Google sign in (HTMLEDITOR_GOOGLE_CREDENTIALS_FILE), /health, SIGTERM stops
 mcp-htmleditor library-list                # web library: folder, presentation, stored path, bytes (read only, for history/restore)
@@ -171,7 +172,7 @@ Authoring rules for slides and documents live in the skill: run `mcp-htmleditor 
 (sources in `skill/core.md`, `skill/topics/`, `skill/checks/`). `docs/skill-archive/` keeps the
 previous monolithic skill, reference only.
 
-The MCP server exposes twenty three tools, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`, `history`, `restore`, `list_requests`, `clear_requests`, `complete_request`, `write_review`, `render` and `breathe_inline` included. A story that registers a tool adds
+The MCP server exposes twenty four tools, `get_skill`, `outline`, `get_slide`, `patch`, `lint`, `list_templates`, `new_file`, `export`, `history`, `restore`, `list_requests`, `clear_requests`, `complete_request`, `write_review`, `render`, `breathe_inline` and `add_pointer` included. A story that registers a tool adds
 one `- <name>: <description>` line to the `## Tools` section of `skill/core.md` in the same
 story (`skill-audit` fails otherwise); see `.agent_docs/architecture.md`.
 

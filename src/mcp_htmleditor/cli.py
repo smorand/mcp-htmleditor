@@ -603,6 +603,16 @@ def breathe_inline_cmd(file: str, link: bool) -> None:
     click.echo(embed_assets(file, link=link).summary())
 
 
+@main.command("add-pointer")
+@click.argument("file", type=click.Path(dir_okay=False))
+@deck_command
+def add_pointer_cmd(file: str) -> None:
+    """Add the presentation pointer (code, Pointeur control, L key) to an older deck FILE."""
+    from .deck.pointer import add_pointer
+
+    click.echo(add_pointer(file).summary())
+
+
 @main.command("export")
 @click.argument("format")
 @click.argument("input_file", type=click.Path(dir_okay=False))
