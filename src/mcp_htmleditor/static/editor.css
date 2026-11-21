@@ -527,6 +527,25 @@ body:has(#ask-ai-panel:not([hidden])) #notices { right: 344px; }
 }
 #requests-list .request-text { line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
 
+/* AI suggestions block (SPEC-0032): the same look as the requests above it */
+#suggestions-heading { margin: 16px 0 8px; color: #f4f4f4; font-size: 12px; font-weight: 600; }
+#suggestions-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+#suggestions-list li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 8px;
+  background: #262626;
+  border: 1px solid #393939;
+}
+#suggestions-list .suggestion-title { color: #f4f4f4; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+#suggestions-list .suggestion-why { color: #c6c6c6; line-height: 1.4; overflow-wrap: anywhere; }
+#suggestions-list .suggestion-apply { padding: 4px 10px; border: 0; background: #0f62fe; color: #fff; font: inherit; cursor: pointer; }
+#suggestions-list .suggestion-apply:hover:not(:disabled) { background: #0353e9; }
+#suggestions-list .suggestion-apply:disabled { background: #393939; color: #8d8d8d; cursor: default; }
+
 /* ── Text width bar (SPEC-0015): editor chrome laid over the frame, never in the edited file ── */
 #width-bar[hidden],
 #width-readout[hidden] { display: none; }
